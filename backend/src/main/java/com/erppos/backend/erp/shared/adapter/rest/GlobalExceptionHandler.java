@@ -14,6 +14,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -82,6 +83,12 @@ public class GlobalExceptionHandler {
                 .body(errorResponseFactory.build(request, HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage()));
     }
 
+    @ExceptionHandler(AuthorizationDeniedException.class)
+    public ResponseEntity<ApiError> handleAuthorizationDenied(AuthorizationDeniedException ex, HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(errorResponseFactory.build(request, HttpStatus.FORBIDDEN, "Access denied"));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> handleGeneric(Exception ex, HttpServletRequest request) {
         LOGGER.error("Unhandled exception while processing {} {}", request.getMethod(), request.getRequestURI(), ex);
@@ -93,4 +100,3 @@ public class GlobalExceptionHandler {
         return fieldError.getField() + " " + fieldError.getDefaultMessage();
     }
 }
-

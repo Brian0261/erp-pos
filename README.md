@@ -88,6 +88,21 @@ Credenciales seed inicial:
 - email: `admin@erp.local`
 - password: `Admin123!`
 
+Credenciales seed local/dev para pruebas de autorizacion (403 por rol):
+
+- CAJERO
+  - username: `cajero`
+  - email: `cajero@erp.local`
+  - password: `Admin123*`
+- ALMACENERO
+  - username: `almacenero`
+  - email: `almacenero@erp.local`
+  - password: `Admin123*`
+- SUPERVISOR
+  - username: `supervisor`
+  - email: `supervisor@erp.local`
+  - password: `Admin123*`
+
 Endpoints actuales:
 
 - `POST /api/v1/auth/login`
