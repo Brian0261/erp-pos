@@ -1,4 +1,4 @@
-# ERP/POS - MVP Sprint 2
+# ERP/POS - Estado Tecnico (Sprint 3 Backend)
 
 Base tecnica del MVP para un ERP/POS de tienda fisica de articulos escolares.
 
@@ -11,32 +11,48 @@ Base tecnica del MVP para un ERP/POS de tienda fisica de articulos escolares.
 - Infra local: Docker Compose
 - CI: GitHub Actions
 
-## Alcance Sprint 2
+## Estado por Sprint
 
-Implementado:
+### Sprint 1 (Cerrado)
 
-- Estructura base con monolito modular hexagonal.
-- Seguridad JWT + login + endpoint `/me`.
-- Roles iniciales: `ADMIN`, `CAJERO`, `ALMACENERO`, `SUPERVISOR`.
-- Migraciones Flyway V1-V4 (seguridad + catalogo y data inicial).
-- Modulo Catalogo backend:
-  - Categorias (`POST/GET /api/v1/categories`)
-  - Unidades (`POST/GET /api/v1/units`)
-  - Productos (`POST/GET/PUT/DELETE /api/v1/products`, `GET /api/v1/products/{id}`, `GET /api/v1/products/search?q=`)
-  - SKU obligatorio y unico.
-  - Barcode opcional y unico cuando existe.
-  - Desactivacion logica de productos.
-- Modulo Catalogo frontend:
+- Auth JWT implementado.
+- Login implementado.
+- Endpoint `GET /api/v1/auth/me` implementado.
+- Docker Compose operativo para entorno local.
+- Frontend Angular base implementado (login/dashboard/guard/interceptor).
+
+### Sprint 2 (Cerrado)
+
+- Catalogo backend completo: categorias, unidades y productos.
+- Reglas de producto implementadas: SKU obligatorio y unico; barcode opcional y unico cuando existe.
+- Catalogo frontend completo:
   - `/catalogo/productos`
   - `/catalogo/productos/nuevo`
   - `/catalogo/productos/:id/editar`
   - `/catalogo/categorias`
   - `/catalogo/unidades`
-- Frontend base con login/dashboard, guard e interceptor JWT.
-- CI para compilar backend y frontend.
-- ADR arquitectonico inicial.
 
-No implementado aun (Sprint 3+): inventario, POS, compras, cotizaciones, facturacion electronica y reportes funcionales.
+### Sprint 3 (Backend Cerrado, Frontend Pendiente)
+
+- Inventario backend completo:
+  - Almacenes.
+  - Stock por producto y almacen.
+  - Stock inicial.
+  - Ajustes positivos y negativos.
+  - Transferencias entre almacenes.
+  - Kardex.
+- Migraciones Flyway de inventario aplicadas: V5 y V6.
+- Endpoints de inventario y almacenes validados en ejecucion real con Docker.
+- Frontend de inventario aun NO implementado.
+
+### Sprint 4 y posteriores (No implementado)
+
+- Compras.
+- Ventas.
+- POS.
+- Cotizaciones.
+- Facturacion electronica.
+- Reportes.
 
 ## Levantar proyecto local
 
@@ -86,6 +102,15 @@ Endpoints actuales:
 - `PUT /api/v1/products/{id}`
 - `DELETE /api/v1/products/{id}`
 - `GET /api/v1/products/search?q=`
+- `POST /api/v1/warehouses`
+- `GET /api/v1/warehouses`
+- `GET /api/v1/warehouses/{id}`
+- `DELETE /api/v1/warehouses/{id}`
+- `GET /api/v1/inventory/stocks`
+- `POST /api/v1/inventory/initial-stock`
+- `POST /api/v1/inventory/adjustments`
+- `POST /api/v1/inventory/transfers`
+- `GET /api/v1/inventory/kardex`
 
 ## Frontend
 
@@ -102,7 +127,7 @@ Pop-Location
 Rutas:
 
 - Funcionales: `/login`, `/dashboard`, `/catalogo/productos`, `/catalogo/productos/nuevo`, `/catalogo/productos/:id/editar`, `/catalogo/categorias`, `/catalogo/unidades`
-- Preparadas (sin funcionalidad de negocio completa): `/pos`, `/inventario`, `/cotizaciones`, `/facturacion`, `/reportes`
+- Pendientes de funcionalidad de negocio: `/inventario`, `/pos`, `/cotizaciones`, `/facturacion`, `/reportes`
 
 ## Docker
 
