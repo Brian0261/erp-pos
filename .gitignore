@@ -5,6 +5,11 @@
 # Env files
 .env
 
+# Angular
+frontend/.angular/cache/
+frontend/dist/
+frontend/node_modules/
+
 # Backend
 backend/target/
 
@@ -12,3 +17,6 @@ backend/target/
 frontend/node_modules/
 frontend/dist/
 
+# OS
+.DS_Store
+Thumbs.db
