@@ -1,0 +1,26 @@
+spring:
+  application:
+    name: erp-pos-backend
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:erp_pos}
+    username: ${DB_USER:erp_user}
+    password: ${DB_PASSWORD:erp_password}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: true
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+server:
+  port: ${SERVER_PORT:8080}
+
+app:
+  security:
+    jwt:
+      secret: ${JWT_SECRET:change-this-secret-at-least-32-characters-long}
+      expiration-ms: ${JWT_EXPIRATION:3600000}
