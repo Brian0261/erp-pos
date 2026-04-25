@@ -1,4 +1,4 @@
-# ERP/POS - Estado Tecnico (Sprint 3 Backend)
+# ERP/POS - Estado Tecnico (Sprint 3 Full-Stack)
 
 Base tecnica del MVP para un ERP/POS de tienda fisica de articulos escolares.
 
@@ -32,7 +32,7 @@ Base tecnica del MVP para un ERP/POS de tienda fisica de articulos escolares.
   - `/catalogo/categorias`
   - `/catalogo/unidades`
 
-### Sprint 3 (Backend Cerrado, Frontend Pendiente)
+### Sprint 3 (Cerrado - Backend + Frontend)
 
 - Inventario backend completo:
   - Almacenes.
@@ -43,7 +43,13 @@ Base tecnica del MVP para un ERP/POS de tienda fisica de articulos escolares.
   - Kardex.
 - Migraciones Flyway de inventario aplicadas: V5 y V6.
 - Endpoints de inventario y almacenes validados en ejecucion real con Docker.
-- Frontend de inventario aun NO implementado.
+- Frontend de inventario implementado y validado:
+  - `/inventario/almacenes`
+  - `/inventario/stock`
+  - `/inventario/stock-inicial`
+  - `/inventario/ajustes`
+  - `/inventario/transferencias`
+  - `/inventario/kardex`
 
 ### Sprint 4 y posteriores (No implementado)
 
@@ -141,8 +147,8 @@ Pop-Location
 
 Rutas:
 
-- Funcionales: `/login`, `/dashboard`, `/catalogo/productos`, `/catalogo/productos/nuevo`, `/catalogo/productos/:id/editar`, `/catalogo/categorias`, `/catalogo/unidades`
-- Pendientes de funcionalidad de negocio: `/inventario`, `/pos`, `/cotizaciones`, `/facturacion`, `/reportes`
+- Funcionales: `/login`, `/dashboard`, `/catalogo/productos`, `/catalogo/productos/nuevo`, `/catalogo/productos/:id/editar`, `/catalogo/categorias`, `/catalogo/unidades`, `/inventario/almacenes`, `/inventario/stock`, `/inventario/stock-inicial`, `/inventario/ajustes`, `/inventario/transferencias`, `/inventario/kardex`
+- Pendientes de funcionalidad de negocio (Sprint 4+): `/pos`, `/cotizaciones`, `/facturacion`, `/reportes`
 
 ## Docker
 
