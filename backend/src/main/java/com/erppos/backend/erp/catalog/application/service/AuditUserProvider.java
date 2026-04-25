@@ -3,7 +3,8 @@ import com.erppos.backend.erp.security.adapter.security.ErpUserDetails;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
-@Component
+
+@Component("catalogAuditUserProvider")
 public class AuditUserProvider {
     public String currentUsername() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();

@@ -20,8 +20,8 @@ public interface InventoryMovementJpaRepository extends JpaRepository<InventoryM
             SELECT m FROM InventoryMovementEntity m
             WHERE (:productId IS NULL OR m.product.id = :productId)
               AND (:warehouseId IS NULL OR m.warehouse.id = :warehouseId)
-              AND (:fromInclusive IS NULL OR m.createdAt >= :fromInclusive)
-              AND (:toExclusive IS NULL OR m.createdAt < :toExclusive)
+              AND m.createdAt >= :fromInclusive
+              AND m.createdAt < :toExclusive
             ORDER BY m.createdAt DESC, m.id DESC
             """)
     List<InventoryMovementEntity> findKardex(@Param("productId") Long productId,

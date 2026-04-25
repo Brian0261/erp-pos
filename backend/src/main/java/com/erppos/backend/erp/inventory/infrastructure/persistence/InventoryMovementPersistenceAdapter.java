@@ -14,6 +14,9 @@ import java.util.List;
 @Component
 public class InventoryMovementPersistenceAdapter implements InventoryMovementRepositoryPort {
 
+    private static final Instant MIN_INSTANT = Instant.parse("1970-01-01T00:00:00Z");
+    private static final Instant MAX_INSTANT_EXCLUSIVE = Instant.parse("9999-12-31T23:59:59Z");
+
     private final InventoryMovementJpaRepository inventoryMovementJpaRepository;
     private final ProductJpaRepository productJpaRepository;
     private final WarehouseJpaRepository warehouseJpaRepository;
@@ -45,7 +48,10 @@ public class InventoryMovementPersistenceAdapter implements InventoryMovementRep
 
     @Override
     public List<InventoryMovement> findKardex(Long productId, Long warehouseId, Instant fromInclusive, Instant toExclusive) {
-        return inventoryMovementJpaRepository.findKardex(productId, warehouseId, fromInclusive, toExclusive)
+        Instant from = fromInclusive == null ? MIN_INSTANT : fromInclusive;
+        Instant to = toExclusive == null ? MAX_INSTANT_EXCLUSIVE : toExclusive;
+
+        return inventoryMovementJpaRepository.findKardex(productId, warehouseId, from, to)
                 .stream()
                 .map(InventoryMovementMapper::toDomain)
                 .toList();
