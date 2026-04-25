@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.Optional;
 
-@Component
+@Component("purchaseCatalogProductReadAdapter")
 public class CatalogProductReadAdapter implements PurchaseProductReadPort {
 
     private final ProductRepositoryPort productRepositoryPort;
