@@ -1,29 +1,76 @@
-import { CommonModule } from '@angular/common';
-import { Component, OnInit } from '@angular/core';
-import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { CommonModule } from "@angular/common";
+import { Component, OnInit } from "@angular/core";
+import {
+  Router,
+  RouterLink,
+  RouterLinkActive,
+  RouterOutlet,
+} from "@angular/router";
 
-import { AuthService } from '../../core/auth/auth.service';
-import { UserProfile } from '../../core/auth/auth.models';
+import { AuthService } from "../../core/auth/auth.service";
+import { UserProfile } from "../../core/auth/auth.models";
 
 @Component({
-  selector: 'app-layout',
+  selector: "app-layout",
   standalone: true,
   imports: [CommonModule, RouterOutlet, RouterLink, RouterLinkActive],
   template: `
     <div class="layout">
       <aside class="sidebar">
         <h2>ERP/POS</h2>
-        <p class="muted">{{ currentUser?.username || 'Usuario' }}</p>
+        <p class="muted">{{ currentUser?.username || "Usuario" }}</p>
         <p class="muted">Rol: {{ primaryRole }}</p>
 
         <nav>
           <a routerLink="/dashboard" routerLinkActive="active">Dashboard</a>
-          <a *ngIf="canSee(['ADMIN','CAJERO'])" routerLink="/pos" routerLinkActive="active">POS</a>
-          <a *ngIf="canSee(['ADMIN','ALMACENERO','SUPERVISOR'])" routerLink="/catalogo" routerLinkActive="active">Catalogo</a>
-          <a *ngIf="canSee(['ADMIN','ALMACENERO','SUPERVISOR'])" routerLink="/inventario" routerLinkActive="active">Inventario</a>
-          <a *ngIf="canSee(['ADMIN','SUPERVISOR'])" routerLink="/cotizaciones" routerLinkActive="active">Cotizaciones</a>
-          <a *ngIf="canSee(['ADMIN','CAJERO','SUPERVISOR'])" routerLink="/facturacion" routerLinkActive="active">Facturacion</a>
-          <a *ngIf="canSee(['ADMIN','SUPERVISOR'])" routerLink="/reportes" routerLinkActive="active">Reportes</a>
+          <a
+            *ngIf="canSee(['ADMIN', 'CAJERO'])"
+            routerLink="/pos"
+            routerLinkActive="active"
+            >POS</a
+          >
+          <a
+            *ngIf="canSee(['ADMIN', 'ALMACENERO', 'SUPERVISOR'])"
+            routerLink="/catalogo/productos"
+            routerLinkActive="active"
+            >Catalogo - Productos</a
+          >
+          <a
+            *ngIf="canSee(['ADMIN', 'ALMACENERO', 'SUPERVISOR'])"
+            routerLink="/catalogo/categorias"
+            routerLinkActive="active"
+            >Catalogo - Categorias</a
+          >
+          <a
+            *ngIf="canSee(['ADMIN', 'ALMACENERO', 'SUPERVISOR'])"
+            routerLink="/catalogo/unidades"
+            routerLinkActive="active"
+            >Catalogo - Unidades</a
+          >
+          <a
+            *ngIf="canSee(['ADMIN', 'ALMACENERO', 'SUPERVISOR'])"
+            routerLink="/inventario"
+            routerLinkActive="active"
+            >Inventario</a
+          >
+          <a
+            *ngIf="canSee(['ADMIN', 'SUPERVISOR'])"
+            routerLink="/cotizaciones"
+            routerLinkActive="active"
+            >Cotizaciones</a
+          >
+          <a
+            *ngIf="canSee(['ADMIN', 'CAJERO', 'SUPERVISOR'])"
+            routerLink="/facturacion"
+            routerLinkActive="active"
+            >Facturacion</a
+          >
+          <a
+            *ngIf="canSee(['ADMIN', 'SUPERVISOR'])"
+            routerLink="/reportes"
+            routerLinkActive="active"
+            >Reportes</a
+          >
         </nav>
 
         <button type="button" (click)="logout()">Cerrar sesion</button>
@@ -34,30 +81,71 @@ import { UserProfile } from '../../core/auth/auth.models';
       </main>
     </div>
   `,
-  styles: [`
-    .layout { display: grid; grid-template-columns: 250px 1fr; min-height: 100vh; }
-    .sidebar { background: #111827; color: #fff; padding: 1rem; display: flex; flex-direction: column; gap: .75rem; }
-    .content { padding: 1.25rem; }
-    nav { display: flex; flex-direction: column; gap: .5rem; margin: 1rem 0; }
-    a { color: #cbd5e1; padding: .5rem; border-radius: .35rem; }
-    a.active, a:hover { background: #1f2937; color: #fff; }
-    .muted { color: #93c5fd; margin: 0; font-size: .9rem; }
-    button { margin-top: auto; padding: .5rem .75rem; border: 0; border-radius: .35rem; cursor: pointer; }
-  `]
+  styles: [
+    `
+      .layout {
+        display: grid;
+        grid-template-columns: 250px 1fr;
+        min-height: 100vh;
+      }
+      .sidebar {
+        background: #111827;
+        color: #fff;
+        padding: 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+      .content {
+        padding: 1.25rem;
+      }
+      nav {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        margin: 1rem 0;
+      }
+      a {
+        color: #cbd5e1;
+        padding: 0.5rem;
+        border-radius: 0.35rem;
+      }
+      a.active,
+      a:hover {
+        background: #1f2937;
+        color: #fff;
+      }
+      .muted {
+        color: #93c5fd;
+        margin: 0;
+        font-size: 0.9rem;
+      }
+      button {
+        margin-top: auto;
+        padding: 0.5rem 0.75rem;
+        border: 0;
+        border-radius: 0.35rem;
+        cursor: pointer;
+      }
+    `,
+  ],
 })
 export class LayoutComponent implements OnInit {
   currentUser: UserProfile | null = null;
-  primaryRole = 'N/A';
+  primaryRole = "N/A";
 
-  constructor(private readonly authService: AuthService, private readonly router: Router) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly router: Router,
+  ) {}
 
   ngOnInit(): void {
     this.authService.me().subscribe({
       next: (user) => {
         this.currentUser = user;
-        this.primaryRole = user.roles?.[0] || 'N/A';
+        this.primaryRole = user.roles?.[0] || "N/A";
       },
-      error: () => this.logout()
+      error: () => this.logout(),
     });
   }
 
@@ -70,7 +158,6 @@ export class LayoutComponent implements OnInit {
 
   logout(): void {
     this.authService.logout();
-    this.router.navigate(['/login']);
+    this.router.navigate(["/login"]);
   }
 }
-
