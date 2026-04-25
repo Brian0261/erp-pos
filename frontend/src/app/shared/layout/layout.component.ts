@@ -49,9 +49,39 @@ import { UserProfile } from "../../core/auth/auth.models";
           >
           <a
             *ngIf="canSee(['ADMIN', 'ALMACENERO', 'SUPERVISOR'])"
-            routerLink="/inventario"
+            routerLink="/inventario/almacenes"
             routerLinkActive="active"
-            >Inventario</a
+            >Inventario - Almacenes</a
+          >
+          <a
+            *ngIf="canSee(['ADMIN', 'ALMACENERO', 'SUPERVISOR', 'CAJERO'])"
+            routerLink="/inventario/stock"
+            routerLinkActive="active"
+            >Inventario - Stock</a
+          >
+          <a
+            *ngIf="canSee(['ADMIN', 'ALMACENERO'])"
+            routerLink="/inventario/stock-inicial"
+            routerLinkActive="active"
+            >Inventario - Stock inicial</a
+          >
+          <a
+            *ngIf="canSee(['ADMIN', 'ALMACENERO'])"
+            routerLink="/inventario/ajustes"
+            routerLinkActive="active"
+            >Inventario - Ajustes</a
+          >
+          <a
+            *ngIf="canSee(['ADMIN', 'ALMACENERO'])"
+            routerLink="/inventario/transferencias"
+            routerLinkActive="active"
+            >Inventario - Transferencias</a
+          >
+          <a
+            *ngIf="canSee(['ADMIN', 'SUPERVISOR'])"
+            routerLink="/inventario/kardex"
+            routerLinkActive="active"
+            >Inventario - Kardex</a
           >
           <a
             *ngIf="canSee(['ADMIN', 'SUPERVISOR'])"
