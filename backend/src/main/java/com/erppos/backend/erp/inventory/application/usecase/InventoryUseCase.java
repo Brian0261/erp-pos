@@ -13,7 +13,7 @@ public interface InventoryUseCase {
     Page<StockBalance> listStocks(Long productId, Long warehouseId, Pageable pageable);
     InventoryMovement registerInitialStock(RegisterInitialStockCommand command);
     InventoryMovement registerAdjustment(RegisterAdjustmentCommand command);
+    InventoryMovement registerPurchaseIn(RegisterPurchaseInCommand command);
     StockTransfer transfer(TransferStockCommand command);
     List<InventoryMovement> kardex(Long productId, Long warehouseId, LocalDate from, LocalDate to);
 }
-

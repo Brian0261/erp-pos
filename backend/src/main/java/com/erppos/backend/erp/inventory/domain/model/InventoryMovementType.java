@@ -5,6 +5,7 @@ public enum InventoryMovementType {
     ADJUSTMENT_IN,
     ADJUSTMENT_OUT,
     TRANSFER_OUT,
-    TRANSFER_IN
+    TRANSFER_IN,
+    PURCHASE_IN
 }
 

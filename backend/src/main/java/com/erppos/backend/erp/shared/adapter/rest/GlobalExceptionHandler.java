@@ -6,6 +6,9 @@ import com.erppos.backend.erp.catalog.domain.exception.CatalogNotFoundException;
 import com.erppos.backend.erp.inventory.domain.exception.InventoryBusinessRuleException;
 import com.erppos.backend.erp.inventory.domain.exception.InventoryConflictException;
 import com.erppos.backend.erp.inventory.domain.exception.InventoryNotFoundException;
+import com.erppos.backend.erp.purchases.domain.exception.PurchaseBusinessRuleException;
+import com.erppos.backend.erp.purchases.domain.exception.PurchaseConflictException;
+import com.erppos.backend.erp.purchases.domain.exception.PurchaseNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
@@ -62,22 +65,24 @@ public class GlobalExceptionHandler {
                 .body(errorResponseFactory.build(request, HttpStatus.UNAUTHORIZED, "Invalid credentials"));
     }
 
-    @ExceptionHandler({CatalogNotFoundException.class, InventoryNotFoundException.class})
+    @ExceptionHandler({CatalogNotFoundException.class, InventoryNotFoundException.class, PurchaseNotFoundException.class})
     public ResponseEntity<ApiError> handleNotFound(RuntimeException ex, HttpServletRequest request) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(errorResponseFactory.build(request, HttpStatus.NOT_FOUND, ex.getMessage()));
     }
 
-    @ExceptionHandler({CatalogConflictException.class, InventoryConflictException.class, DataIntegrityViolationException.class})
+    @ExceptionHandler({CatalogConflictException.class, InventoryConflictException.class, PurchaseConflictException.class, DataIntegrityViolationException.class})
     public ResponseEntity<ApiError> handleConflict(Exception ex, HttpServletRequest request) {
-        String message = (ex instanceof CatalogConflictException || ex instanceof InventoryConflictException)
+        String message = (ex instanceof CatalogConflictException
+                || ex instanceof InventoryConflictException
+                || ex instanceof PurchaseConflictException)
                 ? ex.getMessage()
                 : "Conflict: duplicated value";
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(errorResponseFactory.build(request, HttpStatus.CONFLICT, message));
     }
 
-    @ExceptionHandler({CatalogBusinessRuleException.class, InventoryBusinessRuleException.class})
+    @ExceptionHandler({CatalogBusinessRuleException.class, InventoryBusinessRuleException.class, PurchaseBusinessRuleException.class})
     public ResponseEntity<ApiError> handleBusinessRule(RuntimeException ex, HttpServletRequest request) {
         return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
                 .body(errorResponseFactory.build(request, HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage()));
