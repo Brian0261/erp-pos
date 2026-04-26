@@ -1,4 +1,4 @@
-# ERP/POS - Estado Tecnico (Sprint 4 Full-Stack Cerrado)
+# ERP/POS - Estado Tecnico (Sprint 5 Full-Stack Cerrado)
 
 Base tecnica del MVP para un ERP/POS de tienda fisica de articulos escolares.
 
@@ -70,11 +70,27 @@ Base tecnica del MVP para un ERP/POS de tienda fisica de articulos escolares.
 - Migracion Flyway aplicada: V8.
 - Endpoints de compras validados con Docker y HTTP real.
 
+### Sprint 5 (Cerrado - Full-Stack)
+
+- Caja backend/frontend implementado:
+  - Apertura de caja.
+  - Cierre de caja.
+- POS backend/frontend implementado:
+  - Busqueda de productos por SKU, barcode y nombre.
+  - Carrito de venta.
+  - Registro de pagos.
+  - Calculo de vuelto.
+- Ventas backend/frontend implementado:
+  - Registro de ventas.
+  - Listado y detalle de ventas.
+  - Anulacion de venta.
+- Integracion con inventario validada:
+  - Descuento de stock mediante `SALE_OUT`.
+  - Reposicion de stock por anulacion mediante `SALE_VOID_IN`.
+  - Validacion de stock y kardex.
+
 ### Pendiente (modulos posteriores)
 
-- Ventas NO implementado.
-- POS NO implementado.
-- Caja NO implementado.
 - Cotizaciones NO implementado.
 - Facturacion electronica NO implementada.
 - Reportes NO implementados.
@@ -164,6 +180,16 @@ Endpoints actuales:
 - `POST /api/v1/purchase-orders/{id}/approve`
 - `POST /api/v1/purchase-orders/{id}/receive`
 - `POST /api/v1/purchase-orders/{id}/cancel`
+- `POST /api/v1/cash-registers/open`
+- `GET /api/v1/cash-registers/current`
+- `GET /api/v1/cash-registers/{id}`
+- `POST /api/v1/cash-registers/{id}/close`
+- `GET /api/v1/pos/products/lookup?code=&warehouseId=`
+- `GET /api/v1/pos/products/search?q=&warehouseId=`
+- `POST /api/v1/sales`
+- `GET /api/v1/sales`
+- `GET /api/v1/sales/{id}`
+- `POST /api/v1/sales/{id}/void`
 
 ## Frontend
 
@@ -179,8 +205,8 @@ Pop-Location
 
 Rutas:
 
-- Funcionales: `/login`, `/dashboard`, `/catalogo/productos`, `/catalogo/productos/nuevo`, `/catalogo/productos/:id/editar`, `/catalogo/categorias`, `/catalogo/unidades`, `/inventario/almacenes`, `/inventario/stock`, `/inventario/stock-inicial`, `/inventario/ajustes`, `/inventario/transferencias`, `/inventario/kardex`, `/compras/proveedores`, `/compras/ordenes`, `/compras/ordenes/nueva`, `/compras/ordenes/:id`, `/compras/ordenes/:id/editar`, `/compras/ordenes/:id/recibir`
-- Pendientes de funcionalidad de negocio: `/pos`, caja, `/cotizaciones`, `/facturacion`, `/reportes`, integracion e-commerce
+- Funcionales: `/login`, `/dashboard`, `/pos`, `/caja`, `/ventas`, `/ventas/:id`, `/ventas/:id/anular`, `/catalogo/productos`, `/catalogo/productos/nuevo`, `/catalogo/productos/:id/editar`, `/catalogo/categorias`, `/catalogo/unidades`, `/inventario/almacenes`, `/inventario/stock`, `/inventario/stock-inicial`, `/inventario/ajustes`, `/inventario/transferencias`, `/inventario/kardex`, `/compras/proveedores`, `/compras/ordenes`, `/compras/ordenes/nueva`, `/compras/ordenes/:id`, `/compras/ordenes/:id/editar`, `/compras/ordenes/:id/recibir`
+- Pendientes de funcionalidad de negocio: `/cotizaciones`, `/facturacion`, `/reportes`, integracion e-commerce
 
 ## Docker
 
