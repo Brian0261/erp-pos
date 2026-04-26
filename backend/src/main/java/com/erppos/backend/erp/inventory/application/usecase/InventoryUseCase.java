@@ -14,6 +14,8 @@ public interface InventoryUseCase {
     InventoryMovement registerInitialStock(RegisterInitialStockCommand command);
     InventoryMovement registerAdjustment(RegisterAdjustmentCommand command);
     InventoryMovement registerPurchaseIn(RegisterPurchaseInCommand command);
+    InventoryMovement registerSaleOut(RegisterSaleOutCommand command);
+    InventoryMovement registerSaleVoidIn(RegisterSaleVoidInCommand command);
     StockTransfer transfer(TransferStockCommand command);
     List<InventoryMovement> kardex(Long productId, Long warehouseId, LocalDate from, LocalDate to);
 }

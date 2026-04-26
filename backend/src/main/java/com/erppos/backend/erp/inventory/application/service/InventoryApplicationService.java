@@ -6,6 +6,8 @@ import com.erppos.backend.erp.inventory.application.usecase.RegisterInitialStock
 import com.erppos.backend.erp.inventory.application.usecase.RegisterPurchaseInCommand;
 import com.erppos.backend.erp.inventory.application.usecase.TransferStockCommand;
 import com.erppos.backend.erp.inventory.application.usecase.TransferStockItemCommand;
+import com.erppos.backend.erp.inventory.application.usecase.RegisterSaleOutCommand;
+import com.erppos.backend.erp.inventory.application.usecase.RegisterSaleVoidInCommand;
 import com.erppos.backend.erp.inventory.domain.exception.InventoryBusinessRuleException;
 import com.erppos.backend.erp.inventory.domain.exception.InventoryConflictException;
 import com.erppos.backend.erp.inventory.domain.exception.InventoryNotFoundException;
@@ -292,6 +294,101 @@ public class InventoryApplicationService implements InventoryUseCase {
                 command.productId(),
                 command.warehouseId(),
                 InventoryMovementType.PURCHASE_IN,
+                quantity,
+                previous,
+                next,
+                reason,
+                referenceType,
+                command.referenceId(),
+                null,
+                auditUserProvider.currentUsername()
+        ));
+    }
+
+    @Override
+    @Transactional
+    public InventoryMovement registerSaleOut(RegisterSaleOutCommand command) {
+        ensureProductActive(command.productId());
+        ensureWarehouseActive(command.warehouseId());
+
+        BigDecimal quantity = normalizeQuantity(command.quantity());
+        if (quantity.compareTo(ZERO) <= 0) {
+            throw new InventoryBusinessRuleException("Sale quantity must be > 0");
+        }
+
+        StockBalance current = stockBalanceRepositoryPort.findByProductIdAndWarehouseIdForUpdate(command.productId(), command.warehouseId())
+                .orElse(new StockBalance(null, command.productId(), command.warehouseId(), ZERO, null, null, null));
+
+        BigDecimal previous = current.quantity();
+        BigDecimal next = previous.subtract(quantity);
+        if (next.compareTo(ZERO) < 0) {
+            throw new InventoryConflictException("Insufficient stock for sale");
+        }
+
+        stockBalanceRepositoryPort.save(new StockBalance(
+                current.id(),
+                command.productId(),
+                command.warehouseId(),
+                next,
+                current.version(),
+                current.createdAt(),
+                current.updatedAt()
+        ));
+
+        String reason = command.reason() == null ? "Sale" : command.reason().trim();
+        String referenceType = command.referenceType() == null ? "SALE" : command.referenceType().trim();
+
+        return inventoryMovementRepositoryPort.save(new InventoryMovement(
+                null,
+                command.productId(),
+                command.warehouseId(),
+                InventoryMovementType.SALE_OUT,
+                quantity,
+                previous,
+                next,
+                reason,
+                referenceType,
+                command.referenceId(),
+                null,
+                auditUserProvider.currentUsername()
+        ));
+    }
+
+    @Override
+    @Transactional
+    public InventoryMovement registerSaleVoidIn(RegisterSaleVoidInCommand command) {
+        ensureProductActive(command.productId());
+        ensureWarehouseActive(command.warehouseId());
+
+        BigDecimal quantity = normalizeQuantity(command.quantity());
+        if (quantity.compareTo(ZERO) <= 0) {
+            throw new InventoryBusinessRuleException("Void quantity must be > 0");
+        }
+
+        StockBalance current = stockBalanceRepositoryPort.findByProductIdAndWarehouseIdForUpdate(command.productId(), command.warehouseId())
+                .orElse(new StockBalance(null, command.productId(), command.warehouseId(), ZERO, null, null, null));
+
+        BigDecimal previous = current.quantity();
+        BigDecimal next = previous.add(quantity);
+
+        stockBalanceRepositoryPort.save(new StockBalance(
+                current.id(),
+                command.productId(),
+                command.warehouseId(),
+                next,
+                current.version(),
+                current.createdAt(),
+                current.updatedAt()
+        ));
+
+        String reason = command.reason() == null ? "Sale void" : command.reason().trim();
+        String referenceType = command.referenceType() == null ? "SALE_VOID" : command.referenceType().trim();
+
+        return inventoryMovementRepositoryPort.save(new InventoryMovement(
+                null,
+                command.productId(),
+                command.warehouseId(),
+                InventoryMovementType.SALE_VOID_IN,
                 quantity,
                 previous,
                 next,
