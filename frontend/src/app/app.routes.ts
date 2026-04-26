@@ -19,6 +19,11 @@ import { PurchaseOrderNewPageComponent } from "./features/purchases/purchase-ord
 import { PurchaseOrderReceivePageComponent } from "./features/purchases/purchase-order-receive-page.component";
 import { PurchaseOrdersPageComponent } from "./features/purchases/purchase-orders-page.component";
 import { SuppliersPageComponent } from "./features/purchases/suppliers-page.component";
+import { CashRegisterPageComponent } from "./features/sales/cash-register-page.component";
+import { PosPageComponent } from "./features/sales/pos-page.component";
+import { SaleDetailPageComponent } from "./features/sales/sale-detail-page.component";
+import { SaleVoidPageComponent } from "./features/sales/sale-void-page.component";
+import { SalesPageComponent } from "./features/sales/sales-page.component";
 import { LayoutComponent } from "./shared/layout/layout.component";
 
 export const routes: Routes = [
@@ -29,7 +34,11 @@ export const routes: Routes = [
     canActivate: [authGuard],
     children: [
       { path: "dashboard", component: DashboardComponent },
-      { path: "pos", component: DashboardComponent },
+      { path: "pos", component: PosPageComponent },
+      { path: "caja", component: CashRegisterPageComponent },
+      { path: "ventas", component: SalesPageComponent },
+      { path: "ventas/:id/anular", component: SaleVoidPageComponent },
+      { path: "ventas/:id", component: SaleDetailPageComponent },
       { path: "catalogo", pathMatch: "full", redirectTo: "catalogo/productos" },
       { path: "catalogo/productos", component: ProductsPageComponent },
       { path: "catalogo/productos/nuevo", component: ProductFormComponent },

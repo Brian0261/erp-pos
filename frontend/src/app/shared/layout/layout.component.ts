@@ -24,10 +24,22 @@ import { UserProfile } from "../../core/auth/auth.models";
         <nav>
           <a routerLink="/dashboard" routerLinkActive="active">Dashboard</a>
           <a
-            *ngIf="canSee(['ADMIN', 'CAJERO'])"
+            *ngIf="canSee(['ADMIN', 'CAJERO', 'SUPERVISOR'])"
             routerLink="/pos"
             routerLinkActive="active"
             >POS</a
+          >
+          <a
+            *ngIf="canSee(['ADMIN', 'CAJERO', 'SUPERVISOR'])"
+            routerLink="/caja"
+            routerLinkActive="active"
+            >Caja</a
+          >
+          <a
+            *ngIf="canSee(['ADMIN', 'CAJERO', 'SUPERVISOR'])"
+            routerLink="/ventas"
+            routerLinkActive="active"
+            >Ventas</a
           >
           <a
             *ngIf="canSee(['ADMIN', 'ALMACENERO', 'SUPERVISOR'])"
