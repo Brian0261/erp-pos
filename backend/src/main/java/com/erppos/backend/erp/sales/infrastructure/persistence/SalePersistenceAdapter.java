@@ -8,6 +8,7 @@ import com.erppos.backend.erp.sales.domain.model.SaleStatus;
 import com.erppos.backend.erp.sales.domain.port.SaleRepositoryPort;
 import com.erppos.backend.erp.sales.infrastructure.mapper.SaleMapper;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.HashMap;
@@ -46,11 +47,13 @@ public class SalePersistenceAdapter implements SaleRepositoryPort {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Optional<Sale> findById(Long id) {
         return saleJpaRepository.findById(id).map(SaleMapper::toDomain);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<Sale> findByFilters(LocalDate from, LocalDate to, Long cashRegisterSessionId, SaleStatus status, String createdBy) {
         return saleJpaRepository.findByFiltersWithDate(from, to, cashRegisterSessionId, status, createdBy)
                 .stream()

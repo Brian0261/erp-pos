@@ -1,7 +1,6 @@
 package com.erppos.backend.erp.sales.infrastructure.persistence;
 
 import com.erppos.backend.erp.sales.domain.model.SaleStatus;
-import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -14,14 +13,8 @@ import java.util.Optional;
 
 public interface SaleJpaRepository extends JpaRepository<SaleEntity, Long> {
 
-    @Override
-    @EntityGraph(attributePaths = {"cashRegisterSession", "items", "payments"})
-    Optional<SaleEntity> findById(Long id);
-
     @Query("""
-            SELECT DISTINCT s FROM SaleEntity s
-            LEFT JOIN FETCH s.items
-            LEFT JOIN FETCH s.payments
+            SELECT s FROM SaleEntity s
             JOIN FETCH s.cashRegisterSession
             WHERE (:fromDate IS NULL OR s.soldAt >= :fromInstant)
               AND (:toDate IS NULL OR s.soldAt < :toExclusiveInstant)
