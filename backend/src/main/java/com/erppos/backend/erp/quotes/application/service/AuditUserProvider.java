@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.Set;
 
-@Component
+@Component("quotesAuditUserProvider")
 public class AuditUserProvider {
 
     public String currentUsername() {

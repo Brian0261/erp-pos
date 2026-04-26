@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.Optional;
 
-@Component
+@Component("quotesCatalogProductReadAdapter")
 public class CatalogProductReadAdapter implements QuoteCatalogReadPort {
 
     private final ProductUseCase productUseCase;
