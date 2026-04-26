@@ -115,9 +115,21 @@ import { UserProfile } from "../../core/auth/auth.models";
           >
           <a
             *ngIf="canSee(['ADMIN', 'CAJERO', 'SUPERVISOR'])"
-            routerLink="/facturacion"
+            routerLink="/facturacion/comprobantes"
             routerLinkActive="active"
-            >Facturacion</a
+            >Facturacion - Comprobantes</a
+          >
+          <a
+            *ngIf="canSee(['ADMIN'])"
+            routerLink="/facturacion/configuracion"
+            routerLinkActive="active"
+            >Facturacion - Configuracion</a
+          >
+          <a
+            *ngIf="canSee(['ADMIN'])"
+            routerLink="/facturacion/series"
+            routerLinkActive="active"
+            >Facturacion - Series</a
           >
           <a
             *ngIf="canSee(['ADMIN', 'SUPERVISOR'])"

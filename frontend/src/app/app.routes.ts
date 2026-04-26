@@ -5,6 +5,11 @@ import { CategoriesPageComponent } from "./features/catalog/categories-page.comp
 import { ProductFormComponent } from "./features/catalog/product-form.component";
 import { ProductsPageComponent } from "./features/catalog/products-page.component";
 import { UnitsPageComponent } from "./features/catalog/units-page.component";
+import { BillingConfigPageComponent } from "./features/billing/billing-config-page.component";
+import { BillingDocumentDetailPageComponent } from "./features/billing/billing-document-detail-page.component";
+import { BillingDocumentsPageComponent } from "./features/billing/billing-documents-page.component";
+import { BillingIssueFromSalePageComponent } from "./features/billing/billing-issue-from-sale-page.component";
+import { BillingSeriesPageComponent } from "./features/billing/billing-series-page.component";
 import { DashboardComponent } from "./features/dashboard/dashboard.component";
 import { AdjustmentsPageComponent } from "./features/inventory/adjustments-page.component";
 import { InitialStockPageComponent } from "./features/inventory/initial-stock-page.component";
@@ -93,7 +98,28 @@ export const routes: Routes = [
         component: QuoteConvertPageComponent,
       },
       { path: "cotizaciones/:id", component: QuoteDetailPageComponent },
-      { path: "facturacion", component: DashboardComponent },
+      {
+        path: "facturacion",
+        pathMatch: "full",
+        redirectTo: "facturacion/comprobantes",
+      },
+      {
+        path: "facturacion/configuracion",
+        component: BillingConfigPageComponent,
+      },
+      { path: "facturacion/series", component: BillingSeriesPageComponent },
+      {
+        path: "facturacion/comprobantes",
+        component: BillingDocumentsPageComponent,
+      },
+      {
+        path: "facturacion/comprobantes/:id",
+        component: BillingDocumentDetailPageComponent,
+      },
+      {
+        path: "facturacion/emitir/:saleId",
+        component: BillingIssueFromSalePageComponent,
+      },
       { path: "reportes", component: DashboardComponent },
       { path: "", pathMatch: "full", redirectTo: "dashboard" },
     ],
