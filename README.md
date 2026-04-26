@@ -1,4 +1,4 @@
-# ERP/POS - Estado Tecnico (Sprint 6 Full-Stack Cerrado)
+# ERP/POS - Estado Tecnico (Sprint 7 Full-Stack Cerrado)
 
 Base tecnica del MVP para un ERP/POS de tienda fisica de articulos escolares.
 
@@ -101,11 +101,30 @@ Base tecnica del MVP para un ERP/POS de tienda fisica de articulos escolares.
   - Conversion exitosa genera venta y movimiento `SALE_OUT`.
   - Conversiones invalidadas no alteran estado ni stock.
 
+### Sprint 7 (Cerrado - Full-Stack)
+
+- Facturacion electronica backend/frontend implementado:
+  - Configuracion tributaria por ambiente (`LOCAL`, `BETA`, `PROD`).
+  - Series y correlativos para boleta/factura.
+  - Emision de comprobantes desde ventas completadas.
+  - Detalle de comprobante con acciones de generar XML, firmar y enviar a mock/sandbox.
+  - Historial de estados del comprobante.
+- Seguridad por roles validada en facturacion:
+  - Sin token: `401`.
+  - `ALMACENERO`: `403` en endpoints de facturacion.
+  - `CAJERO`: puede emitir; no puede firmar ni administrar configuracion/series.
+  - `SUPERVISOR`: puede consultar y enviar mock/sandbox.
+- Integracion validada con ventas:
+  - Rechazo de emision duplicada por venta (`409`).
+  - Rechazo de factura sin datos de cliente (`422`).
+  - Rechazo de emision para venta anulada (`422`).
+  - Flujo exitoso `DRAFT -> GENERATED -> SIGNED -> SENT -> ACCEPTED`.
+
 ### Pendiente (modulos posteriores)
 
-- Facturacion electronica NO implementada.
 - Reportes NO implementados.
 - Integracion con e-commerce NO implementada.
+- Integracion productiva con SUNAT/OSE/PSE NO implementada (se mantiene adapter mock/sandbox).
 
 ## Levantar proyecto local
 
@@ -209,6 +228,21 @@ Endpoints actuales:
 - `POST /api/v1/quotes/{id}/cancel`
 - `POST /api/v1/quotes/{id}/convert-to-sale`
 - `GET /api/v1/quotes/{id}/history`
+- `POST /api/v1/billing/company-profile`
+- `GET /api/v1/billing/company-profile?environment=`
+- `PUT /api/v1/billing/company-profile`
+- `POST /api/v1/billing/series`
+- `GET /api/v1/billing/series`
+- `GET /api/v1/billing/series/{id}`
+- `PUT /api/v1/billing/series/{id}`
+- `DELETE /api/v1/billing/series/{id}`
+- `POST /api/v1/billing/documents/from-sale/{saleId}`
+- `GET /api/v1/billing/documents`
+- `GET /api/v1/billing/documents/{id}`
+- `POST /api/v1/billing/documents/{id}/generate-xml`
+- `POST /api/v1/billing/documents/{id}/sign`
+- `POST /api/v1/billing/documents/{id}/send`
+- `GET /api/v1/billing/documents/{id}/history`
 
 ## Frontend
 
@@ -225,7 +259,8 @@ Pop-Location
 Rutas:
 
 - Funcionales: `/login`, `/dashboard`, `/pos`, `/caja`, `/ventas`, `/ventas/:id`, `/ventas/:id/anular`, `/catalogo/productos`, `/catalogo/productos/nuevo`, `/catalogo/productos/:id/editar`, `/catalogo/categorias`, `/catalogo/unidades`, `/inventario/almacenes`, `/inventario/stock`, `/inventario/stock-inicial`, `/inventario/ajustes`, `/inventario/transferencias`, `/inventario/kardex`, `/compras/proveedores`, `/compras/ordenes`, `/compras/ordenes/nueva`, `/compras/ordenes/:id`, `/compras/ordenes/:id/editar`, `/compras/ordenes/:id/recibir`, `/cotizaciones`, `/cotizaciones/nueva`, `/cotizaciones/:id`, `/cotizaciones/:id/editar`, `/cotizaciones/:id/convertir`
-- Pendientes de funcionalidad de negocio: `/facturacion`, `/reportes`, integracion e-commerce
+- Funcionales de facturacion: `/facturacion/configuracion`, `/facturacion/series`, `/facturacion/comprobantes`, `/facturacion/comprobantes/:id`, `/facturacion/emitir/:saleId`
+- Pendientes de funcionalidad de negocio: `/reportes`, integracion e-commerce
 
 ## Docker
 
@@ -244,3 +279,4 @@ Workflow: `.github/workflows/ci.yml`
 ## ADR
 
 - `docs/adr/ADR-0001-monolito-modular-hexagonal.md`
+- `docs/adr/ADR-0002-facturacion-electronica-mvp.md`
