@@ -19,6 +19,11 @@ import { PurchaseOrderNewPageComponent } from "./features/purchases/purchase-ord
 import { PurchaseOrderReceivePageComponent } from "./features/purchases/purchase-order-receive-page.component";
 import { PurchaseOrdersPageComponent } from "./features/purchases/purchase-orders-page.component";
 import { SuppliersPageComponent } from "./features/purchases/suppliers-page.component";
+import { QuoteConvertPageComponent } from "./features/quotes/quote-convert-page.component";
+import { QuoteDetailPageComponent } from "./features/quotes/quote-detail-page.component";
+import { QuoteEditPageComponent } from "./features/quotes/quote-edit-page.component";
+import { QuoteNewPageComponent } from "./features/quotes/quote-new-page.component";
+import { QuotesPageComponent } from "./features/quotes/quotes-page.component";
 import { CashRegisterPageComponent } from "./features/sales/cash-register-page.component";
 import { PosPageComponent } from "./features/sales/pos-page.component";
 import { SaleDetailPageComponent } from "./features/sales/sale-detail-page.component";
@@ -80,7 +85,14 @@ export const routes: Routes = [
         path: "compras/ordenes/:id/recibir",
         component: PurchaseOrderReceivePageComponent,
       },
-      { path: "cotizaciones", component: DashboardComponent },
+      { path: "cotizaciones", component: QuotesPageComponent },
+      { path: "cotizaciones/nueva", component: QuoteNewPageComponent },
+      { path: "cotizaciones/:id/editar", component: QuoteEditPageComponent },
+      {
+        path: "cotizaciones/:id/convertir",
+        component: QuoteConvertPageComponent,
+      },
+      { path: "cotizaciones/:id", component: QuoteDetailPageComponent },
       { path: "facturacion", component: DashboardComponent },
       { path: "reportes", component: DashboardComponent },
       { path: "", pathMatch: "full", redirectTo: "dashboard" },

@@ -108,7 +108,7 @@ import { UserProfile } from "../../core/auth/auth.models";
             >Compras - Ordenes</a
           >
           <a
-            *ngIf="canSee(['ADMIN', 'SUPERVISOR'])"
+            *ngIf="canSee(['ADMIN', 'SUPERVISOR', 'CAJERO'])"
             routerLink="/cotizaciones"
             routerLinkActive="active"
             >Cotizaciones</a
