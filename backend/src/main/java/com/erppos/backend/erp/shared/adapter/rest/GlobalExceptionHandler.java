@@ -3,6 +3,9 @@ package com.erppos.backend.erp.shared.adapter.rest;
 import com.erppos.backend.erp.catalog.domain.exception.CatalogBusinessRuleException;
 import com.erppos.backend.erp.catalog.domain.exception.CatalogConflictException;
 import com.erppos.backend.erp.catalog.domain.exception.CatalogNotFoundException;
+import com.erppos.backend.erp.billing.domain.exception.BillingBusinessRuleException;
+import com.erppos.backend.erp.billing.domain.exception.BillingConflictException;
+import com.erppos.backend.erp.billing.domain.exception.BillingNotFoundException;
 import com.erppos.backend.erp.inventory.domain.exception.InventoryBusinessRuleException;
 import com.erppos.backend.erp.inventory.domain.exception.InventoryConflictException;
 import com.erppos.backend.erp.inventory.domain.exception.InventoryNotFoundException;
@@ -71,26 +74,27 @@ public class GlobalExceptionHandler {
                 .body(errorResponseFactory.build(request, HttpStatus.UNAUTHORIZED, "Invalid credentials"));
     }
 
-    @ExceptionHandler({CatalogNotFoundException.class, InventoryNotFoundException.class, PurchaseNotFoundException.class, SalesNotFoundException.class, QuoteNotFoundException.class})
+    @ExceptionHandler({CatalogNotFoundException.class, InventoryNotFoundException.class, PurchaseNotFoundException.class, SalesNotFoundException.class, QuoteNotFoundException.class, BillingNotFoundException.class})
     public ResponseEntity<ApiError> handleNotFound(RuntimeException ex, HttpServletRequest request) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(errorResponseFactory.build(request, HttpStatus.NOT_FOUND, ex.getMessage()));
     }
 
-    @ExceptionHandler({CatalogConflictException.class, InventoryConflictException.class, PurchaseConflictException.class, SalesConflictException.class, QuoteConflictException.class, DataIntegrityViolationException.class})
+    @ExceptionHandler({CatalogConflictException.class, InventoryConflictException.class, PurchaseConflictException.class, SalesConflictException.class, QuoteConflictException.class, BillingConflictException.class, DataIntegrityViolationException.class})
     public ResponseEntity<ApiError> handleConflict(Exception ex, HttpServletRequest request) {
         String message = (ex instanceof CatalogConflictException
                 || ex instanceof InventoryConflictException
                 || ex instanceof PurchaseConflictException
                 || ex instanceof SalesConflictException
-                || ex instanceof QuoteConflictException)
+                || ex instanceof QuoteConflictException
+                || ex instanceof BillingConflictException)
                 ? ex.getMessage()
                 : "Conflict: duplicated value";
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(errorResponseFactory.build(request, HttpStatus.CONFLICT, message));
     }
 
-    @ExceptionHandler({CatalogBusinessRuleException.class, InventoryBusinessRuleException.class, PurchaseBusinessRuleException.class, SalesBusinessRuleException.class, QuoteBusinessRuleException.class})
+    @ExceptionHandler({CatalogBusinessRuleException.class, InventoryBusinessRuleException.class, PurchaseBusinessRuleException.class, SalesBusinessRuleException.class, QuoteBusinessRuleException.class, BillingBusinessRuleException.class})
     public ResponseEntity<ApiError> handleBusinessRule(RuntimeException ex, HttpServletRequest request) {
         return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
                 .body(errorResponseFactory.build(request, HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage()));
