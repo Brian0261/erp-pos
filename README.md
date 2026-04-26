@@ -1,4 +1,4 @@
-# ERP/POS - Estado Tecnico (Sprint 4 Backend Cerrado)
+# ERP/POS - Estado Tecnico (Sprint 4 Full-Stack Cerrado)
 
 Base tecnica del MVP para un ERP/POS de tienda fisica de articulos escolares.
 
@@ -17,9 +17,11 @@ Base tecnica del MVP para un ERP/POS de tienda fisica de articulos escolares.
 
 - Auth JWT implementado.
 - Login implementado.
+- Roles y seguridad por rol implementados.
 - Endpoint `GET /api/v1/auth/me` implementado.
 - Docker Compose operativo para entorno local.
 - Frontend Angular base implementado (login/dashboard/guard/interceptor).
+- CI operativo con GitHub Actions.
 
 ### Sprint 2 (Cerrado)
 
@@ -50,25 +52,29 @@ Base tecnica del MVP para un ERP/POS de tienda fisica de articulos escolares.
   - `/inventario/ajustes`
   - `/inventario/transferencias`
   - `/inventario/kardex`
+- Seguridad por roles validada para flujos de inventario.
 
-### Sprint 4 (Backend Cerrado)
+### Sprint 4 (Cerrado - Full-Stack)
 
-- Compras backend implementado:
+- Compras backend/frontend implementado:
   - Proveedores.
   - Ordenes de compra.
+  - Creacion de ordenes en estado DRAFT.
   - Aprobacion de ordenes.
   - Recepcion parcial y total.
-  - Cancelacion.
+  - Cancelacion de ordenes.
 - Integracion con inventario mediante movimiento `PURCHASE_IN`.
-- Incremento de stock validado en recepcion de compras.
+- Incremento de stock validado desde compras.
+- Seguridad por roles validada en modulo de compras.
+- UI de compras validada manualmente.
 - Migracion Flyway aplicada: V8.
 - Endpoints de compras validados con Docker y HTTP real.
 
-### Pendiente (Frontend Sprint 4 y modulos posteriores)
+### Pendiente (modulos posteriores)
 
-- Frontend Angular de compras NO implementado aun.
 - Ventas NO implementado.
 - POS NO implementado.
+- Caja NO implementado.
 - Cotizaciones NO implementado.
 - Facturacion electronica NO implementada.
 - Reportes NO implementados.
@@ -173,8 +179,8 @@ Pop-Location
 
 Rutas:
 
-- Funcionales: `/login`, `/dashboard`, `/catalogo/productos`, `/catalogo/productos/nuevo`, `/catalogo/productos/:id/editar`, `/catalogo/categorias`, `/catalogo/unidades`, `/inventario/almacenes`, `/inventario/stock`, `/inventario/stock-inicial`, `/inventario/ajustes`, `/inventario/transferencias`, `/inventario/kardex`
-- Pendientes de funcionalidad de negocio (Sprint 4 frontend y posteriores): compras frontend, `/pos`, `/cotizaciones`, `/facturacion`, `/reportes`, integracion e-commerce
+- Funcionales: `/login`, `/dashboard`, `/catalogo/productos`, `/catalogo/productos/nuevo`, `/catalogo/productos/:id/editar`, `/catalogo/categorias`, `/catalogo/unidades`, `/inventario/almacenes`, `/inventario/stock`, `/inventario/stock-inicial`, `/inventario/ajustes`, `/inventario/transferencias`, `/inventario/kardex`, `/compras/proveedores`, `/compras/ordenes`, `/compras/ordenes/nueva`, `/compras/ordenes/:id`, `/compras/ordenes/:id/editar`, `/compras/ordenes/:id/recibir`
+- Pendientes de funcionalidad de negocio: `/pos`, caja, `/cotizaciones`, `/facturacion`, `/reportes`, integracion e-commerce
 
 ## Docker
 
