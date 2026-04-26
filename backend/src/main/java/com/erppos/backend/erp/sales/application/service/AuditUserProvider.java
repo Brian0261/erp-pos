@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
 import java.util.Set;
 import java.util.UUID;
 
-@Component
+@Component("salesAuditUserProvider")
 public class AuditUserProvider {
 
     public UUID currentUserId() {

@@ -15,8 +15,8 @@ public interface ElectronicDocumentJpaRepository extends JpaRepository<Electroni
             where (:status is null or d.status = :status)
               and (:type is null or d.documentType = :type)
               and (:saleId is null or d.saleId = :saleId)
-              and (:fromInstant is null or d.createdAt >= :fromInstant)
-              and (:toInstant is null or d.createdAt <= :toInstant)
+              and d.createdAt >= :fromInstant
+              and d.createdAt <= :toInstant
             order by d.createdAt desc
             """)
     List<ElectronicDocumentEntity> findByFilters(

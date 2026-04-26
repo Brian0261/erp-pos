@@ -7,12 +7,17 @@ import com.erppos.backend.erp.billing.domain.port.ElectronicDocumentRepositoryPo
 import com.erppos.backend.erp.billing.infrastructure.mapper.ElectronicDocumentMapper;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 
 @Component
 public class ElectronicDocumentPersistenceAdapter implements ElectronicDocumentRepositoryPort {
+
+    private static final Instant MIN_INSTANT_FILTER = Instant.parse("1970-01-01T00:00:00Z");
+    private static final Instant MAX_INSTANT_FILTER = Instant.parse("9999-12-31T23:59:59Z");
 
     private final ElectronicDocumentJpaRepository documentJpaRepository;
     private final BillingSeriesJpaRepository seriesJpaRepository;
@@ -45,12 +50,14 @@ public class ElectronicDocumentPersistenceAdapter implements ElectronicDocumentR
 
     @Override
     public List<ElectronicDocument> findByFilters(ElectronicDocumentStatus status, ElectronicDocumentType type, Long saleId, LocalDate from, LocalDate to) {
+        Instant fromInstant = from == null ? MIN_INSTANT_FILTER : from.atStartOfDay().toInstant(ZoneOffset.UTC);
+        Instant toInstant = to == null ? MAX_INSTANT_FILTER : to.plusDays(1).atStartOfDay().minusSeconds(1).toInstant(ZoneOffset.UTC);
         return documentJpaRepository.findByFilters(
                         status,
                         type,
                         saleId,
-                        from == null ? null : from.atStartOfDay().toInstant(java.time.ZoneOffset.UTC),
-                        to == null ? null : to.plusDays(1).atStartOfDay().minusSeconds(1).toInstant(java.time.ZoneOffset.UTC)
+                        fromInstant,
+                        toInstant
                 )
                 .stream()
                 .map(ElectronicDocumentMapper::toDomain)
