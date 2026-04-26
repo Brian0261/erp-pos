@@ -214,14 +214,19 @@ public class QuoteApplicationService implements QuoteUseCase {
     @Transactional
     public Quote convertToSale(Long id, ConvertQuoteToSaleCommand command) {
         Quote current = getById(id);
+
+        // Prioridad: una cotización ya convertida siempre responde conflicto (409).
+        if (current.convertedSaleId() != null || current.status() == QuoteStatus.CONVERTED) {
+            throw new QuoteConflictException("Quote already converted");
+        }
+        if (current.status() == QuoteStatus.CANCELLED) {
+            throw new QuoteConflictException("Cancelled quote cannot be converted");
+        }
         if (current.expiresAt().isBefore(LocalDate.now()) || current.status() == QuoteStatus.EXPIRED) {
             throw new QuoteBusinessRuleException("Quote is expired and cannot be converted");
         }
         if (current.status() != QuoteStatus.DRAFT && current.status() != QuoteStatus.SENT) {
             throw new QuoteConflictException("Only DRAFT or SENT quotes can be converted");
-        }
-        if (current.convertedSaleId() != null || current.status() == QuoteStatus.CONVERTED) {
-            throw new QuoteConflictException("Quote already converted");
         }
         if (command.warehouseId() == null) {
             throw new QuoteBusinessRuleException("warehouseId is required");

@@ -151,6 +151,14 @@ class QuoteApplicationServiceTest {
     }
 
     @Test
+    void shouldRejectConversionOfCancelledQuoteWithout500() {
+        Quote quote = quoteService.create(validCreateCommand());
+        quoteService.cancel(quote.id(), "cancelada");
+
+        assertThrows(QuoteConflictException.class, () -> quoteService.convertToSale(quote.id(), validConvertCommand()));
+    }
+
+    @Test
     void shouldConvertQuoteToSaleSuccessfully() {
         Quote quote = quoteService.create(validCreateCommand());
         Quote converted = quoteService.convertToSale(quote.id(), validConvertCommand());
@@ -203,6 +211,28 @@ class QuoteApplicationServiceTest {
         Quote quote = quoteService.create(validCreateCommand());
         quoteService.convertToSale(quote.id(), validConvertCommand());
         assertThrows(QuoteConflictException.class, () -> quoteService.convertToSale(quote.id(), validConvertCommand()));
+    }
+
+    @Test
+    void shouldNotChangeQuoteStatusWhenConversionFails() {
+        quoteSalesPort.failNoOpenCash = true;
+        Quote quote = quoteService.create(validCreateCommand());
+
+        assertThrows(QuoteBusinessRuleException.class, () -> quoteService.convertToSale(quote.id(), validConvertCommand()));
+
+        Quote reloaded = quoteService.getById(quote.id());
+        assertEquals(QuoteStatus.DRAFT, reloaded.status());
+    }
+
+    @Test
+    void shouldNotSetConvertedSaleIdWhenConversionFails() {
+        quoteSalesPort.failStock = true;
+        Quote quote = quoteService.create(validCreateCommand());
+
+        assertThrows(QuoteConflictException.class, () -> quoteService.convertToSale(quote.id(), validConvertCommand()));
+
+        Quote reloaded = quoteService.getById(quote.id());
+        assertNull(reloaded.convertedSaleId());
     }
 
     @Test
