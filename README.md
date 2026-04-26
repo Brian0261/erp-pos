@@ -1,4 +1,4 @@
-# ERP/POS - Estado Tecnico (Sprint 5 Full-Stack Cerrado)
+# ERP/POS - Estado Tecnico (Sprint 6 Full-Stack Cerrado)
 
 Base tecnica del MVP para un ERP/POS de tienda fisica de articulos escolares.
 
@@ -89,9 +89,20 @@ Base tecnica del MVP para un ERP/POS de tienda fisica de articulos escolares.
   - Reposicion de stock por anulacion mediante `SALE_VOID_IN`.
   - Validacion de stock y kardex.
 
+### Sprint 6 (Cerrado - Full-Stack)
+
+- Cotizaciones backend/frontend implementado:
+  - Creacion, listado, detalle y edicion de cotizaciones.
+  - Envio y cancelacion de cotizaciones.
+  - Conversion de cotizacion a venta con validaciones de negocio.
+  - Historial de estados por cotizacion.
+- Seguridad por roles validada en modulo de cotizaciones.
+- Integracion validada con ventas, caja e inventario:
+  - Conversion exitosa genera venta y movimiento `SALE_OUT`.
+  - Conversiones invalidadas no alteran estado ni stock.
+
 ### Pendiente (modulos posteriores)
 
-- Cotizaciones NO implementado.
 - Facturacion electronica NO implementada.
 - Reportes NO implementados.
 - Integracion con e-commerce NO implementada.
@@ -190,6 +201,14 @@ Endpoints actuales:
 - `GET /api/v1/sales`
 - `GET /api/v1/sales/{id}`
 - `POST /api/v1/sales/{id}/void`
+- `POST /api/v1/quotes`
+- `GET /api/v1/quotes`
+- `GET /api/v1/quotes/{id}`
+- `PUT /api/v1/quotes/{id}`
+- `POST /api/v1/quotes/{id}/send`
+- `POST /api/v1/quotes/{id}/cancel`
+- `POST /api/v1/quotes/{id}/convert-to-sale`
+- `GET /api/v1/quotes/{id}/history`
 
 ## Frontend
 
@@ -205,8 +224,8 @@ Pop-Location
 
 Rutas:
 
-- Funcionales: `/login`, `/dashboard`, `/pos`, `/caja`, `/ventas`, `/ventas/:id`, `/ventas/:id/anular`, `/catalogo/productos`, `/catalogo/productos/nuevo`, `/catalogo/productos/:id/editar`, `/catalogo/categorias`, `/catalogo/unidades`, `/inventario/almacenes`, `/inventario/stock`, `/inventario/stock-inicial`, `/inventario/ajustes`, `/inventario/transferencias`, `/inventario/kardex`, `/compras/proveedores`, `/compras/ordenes`, `/compras/ordenes/nueva`, `/compras/ordenes/:id`, `/compras/ordenes/:id/editar`, `/compras/ordenes/:id/recibir`
-- Pendientes de funcionalidad de negocio: `/cotizaciones`, `/facturacion`, `/reportes`, integracion e-commerce
+- Funcionales: `/login`, `/dashboard`, `/pos`, `/caja`, `/ventas`, `/ventas/:id`, `/ventas/:id/anular`, `/catalogo/productos`, `/catalogo/productos/nuevo`, `/catalogo/productos/:id/editar`, `/catalogo/categorias`, `/catalogo/unidades`, `/inventario/almacenes`, `/inventario/stock`, `/inventario/stock-inicial`, `/inventario/ajustes`, `/inventario/transferencias`, `/inventario/kardex`, `/compras/proveedores`, `/compras/ordenes`, `/compras/ordenes/nueva`, `/compras/ordenes/:id`, `/compras/ordenes/:id/editar`, `/compras/ordenes/:id/recibir`, `/cotizaciones`, `/cotizaciones/nueva`, `/cotizaciones/:id`, `/cotizaciones/:id/editar`, `/cotizaciones/:id/convertir`
+- Pendientes de funcionalidad de negocio: `/facturacion`, `/reportes`, integracion e-commerce
 
 ## Docker
 
