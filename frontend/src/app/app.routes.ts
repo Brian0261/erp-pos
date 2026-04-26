@@ -13,6 +13,12 @@ import { StockPageComponent } from "./features/inventory/stock-page.component";
 import { TransfersPageComponent } from "./features/inventory/transfers-page.component";
 import { WarehousesPageComponent } from "./features/inventory/warehouses-page.component";
 import { LoginComponent } from "./features/login/login.component";
+import { PurchaseOrderDetailPageComponent } from "./features/purchases/purchase-order-detail-page.component";
+import { PurchaseOrderEditPageComponent } from "./features/purchases/purchase-order-edit-page.component";
+import { PurchaseOrderNewPageComponent } from "./features/purchases/purchase-order-new-page.component";
+import { PurchaseOrderReceivePageComponent } from "./features/purchases/purchase-order-receive-page.component";
+import { PurchaseOrdersPageComponent } from "./features/purchases/purchase-orders-page.component";
+import { SuppliersPageComponent } from "./features/purchases/suppliers-page.component";
 import { LayoutComponent } from "./shared/layout/layout.component";
 
 export const routes: Routes = [
@@ -46,6 +52,25 @@ export const routes: Routes = [
         component: TransfersPageComponent,
       },
       { path: "inventario/kardex", component: KardexPageComponent },
+      { path: "compras", pathMatch: "full", redirectTo: "compras/ordenes" },
+      { path: "compras/proveedores", component: SuppliersPageComponent },
+      { path: "compras/ordenes", component: PurchaseOrdersPageComponent },
+      {
+        path: "compras/ordenes/nueva",
+        component: PurchaseOrderNewPageComponent,
+      },
+      {
+        path: "compras/ordenes/:id",
+        component: PurchaseOrderDetailPageComponent,
+      },
+      {
+        path: "compras/ordenes/:id/editar",
+        component: PurchaseOrderEditPageComponent,
+      },
+      {
+        path: "compras/ordenes/:id/recibir",
+        component: PurchaseOrderReceivePageComponent,
+      },
       { path: "cotizaciones", component: DashboardComponent },
       { path: "facturacion", component: DashboardComponent },
       { path: "reportes", component: DashboardComponent },

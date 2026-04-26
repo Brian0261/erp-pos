@@ -84,6 +84,18 @@ import { UserProfile } from "../../core/auth/auth.models";
             >Inventario - Kardex</a
           >
           <a
+            *ngIf="canSee(['ADMIN', 'ALMACENERO', 'SUPERVISOR'])"
+            routerLink="/compras/proveedores"
+            routerLinkActive="active"
+            >Compras - Proveedores</a
+          >
+          <a
+            *ngIf="canSee(['ADMIN', 'ALMACENERO', 'SUPERVISOR'])"
+            routerLink="/compras/ordenes"
+            routerLinkActive="active"
+            >Compras - Ordenes</a
+          >
+          <a
             *ngIf="canSee(['ADMIN', 'SUPERVISOR'])"
             routerLink="/cotizaciones"
             routerLinkActive="active"
