@@ -2,30 +2,29 @@
 
 ## Plataforma
 
-- [ ] Backend compila con `mvn clean verify`
-- [ ] Frontend compila
-- [ ] Docker Compose levanta servicios
-- [ ] Migraciones Flyway aplican correctamente
+- [x] Backend compila con `mvn clean verify`
+- [x] Frontend compila
+- [x] Docker Compose levanta servicios
+- [x] Migraciones Flyway aplican correctamente
 
 ## Seguridad
 
-- [ ] Login JWT operativo
-- [ ] 401 sin token
-- [ ] 403 por rol en endpoints protegidos
+- [x] Login JWT operativo
+- [x] 401 sin token
+- [x] 403 por rol en endpoints protegidos
 
 ## Modulos MVP
 
-- [ ] Catalogo
-- [ ] Inventario multialmacen
-- [ ] Compras y recepcion
-- [ ] POS, caja, ventas
-- [ ] Cotizaciones y conversion
-- [ ] Facturacion electronica MVP (mock)
+- [x] Catalogo
+- [x] Inventario multialmacen
+- [x] Compras y recepcion
+- [x] POS, caja, ventas
+- [x] Cotizaciones y conversion
+- [x] Facturacion electronica MVP (mock)
 
 ## Sprint 8
 
-- [ ] Reportes backend operativos
-- [ ] Outbox events operativo (mock publish)
-- [ ] Healthcheck API y DB
-- [ ] Documentacion ADR y deployment local
-
+- [x] Reportes backend operativos
+- [x] Outbox events operativo (mock publish)
+- [x] Healthcheck API y DB
+- [x] Documentacion ADR y deployment local

@@ -27,7 +27,7 @@ public class OutboxEventController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<OutboxEventResponse>> list(
             @RequestParam(required = false) OutboxEventStatus status,
             @RequestParam(required = false) OutboxEventType eventType
@@ -36,7 +36,7 @@ public class OutboxEventController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<OutboxEventResponse> getById(@PathVariable Long id) {
         return ResponseEntity.ok(toResponse(outboxEventUseCase.getById(id)));
     }

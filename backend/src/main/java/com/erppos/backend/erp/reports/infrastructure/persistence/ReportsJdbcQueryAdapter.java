@@ -96,15 +96,15 @@ public class ReportsJdbcQueryAdapter implements ReportsQueryPort {
 
         List<SalesByDay> byDay = jdbcTemplate.query(
                 """
-                        select date(s.sold_at) day, count(*) sales_count, coalesce(sum(s.total_amount), 0) total_amount
+                        select date(s.sold_at) as sold_day, count(*) sales_count, coalesce(sum(s.total_amount), 0) total_amount
                         from sales s
                         where s.status = 'COMPLETED'
                           and s.sold_at >= ? and s.sold_at <= ?
                         group by date(s.sold_at)
-                        order by day
+                        order by sold_day
                         """,
                 (rs, rowNum) -> new SalesByDay(
-                        rs.getDate("day").toLocalDate(),
+                        rs.getDate("sold_day").toLocalDate(),
                         nz(rs.getBigDecimal("total_amount")),
                         rs.getLong("sales_count")
                 ),

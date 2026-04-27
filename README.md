@@ -120,11 +120,12 @@ Base tecnica del MVP para un ERP/POS de tienda fisica de articulos escolares.
   - Rechazo de emision para venta anulada (`422`).
   - Flujo exitoso `DRAFT -> GENERATED -> SIGNED -> SENT -> ACCEPTED`.
 
-### Pendiente (modulos posteriores)
+### Pendiente (post-MVP)
 
-- Reportes NO implementados.
-- Integracion con e-commerce NO implementada.
+- Integracion con e-commerce real NO implementada.
+- Integracion real con RabbitMQ/SQS NO implementada (se mantiene outbox con publisher mock).
 - Integracion productiva con SUNAT/OSE/PSE NO implementada (se mantiene adapter mock/sandbox).
+- Reportes avanzados NO implementados (se cubre set MVP de Sprint 8).
 
 ## Levantar proyecto local
 
@@ -260,7 +261,9 @@ Rutas:
 
 - Funcionales: `/login`, `/dashboard`, `/pos`, `/caja`, `/ventas`, `/ventas/:id`, `/ventas/:id/anular`, `/catalogo/productos`, `/catalogo/productos/nuevo`, `/catalogo/productos/:id/editar`, `/catalogo/categorias`, `/catalogo/unidades`, `/inventario/almacenes`, `/inventario/stock`, `/inventario/stock-inicial`, `/inventario/ajustes`, `/inventario/transferencias`, `/inventario/kardex`, `/compras/proveedores`, `/compras/ordenes`, `/compras/ordenes/nueva`, `/compras/ordenes/:id`, `/compras/ordenes/:id/editar`, `/compras/ordenes/:id/recibir`, `/cotizaciones`, `/cotizaciones/nueva`, `/cotizaciones/:id`, `/cotizaciones/:id/editar`, `/cotizaciones/:id/convertir`
 - Funcionales de facturacion: `/facturacion/configuracion`, `/facturacion/series`, `/facturacion/comprobantes`, `/facturacion/comprobantes/:id`, `/facturacion/emitir/:saleId`
-- Pendientes de funcionalidad de negocio: `/reportes`, integracion e-commerce
+- Funcionales de reportes: `/reportes`, `/reportes/ventas`, `/reportes/caja`, `/reportes/stock-bajo`, `/reportes/movimientos-inventario`, `/reportes/compras`, `/reportes/productos-mas-vendidos`, `/reportes/cotizaciones`, `/reportes/comprobantes`
+- Funcionales de integraciones (outbox): `/integraciones/eventos`, `/integraciones/eventos/:id`
+- Pendientes de funcionalidad de negocio: integracion e-commerce real
 
 ## Docker
 
@@ -280,3 +283,4 @@ Workflow: `.github/workflows/ci.yml`
 
 - `docs/adr/ADR-0001-monolito-modular-hexagonal.md`
 - `docs/adr/ADR-0002-facturacion-electronica-mvp.md`
+- `docs/adr/ADR-0003-outbox-eventos-ecommerce-futuro.md`
