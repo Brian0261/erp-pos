@@ -9,6 +9,8 @@ import com.erppos.backend.erp.billing.domain.exception.BillingNotFoundException;
 import com.erppos.backend.erp.inventory.domain.exception.InventoryBusinessRuleException;
 import com.erppos.backend.erp.inventory.domain.exception.InventoryConflictException;
 import com.erppos.backend.erp.inventory.domain.exception.InventoryNotFoundException;
+import com.erppos.backend.erp.integrations.domain.exception.IntegrationBusinessRuleException;
+import com.erppos.backend.erp.integrations.domain.exception.IntegrationNotFoundException;
 import com.erppos.backend.erp.purchases.domain.exception.PurchaseBusinessRuleException;
 import com.erppos.backend.erp.purchases.domain.exception.PurchaseConflictException;
 import com.erppos.backend.erp.purchases.domain.exception.PurchaseNotFoundException;
@@ -18,6 +20,8 @@ import com.erppos.backend.erp.quotes.domain.exception.QuoteNotFoundException;
 import com.erppos.backend.erp.sales.domain.exception.SalesBusinessRuleException;
 import com.erppos.backend.erp.sales.domain.exception.SalesConflictException;
 import com.erppos.backend.erp.sales.domain.exception.SalesNotFoundException;
+import com.erppos.backend.erp.reports.domain.exception.ReportBusinessRuleException;
+import com.erppos.backend.erp.reports.domain.exception.ReportNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
@@ -74,7 +78,7 @@ public class GlobalExceptionHandler {
                 .body(errorResponseFactory.build(request, HttpStatus.UNAUTHORIZED, "Invalid credentials"));
     }
 
-    @ExceptionHandler({CatalogNotFoundException.class, InventoryNotFoundException.class, PurchaseNotFoundException.class, SalesNotFoundException.class, QuoteNotFoundException.class, BillingNotFoundException.class})
+    @ExceptionHandler({CatalogNotFoundException.class, InventoryNotFoundException.class, PurchaseNotFoundException.class, SalesNotFoundException.class, QuoteNotFoundException.class, BillingNotFoundException.class, ReportNotFoundException.class, IntegrationNotFoundException.class})
     public ResponseEntity<ApiError> handleNotFound(RuntimeException ex, HttpServletRequest request) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(errorResponseFactory.build(request, HttpStatus.NOT_FOUND, ex.getMessage()));
@@ -94,7 +98,7 @@ public class GlobalExceptionHandler {
                 .body(errorResponseFactory.build(request, HttpStatus.CONFLICT, message));
     }
 
-    @ExceptionHandler({CatalogBusinessRuleException.class, InventoryBusinessRuleException.class, PurchaseBusinessRuleException.class, SalesBusinessRuleException.class, QuoteBusinessRuleException.class, BillingBusinessRuleException.class})
+    @ExceptionHandler({CatalogBusinessRuleException.class, InventoryBusinessRuleException.class, PurchaseBusinessRuleException.class, SalesBusinessRuleException.class, QuoteBusinessRuleException.class, BillingBusinessRuleException.class, ReportBusinessRuleException.class, IntegrationBusinessRuleException.class})
     public ResponseEntity<ApiError> handleBusinessRule(RuntimeException ex, HttpServletRequest request) {
         return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
                 .body(errorResponseFactory.build(request, HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage()));

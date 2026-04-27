@@ -132,10 +132,16 @@ import { UserProfile } from "../../core/auth/auth.models";
             >Facturacion - Series</a
           >
           <a
-            *ngIf="canSee(['ADMIN', 'SUPERVISOR'])"
+            *ngIf="canSee(['ADMIN', 'SUPERVISOR', 'ALMACENERO'])"
             routerLink="/reportes"
             routerLinkActive="active"
             >Reportes</a
+          >
+          <a
+            *ngIf="canSee(['ADMIN'])"
+            routerLink="/integraciones/eventos"
+            routerLinkActive="active"
+            >Integraciones - Eventos</a
           >
         </nav>
 

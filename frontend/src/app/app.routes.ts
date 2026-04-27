@@ -11,6 +11,8 @@ import { BillingDocumentsPageComponent } from "./features/billing/billing-docume
 import { BillingIssueFromSalePageComponent } from "./features/billing/billing-issue-from-sale-page.component";
 import { BillingSeriesPageComponent } from "./features/billing/billing-series-page.component";
 import { DashboardComponent } from "./features/dashboard/dashboard.component";
+import { OutboxEventDetailPageComponent } from "./features/integrations/outbox-event-detail-page.component";
+import { OutboxEventsPageComponent } from "./features/integrations/outbox-events-page.component";
 import { AdjustmentsPageComponent } from "./features/inventory/adjustments-page.component";
 import { InitialStockPageComponent } from "./features/inventory/initial-stock-page.component";
 import { KardexPageComponent } from "./features/inventory/kardex-page.component";
@@ -18,6 +20,15 @@ import { StockPageComponent } from "./features/inventory/stock-page.component";
 import { TransfersPageComponent } from "./features/inventory/transfers-page.component";
 import { WarehousesPageComponent } from "./features/inventory/warehouses-page.component";
 import { LoginComponent } from "./features/login/login.component";
+import { CashRegisterReportPageComponent } from "./features/reports/cash-register-report-page.component";
+import { ElectronicDocumentsReportPageComponent } from "./features/reports/electronic-documents-report-page.component";
+import { InventoryMovementsReportPageComponent } from "./features/reports/inventory-movements-report-page.component";
+import { LowStockReportPageComponent } from "./features/reports/low-stock-report-page.component";
+import { PurchasesReportPageComponent } from "./features/reports/purchases-report-page.component";
+import { QuotesReportPageComponent } from "./features/reports/quotes-report-page.component";
+import { ReportsDashboardPageComponent } from "./features/reports/reports-dashboard-page.component";
+import { SalesReportPageComponent } from "./features/reports/sales-report-page.component";
+import { TopProductsReportPageComponent } from "./features/reports/top-products-report-page.component";
 import { PurchaseOrderDetailPageComponent } from "./features/purchases/purchase-order-detail-page.component";
 import { PurchaseOrderEditPageComponent } from "./features/purchases/purchase-order-edit-page.component";
 import { PurchaseOrderNewPageComponent } from "./features/purchases/purchase-order-new-page.component";
@@ -120,7 +131,29 @@ export const routes: Routes = [
         path: "facturacion/emitir/:saleId",
         component: BillingIssueFromSalePageComponent,
       },
-      { path: "reportes", component: DashboardComponent },
+      { path: "reportes", component: ReportsDashboardPageComponent },
+      { path: "reportes/ventas", component: SalesReportPageComponent },
+      { path: "reportes/caja", component: CashRegisterReportPageComponent },
+      { path: "reportes/stock-bajo", component: LowStockReportPageComponent },
+      {
+        path: "reportes/movimientos-inventario",
+        component: InventoryMovementsReportPageComponent,
+      },
+      { path: "reportes/compras", component: PurchasesReportPageComponent },
+      {
+        path: "reportes/productos-mas-vendidos",
+        component: TopProductsReportPageComponent,
+      },
+      { path: "reportes/cotizaciones", component: QuotesReportPageComponent },
+      {
+        path: "reportes/comprobantes",
+        component: ElectronicDocumentsReportPageComponent,
+      },
+      { path: "integraciones/eventos", component: OutboxEventsPageComponent },
+      {
+        path: "integraciones/eventos/:id",
+        component: OutboxEventDetailPageComponent,
+      },
       { path: "", pathMatch: "full", redirectTo: "dashboard" },
     ],
   },
