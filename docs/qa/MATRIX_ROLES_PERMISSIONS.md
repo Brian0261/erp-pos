@@ -49,3 +49,32 @@ Convencion: SI = permitido, NO = denegado (403), AUTH = requiere token (sin toke
   - Segundo `POST /api/v1/quotes/{id}/convert-to-sale` => 409 (bloqueo de doble conversion)
   - SUPERVISOR en `POST /api/v1/billing/documents/{id}/sign` => 200
   - SUPERVISOR en `POST /api/v1/billing/documents/{id}/send` => 200
+
+## Frontend Route Hardening (Angular RBAC)
+
+Fecha de aplicacion: 2026-04-29
+Convencion frontend: ruta no permitida por rol => redireccion a `/dashboard`.
+
+| Grupo de rutas Angular                                                                                                                            | ADMIN | CAJERO | ALMACENERO | SUPERVISOR | Regla frontend aplicada |
+| ------------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ------ | ---------- | ---------- | ----------------------- |
+| `/dashboard`                                                                                                                                      | SI    | SI     | SI         | SI         | Ruta base autenticada.  |
+| `/pos`, `/caja`, `/ventas`, `/ventas/:id`, `/cotizaciones/**`, `/facturacion/comprobantes/**`, `/facturacion/emitir/:saleId`                      | SI    | SI     | NO         | SI         | Comercial/caja.         |
+| `/ventas/:id/anular`                                                                                                                              | SI    | NO     | NO         | SI         | Anulacion restringida.  |
+| `/catalogo/**`                                                                                                                                    | SI    | NO     | SI         | SI         | Consistente con menu.   |
+| `/inventario/stock`                                                                                                                               | SI    | SI     | SI         | SI         | Stock operativo.        |
+| `/inventario/almacenes`                                                                                                                           | SI    | NO     | SI         | SI         | Segun menu actual.      |
+| `/inventario/stock-inicial`, `/inventario/ajustes`, `/inventario/transferencias`                                                                  | SI    | NO     | SI         | NO         | Operacion inventario.   |
+| `/inventario/kardex`                                                                                                                              | SI    | NO     | NO         | SI         | Seguimiento supervisor. |
+| `/compras/proveedores`, `/compras/ordenes`, `/compras/ordenes/:id`                                                                                | SI    | NO     | SI         | SI         | Consulta/gestion base.  |
+| `/compras/ordenes/nueva`, `/compras/ordenes/:id/editar`, `/compras/ordenes/:id/recibir`                                                           | SI    | NO     | SI         | NO         | Acciones de gestion OC. |
+| `/facturacion/configuracion`, `/facturacion/series`                                                                                               | SI    | NO     | NO         | NO         | Configuracion critica.  |
+| `/reportes`                                                                                                                                       | SI    | NO     | SI         | SI         | Dashboard reportes.     |
+| `/reportes/stock-bajo`, `/reportes/movimientos-inventario`                                                                                        | SI    | NO     | SI         | SI         | Reportes inventario.    |
+| `/reportes/ventas`, `/reportes/caja`, `/reportes/compras`, `/reportes/productos-mas-vendidos`, `/reportes/cotizaciones`, `/reportes/comprobantes` | SI    | NO     | NO         | SI         | Reportes comerciales.   |
+| `/integraciones/eventos`, `/integraciones/eventos/:id`                                                                                            | SI    | NO     | NO         | NO         | Outbox solo ADMIN.      |
+
+### Ambiguedades resueltas
+
+- Las subrutas de compras de accion (`nueva`, `editar`, `recibir`) se restringen a `ADMIN` y `ALMACENERO` por coherencia con la matriz backend, aunque la vista de listado de compras siga visible para `SUPERVISOR`.
+- La ruta `/ventas/:id/anular` se restringe a `ADMIN` y `SUPERVISOR` por seguridad de negocio.
+- En rutas sin sesion valida, se mantiene prioridad de autenticacion: redireccion a `/login`.

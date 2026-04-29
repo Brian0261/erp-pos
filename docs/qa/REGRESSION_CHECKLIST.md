@@ -114,3 +114,18 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [x] Sin errores de consola JavaScript ni errores de runtime (`pageerror`) en pruebas E1.
 - [x] Logo InkToy, layout/sidebar y dashboard permanecen estables.
 - [x] Backend, endpoints, rutas, AuthService, guards e interceptor sin cambios.
+
+## Hardening RBAC Frontend (2026-04-29)
+
+- [x] Se implemento `roleGuard` para `canActivateChild` sobre rutas protegidas por sesion.
+- [x] Matriz de `allowedRoles` aplicada en `app.routes.ts` por ruta/modulo.
+- [x] Usuario sin sesion redirige a `/login` al abrir rutas protegidas.
+- [x] CAJERO bloqueado por frontend en `/catalogo/productos` (redirige a `/dashboard`).
+- [x] CAJERO bloqueado por frontend en `/integraciones/eventos` (redirige a `/dashboard`).
+- [x] ALMACENERO bloqueado por frontend en `/pos` (redirige a `/dashboard`).
+- [x] SUPERVISOR bloqueado por frontend en `/integraciones/eventos` (redirige a `/dashboard`).
+- [x] ADMIN mantiene acceso en rutas criticas (`/integraciones/eventos`, `/facturacion/configuracion`, `/facturacion/series`).
+- [x] Login/logout sin regresion tras endurecimiento de guardias de rutas.
+- [x] Build frontend (`npm run build`) exitoso.
+- [x] `docker compose up --build -d` y `docker compose ps` exitosos.
+- [x] Revalidacion puntual en `/pos` (SUPERVISOR): no se reprodujo respuesta `403`; sin impacto en bloqueo de rutas.

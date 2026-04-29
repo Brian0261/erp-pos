@@ -1,6 +1,7 @@
 import { Routes } from "@angular/router";
 
 import { authGuard } from "./core/guards/auth.guard";
+import { roleGuard } from "./core/guards/role.guard";
 import { CategoriesPageComponent } from "./features/catalog/categories-page.component";
 import { ProductFormComponent } from "./features/catalog/product-form.component";
 import { ProductsPageComponent } from "./features/catalog/products-page.component";
@@ -47,112 +48,265 @@ import { SaleVoidPageComponent } from "./features/sales/sale-void-page.component
 import { SalesPageComponent } from "./features/sales/sales-page.component";
 import { LayoutComponent } from "./shared/layout/layout.component";
 
+const ROLES_ADMIN = ["ADMIN"];
+const ROLES_CATALOG = ["ADMIN", "ALMACENERO", "SUPERVISOR"];
+const ROLES_INVENTORY_STOCK = ["ADMIN", "ALMACENERO", "SUPERVISOR", "CAJERO"];
+const ROLES_INVENTORY_MANAGEMENT = ["ADMIN", "ALMACENERO"];
+const ROLES_INVENTORY_KARDEX = ["ADMIN", "SUPERVISOR"];
+const ROLES_SALES = ["ADMIN", "CAJERO", "SUPERVISOR"];
+const ROLES_SALES_VOID = ["ADMIN", "SUPERVISOR"];
+const ROLES_PURCHASES = ["ADMIN", "ALMACENERO", "SUPERVISOR"];
+const ROLES_PURCHASES_MANAGEMENT = ["ADMIN", "ALMACENERO"];
+const ROLES_REPORTS = ["ADMIN", "SUPERVISOR", "ALMACENERO"];
+const ROLES_REPORTS_COMMERCIAL = ["ADMIN", "SUPERVISOR"];
+
 export const routes: Routes = [
   { path: "login", component: LoginComponent },
   {
     path: "",
     component: LayoutComponent,
     canActivate: [authGuard],
+    canActivateChild: [roleGuard],
     children: [
       { path: "dashboard", component: DashboardComponent },
-      { path: "pos", component: PosPageComponent },
-      { path: "caja", component: CashRegisterPageComponent },
-      { path: "ventas", component: SalesPageComponent },
-      { path: "ventas/:id/anular", component: SaleVoidPageComponent },
-      { path: "ventas/:id", component: SaleDetailPageComponent },
-      { path: "catalogo", pathMatch: "full", redirectTo: "catalogo/productos" },
-      { path: "catalogo/productos", component: ProductsPageComponent },
-      { path: "catalogo/productos/nuevo", component: ProductFormComponent },
+      {
+        path: "pos",
+        component: PosPageComponent,
+        data: { allowedRoles: ROLES_SALES },
+      },
+      {
+        path: "caja",
+        component: CashRegisterPageComponent,
+        data: { allowedRoles: ROLES_SALES },
+      },
+      {
+        path: "ventas",
+        component: SalesPageComponent,
+        data: { allowedRoles: ROLES_SALES },
+      },
+      {
+        path: "ventas/:id/anular",
+        component: SaleVoidPageComponent,
+        data: { allowedRoles: ROLES_SALES_VOID },
+      },
+      {
+        path: "ventas/:id",
+        component: SaleDetailPageComponent,
+        data: { allowedRoles: ROLES_SALES },
+      },
+      {
+        path: "catalogo",
+        pathMatch: "full",
+        redirectTo: "catalogo/productos",
+        data: { allowedRoles: ROLES_CATALOG },
+      },
+      {
+        path: "catalogo/productos",
+        component: ProductsPageComponent,
+        data: { allowedRoles: ROLES_CATALOG },
+      },
+      {
+        path: "catalogo/productos/nuevo",
+        component: ProductFormComponent,
+        data: { allowedRoles: ROLES_CATALOG },
+      },
       {
         path: "catalogo/productos/:id/editar",
         component: ProductFormComponent,
+        data: { allowedRoles: ROLES_CATALOG },
       },
-      { path: "catalogo/categorias", component: CategoriesPageComponent },
-      { path: "catalogo/unidades", component: UnitsPageComponent },
-      { path: "inventario", pathMatch: "full", redirectTo: "inventario/stock" },
-      { path: "inventario/almacenes", component: WarehousesPageComponent },
-      { path: "inventario/stock", component: StockPageComponent },
+      {
+        path: "catalogo/categorias",
+        component: CategoriesPageComponent,
+        data: { allowedRoles: ROLES_CATALOG },
+      },
+      {
+        path: "catalogo/unidades",
+        component: UnitsPageComponent,
+        data: { allowedRoles: ROLES_CATALOG },
+      },
+      {
+        path: "inventario",
+        pathMatch: "full",
+        redirectTo: "inventario/stock",
+        data: { allowedRoles: ROLES_INVENTORY_STOCK },
+      },
+      {
+        path: "inventario/almacenes",
+        component: WarehousesPageComponent,
+        data: { allowedRoles: ROLES_CATALOG },
+      },
+      {
+        path: "inventario/stock",
+        component: StockPageComponent,
+        data: { allowedRoles: ROLES_INVENTORY_STOCK },
+      },
       {
         path: "inventario/stock-inicial",
         component: InitialStockPageComponent,
+        data: { allowedRoles: ROLES_INVENTORY_MANAGEMENT },
       },
-      { path: "inventario/ajustes", component: AdjustmentsPageComponent },
+      {
+        path: "inventario/ajustes",
+        component: AdjustmentsPageComponent,
+        data: { allowedRoles: ROLES_INVENTORY_MANAGEMENT },
+      },
       {
         path: "inventario/transferencias",
         component: TransfersPageComponent,
+        data: { allowedRoles: ROLES_INVENTORY_MANAGEMENT },
       },
-      { path: "inventario/kardex", component: KardexPageComponent },
-      { path: "compras", pathMatch: "full", redirectTo: "compras/ordenes" },
-      { path: "compras/proveedores", component: SuppliersPageComponent },
-      { path: "compras/ordenes", component: PurchaseOrdersPageComponent },
+      {
+        path: "inventario/kardex",
+        component: KardexPageComponent,
+        data: { allowedRoles: ROLES_INVENTORY_KARDEX },
+      },
+      {
+        path: "compras",
+        pathMatch: "full",
+        redirectTo: "compras/ordenes",
+        data: { allowedRoles: ROLES_PURCHASES },
+      },
+      {
+        path: "compras/proveedores",
+        component: SuppliersPageComponent,
+        data: { allowedRoles: ROLES_PURCHASES },
+      },
+      {
+        path: "compras/ordenes",
+        component: PurchaseOrdersPageComponent,
+        data: { allowedRoles: ROLES_PURCHASES },
+      },
       {
         path: "compras/ordenes/nueva",
         component: PurchaseOrderNewPageComponent,
+        data: { allowedRoles: ROLES_PURCHASES_MANAGEMENT },
       },
       {
         path: "compras/ordenes/:id",
         component: PurchaseOrderDetailPageComponent,
+        data: { allowedRoles: ROLES_PURCHASES },
       },
       {
         path: "compras/ordenes/:id/editar",
         component: PurchaseOrderEditPageComponent,
+        data: { allowedRoles: ROLES_PURCHASES_MANAGEMENT },
       },
       {
         path: "compras/ordenes/:id/recibir",
         component: PurchaseOrderReceivePageComponent,
+        data: { allowedRoles: ROLES_PURCHASES_MANAGEMENT },
       },
-      { path: "cotizaciones", component: QuotesPageComponent },
-      { path: "cotizaciones/nueva", component: QuoteNewPageComponent },
-      { path: "cotizaciones/:id/editar", component: QuoteEditPageComponent },
+      {
+        path: "cotizaciones",
+        component: QuotesPageComponent,
+        data: { allowedRoles: ROLES_SALES },
+      },
+      {
+        path: "cotizaciones/nueva",
+        component: QuoteNewPageComponent,
+        data: { allowedRoles: ROLES_SALES },
+      },
+      {
+        path: "cotizaciones/:id/editar",
+        component: QuoteEditPageComponent,
+        data: { allowedRoles: ROLES_SALES },
+      },
       {
         path: "cotizaciones/:id/convertir",
         component: QuoteConvertPageComponent,
+        data: { allowedRoles: ROLES_SALES },
       },
-      { path: "cotizaciones/:id", component: QuoteDetailPageComponent },
+      {
+        path: "cotizaciones/:id",
+        component: QuoteDetailPageComponent,
+        data: { allowedRoles: ROLES_SALES },
+      },
       {
         path: "facturacion",
         pathMatch: "full",
         redirectTo: "facturacion/comprobantes",
+        data: { allowedRoles: ROLES_SALES },
       },
       {
         path: "facturacion/configuracion",
         component: BillingConfigPageComponent,
+        data: { allowedRoles: ROLES_ADMIN },
       },
-      { path: "facturacion/series", component: BillingSeriesPageComponent },
+      {
+        path: "facturacion/series",
+        component: BillingSeriesPageComponent,
+        data: { allowedRoles: ROLES_ADMIN },
+      },
       {
         path: "facturacion/comprobantes",
         component: BillingDocumentsPageComponent,
+        data: { allowedRoles: ROLES_SALES },
       },
       {
         path: "facturacion/comprobantes/:id",
         component: BillingDocumentDetailPageComponent,
+        data: { allowedRoles: ROLES_SALES },
       },
       {
         path: "facturacion/emitir/:saleId",
         component: BillingIssueFromSalePageComponent,
+        data: { allowedRoles: ROLES_SALES },
       },
-      { path: "reportes", component: ReportsDashboardPageComponent },
-      { path: "reportes/ventas", component: SalesReportPageComponent },
-      { path: "reportes/caja", component: CashRegisterReportPageComponent },
-      { path: "reportes/stock-bajo", component: LowStockReportPageComponent },
+      {
+        path: "reportes",
+        component: ReportsDashboardPageComponent,
+        data: { allowedRoles: ROLES_REPORTS },
+      },
+      {
+        path: "reportes/ventas",
+        component: SalesReportPageComponent,
+        data: { allowedRoles: ROLES_REPORTS_COMMERCIAL },
+      },
+      {
+        path: "reportes/caja",
+        component: CashRegisterReportPageComponent,
+        data: { allowedRoles: ROLES_REPORTS_COMMERCIAL },
+      },
+      {
+        path: "reportes/stock-bajo",
+        component: LowStockReportPageComponent,
+        data: { allowedRoles: ROLES_REPORTS },
+      },
       {
         path: "reportes/movimientos-inventario",
         component: InventoryMovementsReportPageComponent,
+        data: { allowedRoles: ROLES_REPORTS },
       },
-      { path: "reportes/compras", component: PurchasesReportPageComponent },
+      {
+        path: "reportes/compras",
+        component: PurchasesReportPageComponent,
+        data: { allowedRoles: ROLES_REPORTS_COMMERCIAL },
+      },
       {
         path: "reportes/productos-mas-vendidos",
         component: TopProductsReportPageComponent,
+        data: { allowedRoles: ROLES_REPORTS_COMMERCIAL },
       },
-      { path: "reportes/cotizaciones", component: QuotesReportPageComponent },
+      {
+        path: "reportes/cotizaciones",
+        component: QuotesReportPageComponent,
+        data: { allowedRoles: ROLES_REPORTS_COMMERCIAL },
+      },
       {
         path: "reportes/comprobantes",
         component: ElectronicDocumentsReportPageComponent,
+        data: { allowedRoles: ROLES_REPORTS_COMMERCIAL },
       },
-      { path: "integraciones/eventos", component: OutboxEventsPageComponent },
+      {
+        path: "integraciones/eventos",
+        component: OutboxEventsPageComponent,
+        data: { allowedRoles: ROLES_ADMIN },
+      },
       {
         path: "integraciones/eventos/:id",
         component: OutboxEventDetailPageComponent,
+        data: { allowedRoles: ROLES_ADMIN },
       },
       { path: "", pathMatch: "full", redirectTo: "dashboard" },
     ],
