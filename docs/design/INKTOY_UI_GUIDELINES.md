@@ -1,0 +1,38 @@
+# InkToy UI Guidelines (MVP)
+
+## Objective
+
+Apply visual consistency across the ERP/POS while preserving MVP behavior.
+
+## Practical Guidelines
+
+1. Use token variables from design-tokens.css instead of hardcoded colors.
+2. Prefer semantic aliases (for example, --color-brand-primary) over direct brand primitives.
+3. Reuse global classes (.ui-card, .ui-button, .ui-badge) before creating local variants.
+4. Keep spacing aligned to token scale (--space-\*).
+5. Use display font for section titles and body font for forms/table content.
+6. Maintain minimum contrast and visible focus styles.
+
+## Login-Specific Rules
+
+1. Login can have a stronger branded composition than other pages.
+2. Do not alter login form model, validator rules, or submit method signatures.
+3. Preserve accessibility attributes (labels, alt text, focus states).
+
+## Rollout Sequence (Recommended)
+
+1. Block A: foundation (tokens/assets/base classes).
+2. Block B: login branding.
+3. Block C: shell/layout adaptation.
+4. Block D: dashboard identity refresh.
+5. Block E: module cards and forms.
+6. Block F: tables, statuses, and badges.
+7. Block G: final responsive and QA pass.
+
+## Validation Checklist
+
+- npm run build succeeds.
+- Docker composition serves frontend and backend correctly.
+- /api proxy remains functional.
+- Login still authenticates seeded users.
+- Guarded routes still require token and valid roles.

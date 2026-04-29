@@ -1,0 +1,68 @@
+:root {
+  /* Brand colors (InkToy) */
+  --inktoy-blue: #1217b8;
+  --inktoy-orange: #f24a0b;
+  --inktoy-yellow: #f4c20d;
+  --inktoy-black: #101114;
+  --inktoy-white: #ffffff;
+
+  /* Neutral scale */
+  --inktoy-neutral-50: #f6f7fb;
+  --inktoy-neutral-100: #e7eaf1;
+  --inktoy-neutral-500: #6c7383;
+
+  /* Semantic aliases */
+  --color-bg-canvas: var(--inktoy-neutral-50);
+  --color-bg-surface: var(--inktoy-white);
+  --color-bg-soft: var(--inktoy-neutral-100);
+
+  --color-text-primary: var(--inktoy-black);
+  --color-text-secondary: var(--inktoy-neutral-500);
+  --color-text-on-dark: var(--inktoy-white);
+
+  --color-brand-primary: var(--inktoy-blue);
+  --color-brand-accent: var(--inktoy-orange);
+  --color-brand-highlight: var(--inktoy-yellow);
+
+  --color-border-default: #d5dbe7;
+  --color-border-strong: #b8c1d4;
+
+  --color-success: #166534;
+  --color-danger: #b91c1c;
+  --color-info: #1d4ed8;
+  --color-warning: #92400e;
+
+  /* Typography */
+  --font-family-body:
+    "Nunito Sans", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --font-family-display:
+    "Fredoka", "Baloo 2", "Nunito Sans", "Segoe UI", sans-serif;
+
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-md: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.5rem;
+
+  /* Spacing */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+
+  /* Radius and elevation */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 0.875rem;
+  --radius-pill: 999px;
+
+  --shadow-sm: 0 2px 8px rgba(16, 17, 20, 0.06);
+  --shadow-md: 0 10px 28px rgba(18, 23, 184, 0.15);
+
+  /* Layout */
+  --layout-max-content: 1200px;
+  --layout-sidebar-width: 250px;
+}
