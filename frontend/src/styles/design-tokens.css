@@ -33,10 +33,8 @@
   --color-warning: #92400e;
 
   /* Typography */
-  --font-family-body:
-    "Nunito Sans", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
-  --font-family-display:
-    "Fredoka", "Baloo 2", "Nunito Sans", "Segoe UI", sans-serif;
+  --font-family-body: "Segoe UI", Roboto, Arial, sans-serif;
+  --font-family-display: "Segoe UI", Roboto, Arial, sans-serif;
 
   --font-size-xs: 0.75rem;
   --font-size-sm: 0.875rem;

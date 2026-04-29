@@ -48,8 +48,8 @@ Out of scope in this phase:
 
 ### Typography
 
-- Body: Nunito Sans
-- Display: Baloo 2
+- Body: Segoe UI, Roboto, Arial, sans-serif
+- Display: Segoe UI, Roboto, Arial, sans-serif
 
 ### Layout and UI Rhythm
 
