@@ -19,11 +19,19 @@ Apply visual consistency across the ERP/POS while preserving MVP behavior.
 2. Do not alter login form model, validator rules, or submit method signatures.
 3. Preserve accessibility attributes (labels, alt text, focus states).
 
+## Shell-Specific Rules (Block C)
+
+1. Keep all route links and role conditions exactly as defined in layout RBAC rules.
+2. Use visual states for active links without changing route names or navigation targets.
+3. Keep logout behavior unchanged and always visible in shell actions.
+4. Present user and role data clearly in sidebar/topbar while preserving existing data sources.
+5. Ensure responsive behavior for sidebar and topbar without hiding allowed menus.
+
 ## Rollout Sequence (Recommended)
 
-1. Block A: foundation (tokens/assets/base classes).
-2. Block B: login branding.
-3. Block C: shell/layout adaptation.
+1. Block A: foundation (tokens/assets/base classes) - completed.
+2. Block B: login branding - completed.
+3. Block C: shell/layout adaptation - completed.
 4. Block D: dashboard identity refresh.
 5. Block E: module cards and forms.
 6. Block F: tables, statuses, and badges.
