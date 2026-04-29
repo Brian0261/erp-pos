@@ -79,3 +79,17 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [x] Backend sin errores 500 inesperados en la corrida.
 - [x] Frontend Nginx sin errores criticos de arranque.
 - [x] Sin llamadas hardcodeadas a `localhost:8080` en `frontend/src`.
+
+## Bloque D Dashboard InkToy (2026-04-29)
+
+- [x] Dashboard reemplazo placeholder por hub operativo con KPIs por rol.
+- [x] Build frontend (`npm run build`) exitoso con Bloque D.
+- [x] `docker compose up --build -d` y `docker compose ps` exitosos.
+- [x] Login y carga de `/dashboard` correctos para ADMIN/CAJERO/ALMACENERO/SUPERVISOR.
+- [x] Refresh de `/dashboard` mantiene sesion valida en los 4 roles.
+- [x] Logout funcional y ruta protegida `/dashboard` redirige a `/login` tras cerrar sesion.
+- [x] Outbox visible solo para ADMIN en shell y accesos rapidos.
+- [x] Configuracion critica de facturacion visible solo para ADMIN en shell.
+- [x] Sin errores de consola durante validacion por roles en navegador.
+- [x] Sin respuestas HTTP 500 inesperadas en dashboard tras ajuste de consumo de ventas/cotizaciones.
+- [x] Backend/AuthService/guards/interceptor/endpoints no modificados.

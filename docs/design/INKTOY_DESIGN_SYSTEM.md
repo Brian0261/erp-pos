@@ -1,4 +1,4 @@
-# InkToy Design System (Bloques A-C)
+# InkToy Design System (Bloques A-D)
 
 ## Scope
 
@@ -9,6 +9,7 @@ Included in this phase:
 - Block A: tokens, base styles, reusable utility classes, and brand asset structure.
 - Block B: login visual brand alignment.
 - Block C: shell visual adaptation (layout/sidebar/topbar/menu states/logout/user summary).
+- Block D: dashboard operational hub with role-aware KPIs, quick actions, alerts, and recent activity.
 
 Out of scope in this phase:
 
@@ -25,6 +26,7 @@ Out of scope in this phase:
 - frontend/src/assets/images/brand/
 - frontend/src/app/features/login/login.component.ts
 - frontend/src/app/shared/layout/layout.component.ts
+- frontend/src/app/features/dashboard/dashboard.component.ts
 
 ## Tokens
 
@@ -82,4 +84,5 @@ Current state:
 - Keep same submit flow and AuthService integration.
 - Keep same route map and role-based guards.
 - Keep role visibility matrix unchanged in sidebar links.
+- Keep dashboard KPIs sourced from existing services/endpoints only (no mocked data).
 - Keep backend contracts unchanged.

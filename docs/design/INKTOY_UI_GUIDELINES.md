@@ -27,12 +27,21 @@ Apply visual consistency across the ERP/POS while preserving MVP behavior.
 4. Present user and role data clearly in sidebar/topbar while preserving existing data sources.
 5. Ensure responsive behavior for sidebar and topbar without hiding allowed menus.
 
+## Dashboard-Specific Rules (Block D)
+
+1. Use existing services/endpoints only for KPI data and quick operational summaries.
+2. Handle each KPI independently so one failing endpoint does not break the whole dashboard.
+3. On `403`, show a friendly unavailable state instead of technical errors.
+4. On empty data, show explicit empty states; never fabricate values.
+5. Keep role-focused quick actions aligned with existing route visibility and RBAC matrix.
+6. Keep dashboard responsive and readable for daily operational use.
+
 ## Rollout Sequence (Recommended)
 
 1. Block A: foundation (tokens/assets/base classes) - completed.
 2. Block B: login branding - completed.
 3. Block C: shell/layout adaptation - completed.
-4. Block D: dashboard identity refresh.
+4. Block D: dashboard identity refresh - completed.
 5. Block E: module cards and forms.
 6. Block F: tables, statuses, and badges.
 7. Block G: final responsive and QA pass.
