@@ -13,37 +13,62 @@ import { toHttpErrorMessage } from "./data/http-error-message";
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, RouterLink],
   template: `
-    <section class="card">
-      <header class="header">
+    <section class="ui-card catalog-page">
+      <header class="ui-page-head">
         <div>
-          <h1>Catalogo - Productos</h1>
-          <p class="muted">
+          <p class="ui-page-kicker">Catalogo InkToy</p>
+          <h1 class="ui-page-title">Productos</h1>
+          <p class="ui-page-description">
             Gestiona productos y buscalos por nombre, SKU o codigo de barras.
           </p>
         </div>
-        <a routerLink="/catalogo/productos/nuevo" class="primary"
+        <a
+          routerLink="/catalogo/productos/nuevo"
+          class="ui-button ui-button--primary"
           >Crear producto</a
         >
       </header>
 
-      <form [formGroup]="searchForm" (ngSubmit)="onSearch()" class="search-row">
-        <input
-          type="text"
-          formControlName="q"
-          placeholder="Buscar por nombre, SKU o codigo de barras"
-        />
-        <button type="submit">Buscar</button>
-        <button type="button" class="secondary" (click)="clearSearch()">
-          Limpiar
-        </button>
+      <form
+        [formGroup]="searchForm"
+        (ngSubmit)="onSearch()"
+        class="search-panel"
+      >
+        <label class="search-field">
+          <span>Busqueda rapida</span>
+          <input
+            type="text"
+            formControlName="q"
+            placeholder="Nombre, SKU o codigo de barras"
+          />
+        </label>
+
+        <div class="search-actions">
+          <button type="submit" class="ui-button ui-button--primary">
+            Buscar
+          </button>
+          <button
+            type="button"
+            class="ui-button ui-button--secondary"
+            (click)="clearSearch()"
+          >
+            Limpiar
+          </button>
+        </div>
       </form>
 
-      <p class="error" *ngIf="errorMessage">{{ errorMessage }}</p>
-      <p class="success" *ngIf="successMessage">{{ successMessage }}</p>
-      <p class="muted" *ngIf="loading">Cargando productos...</p>
+      <p class="ui-alert ui-alert--error" *ngIf="errorMessage">
+        {{ errorMessage }}
+      </p>
+      <p class="ui-alert ui-alert--success" *ngIf="successMessage">
+        {{ successMessage }}
+      </p>
+      <p class="ui-alert ui-alert--info" *ngIf="loading">
+        Cargando productos...
+      </p>
 
-      <div class="table-wrapper" *ngIf="!loading">
-        <table>
+      <div class="ui-table-wrapper" *ngIf="!loading">
+        <table class="ui-table catalog-table">
           <thead>
             <tr>
               <th>ID</th>
@@ -52,35 +77,40 @@ import { toHttpErrorMessage } from "./data/http-error-message";
               <th>Nombre</th>
               <th>Categoria ID</th>
               <th>Unidad ID</th>
-              <th>Precio venta</th>
+              <th class="cell-right">Precio venta</th>
               <th>Estado</th>
               <th>Acciones</th>
             </tr>
           </thead>
           <tbody>
             <tr *ngFor="let product of products">
-              <td>{{ product.id }}</td>
-              <td>{{ product.sku }}</td>
-              <td>{{ product.barcode || "-" }}</td>
+              <td class="cell-id">{{ product.id }}</td>
+              <td class="cell-code">{{ product.sku }}</td>
+              <td class="cell-code">{{ product.barcode || "-" }}</td>
               <td>{{ product.name }}</td>
               <td>{{ product.categoryId }}</td>
               <td>{{ product.unitId }}</td>
-              <td>{{ product.salePrice | number: "1.2-2" }}</td>
+              <td class="cell-right">
+                S/ {{ product.salePrice | number: "1.2-2" }}
+              </td>
               <td>
                 <span
-                  [class.active]="product.active"
-                  [class.inactive]="!product.active"
+                  class="ui-badge"
+                  [class.ui-badge--success]="product.active"
+                  [class.ui-badge--danger]="!product.active"
                 >
                   {{ product.active ? "Activo" : "Inactivo" }}
                 </span>
               </td>
               <td class="actions">
-                <a [routerLink]="['/catalogo/productos', product.id, 'editar']"
+                <a
+                  class="ui-button ui-button--secondary"
+                  [routerLink]="['/catalogo/productos', product.id, 'editar']"
                   >Editar</a
                 >
                 <button
                   type="button"
-                  class="danger"
+                  class="ui-button ui-button--danger"
                   [disabled]="!product.active || !isAdmin"
                   (click)="deactivate(product)"
                 >
@@ -89,146 +119,146 @@ import { toHttpErrorMessage } from "./data/http-error-message";
               </td>
             </tr>
             <tr *ngIf="products.length === 0">
-              <td colspan="9" class="empty">No hay productos para mostrar.</td>
+              <td colspan="9" class="ui-table__empty">
+                <div class="ui-empty-state">No hay productos para mostrar.</div>
+              </td>
             </tr>
           </tbody>
         </table>
       </div>
 
-      <footer class="pagination">
-        <button
-          type="button"
-          (click)="previousPage()"
-          [disabled]="page === 0 || loading"
-        >
-          Anterior
-        </button>
-        <span
-          >Pagina {{ page + 1 }} de {{ totalPages }} -
-          {{ totalElements }} registros</span
-        >
-        <button
-          type="button"
-          (click)="nextPage()"
-          [disabled]="page + 1 >= totalPages || loading"
-        >
-          Siguiente
-        </button>
+      <footer class="pagination" *ngIf="!loading">
+        <p class="ui-muted pagination-copy">
+          Pagina {{ page + 1 }} de {{ totalPages }} -
+          {{ totalElements }} registros
+        </p>
+
+        <div class="pagination-actions">
+          <button
+            type="button"
+            class="ui-button ui-button--secondary"
+            (click)="previousPage()"
+            [disabled]="page === 0 || loading"
+          >
+            Anterior
+          </button>
+          <button
+            type="button"
+            class="ui-button ui-button--secondary"
+            (click)="nextPage()"
+            [disabled]="page + 1 >= totalPages || loading"
+          >
+            Siguiente
+          </button>
+        </div>
       </footer>
     </section>
   `,
   styles: [
     `
-      .card {
-        background: #fff;
-        border-radius: 0.5rem;
-        padding: 1rem;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      .catalog-page {
+        padding: var(--space-5);
         display: grid;
-        gap: 1rem;
+        gap: var(--space-4);
       }
-      .header {
+
+      .search-panel {
+        display: grid;
+        grid-template-columns: minmax(260px, 1fr) auto;
+        gap: var(--space-3);
+        align-items: end;
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-md);
+        background: var(--color-bg-soft);
+        padding: var(--space-3);
+      }
+
+      .search-field {
+        display: grid;
+        gap: var(--space-1);
+      }
+
+      .search-field span {
+        font-size: var(--font-size-sm);
+        color: var(--color-text-secondary);
+        font-weight: 700;
+      }
+
+      .search-field input {
+        min-width: 0;
+        padding: 0.6rem 0.7rem;
+        border: 1px solid var(--color-border-strong);
+        border-radius: var(--radius-sm);
+        background: var(--color-bg-surface);
+      }
+
+      .search-actions {
         display: flex;
-        justify-content: space-between;
-        gap: 1rem;
-        align-items: flex-start;
-      }
-      .header h1 {
-        margin: 0;
-      }
-      .search-row {
-        display: flex;
-        gap: 0.5rem;
+        gap: var(--space-2);
         flex-wrap: wrap;
+        justify-content: flex-end;
       }
-      input {
-        flex: 1;
-        min-width: 260px;
-        padding: 0.55rem;
-        border: 1px solid #d1d5db;
-        border-radius: 0.35rem;
-      }
-      button,
-      .primary,
-      .actions a {
-        border: 0;
-        border-radius: 0.35rem;
-        padding: 0.5rem 0.75rem;
-        cursor: pointer;
-        text-decoration: none;
-        display: inline-block;
-      }
-      button {
-        background: #111827;
-        color: #fff;
-      }
-      .primary {
-        background: #0f766e;
-        color: #fff;
-      }
-      .secondary {
-        background: #4b5563;
-      }
-      .danger {
-        background: #b91c1c;
-      }
-      .danger[disabled] {
+
+      .ui-button[disabled] {
         opacity: 0.55;
         cursor: not-allowed;
       }
+
       .actions {
         display: flex;
-        gap: 0.4rem;
+        gap: var(--space-2);
         align-items: center;
+        flex-wrap: wrap;
       }
-      .actions a {
-        background: #1f2937;
-        color: #fff;
+
+      .cell-id,
+      .cell-code {
+        white-space: nowrap;
       }
-      .table-wrapper {
-        overflow-x: auto;
+
+      .cell-right {
+        text-align: right;
       }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        min-width: 1000px;
+
+      .catalog-table {
+        min-width: 960px;
       }
-      th,
-      td {
-        text-align: left;
-        padding: 0.55rem;
-        border-bottom: 1px solid #e5e7eb;
-      }
-      .active {
-        color: #166534;
-        font-weight: 600;
-      }
-      .inactive {
-        color: #b91c1c;
-        font-weight: 600;
-      }
+
       .pagination {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        gap: 0.75rem;
+        gap: var(--space-3);
         flex-wrap: wrap;
       }
-      .muted {
-        color: #6b7280;
+
+      .pagination-copy {
         margin: 0;
       }
-      .error {
-        color: #b91c1c;
-        margin: 0;
+
+      .pagination-actions {
+        display: flex;
+        gap: var(--space-2);
+        flex-wrap: wrap;
       }
-      .success {
-        color: #166534;
-        margin: 0;
-      }
-      .empty {
-        text-align: center;
-        color: #6b7280;
+
+      @media (max-width: 980px) {
+        .catalog-page {
+          padding: var(--space-4);
+        }
+
+        .search-panel {
+          grid-template-columns: 1fr;
+        }
+
+        .search-actions {
+          justify-content: flex-start;
+        }
+
+        .pagination {
+          flex-direction: column;
+          align-items: flex-start;
+        }
       }
     `,
   ],

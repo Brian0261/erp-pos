@@ -11,115 +11,159 @@ import { toHttpErrorMessage } from "./data/http-error-message";
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule],
   template: `
-    <section class="card">
-      <h1>Catalogo - Categorias</h1>
+    <section class="ui-card catalog-page">
+      <header class="ui-page-head">
+        <div>
+          <p class="ui-page-kicker">Catalogo InkToy</p>
+          <h1 class="ui-page-title">Categorias</h1>
+          <p class="ui-page-description">
+            Organiza productos por grupos comerciales para facilitar busquedas y
+            reportes.
+          </p>
+        </div>
+      </header>
 
       <form [formGroup]="form" (ngSubmit)="submit()" class="form-grid">
-        <label>
-          Nombre *
-          <input type="text" formControlName="name" />
-          <small class="error" *ngIf="isInvalid('name')"
+        <label class="field">
+          <span>Nombre *</span>
+          <input
+            type="text"
+            formControlName="name"
+            placeholder="Ej. Cuadernos"
+          />
+          <small class="field-error" *ngIf="isInvalid('name')"
             >Nombre es obligatorio.</small
           >
         </label>
 
-        <label>
-          Descripcion
-          <input type="text" formControlName="description" />
+        <label class="field">
+          <span>Descripcion</span>
+          <input
+            type="text"
+            formControlName="description"
+            placeholder="Descripcion breve para uso interno"
+          />
         </label>
 
-        <button type="submit" [disabled]="saving">
-          {{ saving ? "Creando..." : "Crear categoria" }}
-        </button>
+        <div class="form-action">
+          <button
+            type="submit"
+            class="ui-button ui-button--primary"
+            [disabled]="saving"
+          >
+            {{ saving ? "Creando..." : "Crear categoria" }}
+          </button>
+        </div>
       </form>
 
-      <p class="error" *ngIf="errorMessage">{{ errorMessage }}</p>
-      <p class="success" *ngIf="successMessage">{{ successMessage }}</p>
+      <p class="ui-alert ui-alert--error" *ngIf="errorMessage">
+        {{ errorMessage }}
+      </p>
+      <p class="ui-alert ui-alert--success" *ngIf="successMessage">
+        {{ successMessage }}
+      </p>
 
-      <table>
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Nombre</th>
-            <th>Descripcion</th>
-            <th>Estado</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let category of categories">
-            <td>{{ category.id }}</td>
-            <td>{{ category.name }}</td>
-            <td>{{ category.description || "-" }}</td>
-            <td>{{ category.active ? "Activa" : "Inactiva" }}</td>
-          </tr>
-          <tr *ngIf="categories.length === 0">
-            <td colspan="4" class="empty">No hay categorias registradas.</td>
-          </tr>
-        </tbody>
-      </table>
+      <div class="ui-table-wrapper">
+        <table class="ui-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Nombre</th>
+              <th>Descripcion</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let category of categories">
+              <td class="cell-id">{{ category.id }}</td>
+              <td>{{ category.name }}</td>
+              <td>{{ category.description || "-" }}</td>
+              <td>
+                <span
+                  class="ui-badge"
+                  [class.ui-badge--success]="category.active"
+                  [class.ui-badge--danger]="!category.active"
+                >
+                  {{ category.active ? "Activa" : "Inactiva" }}
+                </span>
+              </td>
+            </tr>
+            <tr *ngIf="categories.length === 0">
+              <td colspan="4" class="ui-table__empty">
+                <div class="ui-empty-state">No hay categorias registradas.</div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </section>
   `,
   styles: [
     `
-      .card {
-        background: #fff;
-        border-radius: 0.5rem;
-        padding: 1rem;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      .catalog-page {
+        padding: var(--space-5);
         display: grid;
-        gap: 1rem;
+        gap: var(--space-4);
       }
-      h1 {
-        margin: 0;
-      }
+
       .form-grid {
         display: grid;
-        grid-template-columns: 1fr 1fr auto;
-        gap: 0.75rem;
+        grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr) auto;
+        gap: var(--space-3);
         align-items: end;
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-md);
+        background: var(--color-bg-soft);
+        padding: var(--space-3);
       }
-      label {
+
+      .field {
         display: grid;
-        gap: 0.35rem;
+        gap: var(--space-1);
       }
+
+      .field > span {
+        font-size: var(--font-size-sm);
+        color: var(--color-text-secondary);
+        font-weight: 700;
+      }
+
       input {
-        padding: 0.55rem;
-        border: 1px solid #d1d5db;
-        border-radius: 0.35rem;
+        padding: 0.6rem 0.7rem;
+        border: 1px solid var(--color-border-strong);
+        border-radius: var(--radius-sm);
       }
-      button {
-        padding: 0.55rem 0.9rem;
-        border: 0;
-        border-radius: 0.35rem;
-        background: #0f766e;
-        color: #fff;
-        cursor: pointer;
+
+      .field-error {
+        color: var(--color-danger);
+        font-size: var(--font-size-xs);
       }
-      table {
-        width: 100%;
-        border-collapse: collapse;
+
+      .form-action {
+        display: flex;
+        justify-content: flex-end;
       }
-      th,
-      td {
-        text-align: left;
-        padding: 0.55rem;
-        border-bottom: 1px solid #e5e7eb;
+
+      .ui-button[disabled] {
+        opacity: 0.55;
+        cursor: not-allowed;
       }
-      .error {
-        color: #b91c1c;
-        margin: 0;
+
+      .cell-id {
+        white-space: nowrap;
       }
-      .success {
-        color: #166534;
-        margin: 0;
-      }
-      .empty {
-        text-align: center;
-        color: #6b7280;
-      }
+
       @media (max-width: 900px) {
+        .catalog-page {
+          padding: var(--space-4);
+        }
+
         .form-grid {
           grid-template-columns: 1fr;
+        }
+
+        .form-action {
+          justify-content: flex-start;
         }
       }
     `,

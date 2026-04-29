@@ -20,99 +20,139 @@ import { toHttpErrorMessage } from "./data/http-error-message";
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, RouterLink],
   template: `
-    <section class="card">
-      <header class="header">
+    <section class="ui-card product-form-page">
+      <header class="ui-page-head">
         <div>
-          <h1>{{ isEditMode ? "Editar producto" : "Nuevo producto" }}</h1>
-          <p class="muted">Completa los datos para guardar en catalogo.</p>
+          <p class="ui-page-kicker">Catalogo InkToy</p>
+          <h1 class="ui-page-title">
+            {{ isEditMode ? "Editar producto" : "Nuevo producto" }}
+          </h1>
+          <p class="ui-page-description">
+            Completa los datos comerciales y de inventario para el catalogo.
+          </p>
         </div>
-        <a routerLink="/catalogo/productos" class="secondary"
+        <a
+          routerLink="/catalogo/productos"
+          class="ui-button ui-button--secondary"
           >Volver al listado</a
         >
       </header>
 
-      <p class="error" *ngIf="errorMessage">{{ errorMessage }}</p>
-      <p class="success" *ngIf="successMessage">{{ successMessage }}</p>
-      <p class="muted" *ngIf="loading">Cargando datos...</p>
+      <p class="ui-alert ui-alert--error" *ngIf="errorMessage">
+        {{ errorMessage }}
+      </p>
+      <p class="ui-alert ui-alert--success" *ngIf="successMessage">
+        {{ successMessage }}
+      </p>
+      <p class="ui-alert ui-alert--info" *ngIf="loading">Cargando datos...</p>
 
       <form
         [formGroup]="form"
         (ngSubmit)="submit()"
-        class="grid"
+        class="form-layout"
         *ngIf="!loading"
       >
-        <label>
-          SKU *
-          <input type="text" formControlName="sku" />
-          <small class="error" *ngIf="isInvalid('sku')"
+        <label class="field">
+          <span>SKU *</span>
+          <input type="text" formControlName="sku" placeholder="Ej. LAP-001" />
+          <small class="ui-muted" *ngIf="!isInvalid('sku')"
+            >Identificador interno unico para ventas e inventario.</small
+          >
+          <small class="field-error" *ngIf="isInvalid('sku')"
             >SKU es obligatorio.</small
           >
         </label>
 
-        <label>
-          Codigo de barras
-          <input type="text" formControlName="barcode" />
+        <label class="field">
+          <span>Codigo de barras</span>
+          <input
+            type="text"
+            formControlName="barcode"
+            placeholder="Opcional para escaneo"
+          />
+          <small class="ui-muted"
+            >Se mantiene separado del SKU para no mezclar ambos
+            identificadores.</small
+          >
         </label>
 
-        <label>
-          Nombre *
-          <input type="text" formControlName="name" />
-          <small class="error" *ngIf="isInvalid('name')"
+        <label class="field full">
+          <span>Nombre *</span>
+          <input
+            type="text"
+            formControlName="name"
+            placeholder="Nombre comercial del producto"
+          />
+          <small class="field-error" *ngIf="isInvalid('name')"
             >Nombre es obligatorio.</small
           >
         </label>
 
-        <label class="full">
-          Descripcion
-          <textarea rows="3" formControlName="description"></textarea>
+        <label class="field full">
+          <span>Descripcion</span>
+          <textarea
+            rows="3"
+            formControlName="description"
+            placeholder="Caracteristicas principales, uso o notas comerciales"
+          ></textarea>
         </label>
 
-        <label>
-          Categoria *
+        <label class="field">
+          <span>Categoria *</span>
           <select formControlName="categoryId">
             <option [ngValue]="null">Selecciona una categoria</option>
             <option *ngFor="let category of categories" [ngValue]="category.id">
               {{ category.name }}
             </option>
           </select>
-          <small class="error" *ngIf="isInvalid('categoryId')"
+          <small class="field-error" *ngIf="isInvalid('categoryId')"
             >Categoria es obligatoria.</small
           >
         </label>
 
-        <label>
-          Unidad *
+        <label class="field">
+          <span>Unidad *</span>
           <select formControlName="unitId">
             <option [ngValue]="null">Selecciona una unidad</option>
             <option *ngFor="let unit of units" [ngValue]="unit.id">
               {{ unit.name }} ({{ unit.code }})
             </option>
           </select>
-          <small class="error" *ngIf="isInvalid('unitId')"
+          <small class="field-error" *ngIf="isInvalid('unitId')"
             >Unidad es obligatoria.</small
           >
         </label>
 
-        <label>
-          Precio de venta *
+        <label class="field">
+          <span>Precio de venta *</span>
           <input
             type="number"
             min="0"
             step="0.01"
             formControlName="salePrice"
+            placeholder="0.00"
           />
-          <small class="error" *ngIf="isInvalid('salePrice')">
+          <small class="field-error" *ngIf="isInvalid('salePrice')">
             Precio de venta es obligatorio y debe ser mayor o igual a 0.
           </small>
         </label>
 
         <label class="checkbox" *ngIf="isEditMode">
           <input type="checkbox" formControlName="active" />
-          Activo
+          <span>Producto activo</span>
         </label>
 
         <div class="actions full">
-          <button type="submit" [disabled]="saving">
+          <a
+            routerLink="/catalogo/productos"
+            class="ui-button ui-button--secondary"
+            >Cancelar</a
+          >
+          <button
+            type="submit"
+            class="ui-button ui-button--primary"
+            [disabled]="saving"
+          >
             {{
               saving
                 ? "Guardando..."
@@ -127,88 +167,91 @@ import { toHttpErrorMessage } from "./data/http-error-message";
   `,
   styles: [
     `
-      .card {
-        background: #fff;
-        border-radius: 0.5rem;
-        padding: 1rem;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      .product-form-page {
+        padding: var(--space-5);
         display: grid;
-        gap: 1rem;
+        gap: var(--space-4);
       }
-      .header {
-        display: flex;
-        justify-content: space-between;
-        gap: 1rem;
-        align-items: flex-start;
-      }
-      .header h1 {
-        margin: 0;
-      }
-      .grid {
+
+      .form-layout {
         display: grid;
-        grid-template-columns: repeat(2, minmax(220px, 1fr));
-        gap: 0.9rem;
+        grid-template-columns: repeat(2, minmax(240px, 1fr));
+        gap: var(--space-3);
       }
+
+      .field {
+        display: grid;
+        gap: var(--space-1);
+      }
+
+      .field > span {
+        font-size: var(--font-size-sm);
+        color: var(--color-text-secondary);
+        font-weight: 700;
+      }
+
       .full {
         grid-column: 1 / -1;
       }
-      label {
-        display: grid;
-        gap: 0.35rem;
-        font-size: 0.92rem;
-      }
+
       input,
       textarea,
       select {
-        padding: 0.55rem;
-        border: 1px solid #d1d5db;
-        border-radius: 0.35rem;
-        font: inherit;
+        padding: 0.6rem 0.7rem;
+        border: 1px solid var(--color-border-strong);
+        border-radius: var(--radius-sm);
+        background: var(--color-bg-surface);
       }
+
+      textarea {
+        resize: vertical;
+        min-height: 96px;
+      }
+
+      .field-error {
+        color: var(--color-danger);
+        font-size: var(--font-size-xs);
+      }
+
       .checkbox {
         display: flex;
         align-items: center;
-        gap: 0.5rem;
+        gap: var(--space-2);
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-sm);
+        padding: var(--space-2) var(--space-3);
+        background: var(--color-bg-soft);
       }
+
       .checkbox input {
         width: 16px;
         height: 16px;
       }
+
       .actions {
         display: flex;
         justify-content: flex-end;
+        align-items: center;
+        gap: var(--space-2);
+        flex-wrap: wrap;
       }
-      button,
-      .secondary {
-        border: 0;
-        border-radius: 0.35rem;
-        padding: 0.55rem 0.9rem;
-        cursor: pointer;
-        text-decoration: none;
+
+      .ui-button[disabled] {
+        opacity: 0.55;
+        cursor: not-allowed;
       }
-      button {
-        background: #0f766e;
-        color: #fff;
-      }
-      .secondary {
-        background: #4b5563;
-        color: #fff;
-      }
-      .muted {
-        color: #6b7280;
-        margin: 0;
-      }
-      .error {
-        color: #b91c1c;
-        margin: 0;
-      }
-      .success {
-        color: #166534;
-        margin: 0;
-      }
+
       @media (max-width: 820px) {
-        .grid {
+        .product-form-page {
+          padding: var(--space-4);
+        }
+
+        .form-layout {
           grid-template-columns: 1fr;
+        }
+
+        .actions {
+          justify-content: flex-start;
         }
       }
     `,

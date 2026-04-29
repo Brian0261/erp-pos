@@ -93,3 +93,24 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [x] Sin errores de consola durante validacion por roles en navegador.
 - [x] Sin respuestas HTTP 500 inesperadas en dashboard tras ajuste de consumo de ventas/cotizaciones.
 - [x] Backend/AuthService/guards/interceptor/endpoints no modificados.
+
+## Bloque E1 Catalogo InkToy (2026-04-29)
+
+- [x] Pantallas aplicadas: `/catalogo/productos`, `/catalogo/productos/nuevo`, `/catalogo/productos/:id/editar`, `/catalogo/categorias`, `/catalogo/unidades`.
+- [x] Build frontend (`npm run build`) exitoso tras cambios visuales E1.
+- [x] `docker compose up --build -d` y `docker compose ps` exitosos.
+- [x] ADMIN: busqueda de productos por nombre, SKU y barcode validada.
+- [x] ADMIN: crear producto validado (SKU/barcode independientes).
+- [x] ADMIN: editar producto validado.
+- [x] ADMIN: desactivar producto validado (estado Inactivo + boton deshabilitado).
+- [x] ADMIN: crear categoria validado.
+- [x] ADMIN: crear unidad validado.
+- [x] Refresh directo SPA sin `404` en rutas de catalogo intervenidas.
+- [x] Validacion RBAC visual de menu catalogo:
+  - [x] CAJERO no ve entradas de catalogo.
+  - [x] ALMACENERO ve entradas de catalogo.
+  - [x] SUPERVISOR ve entradas de catalogo.
+- [x] Login/logout funcional para CAJERO, ALMACENERO y SUPERVISOR.
+- [x] Sin errores de consola JavaScript ni errores de runtime (`pageerror`) en pruebas E1.
+- [x] Logo InkToy, layout/sidebar y dashboard permanecen estables.
+- [x] Backend, endpoints, rutas, AuthService, guards e interceptor sin cambios.

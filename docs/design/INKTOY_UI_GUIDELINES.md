@@ -36,15 +36,26 @@ Apply visual consistency across the ERP/POS while preserving MVP behavior.
 5. Keep role-focused quick actions aligned with existing route visibility and RBAC matrix.
 6. Keep dashboard responsive and readable for daily operational use.
 
+## Catalog-Specific Rules (Block E1)
+
+1. Keep product list/search/create/edit/deactivate behavior unchanged; only adjust visual presentation.
+2. Preserve SKU and barcode as independent fields with separate helper text and validation states.
+3. Use consistent page headers, filter blocks, and table wrappers across products, categories, and units.
+4. Use semantic badges for active/inactive status and preserve ADMIN-only deactivation behavior.
+5. Use tokenized button variants (primary/secondary/danger) for clear action hierarchy.
+6. Keep empty, loading, success, and error messages visually consistent with reusable alert styles.
+7. Do not alter routes, guards, interceptors, or service endpoint contracts for catalog modules.
+
 ## Rollout Sequence (Recommended)
 
 1. Block A: foundation (tokens/assets/base classes) - completed.
 2. Block B: login branding - completed.
 3. Block C: shell/layout adaptation - completed.
 4. Block D: dashboard identity refresh - completed.
-5. Block E: module cards and forms.
-6. Block F: tables, statuses, and badges.
-7. Block G: final responsive and QA pass.
+5. Block E1: catalog visual upgrade (products/forms/categories/units) - completed.
+6. Block E2+: remaining modules cards/forms.
+7. Block F: tables, statuses, and badges across remaining modules.
+8. Block G: final responsive and QA pass.
 
 ## Validation Checklist
 
