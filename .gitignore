@@ -22,3 +22,25 @@ frontend/dist/
 Thumbs.db
 .agents/
 skills-lock.json
+
+# Allow only shared team skills under .agents/skills
+!.agents/
+.agents/*
+!.agents/skills/
+.agents/skills/*
+!.agents/skills/brainstorm-safe/
+!.agents/skills/brainstorm-safe/**
+!.agents/skills/changelog-safe/
+!.agents/skills/changelog-safe/**
+<<<<<<< ours
+<<<<<<< ours
+=======
+!.agents/skills/error-handling-safe/
+!.agents/skills/error-handling-safe/**
+>>>>>>> theirs
+=======
+!.agents/skills/error-handling-safe/
+!.agents/skills/error-handling-safe/**
+>>>>>>> theirs
+!.agents/skills/api-design-safe/
+!.agents/skills/api-design-safe/**
