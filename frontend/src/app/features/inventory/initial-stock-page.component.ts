@@ -31,8 +31,11 @@ import { WarehouseService } from "./data/warehouse.service";
         <label class="field">
           <span>Producto *</span>
           <select formControlName="productId">
-            <option [ngValue]="null">Selecciona un producto</option>
-            <option *ngFor="let product of products" [ngValue]="product.id">
+            <option [ngValue]="null">Selecciona un producto activo</option>
+            <option
+              *ngFor="let product of activeProducts()"
+              [ngValue]="product.id"
+            >
               {{ product.name }} (SKU: {{ product.sku }})
             </option>
           </select>
@@ -232,10 +235,7 @@ export class InitialStockPageComponent implements OnInit {
         },
         error: (error: unknown) => {
           this.saving = false;
-          this.errorMessage = toHttpErrorMessage(
-            error,
-            "No se pudo registrar el stock inicial.",
-          );
+          this.errorMessage = this.toSubmitErrorMessage(error);
         },
       });
   }
@@ -245,13 +245,19 @@ export class InitialStockPageComponent implements OnInit {
     return !!control && control.invalid && (control.touched || control.dirty);
   }
 
+  activeProducts(): Product[] {
+    return this.products.filter((product) => product.active === true);
+  }
+
   private loadLookups(): void {
     forkJoin({
       productsPage: this.productService.list(0, 300),
       warehouses: this.warehouseService.list(true),
     }).subscribe({
       next: ({ productsPage, warehouses }) => {
-        this.products = productsPage.content;
+        this.products = productsPage.content.filter(
+          (product) => product.active,
+        );
         this.warehouses = warehouses;
       },
       error: (error: unknown) => {
@@ -261,5 +267,16 @@ export class InitialStockPageComponent implements OnInit {
         );
       },
     });
+  }
+
+  private toSubmitErrorMessage(error: unknown): string {
+    const message = toHttpErrorMessage(
+      error,
+      "No se pudo registrar el stock inicial.",
+    );
+    if (message.includes("Product is inactive")) {
+      return "El producto seleccionado esta inactivo. Elige un producto activo.";
+    }
+    return message;
   }
 }

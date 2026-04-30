@@ -420,3 +420,35 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
   - [x] Sin llamadas a `localhost:8080` desde Angular.
   - [x] Sin solicitudes a `fonts.googleapis.com`.
   - [x] Proxy `/api` operativo.
+
+## Correccion UX FE-007 inventario (2026-04-30)
+
+- [x] Revision tecnica completada en:
+  - [x] `frontend/src/app/features/inventory/initial-stock-page.component.ts`
+  - [x] `frontend/src/app/features/inventory/adjustments-page.component.ts`
+  - [x] `frontend/src/app/features/inventory/transfers-page.component.ts`
+  - [x] `frontend/src/app/features/catalog/data/product.service.ts`
+  - [x] `frontend/src/app/features/catalog/data/catalog.models.ts`
+  - [x] `frontend/src/app/features/inventory/data/inventory.models.ts`
+- [x] Causa identificada: selectores operativos consumian listado general de productos (`productService.list`) y mostraban items inactivos.
+- [x] Correccion UX minima aplicada sin cambios de backend/endpoints/reglas:
+  - [x] Filtro frontend `active === true` en carga de lookups de las 3 pantallas objetivo.
+  - [x] Filtro adicional en render de opciones para asegurar visualizacion exclusiva de productos activos.
+  - [x] Mensaje UX claro mantenido si backend devuelve `422 Product is inactive` por condicion residual.
+  - [x] Sin cambios de payloads ni validaciones de backend.
+- [x] Comandos tecnicos ejecutados:
+  - [x] `cd frontend`
+  - [x] `npm run build`
+  - [x] `cd ..`
+  - [x] `docker compose up --build -d`
+  - [x] `docker compose ps`
+- [x] Validacion manual (browser QA):
+  - [x] `/inventario/stock-inicial` muestra placeholder `Selecciona un producto activo` y solo productos activos.
+  - [x] `/inventario/ajustes` muestra placeholder `Selecciona un producto activo` y solo productos activos.
+  - [x] `/inventario/transferencias` muestra placeholder `Selecciona un producto activo` y solo productos activos.
+  - [x] Productos inactivos conocidos (`Producto E1 504590 Editado`, `Producto Cierre B Editado`, `Producto Sprint2 B`) no aparecen en selectores operativos.
+  - [x] Registro ajuste positivo valido con producto activo: OK.
+  - [x] Registro ajuste negativo valido con producto activo: OK.
+  - [x] Registro transferencia valida con producto activo: OK.
+  - [x] Sin errores de consola inesperados, sin `pageerror` y sin `500` durante corrida final FE-007.
+- [x] Nota operativa QA: para evitar shell cacheada por service worker en auditoria browser se uso `?ngsw-bypass=true` en rutas de verificacion.

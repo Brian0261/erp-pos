@@ -101,9 +101,11 @@ import { WarehouseService } from "./data/warehouse.service";
               <label class="field">
                 <span>Producto *</span>
                 <select formControlName="productId">
-                  <option [ngValue]="null">Selecciona producto</option>
+                  <option [ngValue]="null">
+                    Selecciona un producto activo
+                  </option>
                   <option
-                    *ngFor="let product of products"
+                    *ngFor="let product of activeProducts()"
                     [ngValue]="product.id"
                   >
                     {{ product.name }} (SKU: {{ product.sku }})
@@ -372,10 +374,7 @@ export class TransfersPageComponent implements OnInit {
         },
         error: (error: unknown) => {
           this.saving = false;
-          this.errorMessage = toHttpErrorMessage(
-            error,
-            "No se pudo registrar la transferencia.",
-          );
+          this.errorMessage = this.toSubmitErrorMessage(error);
         },
       });
   }
@@ -383,6 +382,10 @@ export class TransfersPageComponent implements OnInit {
   isInvalid(controlName: string): boolean {
     const control = this.form.get(controlName);
     return !!control && control.invalid && (control.touched || control.dirty);
+  }
+
+  activeProducts(): Product[] {
+    return this.products.filter((product) => product.active === true);
   }
 
   private createItemGroup(): FormGroup {
@@ -401,7 +404,9 @@ export class TransfersPageComponent implements OnInit {
       warehouses: this.warehouseService.list(true),
     }).subscribe({
       next: ({ productsPage, warehouses }) => {
-        this.products = productsPage.content;
+        this.products = productsPage.content.filter(
+          (product) => product.active,
+        );
         this.warehouses = warehouses;
       },
       error: (error: unknown) => {
@@ -411,5 +416,16 @@ export class TransfersPageComponent implements OnInit {
         );
       },
     });
+  }
+
+  private toSubmitErrorMessage(error: unknown): string {
+    const message = toHttpErrorMessage(
+      error,
+      "No se pudo registrar la transferencia.",
+    );
+    if (message.includes("Product is inactive")) {
+      return "El producto seleccionado esta inactivo. Elige un producto activo.";
+    }
+    return message;
   }
 }
