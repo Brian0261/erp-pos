@@ -418,6 +418,31 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
   - [x] Sin HTTP `500` inesperados.
   - [x] Sin CORS.
   - [x] Sin llamadas a `localhost:8080` desde Angular.
+
+## Hotfix UX-001 POS post-venta (2026-04-30)
+
+- [x] Alcance limitado aplicado solo en `frontend/src/app/features/sales/pos-page.component.ts`.
+- [x] Build y runtime de verificacion ejecutados:
+  - [x] `cd frontend` + `npm run build` => OK.
+  - [x] `docker compose up --build -d` => OK.
+  - [x] `docker compose ps` => `postgres` healthy, `backend` up, `frontend` up.
+- [x] Login validado en ambos perfiles operativos solicitados:
+  - [x] `admin@erp.local`.
+  - [x] `cajero@erp.local`.
+- [x] Flujo UX-001 validado en navegador con `ADMIN`:
+  - [x] Acceso a `/pos`.
+  - [x] Refresco de caja y estado `Caja abierta` confirmado (`#15`).
+  - [x] Almacen usado: `S3DST1777141469 - Almacen Destino S3 1777141469`.
+  - [x] Producto usado: `Producto QA Sprint3 1777141469 (SKU-S3-1777141469)`.
+  - [x] Pago usado: `CASH 12.50`.
+  - [x] Venta registrada: `S-1777590981866` (ID `40`).
+  - [x] Mensaje de exito visible: `Venta S-1777590981866 registrada correctamente.`.
+  - [x] CTA post-venta visible tras limpiar carrito/pagos: `Ver venta #40`.
+  - [x] Click en CTA navega a `/ventas/40`.
+  - [x] Detalle de venta carga correctamente (resumen, items y pagos visibles).
+- [x] Estabilidad de la corrida UX-001:
+  - [x] Sin errores `500` inesperados durante el flujo validado.
+  - [x] Sin `pageerror` en el flujo de venta->detalle.
   - [x] Sin solicitudes a `fonts.googleapis.com`.
   - [x] Proxy `/api` operativo.
 

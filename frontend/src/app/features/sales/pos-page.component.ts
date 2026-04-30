@@ -693,6 +693,10 @@ export class PosPageComponent implements OnInit {
     this.errorMessage = "";
     this.successMessage = "";
 
+    if (this.cart.length === 0 && this.lastSaleId !== null) {
+      this.lastSaleId = null;
+    }
+
     const existing = this.cart.find(
       (item) => item.productId === product.productId,
     );
@@ -728,10 +732,12 @@ export class PosPageComponent implements OnInit {
     this.cart.splice(index, 1);
   }
 
-  clearCart(): void {
+  clearCart(clearLastSaleReference = true): void {
     this.cart = [];
     this.payments = [{ paymentMethod: "CASH", amount: 0, reference: "" }];
-    this.lastSaleId = null;
+    if (clearLastSaleReference) {
+      this.lastSaleId = null;
+    }
   }
 
   setQuantity(index: number, rawValue: string): void {
@@ -872,7 +878,7 @@ export class PosPageComponent implements OnInit {
         this.submitting = false;
         this.successMessage = `Venta ${sale.saleNumber} registrada correctamente.`;
         this.lastSaleId = sale.id;
-        this.clearCart();
+        this.clearCart(false);
         this.searchResults = [];
       },
       error: (error: unknown) => {

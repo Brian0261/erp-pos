@@ -14,11 +14,12 @@ Alcance: Angular frontend, integracion REST real, Docker/Nginx, rutas SPA y perm
 | FE-007 | Inventario (operaciones)   | LOW       | Formularios operativos de inventario mostraban productos inactivos en selectores y backend devolvia `422 Product is inactive` | Los selectores consumian listado general de productos sin filtrar `active` en frontend | frontend/src/app/features/inventory/initial-stock-page.component.ts, frontend/src/app/features/inventory/adjustments-page.component.ts, frontend/src/app/features/inventory/transfers-page.component.ts | Se filtro visualmente a productos activos (`active === true`) en carga y render de opciones; se mantiene validacion backend `422` y mensaje claro para casos residuales         | Cerrado                   |
 | FE-008 | Facturacion E6 (emision)   | HIGH      | `CAJERO` no podia completar `/facturacion/emitir/:saleId`; la vista quedaba sin datos por respuestas `403`                    | Desalineacion RBAC entre flujo de emision y endpoint dependiente de series             | backend/src/main/java/com/erppos/backend/erp/billing/adapter/rest/BillingSeriesController.java, frontend/src/app/features/billing/billing-issue-from-sale-page.component.ts                             | Se ajusto RBAC de lectura en `GET /billing/series` para `ADMIN/SUPERVISOR/CAJERO`; emision desde venta validada para `CAJERO` manteniendo bloqueo en configuracion/series admin | Cerrado                   |
 | FE-009 | Facturacion E6 (detalle)   | LOW       | En comprobantes sin XML se observaba error de consola por `404` al consultar XML                                              | La pantalla intentaba cargar XML aun cuando no existia archivo generado                | frontend/src/app/features/billing/billing-document-detail-page.component.ts                                                                                                                             | Se condiciono la carga de XML a `xmlGeneratedAt` y se muestra estado informativo cuando no existe XML; validado sin ruido tecnico y con visualizacion correcta tras generar XML | Cerrado                   |
+| FE-010 | POS (post-venta)           | HIGH      | Tras registrar una venta exitosa desaparecia la accion `Ver venta #ID`, impidiendo navegar de inmediato al detalle            | `clearCart()` reiniciaba `lastSaleId` justo despues de asignarlo en `finalizeSale()`   | frontend/src/app/features/sales/pos-page.component.ts                                                                                                                                                   | Se desacoplo el reseteo del carrito del reseteo de `lastSaleId`; ahora se conserva el enlace post-venta y se limpia al iniciar una nueva operacion                              | Cerrado                   |
 
 ## Resumen de severidades
 
 - CRITICAL: 0
-- HIGH: 4 (4 corregidos, 0 abiertos)
+- HIGH: 5 (5 corregidos, 0 abiertos)
 - MEDIUM: 0
 - LOW: 5 (2 corregidos, 3 abiertos)
 
@@ -38,6 +39,7 @@ Alcance: Angular frontend, integracion REST real, Docker/Nginx, rutas SPA y perm
 - Bloque E6 Facturacion (visual-only) validado en build/docker/smoke por rutas y roles; se confirma flujo completo en ADMIN y envio mock en SUPERVISOR.
 - FE-008 corregido: `CAJERO` emite desde venta en `/facturacion/emitir/:saleId` con series cargadas y sin habilitar gestion administrativa de series/configuracion.
 - FE-009 corregido: detalle evita request XML prematuro y muestra mensaje informativo limpio cuando aun no existe XML.
+- FE-010 corregido: luego de registrar venta en POS se mantiene visible `Ver venta #ID`; navegacion al detalle `/ventas/:id` validada sin errores `500`.
 - FE-007 corregido: `/inventario/stock-inicial`, `/inventario/ajustes` y `/inventario/transferencias` muestran solo productos activos en selectores operativos; pruebas funcionales IN/OUT/transferencia con activos completadas sin `500`.
 - Bloque E7 Reportes y Outbox/Eventos (visual-only) validado en build/docker/smoke UI (`http://localhost:4200`) con rutas E7 completas y matriz RBAC (`ADMIN`, `SUPERVISOR`, `ALMACENERO`, `CAJERO`) sin nuevos hallazgos funcionales ni de seguridad.
 - Auditoria final full-stack InkToy (2026-04-30): validacion tecnica, visual, SPA, smoke y RBAC completada sin nuevos hallazgos `CRITICAL`/`HIGH`; deudas `LOW` vigentes se mantienen sin cambio de severidad.
