@@ -1,4 +1,4 @@
-# InkToy Design System (Bloques A-D)
+# InkToy Design System (Bloques A-E7)
 
 ## Scope
 
@@ -10,6 +10,13 @@ Included in this phase:
 - Block B: login visual brand alignment.
 - Block C: shell visual adaptation (layout/sidebar/topbar/menu states/logout/user summary).
 - Block D: dashboard operational hub with role-aware KPIs, quick actions, alerts, and recent activity.
+- Block E1: catalog visual adaptation (products, categories, units).
+- Block E2: inventory visual adaptation (warehouses, stock, initial stock, adjustments, transfers, kardex).
+- Block E3: POS/cash/sales visual adaptation.
+- Block E4: purchases/suppliers visual adaptation.
+- Block E5: quotes visual adaptation.
+- Block E6: billing visual adaptation.
+- Block E7: reports and outbox/integrations visual adaptation.
 
 Out of scope in this phase:
 
@@ -67,6 +74,12 @@ Reusable classes currently available globally:
 - .ui-badge + modifiers (.ui-badge--success, .ui-badge--warning, .ui-badge--danger)
 - .ui-muted
 - .ui-empty-state
+- .ui-module-page
+- .ui-module-section
+- .ui-filter-grid
+- .ui-kpi-grid
+- .ui-chip (+ semantic modifiers)
+- .ui-table-actions
 
 ## Asset Policy
 
@@ -86,3 +99,13 @@ Current state:
 - Keep role visibility matrix unchanged in sidebar links.
 - Keep dashboard KPIs sourced from existing services/endpoints only (no mocked data).
 - Keep backend contracts unchanged.
+
+## Final QA Gate (Pilot)
+
+Validated in final full-stack closure (2026-04-30):
+
+- Frontend build and Docker runtime healthy.
+- SPA routes load without Nginx fallback errors.
+- Role matrix (`ADMIN`, `CAJERO`, `ALMACENERO`, `SUPERVISOR`) preserved.
+- No unexpected browser runtime errors (`pageerror`, `500`, CORS).
+- No direct frontend calls to `localhost:8080`; proxy `/api` remains authoritative.

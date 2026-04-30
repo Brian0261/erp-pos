@@ -39,3 +39,4 @@ Alcance: Angular frontend, integracion REST real, Docker/Nginx, rutas SPA y perm
 - FE-008 corregido: `CAJERO` emite desde venta en `/facturacion/emitir/:saleId` con series cargadas y sin habilitar gestion administrativa de series/configuracion.
 - FE-009 corregido: detalle evita request XML prematuro y muestra mensaje informativo limpio cuando aun no existe XML.
 - Bloque E7 Reportes y Outbox/Eventos (visual-only) validado en build/docker/smoke UI (`http://localhost:4200`) con rutas E7 completas y matriz RBAC (`ADMIN`, `SUPERVISOR`, `ALMACENERO`, `CAJERO`) sin nuevos hallazgos funcionales ni de seguridad.
+- Auditoria final full-stack InkToy (2026-04-30): validacion tecnica, visual, SPA, smoke y RBAC completada sin nuevos hallazgos `CRITICAL`/`HIGH`; deudas `LOW` vigentes se mantienen sin cambio de severidad.

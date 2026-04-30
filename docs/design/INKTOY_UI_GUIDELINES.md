@@ -117,3 +117,12 @@ Apply visual consistency across the ERP/POS while preserving MVP behavior.
 - /api proxy remains functional.
 - Login still authenticates seeded users.
 - Guarded routes still require token and valid roles.
+
+## Final Pilot Gate (2026-04-30)
+
+1. Validate login, dashboard, sidebar visibility by role, logout, and protected-route redirect after logout.
+2. Validate role matrix end-to-end for `ADMIN`, `CAJERO`, `ALMACENERO`, and `SUPERVISOR` on allowed and blocked routes.
+3. Validate visual consistency on all primary operational modules before pilot (dashboard, catalog, inventory, purchases, pos/caja/ventas, quotes, billing, reports, outbox).
+4. Validate SPA direct refresh on critical routes with no Nginx `404` fallback and no `Cannot GET` body.
+5. Validate smoke navigation and minimal interactions (catalog search, stock, kardex, purchases list, pos, cash, sales, quotes, billing docs, reports, outbox).
+6. Validate browser runtime quality gate: no unexpected JS errors, no `pageerror`, no HTTP `500`, no CORS, no direct `localhost:8080` calls, and no `fonts.googleapis.com` dependency.

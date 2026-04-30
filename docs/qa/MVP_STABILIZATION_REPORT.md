@@ -86,3 +86,46 @@ Comandos adicionales de validacion:
 ## Decision final
 
 MVP estabilizado y apto para piloto interno controlado en el negocio, manteniendo compatibilidad Docker Compose y sin cambios de reglas de negocio.
+
+## Addendum - Cierre final InkToy full-stack (2026-04-30)
+
+### Comandos ejecutados
+
+```powershell
+cd frontend
+npm run build
+cd ..
+docker compose up --build -d
+docker compose ps
+docker compose logs frontend --tail=150
+docker compose logs backend --tail=150
+```
+
+Validaciones adicionales de cierre:
+
+- Browser QA en `http://localhost:4200` (login/layout/logout/rutas/roles/SPA/smoke).
+- Barrido de consola y red en rutas principales con sesion `ADMIN`.
+
+### Resultado de cierre
+
+- Build frontend: OK.
+- Runtime Docker Compose: OK (`postgres` healthy, `backend` up, `frontend` up).
+- Logs:
+  - Frontend Nginx arranca normal, sin errores criticos.
+  - Backend Spring Boot/Flyway/JPA inicia correctamente, sin fallas de migracion.
+- Login/logout y ruta protegida: OK (logout redirige y `/dashboard` vuelve a `/login`).
+- Matriz RBAC frontend por rol (`ADMIN`, `CAJERO`, `ALMACENERO`, `SUPERVISOR`): OK.
+- Rutas principales InkToy: OK (21 pantallas cargan correctamente).
+- SPA refresh directo en rutas criticas: OK (documento `200`, sin `Cannot GET`).
+- Smoke funcional minimo: OK (catalogo, inventario, compras, pos, caja, ventas, cotizaciones, facturacion, reportes, outbox).
+- Outbox solo ADMIN: OK (visible para `ADMIN`, bloqueado para `CAJERO`).
+- Consola/red en barrido final: sin `pageerror`, sin `500`, sin CORS, sin llamadas a `localhost:8080`, sin `fonts.googleapis.com`.
+
+### Hallazgos
+
+- No se detectaron hallazgos nuevos `CRITICAL` ni `HIGH` en el cierre final.
+- Deudas `LOW` existentes permanecen en backlog sin incremento de riesgo.
+
+### Decision de liberacion
+
+Rediseño InkToy validado de forma integral y estable para piloto interno controlado.

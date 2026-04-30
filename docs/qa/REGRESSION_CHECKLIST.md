@@ -369,3 +369,54 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
   - [x] `ALMACENERO`: acceso permitido a `/reportes`; bloqueo en `/reportes/ventas` y `/integraciones/eventos` (redirige a `/dashboard`).
   - [x] `CAJERO`: bloqueo en `/reportes` y `/integraciones/eventos` (redirige a `/dashboard`).
 - [x] Alcance tecnico preservado en E7: sin cambios en backend, contratos API, guards, interceptor, rutas ni reglas RBAC.
+
+## Validacion final full-stack InkToy (2026-04-30)
+
+- [x] Secuencia tecnica final ejecutada:
+  - [x] `npm run build` (frontend) exitoso.
+  - [x] `docker compose up --build -d` exitoso.
+  - [x] `docker compose ps` con `postgres` healthy y servicios `backend/frontend` en `Up`.
+  - [x] `docker compose logs frontend --tail=150` sin errores criticos de Nginx.
+  - [x] `docker compose logs backend --tail=150` con arranque Spring Boot/Flyway/JPA correcto.
+- [x] Login y layout:
+  - [x] `/login` muestra branding InkToy (logo y cabecera).
+  - [x] Login `ADMIN` correcto y carga de `/dashboard`.
+  - [x] Sidebar visible con menu esperado por rol.
+  - [x] Logout funcional.
+  - [x] Ruta protegida `/dashboard` redirige a `/login` tras logout.
+- [x] Matriz de roles (frontend/rutas) validada:
+  - [x] `ADMIN`: login/menu/rutas permitidas OK; acceso a `/integraciones/eventos` y configuracion critica de facturacion.
+  - [x] `CAJERO`: login/menu/rutas permitidas OK; bloqueo en `/reportes`, `/integraciones/eventos`, `/facturacion/configuracion`, `/facturacion/series`.
+  - [x] `ALMACENERO`: login/menu/rutas permitidas OK; bloqueo en rutas comerciales/administrativas no permitidas (`/pos`, `/caja`, `/ventas`, `/integraciones/eventos`, `/reportes/ventas`).
+  - [x] `SUPERVISOR`: login/menu/rutas permitidas OK; bloqueo en `/integraciones/eventos`, `/facturacion/configuracion`, `/facturacion/series` y rutas operativas restringidas de inventario.
+- [x] Pantallas principales validadas visualmente (21 rutas) sin regresion de carga ni perdida de informacion operativa.
+- [x] Navegacion SPA (refresh directo) validada en:
+  - [x] `/dashboard`
+  - [x] `/pos`
+  - [x] `/inventario/stock`
+  - [x] `/compras/ordenes`
+  - [x] `/cotizaciones`
+  - [x] `/facturacion/comprobantes`
+  - [x] `/reportes`
+  - [x] `/integraciones/eventos`
+  - [x] Resultado: documento HTTP `200`, shell Angular cargada, sin `Cannot GET`.
+- [x] Smoke funcional minimo completado:
+  - [x] Busqueda de producto en catalogo.
+  - [x] Consulta de stock.
+  - [x] Consulta de kardex.
+  - [x] Listado de compras.
+  - [x] Carga de POS, caja, ventas, cotizaciones, comprobantes, reportes.
+  - [x] Outbox visible solo para `ADMIN`; bloqueo correcto para `CAJERO`.
+- [x] Consistencia visual final:
+  - [x] Branding InkToy consistente (logo/paleta).
+  - [x] Botones primario/secundario/danger y chips legibles.
+  - [x] Tablas/formularios/estados vacios/mensajes con jerarquia clara.
+  - [x] Responsive basico aceptable en rutas de control (`/dashboard`, `/pos`, `/reportes`) sin overflow horizontal.
+- [x] Consola y red:
+  - [x] Sin errores JS inesperados (`console error = 0` en barrido final ADMIN).
+  - [x] Sin `pageerror`.
+  - [x] Sin HTTP `500` inesperados.
+  - [x] Sin CORS.
+  - [x] Sin llamadas a `localhost:8080` desde Angular.
+  - [x] Sin solicitudes a `fonts.googleapis.com`.
+  - [x] Proxy `/api` operativo.
