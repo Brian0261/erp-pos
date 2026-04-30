@@ -13,112 +13,160 @@ import { SaleResponse } from "./data/sales.models";
   standalone: true,
   imports: [CommonModule, RouterLink],
   template: `
-    <section class="card">
-      <header class="header">
+    <section class="ui-card sale-detail-page">
+      <header class="ui-page-head">
         <div>
-          <h1 *ngIf="sale">Venta {{ sale.saleNumber }}</h1>
-          <h1 *ngIf="!sale">Detalle de venta</h1>
-          <p class="muted">Consulta de items, pagos y estado.</p>
+          <p class="ui-page-kicker">Operacion Comercial InkToy</p>
+          <h1 class="ui-page-title" *ngIf="sale">
+            Venta {{ sale.saleNumber }}
+          </h1>
+          <h1 class="ui-page-title" *ngIf="!sale">Detalle de venta</h1>
+          <p class="ui-page-description">Consulta de items, pagos y estado.</p>
         </div>
-        <a class="button secondary" [routerLink]="['/ventas']"
+
+        <a class="ui-button ui-button--secondary" [routerLink]="['/ventas']"
           >Volver al listado</a
         >
       </header>
 
-      <p class="error" *ngIf="errorMessage">{{ errorMessage }}</p>
-      <p class="success" *ngIf="successMessage">{{ successMessage }}</p>
-      <p class="muted" *ngIf="loading">Cargando detalle de venta...</p>
+      <p class="ui-alert ui-alert--error" *ngIf="errorMessage">
+        {{ errorMessage }}
+      </p>
+      <p class="ui-alert ui-alert--success" *ngIf="successMessage">
+        {{ successMessage }}
+      </p>
+      <p class="ui-alert ui-alert--info" *ngIf="loading">
+        Cargando detalle de venta...
+      </p>
 
       <ng-container *ngIf="sale && !loading">
-        <article class="summary-grid">
-          <p><strong>ID:</strong> #{{ sale.id }}</p>
-          <p><strong>Nro venta:</strong> {{ sale.saleNumber }}</p>
-          <p><strong>Estado:</strong> {{ sale.status }}</p>
-          <p>
-            <strong>Fecha:</strong> {{ sale.soldAt | date: "yyyy-MM-dd HH:mm" }}
-          </p>
-          <p><strong>Usuario:</strong> {{ sale.createdBy }}</p>
-          <p><strong>Caja:</strong> #{{ sale.cashRegisterSessionId }}</p>
-          <p><strong>Almacen:</strong> #{{ sale.warehouseId }}</p>
-          <p>
-            <strong>Anulada en:</strong>
-            {{
-              sale.voidedAt ? (sale.voidedAt | date: "yyyy-MM-dd HH:mm") : "-"
-            }}
-          </p>
-          <p><strong>Motivo anulacion:</strong> {{ sale.voidReason || "-" }}</p>
+        <article class="summary-panel">
+          <div class="summary-head">
+            <h2>Resumen</h2>
+            <span
+              class="ui-badge"
+              [class.ui-badge--danger]="sale.status === 'VOIDED'"
+              [class.ui-badge--success]="sale.status !== 'VOIDED'"
+            >
+              {{ sale.status }}
+            </span>
+          </div>
+
+          <div class="summary-grid">
+            <p><strong>ID:</strong> #{{ sale.id }}</p>
+            <p><strong>Nro venta:</strong> {{ sale.saleNumber }}</p>
+            <p>
+              <strong>Fecha:</strong>
+              {{ sale.soldAt | date: "yyyy-MM-dd HH:mm" }}
+            </p>
+            <p><strong>Usuario:</strong> {{ sale.createdBy }}</p>
+            <p><strong>Caja:</strong> #{{ sale.cashRegisterSessionId }}</p>
+            <p><strong>Almacen:</strong> #{{ sale.warehouseId }}</p>
+            <p>
+              <strong>Anulada en:</strong>
+              {{
+                sale.voidedAt ? (sale.voidedAt | date: "yyyy-MM-dd HH:mm") : "-"
+              }}
+            </p>
+            <p class="full-width">
+              <strong>Motivo anulacion:</strong> {{ sale.voidReason || "-" }}
+            </p>
+          </div>
         </article>
 
         <article class="panel">
-          <h2>Items</h2>
-          <table>
-            <thead>
-              <tr>
-                <th>Producto</th>
-                <th>Cantidad</th>
-                <th>Precio unitario</th>
-                <th>Descuento</th>
-                <th>Total linea</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let item of sale.items">
-                <td>Producto #{{ item.productId }}</td>
-                <td>{{ item.quantity | number: "1.0-3" }}</td>
-                <td>{{ item.unitPrice | number: "1.2-2" }}</td>
-                <td>{{ item.discountAmount | number: "1.2-2" }}</td>
-                <td>{{ item.lineTotal | number: "1.2-2" }}</td>
-              </tr>
-            </tbody>
-          </table>
+          <header class="panel-head">
+            <h2>Items</h2>
+            <span class="ui-badge">{{ sale.items.length }} lineas</span>
+          </header>
+          <div class="ui-table-wrapper">
+            <table class="ui-table items-table">
+              <thead>
+                <tr>
+                  <th>Producto</th>
+                  <th class="cell-number">Cantidad</th>
+                  <th class="cell-number">Precio unitario</th>
+                  <th class="cell-number">Descuento</th>
+                  <th class="cell-number">Total linea</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let item of sale.items">
+                  <td>Producto #{{ item.productId }}</td>
+                  <td class="cell-number">
+                    {{ item.quantity | number: "1.0-3" }}
+                  </td>
+                  <td class="cell-number">
+                    {{ item.unitPrice | number: "1.2-2" }}
+                  </td>
+                  <td class="cell-number">
+                    {{ item.discountAmount | number: "1.2-2" }}
+                  </td>
+                  <td class="cell-number">
+                    {{ item.lineTotal | number: "1.2-2" }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </article>
 
         <article class="panel">
-          <h2>Pagos</h2>
-          <table>
-            <thead>
-              <tr>
-                <th>Metodo</th>
-                <th>Monto</th>
-                <th>Referencia</th>
-                <th>Fecha</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let payment of sale.payments">
-                <td>{{ payment.paymentMethod }}</td>
-                <td>{{ payment.amount | number: "1.2-2" }}</td>
-                <td>{{ payment.reference || "-" }}</td>
-                <td>{{ payment.createdAt | date: "yyyy-MM-dd HH:mm" }}</td>
-              </tr>
-            </tbody>
-          </table>
+          <header class="panel-head">
+            <h2>Pagos</h2>
+            <span class="ui-badge">{{ sale.payments.length }} movimientos</span>
+          </header>
+          <div class="ui-table-wrapper">
+            <table class="ui-table payments-table">
+              <thead>
+                <tr>
+                  <th>Metodo</th>
+                  <th class="cell-number">Monto</th>
+                  <th>Referencia</th>
+                  <th>Fecha</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let payment of sale.payments">
+                  <td>{{ payment.paymentMethod }}</td>
+                  <td class="cell-number">
+                    {{ payment.amount | number: "1.2-2" }}
+                  </td>
+                  <td>{{ payment.reference || "-" }}</td>
+                  <td>{{ payment.createdAt | date: "yyyy-MM-dd HH:mm" }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </article>
 
-        <article class="totals">
-          <p>
-            <strong>Subtotal:</strong>
-            {{ sale.subtotalAmount | number: "1.2-2" }}
-          </p>
-          <p>
-            <strong>Descuento:</strong>
-            {{ sale.discountAmount | number: "1.2-2" }}
-          </p>
-          <p>
-            <strong>Total:</strong> {{ sale.totalAmount | number: "1.2-2" }}
-          </p>
-          <p>
-            <strong>Pagado:</strong> {{ sale.paidAmount | number: "1.2-2" }}
-          </p>
-          <p>
-            <strong>Vuelto:</strong> {{ sale.changeAmount | number: "1.2-2" }}
-          </p>
+        <article class="totals-panel">
+          <div class="total-item">
+            <p class="label">Subtotal</p>
+            <p class="value">{{ sale.subtotalAmount | number: "1.2-2" }}</p>
+          </div>
+          <div class="total-item">
+            <p class="label">Descuento</p>
+            <p class="value">{{ sale.discountAmount | number: "1.2-2" }}</p>
+          </div>
+          <div class="total-item total-item--strong">
+            <p class="label">Total</p>
+            <p class="value">{{ sale.totalAmount | number: "1.2-2" }}</p>
+          </div>
+          <div class="total-item">
+            <p class="label">Pagado</p>
+            <p class="value">{{ sale.paidAmount | number: "1.2-2" }}</p>
+          </div>
+          <div class="total-item total-item--accent">
+            <p class="label">Vuelto</p>
+            <p class="value">{{ sale.changeAmount | number: "1.2-2" }}</p>
+          </div>
         </article>
 
         <footer class="actions">
           <a
             *ngIf="canVoidSale()"
-            class="button danger"
+            class="ui-button ui-button--danger"
             [routerLink]="['/ventas', sale.id, 'anular']"
           >
             Anular venta
@@ -129,98 +177,144 @@ import { SaleResponse } from "./data/sales.models";
   `,
   styles: [
     `
-      .card {
-        background: #fff;
-        border-radius: 0.5rem;
-        padding: 1rem;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      .sale-detail-page {
+        padding: var(--space-5);
         display: grid;
-        gap: 1rem;
+        gap: var(--space-4);
       }
-      .header {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        gap: 1rem;
-      }
+
       h1,
       h2 {
         margin: 0;
       }
+
+      .summary-panel {
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-md);
+        background: var(--color-bg-soft);
+        padding: var(--space-3);
+        display: grid;
+        gap: var(--space-3);
+      }
+
+      .summary-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: var(--space-2);
+        flex-wrap: wrap;
+      }
+
       .summary-grid {
         display: grid;
         grid-template-columns: repeat(3, minmax(180px, 1fr));
-        gap: 0.5rem 0.8rem;
+        gap: var(--space-2) var(--space-4);
       }
-      .summary-grid p,
-      .muted,
-      .error,
-      .success {
+
+      .summary-grid p {
         margin: 0;
       }
+
+      .full-width {
+        grid-column: 1 / -1;
+      }
+
       .panel {
-        border: 1px solid #e5e7eb;
-        border-radius: 0.5rem;
-        padding: 0.7rem;
-        overflow-x: auto;
-      }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-      }
-      th,
-      td {
-        border-bottom: 1px solid #e5e7eb;
-        padding: 0.45rem;
-        text-align: left;
-      }
-      .totals {
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-md);
+        padding: var(--space-3);
         display: grid;
-        grid-template-columns: repeat(5, minmax(150px, 1fr));
-        gap: 0.5rem;
+        gap: var(--space-3);
+        background: var(--color-bg-surface);
       }
-      .totals p {
+
+      .panel-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: var(--space-2);
+        flex-wrap: wrap;
+      }
+
+      .items-table,
+      .payments-table {
+        min-width: 720px;
+      }
+
+      .cell-number {
+        text-align: right;
+        white-space: nowrap;
+      }
+
+      .totals-panel {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(130px, 1fr));
+        gap: var(--space-2);
+      }
+
+      .total-item {
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-sm);
+        background: var(--color-bg-soft);
+        padding: var(--space-2) var(--space-3);
+        display: grid;
+        gap: var(--space-1);
+      }
+
+      .total-item .label {
         margin: 0;
-        background: #f3f4f6;
-        padding: 0.5rem;
-        border-radius: 0.35rem;
+        font-size: var(--font-size-xs);
+        color: var(--color-text-secondary);
+        font-weight: 700;
+        text-transform: uppercase;
       }
+
+      .total-item .value {
+        margin: 0;
+        font-weight: 800;
+        font-size: var(--font-size-lg);
+      }
+
+      .total-item--strong {
+        border-color: #c7d2fe;
+        background: #eef2ff;
+      }
+
+      .total-item--strong .value {
+        color: var(--color-brand-primary);
+      }
+
+      .total-item--accent {
+        border-color: #bbf7d0;
+        background: #f0fdf4;
+      }
+
+      .total-item--accent .value {
+        color: var(--color-success);
+      }
+
       .actions {
         display: flex;
-        gap: 0.5rem;
+        gap: var(--space-2);
+        flex-wrap: wrap;
       }
-      .button {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.35rem;
-        text-decoration: none;
-        padding: 0.5rem 0.75rem;
-        border-radius: 0.35rem;
-        background: #0f766e;
-        color: #fff;
+
+      .ui-button {
+        white-space: nowrap;
       }
-      .secondary {
-        background: #374151;
-      }
-      .danger {
-        background: #b91c1c;
-      }
-      .muted {
-        color: #6b7280;
-      }
-      .error {
-        color: #b91c1c;
-      }
-      .success {
-        color: #166534;
-      }
+
       @media (max-width: 900px) {
-        .header {
-          flex-direction: column;
+        .sale-detail-page {
+          padding: var(--space-4);
         }
+
         .summary-grid,
-        .totals {
+        .totals-panel {
           grid-template-columns: 1fr;
+        }
+
+        .full-width {
+          grid-column: auto;
         }
       }
     `,

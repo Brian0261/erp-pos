@@ -11,21 +11,60 @@ import { CashRegisterResponse } from "./data/sales.models";
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule],
   template: `
-    <section class="card">
-      <header>
-        <h1>Caja</h1>
-        <p class="muted">Apertura, consulta y cierre de caja.</p>
+    <section class="ui-card cash-page">
+      <header class="ui-page-head">
+        <div>
+          <p class="ui-page-kicker">Operacion Comercial InkToy</p>
+          <h1 class="ui-page-title">Caja</h1>
+          <p class="ui-page-description">
+            Gestiona apertura, consulta y cierre de caja manteniendo
+            trazabilidad de montos operativos.
+          </p>
+        </div>
+
+        <div class="head-actions">
+          <span
+            class="ui-badge"
+            [class.ui-badge--success]="hasOpenSession"
+            [class.ui-badge--warning]="!hasOpenSession"
+          >
+            {{ hasOpenSession ? "Sesion OPEN" : "Sin sesion OPEN" }}
+          </span>
+          <button
+            type="button"
+            class="ui-button ui-button--secondary"
+            (click)="loadCurrentSession()"
+          >
+            Refrescar caja actual
+          </button>
+        </div>
       </header>
 
-      <p class="error" *ngIf="errorMessage">{{ errorMessage }}</p>
-      <p class="success" *ngIf="successMessage">{{ successMessage }}</p>
+      <p class="ui-alert ui-alert--error" *ngIf="errorMessage">
+        {{ errorMessage }}
+      </p>
+      <p class="ui-alert ui-alert--success" *ngIf="successMessage">
+        {{ successMessage }}
+      </p>
 
       <article class="panel">
-        <h2>Caja actual</h2>
+        <header class="block-head">
+          <h2>Caja actual</h2>
+        </header>
+
         <ng-container *ngIf="currentSession; else noCurrentSession">
           <div class="session-grid">
             <p><strong>ID:</strong> #{{ currentSession.id }}</p>
-            <p><strong>Estado:</strong> {{ currentSession.status }}</p>
+            <p>
+              <strong>Estado:</strong>
+              <span
+                class="ui-badge"
+                [class.ui-badge--success]="currentSession.status === 'OPEN'"
+                [class.ui-badge--danger]="currentSession.status !== 'OPEN'"
+              >
+                {{ currentSession.status }}
+              </span>
+            </p>
             <p>
               <strong>Apertura:</strong>
               {{ currentSession.openedAt | date: "yyyy-MM-dd HH:mm" }}
@@ -44,37 +83,52 @@ import { CashRegisterResponse } from "./data/sales.models";
             </p>
             <p>
               <strong>Monto contado:</strong>
-              {{ currentSession.countedAmount ?? "-" }}
+              {{
+                currentSession.countedAmount !== null
+                  ? (currentSession.countedAmount | number: "1.2-2")
+                  : "-"
+              }}
             </p>
             <p>
               <strong>Efectivo esperado:</strong>
-              {{ currentSession.expectedCashAmount ?? "-" }}
+              {{
+                currentSession.expectedCashAmount !== null
+                  ? (currentSession.expectedCashAmount | number: "1.2-2")
+                  : "-"
+              }}
             </p>
             <p>
               <strong>Diferencia:</strong>
-              {{ currentSession.differenceAmount ?? "-" }}
+              {{
+                currentSession.differenceAmount !== null
+                  ? (currentSession.differenceAmount | number: "1.2-2")
+                  : "-"
+              }}
             </p>
-            <p><strong>Notas:</strong> {{ currentSession.notes || "-" }}</p>
+            <p class="full-width">
+              <strong>Notas:</strong> {{ currentSession.notes || "-" }}
+            </p>
           </div>
         </ng-container>
         <ng-template #noCurrentSession>
-          <p class="muted">No hay caja abierta para el usuario actual.</p>
+          <p class="ui-empty-state">
+            No hay caja abierta para el usuario actual.
+          </p>
         </ng-template>
-
-        <button type="button" class="secondary" (click)="loadCurrentSession()">
-          Refrescar caja actual
-        </button>
       </article>
 
       <article class="panel">
-        <h2>Abrir caja</h2>
+        <header class="block-head">
+          <h2>Abrir caja</h2>
+        </header>
+
         <form
           [formGroup]="openForm"
           (ngSubmit)="openCashRegister()"
           class="form-grid"
         >
-          <label>
-            Monto inicial *
+          <label class="field">
+            <span>Monto inicial *</span>
             <input
               type="number"
               formControlName="openingAmount"
@@ -83,29 +137,37 @@ import { CashRegisterResponse } from "./data/sales.models";
             />
           </label>
 
-          <label>
-            Notas
+          <label class="field">
+            <span>Notas</span>
             <textarea formControlName="notes" maxlength="400"></textarea>
           </label>
 
-          <button type="submit" [disabled]="opening || hasOpenSession">
+          <button
+            type="submit"
+            class="ui-button ui-button--primary"
+            [disabled]="opening || hasOpenSession"
+          >
             Abrir caja
           </button>
         </form>
-        <p class="muted" *ngIf="hasOpenSession">
+
+        <p class="ui-alert ui-alert--info" *ngIf="hasOpenSession">
           Ya existe una caja abierta. Cierra la caja actual antes de abrir otra.
         </p>
       </article>
 
       <article class="panel" *ngIf="hasOpenSession">
-        <h2>Cerrar caja</h2>
+        <header class="block-head">
+          <h2>Cerrar caja</h2>
+        </header>
+
         <form
           [formGroup]="closeForm"
           (ngSubmit)="closeCashRegister()"
           class="form-grid"
         >
-          <label>
-            Monto contado *
+          <label class="field">
+            <span>Monto contado *</span>
             <input
               type="number"
               formControlName="countedAmount"
@@ -114,17 +176,26 @@ import { CashRegisterResponse } from "./data/sales.models";
             />
           </label>
 
-          <label>
-            Notas
+          <label class="field">
+            <span>Notas</span>
             <textarea formControlName="notes" maxlength="400"></textarea>
           </label>
 
-          <button type="submit" [disabled]="closing">Cerrar caja</button>
+          <button
+            type="submit"
+            class="ui-button ui-button--danger"
+            [disabled]="closing"
+          >
+            Cerrar caja
+          </button>
         </form>
       </article>
 
       <article class="panel">
-        <h2>Consultar caja por ID</h2>
+        <header class="block-head">
+          <h2>Consultar caja por ID</h2>
+        </header>
+
         <form
           [formGroup]="lookupForm"
           (ngSubmit)="lookupById()"
@@ -136,12 +207,23 @@ import { CashRegisterResponse } from "./data/sales.models";
             min="1"
             placeholder="ID de caja"
           />
-          <button type="submit">Buscar</button>
+          <button type="submit" class="ui-button ui-button--secondary">
+            Buscar
+          </button>
         </form>
 
-        <div *ngIf="lookupSession" class="session-grid">
+        <div *ngIf="lookupSession" class="session-grid lookup-grid">
           <p><strong>ID:</strong> #{{ lookupSession.id }}</p>
-          <p><strong>Estado:</strong> {{ lookupSession.status }}</p>
+          <p>
+            <strong>Estado:</strong>
+            <span
+              class="ui-badge"
+              [class.ui-badge--success]="lookupSession.status === 'OPEN'"
+              [class.ui-badge--danger]="lookupSession.status !== 'OPEN'"
+            >
+              {{ lookupSession.status }}
+            </span>
+          </p>
           <p>
             <strong>Apertura:</strong>
             {{ lookupSession.openedAt | date: "yyyy-MM-dd HH:mm" }}
@@ -160,15 +242,27 @@ import { CashRegisterResponse } from "./data/sales.models";
           </p>
           <p>
             <strong>Monto contado:</strong>
-            {{ lookupSession.countedAmount ?? "-" }}
+            {{
+              lookupSession.countedAmount !== null
+                ? (lookupSession.countedAmount | number: "1.2-2")
+                : "-"
+            }}
           </p>
           <p>
             <strong>Efectivo esperado:</strong>
-            {{ lookupSession.expectedCashAmount ?? "-" }}
+            {{
+              lookupSession.expectedCashAmount !== null
+                ? (lookupSession.expectedCashAmount | number: "1.2-2")
+                : "-"
+            }}
           </p>
           <p>
             <strong>Diferencia:</strong>
-            {{ lookupSession.differenceAmount ?? "-" }}
+            {{
+              lookupSession.differenceAmount !== null
+                ? (lookupSession.differenceAmount | number: "1.2-2")
+                : "-"
+            }}
           </p>
         </div>
       </article>
@@ -176,85 +270,126 @@ import { CashRegisterResponse } from "./data/sales.models";
   `,
   styles: [
     `
-      .card {
-        background: #fff;
-        border-radius: 0.5rem;
-        padding: 1rem;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      .cash-page {
+        padding: var(--space-5);
         display: grid;
-        gap: 1rem;
+        gap: var(--space-4);
       }
+
+      .head-actions {
+        display: flex;
+        gap: var(--space-2);
+        align-items: center;
+        flex-wrap: wrap;
+      }
+
       h1,
       h2 {
         margin: 0;
       }
+
       .panel {
-        border: 1px solid #e5e7eb;
-        border-radius: 0.5rem;
-        padding: 0.8rem;
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-md);
+        padding: var(--space-3);
+        background: var(--color-bg-surface);
         display: grid;
-        gap: 0.75rem;
+        gap: var(--space-3);
       }
+
+      .block-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: var(--space-2);
+        flex-wrap: wrap;
+      }
+
       .form-grid {
         display: grid;
-        gap: 0.6rem;
+        gap: var(--space-3);
       }
-      label {
+
+      .field {
         display: grid;
-        gap: 0.35rem;
+        gap: var(--space-1);
       }
+
+      .field span {
+        font-size: var(--font-size-sm);
+        color: var(--color-text-secondary);
+        font-weight: 700;
+      }
+
       input,
-      textarea,
-      button {
-        padding: 0.5rem 0.7rem;
-        border-radius: 0.35rem;
-        border: 1px solid #d1d5db;
-      }
       textarea {
-        min-height: 70px;
+        padding: 0.6rem 0.7rem;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--color-border-strong);
+        background: var(--color-bg-surface);
+      }
+
+      textarea {
+        min-height: 88px;
         resize: vertical;
       }
-      button {
-        border: 0;
-        background: #0f766e;
-        color: #fff;
-        cursor: pointer;
-      }
-      .secondary {
-        background: #374151;
+
+      .ui-button {
         width: fit-content;
       }
+
+      .ui-button[disabled] {
+        opacity: 0.55;
+        cursor: not-allowed;
+      }
+
       .lookup-row {
         display: grid;
-        grid-template-columns: 200px auto;
-        gap: 0.5rem;
+        grid-template-columns: minmax(160px, 220px) auto;
+        gap: var(--space-2);
+        align-items: center;
       }
+
       .session-grid {
         display: grid;
         grid-template-columns: repeat(2, minmax(180px, 1fr));
-        gap: 0.45rem 0.8rem;
+        gap: var(--space-2) var(--space-4);
       }
-      .session-grid p,
-      .muted,
-      .error,
-      .success {
+
+      .session-grid p {
         margin: 0;
       }
-      .muted {
-        color: #6b7280;
+
+      .full-width {
+        grid-column: 1 / -1;
       }
-      .error {
-        color: #b91c1c;
+
+      .lookup-grid {
+        border-top: 1px solid var(--color-border-default);
+        padding-top: var(--space-3);
       }
-      .success {
-        color: #166534;
+
+      .ui-empty-state {
+        text-align: left;
+        padding: 0;
       }
+
       @media (max-width: 800px) {
+        .cash-page {
+          padding: var(--space-4);
+        }
+
         .session-grid {
           grid-template-columns: 1fr;
         }
+
+        .full-width {
+          grid-column: auto;
+        }
+
         .lookup-row {
           grid-template-columns: 1fr;
+          align-items: stretch;
         }
       }
     `,

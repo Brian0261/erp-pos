@@ -14,41 +14,79 @@ import { SaleResponse } from "./data/sales.models";
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, RouterLink],
   template: `
-    <section class="card">
-      <header>
-        <h1>Anular venta</h1>
-        <p class="muted">Registra el motivo y confirma la anulacion.</p>
+    <section class="ui-card sale-void-page">
+      <header class="ui-page-head">
+        <div>
+          <p class="ui-page-kicker">Operacion Comercial InkToy</p>
+          <h1 class="ui-page-title">Anular venta</h1>
+          <p class="ui-page-description">
+            Registra el motivo y confirma la anulacion para devolver stock y
+            dejar trazabilidad operativa.
+          </p>
+        </div>
       </header>
 
-      <p class="error" *ngIf="errorMessage">{{ errorMessage }}</p>
-      <p class="success" *ngIf="successMessage">{{ successMessage }}</p>
-      <p class="muted" *ngIf="loading">Cargando venta...</p>
+      <p class="ui-alert ui-alert--error" *ngIf="errorMessage">
+        {{ errorMessage }}
+      </p>
+      <p class="ui-alert ui-alert--success" *ngIf="successMessage">
+        {{ successMessage }}
+      </p>
+      <p class="ui-alert ui-alert--info" *ngIf="loading">Cargando venta...</p>
 
       <ng-container *ngIf="sale && !loading">
         <article class="summary">
-          <p><strong>Venta:</strong> {{ sale.saleNumber }} (#{{ sale.id }})</p>
-          <p><strong>Estado:</strong> {{ sale.status }}</p>
+          <div class="summary-head">
+            <h2>Venta objetivo</h2>
+            <span
+              class="ui-badge"
+              [class.ui-badge--success]="sale.status === 'COMPLETED'"
+              [class.ui-badge--danger]="sale.status !== 'COMPLETED'"
+            >
+              {{ sale.status }}
+            </span>
+          </div>
+
+          <div class="summary-grid">
+            <p>
+              <strong>Venta:</strong> {{ sale.saleNumber }} (#{{ sale.id }})
+            </p>
+            <p>
+              <strong>Total:</strong> {{ sale.totalAmount | number: "1.2-2" }}
+            </p>
+            <p>
+              <strong>Fecha:</strong>
+              {{ sale.soldAt | date: "yyyy-MM-dd HH:mm" }}
+            </p>
+          </div>
+        </article>
+
+        <article class="warning-panel">
           <p>
-            <strong>Total:</strong> {{ sale.totalAmount | number: "1.2-2" }}
-          </p>
-          <p>
-            <strong>Fecha:</strong> {{ sale.soldAt | date: "yyyy-MM-dd HH:mm" }}
+            Esta accion es irreversible en la operacion diaria. Verifica caja,
+            montos y autorizacion antes de confirmar.
           </p>
         </article>
 
         <form [formGroup]="voidForm" (ngSubmit)="voidSale()" class="void-form">
-          <label>
-            Motivo *
-            <textarea formControlName="reason" maxlength="400"></textarea>
+          <label class="field">
+            <span>Motivo *</span>
+            <textarea
+              formControlName="reason"
+              maxlength="400"
+              placeholder="Describe brevemente por que se anula la venta"
+            ></textarea>
           </label>
 
           <div class="actions">
-            <a class="button secondary" [routerLink]="['/ventas', sale.id]"
+            <a
+              class="ui-button ui-button--secondary"
+              [routerLink]="['/ventas', sale.id]"
               >Cancelar</a
             >
             <button
               type="submit"
-              class="danger"
+              class="ui-button ui-button--danger"
               [disabled]="submitting || !canVoidSale()"
             >
               Confirmar anulacion
@@ -56,7 +94,7 @@ import { SaleResponse } from "./data/sales.models";
           </div>
         </form>
 
-        <p class="muted" *ngIf="!canVoidSale()">
+        <p class="ui-alert ui-alert--info" *ngIf="!canVoidSale()">
           Solo ADMIN/SUPERVISOR puede anular ventas en estado COMPLETED.
         </p>
       </ng-container>
@@ -64,76 +102,104 @@ import { SaleResponse } from "./data/sales.models";
   `,
   styles: [
     `
-      .card {
-        background: #fff;
-        border-radius: 0.5rem;
-        padding: 1rem;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      .sale-void-page {
+        padding: var(--space-5);
         display: grid;
-        gap: 1rem;
+        gap: var(--space-4);
       }
+
       h1 {
         margin: 0;
       }
+
       .summary {
-        border: 1px solid #e5e7eb;
-        border-radius: 0.5rem;
-        padding: 0.7rem;
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-md);
+        background: var(--color-bg-soft);
+        padding: var(--space-3);
         display: grid;
-        gap: 0.4rem;
+        gap: var(--space-3);
       }
-      .summary p,
-      .muted,
-      .error,
-      .success {
-        margin: 0;
-      }
-      .void-form {
-        display: grid;
-        gap: 0.75rem;
-      }
-      label {
-        display: grid;
-        gap: 0.35rem;
-      }
-      textarea,
-      button,
-      .button {
-        padding: 0.5rem 0.7rem;
-        border-radius: 0.35rem;
-      }
-      textarea {
-        min-height: 100px;
-        border: 1px solid #d1d5db;
-        resize: vertical;
-      }
-      button,
-      .button {
-        border: 0;
-        background: #0f766e;
-        color: #fff;
-        cursor: pointer;
-        text-decoration: none;
-      }
-      .secondary {
-        background: #374151;
-      }
-      .danger {
-        background: #b91c1c;
-      }
-      .actions {
+
+      .summary-head {
         display: flex;
-        gap: 0.5rem;
+        justify-content: space-between;
+        align-items: center;
+        gap: var(--space-2);
         flex-wrap: wrap;
       }
-      .muted {
-        color: #6b7280;
+
+      .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(180px, 1fr));
+        gap: var(--space-2);
       }
-      .error {
-        color: #b91c1c;
+
+      .summary p {
+        margin: 0;
       }
-      .success {
-        color: #166534;
+
+      .warning-panel {
+        border: 1px solid #fecaca;
+        background: #fff1f2;
+        color: #881337;
+        border-radius: var(--radius-md);
+        padding: var(--space-3);
+      }
+
+      .warning-panel p {
+        margin: 0;
+        font-weight: 700;
+      }
+
+      .void-form {
+        display: grid;
+        gap: var(--space-3);
+      }
+
+      .field {
+        display: grid;
+        gap: var(--space-1);
+      }
+
+      .field span {
+        font-size: var(--font-size-sm);
+        color: var(--color-text-secondary);
+        font-weight: 700;
+      }
+
+      textarea,
+      input {
+        padding: 0.6rem 0.7rem;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--color-border-strong);
+        background: var(--color-bg-surface);
+      }
+
+      textarea {
+        min-height: 120px;
+        resize: vertical;
+      }
+
+      .actions {
+        display: flex;
+        gap: var(--space-2);
+        flex-wrap: wrap;
+      }
+
+      .ui-button[disabled] {
+        opacity: 0.55;
+        cursor: not-allowed;
+      }
+
+      @media (max-width: 900px) {
+        .sale-void-page {
+          padding: var(--space-4);
+        }
+
+        .summary-grid {
+          grid-template-columns: 1fr;
+        }
       }
     `,
   ],

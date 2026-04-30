@@ -12,10 +12,18 @@ import { SaleResponse, SaleStatus } from "./data/sales.models";
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, RouterLink],
   template: `
-    <section class="card">
-      <header>
-        <h1>Ventas</h1>
-        <p class="muted">Listado de ventas y acceso a detalle.</p>
+    <section class="ui-card sales-page">
+      <header class="ui-page-head">
+        <div>
+          <p class="ui-page-kicker">Operacion Comercial InkToy</p>
+          <h1 class="ui-page-title">Ventas</h1>
+          <p class="ui-page-description">
+            Consulta ventas por rango de fechas, estado, caja o usuario y accede
+            al detalle para seguimiento operativo.
+          </p>
+        </div>
+
+        <span class="ui-badge">{{ sales.length }} registros</span>
       </header>
 
       <form
@@ -23,18 +31,18 @@ import { SaleResponse, SaleStatus } from "./data/sales.models";
         (ngSubmit)="applyFilters()"
         class="filters"
       >
-        <label>
-          Desde
+        <label class="field">
+          <span>Desde</span>
           <input type="date" formControlName="from" />
         </label>
 
-        <label>
-          Hasta
+        <label class="field">
+          <span>Hasta</span>
           <input type="date" formControlName="to" />
         </label>
 
-        <label>
-          Estado
+        <label class="field">
+          <span>Estado</span>
           <select formControlName="status">
             <option value="">Todos</option>
             <option *ngFor="let status of statuses" [value]="status">
@@ -43,8 +51,8 @@ import { SaleResponse, SaleStatus } from "./data/sales.models";
           </select>
         </label>
 
-        <label>
-          Caja
+        <label class="field">
+          <span>Caja</span>
           <input
             type="number"
             min="1"
@@ -52,8 +60,8 @@ import { SaleResponse, SaleStatus } from "./data/sales.models";
           />
         </label>
 
-        <label>
-          Usuario
+        <label class="field">
+          <span>Usuario</span>
           <input
             type="text"
             formControlName="createdBy"
@@ -61,26 +69,34 @@ import { SaleResponse, SaleStatus } from "./data/sales.models";
           />
         </label>
 
-        <div class="actions">
-          <button type="submit">Filtrar</button>
-          <button type="button" class="secondary" (click)="resetFilters()">
+        <div class="filter-actions">
+          <button type="submit" class="ui-button ui-button--primary">
+            Filtrar
+          </button>
+          <button
+            type="button"
+            class="ui-button ui-button--secondary"
+            (click)="resetFilters()"
+          >
             Limpiar
           </button>
         </div>
       </form>
 
-      <p class="error" *ngIf="errorMessage">{{ errorMessage }}</p>
-      <p class="muted" *ngIf="loading">Cargando ventas...</p>
+      <p class="ui-alert ui-alert--error" *ngIf="errorMessage">
+        {{ errorMessage }}
+      </p>
+      <p class="ui-alert ui-alert--info" *ngIf="loading">Cargando ventas...</p>
 
-      <div class="table-wrapper" *ngIf="!loading">
-        <table>
+      <div class="ui-table-wrapper" *ngIf="!loading">
+        <table class="ui-table sales-table">
           <thead>
             <tr>
               <th>ID</th>
               <th>Nro venta</th>
               <th>Fecha</th>
               <th>Estado</th>
-              <th>Total</th>
+              <th class="cell-number">Total</th>
               <th>Usuario</th>
               <th>Caja</th>
               <th>Acciones</th>
@@ -88,30 +104,36 @@ import { SaleResponse, SaleStatus } from "./data/sales.models";
           </thead>
           <tbody>
             <tr *ngFor="let sale of sales">
-              <td>#{{ sale.id }}</td>
-              <td>{{ sale.saleNumber }}</td>
+              <td class="cell-id">#{{ sale.id }}</td>
+              <td class="cell-code">{{ sale.saleNumber }}</td>
               <td>{{ sale.soldAt | date: "yyyy-MM-dd HH:mm" }}</td>
               <td>
                 <span
-                  [class]="
-                    sale.status === 'VOIDED'
-                      ? 'status-voided'
-                      : 'status-completed'
-                  "
+                  class="ui-badge"
+                  [class.ui-badge--danger]="sale.status === 'VOIDED'"
+                  [class.ui-badge--success]="sale.status !== 'VOIDED'"
                 >
                   {{ sale.status }}
                 </span>
               </td>
-              <td>{{ sale.totalAmount | number: "1.2-2" }}</td>
+              <td class="cell-number">
+                {{ sale.totalAmount | number: "1.2-2" }}
+              </td>
               <td>{{ sale.createdBy }}</td>
               <td>#{{ sale.cashRegisterSessionId }}</td>
               <td>
-                <a [routerLink]="['/ventas', sale.id]">Ver detalle</a>
+                <a
+                  class="ui-button ui-button--secondary"
+                  [routerLink]="['/ventas', sale.id]"
+                  >Ver detalle</a
+                >
               </td>
             </tr>
             <tr *ngIf="sales.length === 0">
-              <td colspan="8" class="empty">
-                No hay ventas para los filtros aplicados.
+              <td colspan="8" class="ui-table__empty">
+                <div class="ui-empty-state">
+                  No hay ventas para los filtros aplicados.
+                </div>
               </td>
             </tr>
           </tbody>
@@ -121,97 +143,92 @@ import { SaleResponse, SaleStatus } from "./data/sales.models";
   `,
   styles: [
     `
-      .card {
-        background: #fff;
-        border-radius: 0.5rem;
-        padding: 1rem;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      .sales-page {
+        padding: var(--space-5);
         display: grid;
-        gap: 1rem;
+        gap: var(--space-4);
       }
+
       h1 {
         margin: 0;
       }
+
       .filters {
         display: grid;
-        gap: 0.6rem;
-        grid-template-columns: repeat(6, minmax(140px, 1fr));
+        gap: var(--space-3);
+        grid-template-columns: repeat(6, minmax(130px, 1fr));
         align-items: end;
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-md);
+        background: var(--color-bg-soft);
+        padding: var(--space-3);
       }
-      label {
+
+      .field {
         display: grid;
-        gap: 0.35rem;
+        gap: var(--space-1);
       }
+
+      .field span {
+        font-size: var(--font-size-sm);
+        color: var(--color-text-secondary);
+        font-weight: 700;
+      }
+
       input,
-      select,
-      button,
-      a {
-        padding: 0.5rem 0.7rem;
-        border-radius: 0.35rem;
-        border: 1px solid #d1d5db;
+      select {
+        padding: 0.6rem 0.7rem;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--color-border-strong);
+        background: var(--color-bg-surface);
       }
-      button {
-        border: 0;
-        background: #0f766e;
-        color: #fff;
-        cursor: pointer;
-      }
-      a {
-        border: 0;
-        background: #eef2ff;
-        color: #1e3a8a;
-        text-decoration: none;
-        display: inline-flex;
-      }
-      .secondary {
-        background: #374151;
-      }
-      .actions {
+
+      .filter-actions {
         display: flex;
-        gap: 0.5rem;
+        gap: var(--space-2);
+        flex-wrap: wrap;
       }
-      .table-wrapper {
-        overflow-x: auto;
+
+      .sales-table {
+        min-width: 980px;
       }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        min-width: 1000px;
+
+      .cell-id,
+      .cell-code,
+      .cell-number {
+        white-space: nowrap;
       }
-      th,
-      td {
-        padding: 0.45rem;
-        border-bottom: 1px solid #e5e7eb;
-        text-align: left;
+
+      .cell-number {
+        text-align: right;
       }
-      .status-completed {
-        color: #166534;
-        font-weight: 700;
+
+      .ui-button {
+        white-space: nowrap;
       }
-      .status-voided {
-        color: #b91c1c;
-        font-weight: 700;
+
+      .ui-button[disabled] {
+        opacity: 0.55;
+        cursor: not-allowed;
       }
-      .muted,
-      .error,
-      .empty {
-        margin: 0;
-      }
-      .muted,
-      .empty {
-        color: #6b7280;
-      }
-      .error {
-        color: #b91c1c;
-      }
+
       @media (max-width: 1100px) {
+        .sales-page {
+          padding: var(--space-4);
+        }
+
         .filters {
-          grid-template-columns: 1fr 1fr;
+          grid-template-columns: repeat(2, minmax(160px, 1fr));
         }
       }
+
       @media (max-width: 700px) {
         .filters {
           grid-template-columns: 1fr;
+        }
+
+        .filter-actions {
+          justify-content: flex-start;
         }
       }
     `,

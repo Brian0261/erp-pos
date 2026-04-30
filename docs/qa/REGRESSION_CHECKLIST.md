@@ -173,3 +173,68 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
   - `almacenero@erp.local` mantiene acceso a `/inventario/ajustes`.
 - [x] Sin errores `500` ni `pageerror` durante el smoke.
 - [x] Registro de consola con `422` esperado unicamente en la prueba negativa invalida.
+
+## Bloque E3 POS/Caja/Ventas InkToy (2026-04-29)
+
+- [x] Pantallas aplicadas: `/pos`, `/caja`, `/ventas`, `/ventas/:id`, `/ventas/:id/anular`.
+- [x] Build frontend (`npm run build`) exitoso tras cambios visuales E3.
+- [x] `docker compose up --build -d` y `docker compose ps` exitosos.
+- [x] Smoke visual-funcional E3 en navegador con `admin@erp.local` (ADMIN):
+  - [x] `/caja` renderiza cabecera InkToy, estado de sesion y paneles operativos.
+  - [x] `/pos` renderiza bloques de busqueda, carrito, pagos y totales.
+  - [x] Busqueda por nombre en POS (`lapiz`) ejecutada sin `pageerror`.
+  - [x] `/ventas` renderiza filtros y tabla con estados.
+  - [x] `/ventas/37` renderiza resumen, items, pagos y totales.
+  - [x] `/ventas/37/anular` renderiza formulario de anulacion.
+- [x] Matriz de acceso por ruta (frontend) revalidada en E3:
+  - [x] CAJERO: acceso a `/pos`, `/caja`, `/ventas`.
+  - [x] CAJERO: bloqueo en `/ventas/37/anular` (redirige a `/dashboard`).
+  - [x] ALMACENERO: bloqueo en `/pos`, `/caja`, `/ventas` (redirige a `/dashboard`).
+  - [x] ALMACENERO: acceso control en `/inventario/stock` (sin regresion de permisos).
+  - [x] SUPERVISOR: acceso a `/ventas` y `/ventas/37/anular`.
+  - [x] ADMIN: acceso a `/ventas/37/anular`.
+- [x] Sin errores `500` ni `pageerror` inesperados durante validacion E3.
+- [x] Evento de consola `403` observado unicamente en intento no autorizado esperado (CAJERO a ruta de anulacion).
+- [x] Sin cambios en contratos API de `pos/sales/cash-register`, guards, interceptor, backend o rutas.
+
+### Smoke transaccional corto E3 (2026-04-29)
+
+- [x] Validacion base ejecutada:
+  - [x] `cd frontend` + `npm run build` => OK.
+  - [x] `docker compose up --build -d` => OK.
+  - [x] `docker compose ps` => backend/frontend up, postgres healthy.
+- [x] Usuario/rol principal de ejecucion: `admin@erp.local` (ADMIN).
+- [x] Usuario/rol para prueba negativa de permisos: `cajero@erp.local` (CAJERO).
+- [x] Flujo caja:
+  - [x] `/caja` con sesion abierta existente `#15`.
+  - [x] Estado visual de caja confirmado: `OPEN`.
+  - [x] No se abrio nueva caja para evitar alterar estado operativo.
+- [x] Flujo POS/Venta real:
+  - [x] Almacen usado: `S3DST1777141364 - Almacen Destino S3 1777141364`.
+  - [x] Producto usado: `Producto S4 1777159803 (SKU: SKU-S4-1777159803)`.
+  - [x] Venta registrada: `S-1777512445806` (ID `38`).
+  - [x] Total/pago/vuelto validados: `25.50` / `30.50` / `5.00`.
+  - [x] Mensaje de exito mostrado: `Venta S-1777512445806 registrada correctamente.`.
+- [x] Listado y detalle:
+  - [x] Venta visible en `/ventas` con estado `COMPLETED`.
+  - [x] Detalle en `/ventas/38` con items/pagos/totales/fecha correctos.
+- [x] Stock y kardex (post venta):
+  - [x] Stock antes de venta: `19`.
+  - [x] Stock despues de venta: `18`.
+  - [x] Delta confirmado: `-1`.
+  - [x] Kardex confirmado con `SALE_OUT` (motivo incluye `Sale S-1777512445806`).
+- [x] Anulacion y reposicion:
+  - [x] Anulacion ejecutada en `/ventas/38/anular` con motivo controlado.
+  - [x] Estado final de venta: `VOIDED`.
+  - [x] Stock despues de anulacion: `19`.
+  - [x] Delta reposicion confirmado: `+1` (retorno al valor inicial).
+  - [x] Kardex confirmado con `SALE_VOID_IN` (motivo incluye `Sale void S-1777512445806`).
+- [x] Pruebas negativas/control de errores:
+  - [x] Rol no permitido: `CAJERO` bloqueado en `/ventas/38/anular` (redirige a `/dashboard`).
+  - [ ] Venta sin caja abierta: no ejecutada; `CAJERO` presento sesion abierta en el entorno y se evito forzar cierre para no alterar estado.
+  - [x] Error `403` observado y controlado en pruebas negativas.
+  - [ ] Escenarios `409/422` no forzados en E3 para evitar mutaciones no necesarias del flujo operativo.
+- [x] Runtime/consola:
+  - [x] Sin `pageerror`.
+  - [x] Sin respuestas `500` inesperadas.
+  - [x] Solo errores esperados de pruebas negativas/controladas.

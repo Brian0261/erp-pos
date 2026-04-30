@@ -28,3 +28,5 @@ Alcance: Angular frontend, integracion REST real, Docker/Nginx, rutas SPA y perm
 - Endurecimiento RBAC frontend aplicado sin cambios en backend ni servicios Angular.
 - Bloque E2 Inventario (visual-only) validado por roles sin nuevos hallazgos funcionales en frontend.
 - Smoke funcional E2 inventario ejecutado con operaciones reales (ajuste IN/OUT, ajuste invalido controlado, transferencia y kardex) sin errores 500.
+- Bloque E3 POS/Caja/Ventas (visual-only) validado con smoke por roles (ADMIN/CAJERO/ALMACENERO/SUPERVISOR) sin nuevos hallazgos funcionales ni de seguridad.
+- Smoke transaccional E3 (venta real + detalle + anulacion + stock + kardex) completado sin nuevos defectos frontend; se observaron solo respuestas esperadas de pruebas negativas (`403`).
