@@ -19,82 +19,128 @@ import { toHttpErrorMessage } from "./data/http-error-message";
   standalone: true,
   imports: [CommonModule, RouterLink],
   template: `
-    <section class="card" *ngIf="document">
-      <header class="header">
+    <section class="ui-card billing-document-detail-page" *ngIf="document">
+      <header class="ui-page-head">
         <div>
-          <h1>Detalle de comprobante</h1>
-          <p class="muted">
-            {{ typeLabel(document.documentType) }} {{ document.fullNumber }} |
-            Estado
-            <span class="status" [ngClass]="statusClass(document.status)">
-              {{ document.status }}
-            </span>
+          <p class="ui-page-kicker">Facturacion electronica MVP</p>
+          <h1 class="ui-page-title">Detalle de comprobante</h1>
+          <p class="ui-page-description">
+            {{ typeLabel(document.documentType) }} {{ document.fullNumber }}
           </p>
         </div>
-        <a
-          class="button secondary"
-          [routerLink]="['/facturacion/comprobantes']"
-        >
-          Volver al listado
-        </a>
+        <div class="header-actions">
+          <span
+            class="ui-badge status-badge"
+            [ngClass]="statusClass(document.status)"
+          >
+            {{ document.status }}
+          </span>
+          <a
+            class="ui-button ui-button--secondary"
+            [routerLink]="['/facturacion/comprobantes']"
+          >
+            Volver al listado
+          </a>
+        </div>
       </header>
 
-      <p class="error" *ngIf="permissionMessage">{{ permissionMessage }}</p>
-      <p class="error" *ngIf="errorMessage">{{ errorMessage }}</p>
-      <p class="success" *ngIf="successMessage">{{ successMessage }}</p>
+      <p class="ui-alert ui-alert--error" *ngIf="permissionMessage">
+        {{ permissionMessage }}
+      </p>
+      <p class="ui-alert ui-alert--error" *ngIf="errorMessage">
+        {{ errorMessage }}
+      </p>
+      <p class="ui-alert ui-alert--success" *ngIf="successMessage">
+        {{ successMessage }}
+      </p>
 
       <section class="summary-grid">
-        <p><strong>ID:</strong> #{{ document.id }}</p>
-        <p>
-          <strong>Venta asociada:</strong>
-          <a [routerLink]="['/ventas', document.saleId]"
-            >#{{ document.saleId }}</a
-          >
-        </p>
-        <p><strong>Serie:</strong> {{ document.series }}</p>
-        <p><strong>Numero:</strong> {{ document.number }}</p>
-        <p>
-          <strong>Cliente:</strong>
-          {{ document.customerName || "CONSUMIDOR FINAL" }}
-        </p>
-        <p>
-          <strong>Documento:</strong> {{ document.customerDocument || "-" }}
-        </p>
-        <p>
-          <strong>Total:</strong> {{ document.totalAmount | number: "1.2-2" }}
-        </p>
-        <p><strong>Ambiente:</strong> {{ document.environment }}</p>
-        <p>
-          <strong>XML generado:</strong>
-          {{
-            document.xmlGeneratedAt
-              ? (document.xmlGeneratedAt | date: "yyyy-MM-dd HH:mm")
-              : "-"
-          }}
-        </p>
-        <p>
-          <strong>Firmado:</strong>
-          {{
-            document.signedAt
-              ? (document.signedAt | date: "yyyy-MM-dd HH:mm")
-              : "-"
-          }}
-        </p>
-        <p>
-          <strong>Enviado:</strong>
-          {{
-            document.sentAt ? (document.sentAt | date: "yyyy-MM-dd HH:mm") : "-"
-          }}
-        </p>
-        <p>
-          <strong>Mensaje proveedor:</strong>
-          {{ document.providerMessage || "-" }}
-        </p>
+        <article class="summary-card">
+          <h2>Comprobante</h2>
+          <p>
+            <span class="label">ID</span>
+            <strong>#{{ document.id }}</strong>
+          </p>
+          <p>
+            <span class="label">Serie y numero</span>
+            <strong>{{ document.series }}-{{ document.number }}</strong>
+          </p>
+          <p>
+            <span class="label">Total</span>
+            <strong>{{ document.totalAmount | number: "1.2-2" }}</strong>
+          </p>
+          <p>
+            <span class="label">Ambiente</span>
+            <strong>{{ document.environment }}</strong>
+          </p>
+        </article>
+
+        <article class="summary-card">
+          <h2>Cliente y venta</h2>
+          <p>
+            <span class="label">Cliente</span>
+            <strong>{{ document.customerName || "CONSUMIDOR FINAL" }}</strong>
+          </p>
+          <p>
+            <span class="label">Documento</span>
+            <strong>{{ document.customerDocument || "-" }}</strong>
+          </p>
+          <p>
+            <span class="label">Venta asociada</span>
+            <strong>
+              <a
+                class="inline-link"
+                [routerLink]="['/ventas', document.saleId]"
+              >
+                #{{ document.saleId }}
+              </a>
+            </strong>
+          </p>
+        </article>
+
+        <article class="summary-card">
+          <h2>Trazabilidad electronica</h2>
+          <p>
+            <span class="label">XML generado</span>
+            <strong>
+              {{
+                document.xmlGeneratedAt
+                  ? (document.xmlGeneratedAt | date: "yyyy-MM-dd HH:mm")
+                  : "-"
+              }}
+            </strong>
+          </p>
+          <p>
+            <span class="label">Firmado</span>
+            <strong>
+              {{
+                document.signedAt
+                  ? (document.signedAt | date: "yyyy-MM-dd HH:mm")
+                  : "-"
+              }}
+            </strong>
+          </p>
+          <p>
+            <span class="label">Enviado</span>
+            <strong>
+              {{
+                document.sentAt
+                  ? (document.sentAt | date: "yyyy-MM-dd HH:mm")
+                  : "-"
+              }}
+            </strong>
+          </p>
+          <p>
+            <span class="label">Mensaje proveedor</span>
+            <strong>{{ document.providerMessage || "-" }}</strong>
+          </p>
+        </article>
       </section>
 
-      <section class="actions">
+      <section class="workflow-actions">
         <button
           type="button"
+          class="ui-button action-generate"
           (click)="generateXml()"
           [disabled]="processing || !canGenerate()"
         >
@@ -102,6 +148,7 @@ import { toHttpErrorMessage } from "./data/http-error-message";
         </button>
         <button
           type="button"
+          class="ui-button action-sign"
           (click)="signXml()"
           [disabled]="processing || !canSign()"
         >
@@ -109,6 +156,7 @@ import { toHttpErrorMessage } from "./data/http-error-message";
         </button>
         <button
           type="button"
+          class="ui-button action-send"
           (click)="sendToProvider()"
           [disabled]="processing || !canSend()"
         >
@@ -116,133 +164,197 @@ import { toHttpErrorMessage } from "./data/http-error-message";
         </button>
         <button
           type="button"
-          class="secondary"
+          class="ui-button ui-button--secondary"
           (click)="loadData()"
           [disabled]="processing"
         >
-          Ver historial
+          Recargar historial
         </button>
       </section>
 
-      <section class="panel">
-        <h2>Items</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>Producto</th>
-              <th>Descripcion</th>
-              <th>Cantidad</th>
-              <th>Precio unitario</th>
-              <th>Descuento</th>
-              <th>Total linea</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let item of document.items">
-              <td>#{{ item.productId }}</td>
-              <td>{{ item.description }}</td>
-              <td>{{ item.quantity | number: "1.0-3" }}</td>
-              <td>{{ item.unitPrice | number: "1.2-2" }}</td>
-              <td>{{ item.discountAmount | number: "1.2-2" }}</td>
-              <td>{{ item.lineTotal | number: "1.2-2" }}</td>
-            </tr>
-          </tbody>
-        </table>
+      <section class="data-section">
+        <header class="section-head">
+          <h2>Items</h2>
+        </header>
+
+        <div class="ui-table-wrapper">
+          <table class="ui-table detail-table">
+            <thead>
+              <tr>
+                <th>Producto</th>
+                <th>Descripcion</th>
+                <th>Cantidad</th>
+                <th>Precio unitario</th>
+                <th>Descuento</th>
+                <th>Total linea</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let item of document.items">
+                <td>#{{ item.productId }}</td>
+                <td>{{ item.description }}</td>
+                <td>{{ item.quantity | number: "1.0-3" }}</td>
+                <td>{{ item.unitPrice | number: "1.2-2" }}</td>
+                <td>{{ item.discountAmount | number: "1.2-2" }}</td>
+                <td>{{ item.lineTotal | number: "1.2-2" }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </section>
 
-      <section class="panel">
-        <h2>XML generado/firmado</h2>
-        <p class="muted" *ngIf="xmlFile">
+      <section class="data-section">
+        <header class="section-head">
+          <h2>XML generado/firmado</h2>
+        </header>
+
+        <p class="xml-meta" *ngIf="xmlFile">
           Archivo: {{ xmlFile.fileName }} ({{ xmlFile.fileType }})
         </p>
-        <p class="muted" *ngIf="!xmlFile && !xmlMessage">
-          No hay XML disponible.
+        <p class="ui-alert ui-alert--info" *ngIf="!xmlFile">
+          {{ xmlMessage || "XML aun no generado." }}
         </p>
-        <p class="error" *ngIf="xmlMessage">{{ xmlMessage }}</p>
         <pre class="xml-content" *ngIf="xmlFile">{{ xmlFile.content }}</pre>
       </section>
 
-      <section class="panel">
-        <h2>Historial</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>Fecha</th>
-              <th>Previo</th>
-              <th>Nuevo</th>
-              <th>Mensaje</th>
-              <th>Usuario</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let row of historyRows">
-              <td>{{ row.changedAt | date: "yyyy-MM-dd HH:mm" }}</td>
-              <td>{{ row.previousStatus || "-" }}</td>
-              <td>{{ row.newStatus }}</td>
-              <td>{{ row.message || "-" }}</td>
-              <td>{{ row.changedBy }}</td>
-            </tr>
-            <tr *ngIf="historyRows.length === 0">
-              <td colspan="5" class="empty">No hay historial disponible.</td>
-            </tr>
-          </tbody>
-        </table>
+      <section class="data-section">
+        <header class="section-head">
+          <h2>Historial</h2>
+        </header>
+
+        <div class="ui-table-wrapper">
+          <table class="ui-table detail-table">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Previo</th>
+                <th>Nuevo</th>
+                <th>Mensaje</th>
+                <th>Usuario</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let row of historyRows">
+                <td>{{ row.changedAt | date: "yyyy-MM-dd HH:mm" }}</td>
+                <td>{{ row.previousStatus || "-" }}</td>
+                <td>{{ row.newStatus }}</td>
+                <td>{{ row.message || "-" }}</td>
+                <td>{{ row.changedBy }}</td>
+              </tr>
+              <tr *ngIf="historyRows.length === 0">
+                <td colspan="5" class="ui-table__empty">
+                  <div class="ui-empty-state">No hay historial disponible.</div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </section>
     </section>
   `,
   styles: [
     `
-      .card {
-        background: #fff;
-        border-radius: 0.5rem;
-        padding: 1rem;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      .billing-document-detail-page {
+        padding: var(--space-5);
         display: grid;
-        gap: 1rem;
+        gap: var(--space-4);
       }
-      .header {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        gap: 1rem;
-      }
-      h1,
+
       h2 {
         margin: 0;
+        font-size: 1.05rem;
       }
-      .muted {
-        margin: 0.25rem 0 0;
-        color: #6b7280;
-      }
-      .summary-grid {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(180px, 1fr));
-        gap: 0.5rem 0.8rem;
-      }
-      .summary-grid p {
-        margin: 0;
-      }
-      .actions {
+
+      .header-actions {
         display: flex;
-        gap: 0.5rem;
+        align-items: center;
+        gap: var(--space-2);
         flex-wrap: wrap;
       }
-      .panel {
-        border: 1px solid #e5e7eb;
-        border-radius: 0.5rem;
-        padding: 0.7rem;
-        overflow-x: auto;
+
+      .status-badge {
+        font-weight: 700;
       }
-      table {
-        width: 100%;
-        border-collapse: collapse;
+
+      .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(230px, 1fr));
+        gap: var(--space-3);
       }
-      th,
-      td {
-        border-bottom: 1px solid #e5e7eb;
-        padding: 0.45rem;
-        text-align: left;
+
+      .summary-card {
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-md);
+        background: var(--color-bg-surface);
+        padding: var(--space-3);
+        display: grid;
+        gap: var(--space-2);
       }
+
+      .summary-card p {
+        margin: 0;
+        display: grid;
+        gap: 0.1rem;
+      }
+
+      .summary-card .label {
+        font-size: var(--font-size-xs);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--color-text-secondary);
+        font-weight: 700;
+      }
+
+      .inline-link {
+        text-decoration: underline;
+        font-weight: 700;
+      }
+
+      .workflow-actions {
+        display: flex;
+        gap: var(--space-2);
+        flex-wrap: wrap;
+      }
+
+      .action-generate {
+        background: #4338ca;
+        color: var(--color-text-on-dark);
+      }
+
+      .action-sign {
+        background: #0e7490;
+        color: var(--color-text-on-dark);
+      }
+
+      .action-send {
+        background: var(--color-brand-primary);
+        color: var(--color-text-on-dark);
+      }
+
+      .data-section {
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-md);
+        background: var(--color-bg-surface);
+        padding: var(--space-3);
+        display: grid;
+        gap: var(--space-3);
+      }
+
+      .section-head {
+        border-bottom: 1px solid var(--color-border-default);
+        padding-bottom: var(--space-2);
+      }
+
+      .detail-table {
+        min-width: 940px;
+      }
+
+      .xml-meta {
+        margin: 0;
+        color: var(--color-text-secondary);
+        font-size: var(--font-size-sm);
+      }
+
       .xml-content {
         margin: 0;
         white-space: pre-wrap;
@@ -251,72 +363,52 @@ import { toHttpErrorMessage } from "./data/http-error-message";
         overflow: auto;
         background: #111827;
         color: #e5e7eb;
-        padding: 0.75rem;
-        border-radius: 0.4rem;
+        padding: var(--space-3);
+        border-radius: var(--radius-sm);
       }
-      button,
-      .button {
-        padding: 0.5rem 0.75rem;
-        border: 0;
-        border-radius: 0.35rem;
-        background: #0f766e;
-        color: #fff;
-        cursor: pointer;
-        text-decoration: none;
-      }
-      .secondary {
-        background: #374151;
-      }
-      .status {
-        display: inline-flex;
-        padding: 0.2rem 0.5rem;
-        border-radius: 999px;
-        font-size: 0.75rem;
-        font-weight: 700;
-      }
+
       .status-draft {
         background: #dbeafe;
-        color: #1d4ed8;
+        color: var(--color-info);
       }
+
       .status-generated {
         background: #ede9fe;
         color: #6d28d9;
       }
+
       .status-signed {
         background: #cffafe;
         color: #0e7490;
       }
+
       .status-sent {
         background: #fef3c7;
-        color: #92400e;
+        color: var(--color-warning);
       }
+
       .status-accepted {
         background: #dcfce7;
-        color: #166534;
+        color: var(--color-success);
       }
+
       .status-rejected,
       .status-error,
       .status-cancelled {
         background: #fee2e2;
-        color: #b91c1c;
+        color: var(--color-danger);
       }
-      .error {
-        margin: 0;
-        color: #b91c1c;
+
+      .ui-button[disabled] {
+        opacity: 0.55;
+        cursor: not-allowed;
       }
-      .success {
-        margin: 0;
-        color: #166534;
-      }
-      .empty {
-        text-align: center;
-        color: #6b7280;
-      }
+
       @media (max-width: 900px) {
-        .header {
-          flex-direction: column;
-          align-items: flex-start;
+        .billing-document-detail-page {
+          padding: var(--space-4);
         }
+
         .summary-grid {
           grid-template-columns: 1fr;
         }
@@ -519,21 +611,29 @@ export class BillingDocumentDetailPageComponent implements OnInit {
     }
 
     this.errorMessage = "";
+    this.xmlFile = null;
+    this.xmlMessage = "";
 
     forkJoin({
       document: this.electronicDocumentService.getById(this.documentId),
       historyRows: this.electronicDocumentService.history(this.documentId),
-      xmlFile: this.electronicDocumentService
-        .getXml(this.documentId)
-        .pipe(catchError(() => of(null))),
     }).subscribe({
-      next: ({ document, historyRows, xmlFile }) => {
+      next: ({ document, historyRows }) => {
         this.document = document;
         this.historyRows = historyRows;
-        this.xmlFile = xmlFile;
-        this.xmlMessage = xmlFile
-          ? ""
-          : "XML no disponible aun para este comprobante.";
+
+        if (!document.xmlGeneratedAt) {
+          this.xmlMessage = "XML aun no generado.";
+          return;
+        }
+
+        this.electronicDocumentService
+          .getXml(this.documentId)
+          .pipe(catchError(() => of(null)))
+          .subscribe((xmlFile) => {
+            this.xmlFile = xmlFile;
+            this.xmlMessage = xmlFile ? "" : "XML aun no generado.";
+          });
       },
       error: (error: unknown) => {
         this.errorMessage = toHttpErrorMessage(

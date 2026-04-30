@@ -25,113 +25,166 @@ interface BillingProfileExtras {
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule],
   template: `
-    <section class="card">
-      <header class="header">
+    <section class="ui-card billing-config-page">
+      <header class="ui-page-head">
         <div>
-          <h1>Facturacion - Configuracion tributaria</h1>
-          <p class="muted">Configura perfil de emision por ambiente.</p>
+          <p class="ui-page-kicker">Facturacion electronica MVP</p>
+          <h1 class="ui-page-title">Configuracion tributaria</h1>
+          <p class="ui-page-description">
+            Define datos de empresa, direccion fiscal y certificado por ambiente
+            sin alterar reglas de emision.
+          </p>
         </div>
+        <span class="ui-badge env-badge">
+          {{ form.controls.environment.value || "LOCAL" }}
+        </span>
       </header>
 
-      <p class="error" *ngIf="permissionMessage">{{ permissionMessage }}</p>
-      <p class="error" *ngIf="errorMessage">{{ errorMessage }}</p>
-      <p class="success" *ngIf="successMessage">{{ successMessage }}</p>
+      <p class="ui-alert ui-alert--error" *ngIf="permissionMessage">
+        {{ permissionMessage }}
+      </p>
+      <p class="ui-alert ui-alert--error" *ngIf="errorMessage">
+        {{ errorMessage }}
+      </p>
+      <p class="ui-alert ui-alert--success" *ngIf="successMessage">
+        {{ successMessage }}
+      </p>
 
-      <form [formGroup]="form" class="grid" (ngSubmit)="submit()">
-        <label>
-          Ambiente *
-          <select
-            formControlName="environment"
-            (change)="onEnvironmentChanged()"
-          >
-            <option *ngFor="let env of environments" [value]="env">
-              {{ env }}
-            </option>
-          </select>
-        </label>
+      <form [formGroup]="form" class="form-layout" (ngSubmit)="submit()">
+        <section class="form-section">
+          <header class="section-head">
+            <h2>Ambiente y estado</h2>
+          </header>
 
-        <label>
-          RUC *
-          <input type="text" maxlength="11" formControlName="ruc" />
-          <small class="error" *ngIf="isInvalid('ruc')">
-            RUC obligatorio de 11 digitos.
-          </small>
-        </label>
+          <div class="form-grid form-grid--two">
+            <label class="field">
+              <span>Ambiente *</span>
+              <select
+                formControlName="environment"
+                (change)="onEnvironmentChanged()"
+              >
+                <option *ngFor="let env of environments" [value]="env">
+                  {{ env }}
+                </option>
+              </select>
+            </label>
 
-        <label>
-          Razon social *
-          <input type="text" maxlength="180" formControlName="legalName" />
-          <small class="error" *ngIf="isInvalid('legalName')">
-            legalName es obligatorio.
-          </small>
-        </label>
+            <label class="field field--inline">
+              <input type="checkbox" formControlName="active" />
+              <span>Perfil activo</span>
+            </label>
+          </div>
+        </section>
 
-        <label>
-          Nombre comercial
-          <input type="text" maxlength="180" formControlName="tradeName" />
-        </label>
+        <section class="form-section">
+          <header class="section-head">
+            <h2>Datos de empresa</h2>
+          </header>
 
-        <label class="full">
-          Direccion fiscal *
-          <input type="text" maxlength="240" formControlName="fiscalAddress" />
-          <small class="error" *ngIf="isInvalid('fiscalAddress')">
-            fiscalAddress es obligatorio.
-          </small>
-        </label>
+          <div class="form-grid form-grid--two">
+            <label class="field">
+              <span>RUC *</span>
+              <input type="text" maxlength="11" formControlName="ruc" />
+              <small class="field-error" *ngIf="isInvalid('ruc')">
+                RUC obligatorio de 11 digitos.
+              </small>
+            </label>
 
-        <label>
-          Ubigeo
-          <input type="text" maxlength="6" formControlName="ubigeo" />
-        </label>
+            <label class="field">
+              <span>Razon social *</span>
+              <input type="text" maxlength="180" formControlName="legalName" />
+              <small class="field-error" *ngIf="isInvalid('legalName')">
+                legalName es obligatorio.
+              </small>
+            </label>
 
-        <label>
-          Departamento
-          <input type="text" maxlength="120" formControlName="department" />
-        </label>
+            <label class="field full">
+              <span>Nombre comercial</span>
+              <input type="text" maxlength="180" formControlName="tradeName" />
+            </label>
+          </div>
+        </section>
 
-        <label>
-          Provincia
-          <input type="text" maxlength="120" formControlName="province" />
-        </label>
+        <section class="form-section">
+          <header class="section-head">
+            <h2>Direccion fiscal</h2>
+          </header>
 
-        <label>
-          Distrito
-          <input type="text" maxlength="120" formControlName="district" />
-        </label>
+          <div class="form-grid form-grid--two">
+            <label class="field full">
+              <span>Direccion fiscal *</span>
+              <input
+                type="text"
+                maxlength="240"
+                formControlName="fiscalAddress"
+              />
+              <small class="field-error" *ngIf="isInvalid('fiscalAddress')">
+                fiscalAddress es obligatorio.
+              </small>
+            </label>
 
-        <label class="full">
-          Ruta o alias de certificado
-          <input
-            type="text"
-            maxlength="240"
-            formControlName="certificatePath"
-          />
-        </label>
+            <label class="field">
+              <span>Ubigeo</span>
+              <input type="text" maxlength="6" formControlName="ubigeo" />
+            </label>
 
-        <label class="full">
-          Password certificado (si aplica)
-          <input
-            type="password"
-            maxlength="120"
-            formControlName="certificatePassword"
-          />
-        </label>
+            <label class="field">
+              <span>Departamento</span>
+              <input type="text" maxlength="120" formControlName="department" />
+            </label>
 
-        <label class="inline">
-          <input type="checkbox" formControlName="active" />
-          Perfil activo
-        </label>
+            <label class="field">
+              <span>Provincia</span>
+              <input type="text" maxlength="120" formControlName="province" />
+            </label>
 
-        <div class="actions full">
+            <label class="field">
+              <span>Distrito</span>
+              <input type="text" maxlength="120" formControlName="district" />
+            </label>
+          </div>
+        </section>
+
+        <section class="form-section">
+          <header class="section-head">
+            <h2>Certificado</h2>
+          </header>
+
+          <div class="form-grid">
+            <label class="field full">
+              <span>Ruta o alias de certificado</span>
+              <input
+                type="text"
+                maxlength="240"
+                formControlName="certificatePath"
+              />
+            </label>
+
+            <label class="field full">
+              <span>Password certificado (si aplica)</span>
+              <input
+                type="password"
+                maxlength="120"
+                formControlName="certificatePassword"
+              />
+            </label>
+          </div>
+        </section>
+
+        <div class="form-actions">
           <button
             type="button"
-            class="secondary"
+            class="ui-button ui-button--secondary"
             (click)="loadProfile()"
             [disabled]="loading || !canEdit"
           >
             Recargar
           </button>
-          <button type="submit" [disabled]="loading || !canEdit">
+          <button
+            type="submit"
+            class="ui-button ui-button--primary"
+            [disabled]="loading || !canEdit"
+          >
             {{ loading ? "Guardando..." : saveButtonLabel }}
           </button>
         </div>
@@ -140,76 +193,119 @@ interface BillingProfileExtras {
   `,
   styles: [
     `
-      .card {
-        background: #fff;
-        border-radius: 0.5rem;
-        padding: 1rem;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      .billing-config-page {
+        padding: var(--space-5);
         display: grid;
-        gap: 1rem;
+        gap: var(--space-4);
       }
-      .header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 1rem;
-      }
-      h1 {
+
+      h2 {
         margin: 0;
+        font-size: 1.05rem;
       }
-      .muted {
-        margin: 0.25rem 0 0;
-        color: #4b5563;
+
+      .env-badge {
+        background: #ede9fe;
+        color: #6d28d9;
+        font-weight: 700;
       }
-      .grid {
+
+      .form-layout {
         display: grid;
-        grid-template-columns: repeat(2, minmax(220px, 1fr));
-        gap: 0.65rem;
+        gap: var(--space-4);
       }
+
+      .form-section {
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-md);
+        background: var(--color-bg-surface);
+        padding: var(--space-3);
+        display: grid;
+        gap: var(--space-3);
+      }
+
+      .section-head {
+        border-bottom: 1px solid var(--color-border-default);
+        padding-bottom: var(--space-2);
+      }
+
+      .form-grid {
+        display: grid;
+        gap: var(--space-3);
+      }
+
+      .form-grid--two {
+        grid-template-columns: repeat(2, minmax(220px, 1fr));
+      }
+
       .full {
         grid-column: 1 / -1;
       }
-      .inline {
+
+      .field {
+        display: grid;
+        gap: var(--space-1);
+      }
+
+      .field > span {
+        font-size: var(--font-size-sm);
+        color: var(--color-text-secondary);
+        font-weight: 700;
+      }
+
+      .field--inline {
         display: inline-flex;
         align-items: center;
-        gap: 0.5rem;
+        gap: var(--space-2);
+        min-height: 42px;
       }
-      label {
-        display: grid;
-        gap: 0.35rem;
+
+      .field--inline span {
+        font-size: var(--font-size-sm);
       }
+
+      .field--inline input {
+        width: auto;
+      }
+
       input,
-      select,
-      button {
-        padding: 0.5rem;
-        border: 1px solid #d1d5db;
-        border-radius: 0.35rem;
+      select {
+        padding: 0.6rem 0.7rem;
+        border: 1px solid var(--color-border-strong);
+        border-radius: var(--radius-sm);
+        background: var(--color-bg-surface);
       }
-      button {
-        border: 0;
-        background: #0f766e;
-        color: #fff;
-        cursor: pointer;
+
+      .field-error {
+        margin: 0;
+        color: var(--color-danger);
+        font-size: var(--font-size-xs);
+        font-weight: 700;
       }
-      .secondary {
-        background: #374151;
-      }
-      .actions {
+
+      .form-actions {
         display: flex;
-        gap: 0.5rem;
         justify-content: flex-end;
+        gap: var(--space-2);
+        flex-wrap: wrap;
       }
-      .error {
-        margin: 0;
-        color: #b91c1c;
+
+      .ui-button[disabled] {
+        opacity: 0.55;
+        cursor: not-allowed;
       }
-      .success {
-        margin: 0;
-        color: #166534;
-      }
+
       @media (max-width: 900px) {
-        .grid {
+        .billing-config-page {
+          padding: var(--space-4);
+        }
+
+        .form-grid--two {
           grid-template-columns: 1fr;
+        }
+
+        .form-actions {
+          justify-content: flex-start;
         }
       }
     `,

@@ -18,243 +18,342 @@ import { toHttpErrorMessage } from "./data/http-error-message";
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule],
   template: `
-    <section class="card">
-      <header class="header">
+    <section class="ui-card billing-series-page">
+      <header class="ui-page-head">
         <div>
-          <h1>Facturacion - Series y correlativos</h1>
-          <p class="muted">Crea, edita y desactiva series de comprobantes.</p>
+          <p class="ui-page-kicker">Facturacion electronica MVP</p>
+          <h1 class="ui-page-title">Series y correlativos</h1>
+          <p class="ui-page-description">
+            Gestiona series de boleta y factura manteniendo reglas de formato y
+            correlativo actual.
+          </p>
         </div>
+        <span
+          class="ui-badge mode-badge"
+          [class.mode-badge--edit]="!!editingId"
+        >
+          {{ editingId ? "Modo edicion" : "Nueva serie" }}
+        </span>
       </header>
 
-      <p class="error" *ngIf="permissionMessage">{{ permissionMessage }}</p>
-      <p class="error" *ngIf="errorMessage">{{ errorMessage }}</p>
-      <p class="success" *ngIf="successMessage">{{ successMessage }}</p>
+      <p class="ui-alert ui-alert--error" *ngIf="permissionMessage">
+        {{ permissionMessage }}
+      </p>
+      <p class="ui-alert ui-alert--error" *ngIf="errorMessage">
+        {{ errorMessage }}
+      </p>
+      <p class="ui-alert ui-alert--success" *ngIf="successMessage">
+        {{ successMessage }}
+      </p>
 
-      <form [formGroup]="form" class="form-grid" (ngSubmit)="submit()">
-        <label>
-          Tipo documento *
-          <select formControlName="documentType">
-            <option *ngFor="let type of documentTypes" [value]="type">
-              {{ typeLabel(type) }}
-            </option>
-          </select>
-          <small class="error" *ngIf="isInvalid('documentType')">
-            documentType es obligatorio.
-          </small>
-        </label>
+      <section class="form-section">
+        <header class="section-head">
+          <h2>Formulario de serie</h2>
+        </header>
 
-        <label>
-          Serie *
-          <input
-            type="text"
-            maxlength="4"
-            formControlName="series"
-            placeholder="F001 o B001"
-          />
-          <small
-            class="error"
-            *ngIf="isInvalid('series') || seriesPatternInvalid()"
-          >
-            {{ seriesValidationMessage() }}
-          </small>
-        </label>
+        <form
+          [formGroup]="form"
+          class="form-grid form-grid--two"
+          (ngSubmit)="submit()"
+        >
+          <label class="field">
+            <span>Tipo documento *</span>
+            <select formControlName="documentType">
+              <option *ngFor="let type of documentTypes" [value]="type">
+                {{ typeLabel(type) }}
+              </option>
+            </select>
+            <small class="field-error" *ngIf="isInvalid('documentType')">
+              documentType es obligatorio.
+            </small>
+          </label>
 
-        <label>
-          Correlativo actual *
-          <input
-            type="number"
-            min="1"
-            step="1"
-            formControlName="currentNumber"
-          />
-          <small class="error" *ngIf="isInvalid('currentNumber')">
-            currentNumber debe ser mayor o igual que 1.
-          </small>
-        </label>
+          <label class="field">
+            <span>Serie *</span>
+            <input
+              type="text"
+              maxlength="4"
+              formControlName="series"
+              placeholder="F001 o B001"
+            />
+            <small
+              class="field-error"
+              *ngIf="isInvalid('series') || seriesPatternInvalid()"
+            >
+              {{ seriesValidationMessage() }}
+            </small>
+          </label>
 
-        <label>
-          Ambiente *
-          <select formControlName="environment">
-            <option *ngFor="let env of environments" [value]="env">
-              {{ env }}
-            </option>
-          </select>
-          <small class="error" *ngIf="isInvalid('environment')">
-            environment es obligatorio.
-          </small>
-        </label>
+          <label class="field">
+            <span>Correlativo actual *</span>
+            <input
+              type="number"
+              min="1"
+              step="1"
+              formControlName="currentNumber"
+            />
+            <small class="field-error" *ngIf="isInvalid('currentNumber')">
+              currentNumber debe ser mayor o igual que 1.
+            </small>
+          </label>
 
-        <label class="inline">
-          <input type="checkbox" formControlName="active" />
-          Serie activa
-        </label>
+          <label class="field">
+            <span>Ambiente *</span>
+            <select formControlName="environment">
+              <option *ngFor="let env of environments" [value]="env">
+                {{ env }}
+              </option>
+            </select>
+            <small class="field-error" *ngIf="isInvalid('environment')">
+              environment es obligatorio.
+            </small>
+          </label>
 
-        <div class="actions full">
-          <button
-            type="button"
-            class="secondary"
-            (click)="cancelEdit()"
-            [disabled]="loading"
-          >
-            Limpiar
-          </button>
-          <button type="submit" [disabled]="loading || !canManage">
-            {{ loading ? "Guardando..." : submitLabel }}
-          </button>
+          <label class="field field--inline full">
+            <input type="checkbox" formControlName="active" />
+            <span>Serie activa</span>
+          </label>
+
+          <div class="form-actions full">
+            <button
+              type="button"
+              class="ui-button ui-button--secondary"
+              (click)="cancelEdit()"
+              [disabled]="loading"
+            >
+              Limpiar
+            </button>
+            <button
+              type="submit"
+              class="ui-button ui-button--primary"
+              [disabled]="loading || !canManage"
+            >
+              {{ loading ? "Guardando..." : submitLabel }}
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <section class="data-section">
+        <header class="section-head">
+          <h2>Series registradas</h2>
+        </header>
+
+        <div class="ui-table-wrapper">
+          <table class="ui-table series-table">
+            <thead>
+              <tr>
+                <th>Tipo</th>
+                <th>Serie</th>
+                <th>Correlativo actual</th>
+                <th>Ambiente</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let series of seriesRows">
+                <td>
+                  <span
+                    class="ui-badge type-badge"
+                    [ngClass]="
+                      series.documentType === 'INVOICE'
+                        ? 'type-badge--invoice'
+                        : 'type-badge--receipt'
+                    "
+                  >
+                    {{ typeLabel(series.documentType) }}
+                  </span>
+                </td>
+                <td>
+                  <strong>{{ series.series }}</strong>
+                </td>
+                <td>{{ series.currentNumber }}</td>
+                <td>{{ series.environment }}</td>
+                <td>
+                  <span
+                    class="ui-badge"
+                    [ngClass]="
+                      series.active ? 'ui-badge--success' : 'ui-badge--danger'
+                    "
+                  >
+                    {{ series.active ? "ACTIVA" : "INACTIVA" }}
+                  </span>
+                </td>
+                <td class="row-actions">
+                  <button
+                    type="button"
+                    class="ui-button ui-button--secondary action-btn"
+                    (click)="edit(series)"
+                    [disabled]="!canManage"
+                  >
+                    Editar
+                  </button>
+                  <button
+                    type="button"
+                    class="ui-button ui-button--danger action-btn"
+                    (click)="deactivate(series)"
+                    [disabled]="!canManage || !series.active"
+                  >
+                    Desactivar
+                  </button>
+                </td>
+              </tr>
+              <tr *ngIf="!loading && seriesRows.length === 0">
+                <td colspan="6" class="ui-table__empty">
+                  <div class="ui-empty-state">No hay series registradas.</div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
-      </form>
-
-      <section class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Tipo</th>
-              <th>Serie</th>
-              <th>Correlativo actual</th>
-              <th>Ambiente</th>
-              <th>Activa</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let series of seriesRows">
-              <td>{{ typeLabel(series.documentType) }}</td>
-              <td>{{ series.series }}</td>
-              <td>{{ series.currentNumber }}</td>
-              <td>{{ series.environment }}</td>
-              <td>{{ series.active ? "SI" : "NO" }}</td>
-              <td class="row-actions">
-                <button
-                  type="button"
-                  class="link-btn"
-                  (click)="edit(series)"
-                  [disabled]="!canManage"
-                >
-                  Editar
-                </button>
-                <button
-                  type="button"
-                  class="link-btn danger"
-                  (click)="deactivate(series)"
-                  [disabled]="!canManage || !series.active"
-                >
-                  Desactivar
-                </button>
-              </td>
-            </tr>
-            <tr *ngIf="!loading && seriesRows.length === 0">
-              <td colspan="6" class="empty">No hay series registradas.</td>
-            </tr>
-          </tbody>
-        </table>
       </section>
     </section>
   `,
   styles: [
     `
-      .card {
-        background: #fff;
-        border-radius: 0.5rem;
-        padding: 1rem;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      .billing-series-page {
+        padding: var(--space-5);
         display: grid;
-        gap: 1rem;
+        gap: var(--space-4);
       }
-      .header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 1rem;
-      }
-      h1 {
+
+      h2 {
         margin: 0;
+        font-size: 1.05rem;
       }
-      .muted {
-        margin: 0.25rem 0 0;
-        color: #4b5563;
+
+      .mode-badge {
+        background: #dbeafe;
+        color: var(--color-info);
+        font-weight: 700;
       }
+
+      .mode-badge--edit {
+        background: #ede9fe;
+        color: #6d28d9;
+      }
+
+      .form-section,
+      .data-section {
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-md);
+        background: var(--color-bg-surface);
+        padding: var(--space-3);
+        display: grid;
+        gap: var(--space-3);
+      }
+
+      .section-head {
+        border-bottom: 1px solid var(--color-border-default);
+        padding-bottom: var(--space-2);
+      }
+
       .form-grid {
         display: grid;
-        grid-template-columns: repeat(2, minmax(220px, 1fr));
-        gap: 0.65rem;
+        gap: var(--space-3);
       }
+
+      .form-grid--two {
+        grid-template-columns: repeat(2, minmax(220px, 1fr));
+      }
+
       .full {
         grid-column: 1 / -1;
       }
-      .inline {
+
+      .field {
+        display: grid;
+        gap: var(--space-1);
+      }
+
+      .field > span {
+        font-size: var(--font-size-sm);
+        color: var(--color-text-secondary);
+        font-weight: 700;
+      }
+
+      .field--inline {
         display: inline-flex;
         align-items: center;
-        gap: 0.5rem;
+        gap: var(--space-2);
       }
-      label {
-        display: grid;
-        gap: 0.35rem;
+
+      .field--inline span {
+        font-size: var(--font-size-sm);
       }
+
+      .field--inline input {
+        width: auto;
+      }
+
       input,
-      select,
-      button {
-        padding: 0.5rem;
-        border: 1px solid #d1d5db;
-        border-radius: 0.35rem;
+      select {
+        padding: 0.6rem 0.7rem;
+        border: 1px solid var(--color-border-strong);
+        border-radius: var(--radius-sm);
+        background: var(--color-bg-surface);
       }
-      button {
-        border: 0;
-        background: #0f766e;
-        color: #fff;
-        cursor: pointer;
+
+      .field-error {
+        margin: 0;
+        color: var(--color-danger);
+        font-size: var(--font-size-xs);
+        font-weight: 700;
       }
-      .secondary {
-        background: #374151;
-      }
-      .actions {
+
+      .form-actions {
         display: flex;
         justify-content: flex-end;
-        gap: 0.5rem;
-      }
-      .table-wrap {
-        overflow-x: auto;
-      }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-      }
-      th,
-      td {
-        text-align: left;
-        padding: 0.45rem;
-        border-bottom: 1px solid #e5e7eb;
-      }
-      .row-actions {
-        display: flex;
-        gap: 0.4rem;
+        gap: var(--space-2);
         flex-wrap: wrap;
       }
-      .link-btn {
-        padding: 0.35rem 0.55rem;
-        border-radius: 0.3rem;
-        background: #1f2937;
-        color: #fff;
-        border: 0;
-        cursor: pointer;
+
+      .series-table {
+        min-width: 860px;
       }
-      .danger {
-        background: #b91c1c;
+
+      .row-actions {
+        display: flex;
+        gap: var(--space-2);
+        flex-wrap: wrap;
       }
-      .error {
-        margin: 0;
-        color: #b91c1c;
+
+      .action-btn {
+        padding: 0.4rem 0.65rem;
+        font-size: var(--font-size-xs);
       }
-      .success {
-        margin: 0;
-        color: #166534;
+
+      .type-badge {
+        font-weight: 700;
       }
-      .empty {
-        text-align: center;
-        color: #6b7280;
+
+      .type-badge--invoice {
+        background: #ede9fe;
+        color: #6d28d9;
       }
+
+      .type-badge--receipt {
+        background: #dbeafe;
+        color: var(--color-info);
+      }
+
+      .ui-button[disabled] {
+        opacity: 0.55;
+        cursor: not-allowed;
+      }
+
       @media (max-width: 900px) {
-        .form-grid {
+        .billing-series-page {
+          padding: var(--space-4);
+        }
+
+        .form-grid--two {
           grid-template-columns: 1fr;
+        }
+
+        .form-actions {
+          justify-content: flex-start;
         }
       }
     `,

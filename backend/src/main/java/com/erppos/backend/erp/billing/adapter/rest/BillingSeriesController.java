@@ -44,7 +44,7 @@ public class BillingSeriesController {
     }
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR','CAJERO')")
     public ResponseEntity<List<BillingSeriesResponse>> list() {
         return ResponseEntity.ok(seriesUseCase.list().stream().map(this::toResponse).toList());
     }

@@ -22,213 +22,326 @@ import { toHttpErrorMessage } from "./data/http-error-message";
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, RouterLink],
   template: `
-    <section class="card" *ngIf="sale">
-      <header class="header">
+    <section class="ui-card billing-issue-page" *ngIf="sale">
+      <header class="ui-page-head">
         <div>
-          <h1>Emitir comprobante desde venta</h1>
-          <p class="muted">Venta {{ sale.saleNumber }} (ID #{{ sale.id }})</p>
+          <p class="ui-page-kicker">Facturacion electronica MVP</p>
+          <h1 class="ui-page-title">Emitir comprobante desde venta</h1>
+          <p class="ui-page-description">
+            Venta {{ sale.saleNumber }} (ID #{{ sale.id }}): define tipo, serie
+            y datos de cliente para emitir sin alterar reglas tributarias.
+          </p>
         </div>
-        <a class="button secondary" [routerLink]="['/ventas', sale.id]"
-          >Ver venta</a
+        <a
+          class="ui-button ui-button--secondary"
+          [routerLink]="['/ventas', sale.id]"
         >
+          Ver venta
+        </a>
       </header>
 
-      <p class="error" *ngIf="permissionMessage">{{ permissionMessage }}</p>
-      <p class="error" *ngIf="errorMessage">{{ errorMessage }}</p>
-      <p class="success" *ngIf="successMessage">{{ successMessage }}</p>
+      <p class="ui-alert ui-alert--error" *ngIf="permissionMessage">
+        {{ permissionMessage }}
+      </p>
+      <p class="ui-alert ui-alert--error" *ngIf="errorMessage">
+        {{ errorMessage }}
+      </p>
+      <p class="ui-alert ui-alert--success" *ngIf="successMessage">
+        {{ successMessage }}
+      </p>
 
-      <section class="summary-grid">
-        <p><strong>Estado venta:</strong> {{ sale.status }}</p>
-        <p><strong>Total:</strong> {{ sale.totalAmount | number: "1.2-2" }}</p>
-        <p>
-          <strong>Fecha:</strong> {{ sale.soldAt | date: "yyyy-MM-dd HH:mm" }}
-        </p>
-        <p><strong>Caja:</strong> #{{ sale.cashRegisterSessionId }}</p>
-        <p><strong>Almacen:</strong> #{{ sale.warehouseId }}</p>
-        <p><strong>Usuario:</strong> {{ sale.createdBy }}</p>
+      <section class="steps-strip">
+        <span class="ui-badge step-badge">Paso 1: Venta</span>
+        <span class="ui-badge step-badge">Paso 2: Tipo y serie</span>
+        <span class="ui-badge step-badge">Paso 3: Cliente</span>
+        <span class="ui-badge step-badge">Paso 4: Confirmacion</span>
       </section>
 
-      <form [formGroup]="form" class="grid" (ngSubmit)="submit()">
-        <label>
-          Tipo comprobante *
-          <select formControlName="documentType" (change)="onTypeChanged()">
-            <option *ngFor="let type of documentTypes" [value]="type">
-              {{ typeLabel(type) }}
-            </option>
-          </select>
-        </label>
+      <section class="summary-grid">
+        <article class="summary-card">
+          <h2>Resumen de venta</h2>
+          <p>
+            <span class="label">Estado venta</span>
+            <strong>{{ sale.status }}</strong>
+          </p>
+          <p>
+            <span class="label">Total</span>
+            <strong>{{ sale.totalAmount | number: "1.2-2" }}</strong>
+          </p>
+          <p>
+            <span class="label">Fecha</span>
+            <strong>{{ sale.soldAt | date: "yyyy-MM-dd HH:mm" }}</strong>
+          </p>
+        </article>
 
-        <label>
-          Serie *
-          <select formControlName="billingSeriesId">
-            <option [ngValue]="null">Selecciona serie</option>
-            <option *ngFor="let series of filteredSeries" [ngValue]="series.id">
-              {{ series.series }} ({{ series.environment }})
-            </option>
-          </select>
-          <small class="error" *ngIf="isInvalid('billingSeriesId')">
-            Debes seleccionar una serie.
-          </small>
-        </label>
+        <article class="summary-card">
+          <h2>Operacion</h2>
+          <p>
+            <span class="label">Caja</span>
+            <strong>#{{ sale.cashRegisterSessionId }}</strong>
+          </p>
+          <p>
+            <span class="label">Almacen</span>
+            <strong>#{{ sale.warehouseId }}</strong>
+          </p>
+          <p>
+            <span class="label">Usuario</span>
+            <strong>{{ sale.createdBy }}</strong>
+          </p>
+        </article>
+      </section>
 
-        <label>
-          Nombre cliente
-          <input type="text" maxlength="180" formControlName="customerName" />
-          <small class="error" *ngIf="invoiceCustomerInvalid()">
-            Para FACTURA, customerName y customerDocument son obligatorios.
-          </small>
-        </label>
+      <form [formGroup]="form" class="form-layout" (ngSubmit)="submit()">
+        <section class="form-section">
+          <header class="section-head">
+            <h2>Paso 2: Tipo y serie</h2>
+          </header>
 
-        <label>
-          Documento cliente
-          <input
-            type="text"
-            maxlength="40"
-            formControlName="customerDocument"
-          />
-          <small class="error" *ngIf="invoiceCustomerInvalid()">
-            Para FACTURA, customerName y customerDocument son obligatorios.
-          </small>
-        </label>
+          <div class="form-grid form-grid--two">
+            <label class="field">
+              <span>Tipo comprobante *</span>
+              <select formControlName="documentType" (change)="onTypeChanged()">
+                <option *ngFor="let type of documentTypes" [value]="type">
+                  {{ typeLabel(type) }}
+                </option>
+              </select>
+            </label>
 
-        <p
-          class="full muted"
-          *ngIf="form.controls.documentType.value === 'RECEIPT'"
-        >
-          BOLETA permite consumidor final si no se completa cliente.
-        </p>
+            <label class="field">
+              <span>Serie *</span>
+              <select formControlName="billingSeriesId">
+                <option [ngValue]="null">Selecciona serie</option>
+                <option
+                  *ngFor="let series of filteredSeries"
+                  [ngValue]="series.id"
+                >
+                  {{ series.series }} ({{ series.environment }})
+                </option>
+              </select>
+              <small class="field-error" *ngIf="isInvalid('billingSeriesId')">
+                Debes seleccionar una serie.
+              </small>
+            </label>
+          </div>
+        </section>
 
-        <div class="actions full">
-          <button type="submit" [disabled]="submitting || !canIssue">
+        <section class="form-section">
+          <header class="section-head">
+            <h2>Paso 3: Datos del cliente</h2>
+          </header>
+
+          <div class="form-grid form-grid--two">
+            <label class="field">
+              <span>Nombre cliente</span>
+              <input
+                type="text"
+                maxlength="180"
+                formControlName="customerName"
+              />
+              <small class="field-error" *ngIf="invoiceCustomerInvalid()">
+                Para FACTURA, customerName y customerDocument son obligatorios.
+              </small>
+            </label>
+
+            <label class="field">
+              <span>Documento cliente</span>
+              <input
+                type="text"
+                maxlength="40"
+                formControlName="customerDocument"
+              />
+              <small class="field-error" *ngIf="invoiceCustomerInvalid()">
+                Para FACTURA, customerName y customerDocument son obligatorios.
+              </small>
+            </label>
+          </div>
+
+          <p
+            class="ui-alert ui-alert--info"
+            *ngIf="form.controls.documentType.value === 'RECEIPT'"
+          >
+            BOLETA permite consumidor final si no se completa cliente.
+          </p>
+        </section>
+
+        <div class="form-actions">
+          <button
+            type="submit"
+            class="ui-button ui-button--primary"
+            [disabled]="submitting || !canIssue"
+          >
             {{ submitting ? "Emitiendo..." : "Emitir comprobante" }}
           </button>
         </div>
       </form>
 
-      <section class="panel">
-        <h2>Items de venta</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>Producto</th>
-              <th>Cantidad</th>
-              <th>Precio unitario</th>
-              <th>Descuento</th>
-              <th>Total linea</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let item of sale.items">
-              <td>#{{ item.productId }}</td>
-              <td>{{ item.quantity | number: "1.0-3" }}</td>
-              <td>{{ item.unitPrice | number: "1.2-2" }}</td>
-              <td>{{ item.discountAmount | number: "1.2-2" }}</td>
-              <td>{{ item.lineTotal | number: "1.2-2" }}</td>
-            </tr>
-          </tbody>
-        </table>
+      <section class="data-section">
+        <header class="section-head">
+          <h2>Items de venta</h2>
+        </header>
+
+        <div class="ui-table-wrapper">
+          <table class="ui-table issue-table">
+            <thead>
+              <tr>
+                <th>Producto</th>
+                <th>Cantidad</th>
+                <th>Precio unitario</th>
+                <th>Descuento</th>
+                <th>Total linea</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let item of sale.items">
+                <td>#{{ item.productId }}</td>
+                <td>{{ item.quantity | number: "1.0-3" }}</td>
+                <td>{{ item.unitPrice | number: "1.2-2" }}</td>
+                <td>{{ item.discountAmount | number: "1.2-2" }}</td>
+                <td>{{ item.lineTotal | number: "1.2-2" }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </section>
     </section>
   `,
   styles: [
     `
-      .card {
-        background: #fff;
-        border-radius: 0.5rem;
-        padding: 1rem;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      .billing-issue-page {
+        padding: var(--space-5);
         display: grid;
-        gap: 1rem;
+        gap: var(--space-4);
       }
-      .header {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        gap: 1rem;
-      }
-      h1,
+
       h2 {
         margin: 0;
+        font-size: 1.05rem;
       }
-      .muted {
-        margin: 0.25rem 0 0;
-        color: #6b7280;
+
+      .steps-strip {
+        display: flex;
+        gap: var(--space-2);
+        flex-wrap: wrap;
       }
+
+      .step-badge {
+        background: #e0e7ff;
+        color: #3730a3;
+        font-weight: 700;
+      }
+
       .summary-grid {
         display: grid;
-        grid-template-columns: repeat(3, minmax(180px, 1fr));
-        gap: 0.5rem 0.8rem;
+        grid-template-columns: repeat(2, minmax(240px, 1fr));
+        gap: var(--space-3);
       }
-      .summary-grid p {
+
+      .summary-card {
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-md);
+        background: var(--color-bg-surface);
+        padding: var(--space-3);
+        display: grid;
+        gap: var(--space-2);
+      }
+
+      .summary-card p {
         margin: 0;
-      }
-      .grid {
         display: grid;
+        gap: 0.1rem;
+      }
+
+      .summary-card .label {
+        font-size: var(--font-size-xs);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--color-text-secondary);
+        font-weight: 700;
+      }
+
+      .form-layout {
+        display: grid;
+        gap: var(--space-4);
+      }
+
+      .form-section,
+      .data-section {
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-md);
+        background: var(--color-bg-surface);
+        padding: var(--space-3);
+        display: grid;
+        gap: var(--space-3);
+      }
+
+      .section-head {
+        border-bottom: 1px solid var(--color-border-default);
+        padding-bottom: var(--space-2);
+      }
+
+      .form-grid {
+        display: grid;
+        gap: var(--space-3);
+      }
+
+      .form-grid--two {
         grid-template-columns: repeat(2, minmax(220px, 1fr));
-        gap: 0.65rem;
       }
-      .full {
-        grid-column: 1 / -1;
-      }
-      label {
+
+      .field {
         display: grid;
-        gap: 0.35rem;
+        gap: var(--space-1);
       }
+
+      .field > span {
+        font-size: var(--font-size-sm);
+        color: var(--color-text-secondary);
+        font-weight: 700;
+      }
+
       input,
-      select,
-      button,
-      .button {
-        padding: 0.5rem;
-        border: 1px solid #d1d5db;
-        border-radius: 0.35rem;
+      select {
+        padding: 0.6rem 0.7rem;
+        border: 1px solid var(--color-border-strong);
+        border-radius: var(--radius-sm);
+        background: var(--color-bg-surface);
       }
-      button,
-      .button {
-        border: 0;
-        background: #0f766e;
-        color: #fff;
-        cursor: pointer;
-        text-decoration: none;
+
+      .field-error {
+        margin: 0;
+        color: var(--color-danger);
+        font-size: var(--font-size-xs);
+        font-weight: 700;
       }
-      .secondary {
-        background: #374151;
-      }
-      .actions {
+
+      .form-actions {
         display: flex;
         justify-content: flex-end;
+        gap: var(--space-2);
+        flex-wrap: wrap;
       }
-      .panel {
-        border: 1px solid #e5e7eb;
-        border-radius: 0.5rem;
-        padding: 0.7rem;
-        overflow-x: auto;
+
+      .issue-table {
+        min-width: 820px;
       }
-      table {
-        width: 100%;
-        border-collapse: collapse;
+
+      .ui-button[disabled] {
+        opacity: 0.55;
+        cursor: not-allowed;
       }
-      th,
-      td {
-        border-bottom: 1px solid #e5e7eb;
-        padding: 0.45rem;
-        text-align: left;
-      }
-      .error {
-        margin: 0;
-        color: #b91c1c;
-      }
-      .success {
-        margin: 0;
-        color: #166534;
-      }
+
       @media (max-width: 900px) {
-        .header {
-          flex-direction: column;
-          align-items: flex-start;
+        .billing-issue-page {
+          padding: var(--space-4);
         }
+
         .summary-grid,
-        .grid {
+        .form-grid--two {
           grid-template-columns: 1fr;
+        }
+
+        .form-actions {
+          justify-content: flex-start;
         }
       }
     `,

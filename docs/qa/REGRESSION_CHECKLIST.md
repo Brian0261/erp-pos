@@ -30,7 +30,7 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 
 - [x] Outbox solo ADMIN (`200` ADMIN, `403` CAJERO/ALMACENERO/SUPERVISOR).
 - [x] Configuracion critica billing solo ADMIN (`/billing/company-profile`).
-- [x] `CAJERO` sin acceso a `/billing/series` => 403.
+- [x] `CAJERO` con acceso de lectura a `/billing/series` => 200; mutaciones de series (`POST/PUT/DELETE`) se mantienen solo ADMIN.
 - [x] `ALMACENERO` sin acceso a `/cash-registers/current` => 403.
 - [x] `SUPERVISOR` con acceso a `/reports/sales` => 200.
 
@@ -316,3 +316,29 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
   - [x] `SUPERVISOR`: acceso a `/cotizaciones` y `/cotizaciones/nueva`; API `GET/POST/send` en quotes => `200/201/200`.
   - [x] `ALMACENERO`: bloqueo frontend en `/cotizaciones` y `/cotizaciones/nueva` con redireccion a `/dashboard`; API quotes (`GET/POST`) => `403/403`.
 - [x] Alcance tecnico preservado: sin cambios en backend, endpoints, contratos de servicio, guards, interceptor ni reglas de negocio de cotizaciones.
+
+## Bloque E6 Facturacion InkToy (2026-04-30)
+
+- [x] Pantallas aplicadas:
+  - [x] `/facturacion/configuracion`
+  - [x] `/facturacion/series`
+  - [x] `/facturacion/comprobantes`
+  - [x] `/facturacion/comprobantes/:id`
+  - [x] `/facturacion/emitir/:saleId`
+- [x] Build frontend (`npm run build`) exitoso tras cambios visuales E6.
+- [x] `docker compose up --build -d` y `docker compose ps` exitosos (`postgres` healthy, `backend` up, `frontend` up).
+- [x] Smoke funcional E6 en navegador (ADMIN, `http://localhost:4200`):
+  - [x] Configuracion: carga de perfil por ambiente y actualizacion exitosa (`Perfil tributario guardado correctamente.`).
+  - [x] Series: listado, creacion (`B009`) y edicion de correlativo (`101`) exitosas.
+  - [x] Comprobantes: filtros por estado (`DRAFT`) y listado operativo.
+  - [x] Emision desde venta: venta `#39` emitida como `B009-00000101`.
+  - [x] Detalle `#9`: flujo `DRAFT -> GENERATED -> SIGNED -> SENT -> ACCEPTED` con historial completo.
+- [x] Validacion de roles E6 (frontend + smoke UI):
+  - [x] `ADMIN`: acceso total a configuracion, series, comprobantes, emision y workflow de detalle.
+  - [x] `CAJERO`: acceso a `/facturacion/comprobantes` y detalle; bloqueo en `/facturacion/configuracion` (redirige a `/dashboard`); botones `Firmar XML`/`Enviar mock/sandbox` deshabilitados en detalle.
+  - [x] `CAJERO`: flujo `/facturacion/emitir/:saleId` validado; series cargan correctamente y emision desde venta completada sin habilitar rutas admin de series/configuracion.
+  - [x] `SUPERVISOR`: acceso a comprobantes/detalle; bloqueo en `/facturacion/configuracion` (redirige a `/dashboard`); flujo de firma/envio mock validado en comprobante `#10` hasta `ACCEPTED`.
+  - [x] `ALMACENERO`: bloqueo en `/facturacion/comprobantes` y `/facturacion/configuracion` con redireccion a `/dashboard`.
+- [x] Sin respuestas HTTP `500` inesperadas durante validacion E6.
+- [x] Sin errores de consola en rutas E6 por carga de XML prematura; comprobantes sin XML muestran estado informativo sin `404` tecnico visible.
+- [x] Alcance tecnico preservado en E6: sin cambios de contratos API; ajuste puntual aplicado en backend (RBAC lectura de series) y frontend (carga condicional de XML) manteniendo reglas de negocio.

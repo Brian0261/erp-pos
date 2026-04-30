@@ -74,6 +74,16 @@ Apply visual consistency across the ERP/POS while preserving MVP behavior.
 6. Reuse shared InkToy wrappers (`.ui-page-head`, `.ui-alert`, `.ui-table`, `.ui-button`, `.ui-badge`) before adding local styles.
 7. Keep quotes routes, guards, interceptor behavior, backend authorization, and business logic untouched in E5.
 
+## Billing-Specific Rules (Block E6)
+
+1. Keep billing workflows unchanged; E6 is visual-only for `/facturacion/configuracion`, `/facturacion/series`, `/facturacion/comprobantes`, `/facturacion/comprobantes/:id`, and `/facturacion/emitir/:saleId`.
+2. Preserve electronic document lifecycle behavior exactly as implemented (`DRAFT`, `GENERATED`, `SIGNED`, `SENT`, `ACCEPTED`, `REJECTED`, `ERROR`, `CANCELLED`).
+3. Keep role behavior unchanged in billing routes and actions: `ADMIN` full management, `SUPERVISOR` consult/send flow, `CAJERO` operational billing scope, `ALMACENERO` blocked by current guards.
+4. Preserve all reactive-form control names, validators, payload fields, and endpoint contracts in billing services.
+5. Reuse shared wrappers (`.ui-page-head`, `.ui-alert`, `.ui-table`, `.ui-button`, `.ui-badge`) and avoid local styles that duplicate global tokenized primitives.
+6. Keep workflow actions (generate XML, sign, send mock/sandbox) visually differentiated without changing existing enable/disable logic.
+7. Keep billing routes, guards, interceptor behavior, backend authorization, and business rules untouched in E6.
+
 ## Rollout Sequence (Recommended)
 
 1. Block A: foundation (tokens/assets/base classes) - completed.
@@ -85,7 +95,7 @@ Apply visual consistency across the ERP/POS while preserving MVP behavior.
 7. Block E3: POS/Caja/Ventas visual upgrade - completed.
 8. Block E4: Compras/Proveedores visual upgrade - completed.
 9. Block E5: Cotizaciones visual upgrade - completed.
-10. Block E6+: remaining modules cards/forms.
+10. Block E6: Facturacion visual upgrade (configuracion/series/comprobantes/detalle/emitir) - completed.
 11. Block F: tables, statuses, and badges across remaining modules.
 12. Block G: final responsive and QA pass.
 

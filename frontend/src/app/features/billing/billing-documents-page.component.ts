@@ -19,324 +19,388 @@ import { toHttpErrorMessage } from "./data/http-error-message";
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, RouterLink],
   template: `
-    <section class="card">
-      <header class="header">
+    <section class="ui-card billing-documents-page">
+      <header class="ui-page-head">
         <div>
-          <h1>Facturacion - Comprobantes electronicos</h1>
-          <p class="muted">Consulta comprobantes emitidos y su estado.</p>
+          <p class="ui-page-kicker">Facturacion electronica MVP</p>
+          <h1 class="ui-page-title">Comprobantes electronicos</h1>
+          <p class="ui-page-description">
+            Consulta estado del ciclo DRAFT a ACCEPTED, revisa datos de cliente
+            y accede al detalle o a la emision desde venta.
+          </p>
         </div>
       </header>
 
-      <p class="error" *ngIf="permissionMessage">{{ permissionMessage }}</p>
-      <p class="error" *ngIf="errorMessage">{{ errorMessage }}</p>
-      <p class="success" *ngIf="successMessage">{{ successMessage }}</p>
+      <p class="ui-alert ui-alert--error" *ngIf="permissionMessage">
+        {{ permissionMessage }}
+      </p>
+      <p class="ui-alert ui-alert--error" *ngIf="errorMessage">
+        {{ errorMessage }}
+      </p>
+      <p class="ui-alert ui-alert--success" *ngIf="successMessage">
+        {{ successMessage }}
+      </p>
 
-      <form
-        [formGroup]="filtersForm"
-        class="filters"
-        (ngSubmit)="applyFilters()"
-      >
-        <label>
-          Tipo
-          <select formControlName="type">
-            <option value="">Todos</option>
-            <option *ngFor="let type of documentTypes" [value]="type">
-              {{ typeLabel(type) }}
-            </option>
-          </select>
-        </label>
+      <section class="filter-section">
+        <header class="section-head">
+          <h2>Filtros de comprobantes</h2>
+        </header>
 
-        <label>
-          Estado
-          <select formControlName="status">
-            <option value="">Todos</option>
-            <option *ngFor="let status of statuses" [value]="status">
-              {{ status }}
-            </option>
-          </select>
-        </label>
+        <form
+          [formGroup]="filtersForm"
+          class="filters-grid"
+          (ngSubmit)="applyFilters()"
+        >
+          <label class="field">
+            <span>Tipo</span>
+            <select formControlName="type">
+              <option value="">Todos</option>
+              <option *ngFor="let type of documentTypes" [value]="type">
+                {{ typeLabel(type) }}
+              </option>
+            </select>
+          </label>
 
-        <label>
-          Serie
-          <input
-            type="text"
-            maxlength="4"
-            formControlName="series"
-            placeholder="F001 / B001"
-          />
-        </label>
+          <label class="field">
+            <span>Estado</span>
+            <select formControlName="status">
+              <option value="">Todos</option>
+              <option *ngFor="let status of statuses" [value]="status">
+                {{ status }}
+              </option>
+            </select>
+          </label>
 
-        <label>
-          Numero
-          <input
-            type="text"
-            maxlength="30"
-            formControlName="number"
-            placeholder="00000001 o F001-00000001"
-          />
-        </label>
-
-        <label>
-          Desde
-          <input type="date" formControlName="from" />
-        </label>
-
-        <label>
-          Hasta
-          <input type="date" formControlName="to" />
-        </label>
-
-        <label>
-          Venta (saleId)
-          <input type="number" min="1" step="1" formControlName="saleId" />
-        </label>
-
-        <label>
-          Emitir desde venta
-          <div class="inline-group">
+          <label class="field">
+            <span>Serie</span>
             <input
-              type="number"
-              min="1"
-              step="1"
-              formControlName="emitSaleId"
+              type="text"
+              maxlength="4"
+              formControlName="series"
+              placeholder="F001 / B001"
             />
+          </label>
+
+          <label class="field">
+            <span>Numero</span>
+            <input
+              type="text"
+              maxlength="30"
+              formControlName="number"
+              placeholder="00000001 o F001-00000001"
+            />
+          </label>
+
+          <label class="field">
+            <span>Desde</span>
+            <input type="date" formControlName="from" />
+          </label>
+
+          <label class="field">
+            <span>Hasta</span>
+            <input type="date" formControlName="to" />
+          </label>
+
+          <label class="field">
+            <span>Venta (saleId)</span>
+            <input type="number" min="1" step="1" formControlName="saleId" />
+          </label>
+
+          <label class="field">
+            <span>Emitir desde venta</span>
+            <div class="inline-group">
+              <input
+                type="number"
+                min="1"
+                step="1"
+                formControlName="emitSaleId"
+              />
+              <button
+                type="button"
+                class="ui-button ui-button--secondary quick-btn"
+                (click)="goToIssue()"
+                [disabled]="loading"
+              >
+                Ir
+              </button>
+            </div>
+          </label>
+
+          <div class="filter-actions">
+            <button
+              type="submit"
+              class="ui-button ui-button--primary"
+              [disabled]="loading || !canView"
+            >
+              Filtrar
+            </button>
             <button
               type="button"
-              class="secondary"
-              (click)="goToIssue()"
-              [disabled]="loading"
+              class="ui-button ui-button--secondary"
+              (click)="clearFilters()"
+              [disabled]="loading || !canView"
             >
-              Ir
+              Limpiar
             </button>
           </div>
-        </label>
+        </form>
+      </section>
 
-        <div class="actions full">
-          <button type="submit" [disabled]="loading || !canView">
-            Filtrar
-          </button>
-          <button
-            type="button"
-            class="secondary"
-            (click)="clearFilters()"
-            [disabled]="loading || !canView"
-          >
-            Limpiar
-          </button>
+      <section class="data-section">
+        <header class="section-head">
+          <h2>Listado de comprobantes</h2>
+        </header>
+
+        <div class="ui-table-wrapper">
+          <table class="ui-table documents-table">
+            <thead>
+              <tr>
+                <th>Tipo</th>
+                <th>Numeracion</th>
+                <th>Cliente</th>
+                <th>Total</th>
+                <th>Estado</th>
+                <th>Fecha</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let document of documents">
+                <td>
+                  <span
+                    class="ui-badge type-badge"
+                    [ngClass]="
+                      document.documentType === 'INVOICE'
+                        ? 'type-badge--invoice'
+                        : 'type-badge--receipt'
+                    "
+                  >
+                    {{ typeLabel(document.documentType) }}
+                  </span>
+                </td>
+                <td>
+                  <strong>{{ document.fullNumber }}</strong>
+                  <div class="meta-note">
+                    Serie {{ document.series }} - Nro {{ document.number }}
+                  </div>
+                </td>
+                <td>
+                  <strong>{{
+                    document.customerName || "CONSUMIDOR FINAL"
+                  }}</strong>
+                  <div class="meta-note">
+                    {{ document.customerDocument || "Sin documento" }}
+                  </div>
+                </td>
+                <td>{{ document.totalAmount | number: "1.2-2" }}</td>
+                <td>
+                  <span
+                    class="ui-badge status-badge"
+                    [ngClass]="statusClass(document.status)"
+                  >
+                    {{ document.status }}
+                  </span>
+                </td>
+                <td>{{ document.createdAt | date: "yyyy-MM-dd HH:mm" }}</td>
+                <td class="row-actions">
+                  <a
+                    class="ui-button ui-button--secondary action-btn"
+                    [routerLink]="['/facturacion/comprobantes', document.id]"
+                  >
+                    Ver detalle
+                  </a>
+                  <a
+                    class="ui-button ui-button--secondary action-btn"
+                    [routerLink]="['/ventas', document.saleId]"
+                  >
+                    Ver venta
+                  </a>
+                  <a
+                    class="ui-button ui-button--primary action-btn"
+                    [routerLink]="['/facturacion/emitir', document.saleId]"
+                  >
+                    Emitir desde venta
+                  </a>
+                </td>
+              </tr>
+              <tr *ngIf="!loading && documents.length === 0">
+                <td colspan="7" class="ui-table__empty">
+                  <div class="ui-empty-state">
+                    No hay comprobantes para los filtros seleccionados.
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
-      </form>
-
-      <section class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Tipo</th>
-              <th>Numeracion</th>
-              <th>Cliente</th>
-              <th>Total</th>
-              <th>Estado</th>
-              <th>Fecha</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let document of documents">
-              <td>{{ typeLabel(document.documentType) }}</td>
-              <td>
-                <strong>{{ document.fullNumber }}</strong>
-                <div class="muted tiny">
-                  Serie {{ document.series }} - Nro {{ document.number }}
-                </div>
-              </td>
-              <td>
-                <strong>{{
-                  document.customerName || "CONSUMIDOR FINAL"
-                }}</strong>
-                <div class="muted tiny">
-                  {{ document.customerDocument || "Sin documento" }}
-                </div>
-              </td>
-              <td>{{ document.totalAmount | number: "1.2-2" }}</td>
-              <td>
-                <span class="status" [ngClass]="statusClass(document.status)">{{
-                  document.status
-                }}</span>
-              </td>
-              <td>{{ document.createdAt | date: "yyyy-MM-dd HH:mm" }}</td>
-              <td class="row-actions">
-                <a
-                  class="link-btn"
-                  [routerLink]="['/facturacion/comprobantes', document.id]"
-                  >Ver detalle</a
-                >
-                <a class="link-btn" [routerLink]="['/ventas', document.saleId]"
-                  >Ver venta</a
-                >
-                <a
-                  class="link-btn secondary"
-                  [routerLink]="['/facturacion/emitir', document.saleId]"
-                  >Emitir desde venta</a
-                >
-              </td>
-            </tr>
-            <tr *ngIf="!loading && documents.length === 0">
-              <td colspan="7" class="empty">
-                No hay comprobantes para los filtros seleccionados.
-              </td>
-            </tr>
-          </tbody>
-        </table>
       </section>
     </section>
   `,
   styles: [
     `
-      .card {
-        background: #fff;
-        border-radius: 0.5rem;
-        padding: 1rem;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      .billing-documents-page {
+        padding: var(--space-5);
         display: grid;
-        gap: 1rem;
+        gap: var(--space-4);
       }
-      .header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 1rem;
-      }
-      h1 {
+
+      h2 {
         margin: 0;
+        font-size: 1.05rem;
       }
-      .muted {
-        color: #6b7280;
-        margin: 0.25rem 0 0;
+
+      .filter-section,
+      .data-section {
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-md);
+        background: var(--color-bg-surface);
+        padding: var(--space-3);
+        display: grid;
+        gap: var(--space-3);
       }
-      .tiny {
-        font-size: 0.8rem;
+
+      .section-head {
+        border-bottom: 1px solid var(--color-border-default);
+        padding-bottom: var(--space-2);
       }
-      .filters {
+
+      .filters-grid {
         display: grid;
         grid-template-columns: repeat(4, minmax(180px, 1fr));
-        gap: 0.65rem;
+        gap: var(--space-3);
       }
-      .full {
-        grid-column: 1 / -1;
-      }
-      label {
+
+      .field {
         display: grid;
-        gap: 0.35rem;
+        gap: var(--space-1);
       }
+
+      .field > span {
+        font-size: var(--font-size-sm);
+        color: var(--color-text-secondary);
+        font-weight: 700;
+      }
+
       input,
-      select,
-      button,
-      .button {
-        padding: 0.5rem 0.7rem;
-        border-radius: 0.35rem;
-        border: 1px solid #d1d5db;
+      select {
+        padding: 0.6rem 0.7rem;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--color-border-strong);
+        background: var(--color-bg-surface);
       }
-      button,
-      .button {
-        border: 0;
-        background: #0f766e;
-        color: #fff;
-        cursor: pointer;
-      }
-      .secondary {
-        background: #374151;
-      }
+
       .inline-group {
         display: grid;
         grid-template-columns: 1fr auto;
-        gap: 0.4rem;
+        gap: var(--space-2);
       }
-      .actions {
+
+      .quick-btn {
+        padding: 0.45rem 0.7rem;
+        font-size: var(--font-size-xs);
+      }
+
+      .filter-actions {
+        grid-column: 1 / -1;
         display: flex;
         justify-content: flex-end;
-        gap: 0.5rem;
-      }
-      .table-wrap {
-        overflow-x: auto;
-      }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-      }
-      th,
-      td {
-        text-align: left;
-        padding: 0.45rem;
-        border-bottom: 1px solid #e5e7eb;
-        vertical-align: top;
-      }
-      .row-actions {
-        display: flex;
-        gap: 0.35rem;
+        gap: var(--space-2);
         flex-wrap: wrap;
       }
-      .link-btn {
-        padding: 0.35rem 0.55rem;
-        border-radius: 0.3rem;
-        background: #1f2937;
-        color: #fff;
-        border: 0;
-        cursor: pointer;
-        text-decoration: none;
-        font-size: 0.85rem;
+
+      .documents-table {
+        min-width: 1120px;
       }
-      .status {
-        display: inline-flex;
-        padding: 0.2rem 0.5rem;
-        border-radius: 999px;
-        font-size: 0.75rem;
+
+      .type-badge {
         font-weight: 700;
       }
+
+      .type-badge--invoice {
+        background: #ede9fe;
+        color: #6d28d9;
+      }
+
+      .type-badge--receipt {
+        background: #dbeafe;
+        color: var(--color-info);
+      }
+
+      .meta-note {
+        margin-top: 0.1rem;
+        font-size: var(--font-size-xs);
+        color: var(--color-text-secondary);
+      }
+
+      .status-badge {
+        font-weight: 700;
+      }
+
       .status-draft {
         background: #dbeafe;
-        color: #1d4ed8;
+        color: var(--color-info);
       }
+
       .status-generated {
         background: #ede9fe;
         color: #6d28d9;
       }
+
       .status-signed {
         background: #cffafe;
         color: #0e7490;
       }
+
       .status-sent {
         background: #fef3c7;
-        color: #92400e;
+        color: var(--color-warning);
       }
+
       .status-accepted {
         background: #dcfce7;
-        color: #166534;
+        color: var(--color-success);
       }
+
       .status-rejected,
       .status-error,
       .status-cancelled {
         background: #fee2e2;
-        color: #b91c1c;
+        color: var(--color-danger);
       }
-      .error {
-        margin: 0;
-        color: #b91c1c;
+
+      .row-actions {
+        display: grid;
+        gap: var(--space-2);
       }
-      .success {
-        margin: 0;
-        color: #166534;
+
+      .action-btn {
+        width: 100%;
+        padding: 0.45rem 0.7rem;
+        font-size: var(--font-size-xs);
       }
-      .empty {
-        text-align: center;
-        color: #6b7280;
+
+      .ui-button[disabled] {
+        opacity: 0.55;
+        cursor: not-allowed;
       }
+
       @media (max-width: 1080px) {
-        .filters {
+        .billing-documents-page {
+          padding: var(--space-4);
+        }
+
+        .filters-grid {
           grid-template-columns: 1fr 1fr;
         }
       }
+
       @media (max-width: 640px) {
-        .filters {
+        .filters-grid {
           grid-template-columns: 1fr;
+        }
+
+        .filter-actions {
+          justify-content: flex-start;
         }
       }
     `,
