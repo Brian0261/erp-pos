@@ -55,6 +55,15 @@ Apply visual consistency across the ERP/POS while preserving MVP behavior.
 5. Keep form validation, submit payload shape, and service calls exactly as implemented before E2.
 6. Keep all inventory route names, guards, interceptors, and permission matrix untouched in E2.
 
+## Purchases-Specific Rules (Block E4)
+
+1. Keep suppliers and purchase-orders workflows unchanged; E4 is visual-only for suppliers and purchase order pages.
+2. Preserve all lifecycle actions and conditions (`DRAFT`, `APPROVED`, `PARTIALLY_RECEIVED`, `RECEIVED`, `CANCELLED`) exactly as implemented.
+3. Keep role-driven behavior unchanged: `SUPERVISOR` lectura, `ADMIN/ALMACENERO` gestion en acciones de orden.
+4. Preserve all reactive-form control names, validators, payload fields, and endpoint contracts in purchases services.
+5. Reuse shared UI wrappers and tokens (`.ui-page-head`, `.ui-alert`, `.ui-table`, `.ui-button`, `.ui-badge`) before introducing local classes.
+6. Keep all purchases route names, guards, interceptor logic, and backend authorization untouched in E4.
+
 ## Rollout Sequence (Recommended)
 
 1. Block A: foundation (tokens/assets/base classes) - completed.
@@ -63,9 +72,11 @@ Apply visual consistency across the ERP/POS while preserving MVP behavior.
 4. Block D: dashboard identity refresh - completed.
 5. Block E1: catalog visual upgrade (products/forms/categories/units) - completed.
 6. Block E2: inventory visual upgrade (warehouses/stock/initial stock/adjustments/transfers/kardex) - completed.
-7. Block E3+: remaining modules cards/forms.
-8. Block F: tables, statuses, and badges across remaining modules.
-9. Block G: final responsive and QA pass.
+7. Block E3: POS/Caja/Ventas visual upgrade - completed.
+8. Block E4: Compras/Proveedores visual upgrade - completed.
+9. Block E5+: remaining modules cards/forms.
+10. Block F: tables, statuses, and badges across remaining modules.
+11. Block G: final responsive and QA pass.
 
 ## Validation Checklist
 

@@ -238,3 +238,47 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
   - [x] Sin `pageerror`.
   - [x] Sin respuestas `500` inesperadas.
   - [x] Solo errores esperados de pruebas negativas/controladas.
+
+## Bloque E4 Compras/Proveedores InkToy (2026-04-30)
+
+- [x] Pantallas aplicadas:
+  - [x] `/compras/proveedores`
+  - [x] `/compras/ordenes`
+  - [x] `/compras/ordenes/nueva`
+  - [x] `/compras/ordenes/:id`
+  - [x] `/compras/ordenes/:id/editar`
+  - [x] `/compras/ordenes/:id/recibir`
+- [x] Build frontend (`npm run build`) exitoso tras cambios visuales E4.
+- [x] `docker compose up --build -d` y `docker compose ps` exitosos (`postgres` healthy, `backend` up, `frontend` up).
+- [x] Validacion por ruta (frontend) en navegador:
+  - [x] `ADMIN` con acceso a rutas de proveedores/ordenes y acciones de gestion (`nueva`, `editar`, `recibir`).
+  - [x] `ALMACENERO` con acceso a rutas de proveedores/ordenes y acciones de gestion (`nueva`, `editar`, `recibir`).
+  - [x] `SUPERVISOR` con acceso a lectura (`/compras/proveedores`, `/compras/ordenes`, `/compras/ordenes/:id`) y bloqueo en rutas de gestion (`/nueva`, `/editar`, `/recibir`) con redireccion a `/dashboard`.
+  - [x] `CAJERO` bloqueado en todas las rutas de compras intervenidas con redireccion a `/dashboard`.
+- [x] Validacion API RBAC de compras:
+  - [x] `GET /api/v1/suppliers` => `200` SUPERVISOR, `403` CAJERO.
+  - [x] `GET /api/v1/purchase-orders` => `200` SUPERVISOR, `403` CAJERO.
+  - [x] `POST /api/v1/purchase-orders/{id}/approve` => `403` SUPERVISOR.
+  - [x] `POST /api/v1/purchase-orders/{id}/receive` => `403` SUPERVISOR.
+- [x] Sin errores `500` inesperados durante validacion E4.
+- [x] Sin cambios en backend, contratos de servicio, guards, interceptor o rutas; alcance visual-only en componentes de compras.
+
+### Smoke transaccional corto E4 (2026-04-30)
+
+- [x] Usuario/rol de ejecucion principal: `admin@erp.local` (ADMIN).
+- [x] Usuario/rol de gestion complementaria: `almacenero@erp.local` (ALMACENERO).
+- [x] Usuario/rol negativo: `supervisor@erp.local` (SUPERVISOR).
+- [x] Flujo ejecutado sobre datos reales:
+  - [x] Proveedor creado: `#10` (`Proveedor E4 1777509644`).
+  - [x] Orden creada: `#17` en estado inicial `DRAFT`.
+  - [x] Aprobacion con SUPERVISOR bloqueada (`403`).
+  - [x] Aprobacion con ALMACENERO exitosa (`200`).
+  - [x] Recepcion con SUPERVISOR bloqueada (`403`).
+  - [x] Recepcion con ADMIN exitosa (`200`) y estado final `RECEIVED`.
+- [x] Consistencia de inventario y kardex:
+  - [x] Producto usado: `#15` (`SKU-S5-1777163780`).
+  - [x] Almacen usado: `#8`.
+  - [x] Stock antes de recepcion: `2`.
+  - [x] Stock despues de recepcion: `3`.
+  - [x] Delta confirmado: `+1`.
+  - [x] Kardex con movimiento `PURCHASE_IN` encontrado (motivo: `Purchase receipt #19`).

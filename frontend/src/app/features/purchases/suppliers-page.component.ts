@@ -21,33 +21,53 @@ import { SupplierService } from "./data/supplier.service";
   standalone: true,
   imports: [CommonModule, FormsModule, ReactiveFormsModule],
   template: `
-    <section class="card">
-      <header class="header">
+    <section class="ui-card suppliers-page">
+      <header class="ui-page-head">
         <div>
-          <h1>Compras - Proveedores</h1>
-          <p class="muted">Gestion de proveedores para ordenes de compra.</p>
+          <p class="ui-page-kicker">Compras InkToy</p>
+          <h1 class="ui-page-title">Proveedores</h1>
+          <p class="ui-page-description">
+            Gestiona proveedores para ordenar compras, editar datos de contacto
+            y controlar su estado operativo.
+          </p>
         </div>
+        <span class="ui-badge">{{ suppliers.length }} registros</span>
       </header>
 
-      <form class="search-row" (ngSubmit)="search()">
-        <input
-          type="text"
-          name="query"
-          [(ngModel)]="query"
-          [ngModelOptions]="{ standalone: true }"
-          placeholder="Buscar por nombre, documento o contacto"
-        />
-        <button type="submit">Buscar</button>
-        <button type="button" class="secondary" (click)="clearSearch()">
-          Limpiar
-        </button>
+      <form class="search-panel" (ngSubmit)="search()">
+        <label class="field field--grow">
+          <span>Busqueda rapida</span>
+          <input
+            type="text"
+            name="query"
+            [(ngModel)]="query"
+            [ngModelOptions]="{ standalone: true }"
+            placeholder="Buscar por nombre, documento o contacto"
+          />
+        </label>
+
+        <div class="search-actions">
+          <button type="submit" class="ui-button ui-button--primary">
+            Buscar
+          </button>
+          <button
+            type="button"
+            class="ui-button ui-button--secondary"
+            (click)="clearSearch()"
+          >
+            Limpiar
+          </button>
+        </div>
       </form>
 
-      <section class="panel" *ngIf="canManage">
-        <h2>Nuevo proveedor</h2>
-        <form [formGroup]="createForm" (ngSubmit)="create()" class="grid">
-          <label>
-            Documento
+      <section class="supplier-panel" *ngIf="canManage">
+        <header class="panel-head">
+          <h2>Nuevo proveedor</h2>
+        </header>
+
+        <form [formGroup]="createForm" (ngSubmit)="create()" class="form-grid">
+          <label class="field">
+            <span>Documento</span>
             <input
               type="text"
               formControlName="documentNumber"
@@ -55,34 +75,34 @@ import { SupplierService } from "./data/supplier.service";
             />
           </label>
 
-          <label>
-            Nombre *
+          <label class="field">
+            <span>Nombre *</span>
             <input type="text" formControlName="name" maxlength="180" />
-            <small class="error" *ngIf="isCreateInvalid('name')"
+            <small class="field-error" *ngIf="isCreateInvalid('name')"
               >Nombre es obligatorio.</small
             >
           </label>
 
-          <label>
-            Contacto
+          <label class="field">
+            <span>Contacto</span>
             <input type="text" formControlName="contactName" maxlength="120" />
           </label>
 
-          <label>
-            Telefono
+          <label class="field">
+            <span>Telefono</span>
             <input type="text" formControlName="phone" maxlength="40" />
           </label>
 
-          <label>
-            Email
+          <label class="field">
+            <span>Email</span>
             <input type="email" formControlName="email" maxlength="160" />
-            <small class="error" *ngIf="isCreateInvalid('email')"
+            <small class="field-error" *ngIf="isCreateInvalid('email')"
               >Email invalido.</small
             >
           </label>
 
-          <label class="full">
-            Direccion
+          <label class="field full">
+            <span>Direccion</span>
             <textarea
               rows="2"
               formControlName="address"
@@ -90,19 +110,30 @@ import { SupplierService } from "./data/supplier.service";
             ></textarea>
           </label>
 
-          <div class="actions full">
-            <button type="submit" [disabled]="savingCreate">
+          <div class="form-actions full">
+            <button
+              type="submit"
+              class="ui-button ui-button--primary"
+              [disabled]="savingCreate"
+            >
               {{ savingCreate ? "Guardando..." : "Crear proveedor" }}
             </button>
           </div>
         </form>
       </section>
 
-      <section class="panel" *ngIf="editingSupplierId !== null && canManage">
-        <h2>Editar proveedor #{{ editingSupplierId }}</h2>
-        <form [formGroup]="editForm" (ngSubmit)="update()" class="grid">
-          <label>
-            Documento
+      <section
+        class="supplier-panel"
+        *ngIf="editingSupplierId !== null && canManage"
+      >
+        <header class="panel-head">
+          <h2>Editar proveedor #{{ editingSupplierId }}</h2>
+          <span class="ui-badge ui-badge--warning">Modo edicion</span>
+        </header>
+
+        <form [formGroup]="editForm" (ngSubmit)="update()" class="form-grid">
+          <label class="field">
+            <span>Documento</span>
             <input
               type="text"
               formControlName="documentNumber"
@@ -110,34 +141,34 @@ import { SupplierService } from "./data/supplier.service";
             />
           </label>
 
-          <label>
-            Nombre *
+          <label class="field">
+            <span>Nombre *</span>
             <input type="text" formControlName="name" maxlength="180" />
-            <small class="error" *ngIf="isEditInvalid('name')"
+            <small class="field-error" *ngIf="isEditInvalid('name')"
               >Nombre es obligatorio.</small
             >
           </label>
 
-          <label>
-            Contacto
+          <label class="field">
+            <span>Contacto</span>
             <input type="text" formControlName="contactName" maxlength="120" />
           </label>
 
-          <label>
-            Telefono
+          <label class="field">
+            <span>Telefono</span>
             <input type="text" formControlName="phone" maxlength="40" />
           </label>
 
-          <label>
-            Email
+          <label class="field">
+            <span>Email</span>
             <input type="email" formControlName="email" maxlength="160" />
-            <small class="error" *ngIf="isEditInvalid('email')"
+            <small class="field-error" *ngIf="isEditInvalid('email')"
               >Email invalido.</small
             >
           </label>
 
-          <label class="full">
-            Direccion
+          <label class="field full">
+            <span>Direccion</span>
             <textarea
               rows="2"
               formControlName="address"
@@ -145,27 +176,42 @@ import { SupplierService } from "./data/supplier.service";
             ></textarea>
           </label>
 
-          <label class="checkbox">
+          <label class="checkbox-field full">
             <input type="checkbox" formControlName="active" />
             Proveedor activo
           </label>
 
-          <div class="actions full">
-            <button type="submit" [disabled]="savingEdit">
+          <div class="form-actions full">
+            <button
+              type="submit"
+              class="ui-button ui-button--primary"
+              [disabled]="savingEdit"
+            >
               {{ savingEdit ? "Actualizando..." : "Actualizar proveedor" }}
             </button>
-            <button type="button" class="secondary" (click)="cancelEdit()">
+            <button
+              type="button"
+              class="ui-button ui-button--secondary"
+              (click)="cancelEdit()"
+            >
               Cancelar
             </button>
           </div>
         </form>
       </section>
 
-      <p class="error" *ngIf="errorMessage">{{ errorMessage }}</p>
-      <p class="success" *ngIf="successMessage">{{ successMessage }}</p>
+      <p class="ui-alert ui-alert--error" *ngIf="errorMessage">
+        {{ errorMessage }}
+      </p>
+      <p class="ui-alert ui-alert--success" *ngIf="successMessage">
+        {{ successMessage }}
+      </p>
+      <p class="ui-alert ui-alert--info" *ngIf="loading">
+        Cargando proveedores...
+      </p>
 
-      <section class="table-wrap">
-        <table>
+      <div class="ui-table-wrapper" *ngIf="!loading">
+        <table class="ui-table suppliers-table">
           <thead>
             <tr>
               <th>ID</th>
@@ -180,7 +226,7 @@ import { SupplierService } from "./data/supplier.service";
           </thead>
           <tbody>
             <tr *ngFor="let supplier of suppliers">
-              <td>{{ supplier.id }}</td>
+              <td class="cell-id">{{ supplier.id }}</td>
               <td>{{ supplier.documentNumber || "-" }}</td>
               <td>{{ supplier.name }}</td>
               <td>{{ supplier.contactName || "-" }}</td>
@@ -188,23 +234,24 @@ import { SupplierService } from "./data/supplier.service";
               <td>{{ supplier.email || "-" }}</td>
               <td>
                 <span
-                  [class.ok]="supplier.active"
-                  [class.bad]="!supplier.active"
+                  class="ui-badge"
+                  [class.ui-badge--success]="supplier.active"
+                  [class.ui-badge--danger]="!supplier.active"
                 >
                   {{ supplier.active ? "Activo" : "Inactivo" }}
                 </span>
               </td>
-              <td *ngIf="canManage">
+              <td *ngIf="canManage" class="actions-col">
                 <button
                   type="button"
-                  class="secondary"
+                  class="ui-button ui-button--secondary"
                   (click)="startEdit(supplier)"
                 >
                   Editar
                 </button>
                 <button
                   type="button"
-                  class="danger"
+                  class="ui-button ui-button--danger"
                   (click)="deactivate(supplier)"
                   [disabled]="
                     !supplier.active || deactivatingId === supplier.id
@@ -218,125 +265,160 @@ import { SupplierService } from "./data/supplier.service";
                 </button>
               </td>
             </tr>
-            <tr *ngIf="!loading && suppliers.length === 0">
-              <td [attr.colspan]="canManage ? 8 : 7">
-                No hay proveedores registrados.
+            <tr *ngIf="suppliers.length === 0">
+              <td [attr.colspan]="canManage ? 8 : 7" class="ui-table__empty">
+                <div class="ui-empty-state">
+                  No hay proveedores registrados.
+                </div>
               </td>
             </tr>
           </tbody>
         </table>
-      </section>
+      </div>
     </section>
   `,
   styles: [
     `
-      .card {
-        background: #fff;
-        border-radius: 0.5rem;
-        padding: 1rem;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      .suppliers-page {
+        padding: var(--space-5);
         display: grid;
-        gap: 1rem;
+        gap: var(--space-4);
       }
-      .header h1,
+
+      .panel-head,
       h2 {
         margin: 0;
       }
-      .muted {
-        margin: 0.25rem 0 0;
-        color: #4b5563;
-      }
-      .search-row {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.6rem;
-      }
-      .search-row input {
-        min-width: 280px;
-        flex: 1;
-      }
-      .panel {
-        border: 1px solid #e5e7eb;
-        border-radius: 0.5rem;
-        padding: 0.85rem;
+
+      .search-panel {
         display: grid;
-        gap: 0.75rem;
+        grid-template-columns: minmax(280px, 1fr) auto;
+        gap: var(--space-3);
+        align-items: end;
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-md);
+        background: var(--color-bg-soft);
+        padding: var(--space-3);
       }
-      .grid {
+
+      .field {
+        display: grid;
+        gap: var(--space-1);
+      }
+
+      .field span {
+        font-size: var(--font-size-sm);
+        color: var(--color-text-secondary);
+        font-weight: 700;
+      }
+
+      .field--grow {
+        min-width: 0;
+      }
+
+      .search-actions {
+        display: flex;
+        gap: var(--space-2);
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+
+      input,
+      textarea,
+      select {
+        padding: 0.6rem 0.7rem;
+        border: 1px solid var(--color-border-strong);
+        border-radius: var(--radius-sm);
+        background: var(--color-bg-surface);
+      }
+
+      .supplier-panel {
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-md);
+        background: var(--color-bg-surface);
+        padding: var(--space-3);
+        display: grid;
+        gap: var(--space-3);
+      }
+
+      .panel-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: var(--space-2);
+        flex-wrap: wrap;
+      }
+
+      .form-grid {
         display: grid;
         grid-template-columns: repeat(2, minmax(220px, 1fr));
-        gap: 0.65rem;
+        gap: var(--space-3);
       }
+
       .full {
         grid-column: 1 / -1;
       }
-      label {
-        display: grid;
-        gap: 0.35rem;
-      }
-      .checkbox {
+
+      .checkbox-field {
         display: flex;
         align-items: center;
-        gap: 0.5rem;
+        gap: var(--space-2);
+        font-size: var(--font-size-sm);
+        font-weight: 700;
       }
-      input,
-      textarea {
-        padding: 0.5rem;
-        border: 1px solid #d1d5db;
-        border-radius: 0.35rem;
-      }
-      button {
-        padding: 0.45rem 0.8rem;
-        border: 0;
-        border-radius: 0.35rem;
-        background: #0f766e;
-        color: #fff;
-        cursor: pointer;
-      }
-      .secondary {
-        background: #374151;
-      }
-      .danger {
-        background: #b91c1c;
-      }
-      .actions {
+
+      .form-actions {
         display: flex;
         justify-content: flex-end;
-        gap: 0.5rem;
+        gap: var(--space-2);
+        flex-wrap: wrap;
       }
-      .table-wrap {
-        overflow: auto;
+
+      .ui-button[disabled] {
+        opacity: 0.55;
+        cursor: not-allowed;
       }
-      table {
-        width: 100%;
-        border-collapse: collapse;
+
+      .suppliers-table {
+        min-width: 980px;
       }
-      th,
-      td {
-        border-bottom: 1px solid #e5e7eb;
-        padding: 0.5rem;
-        text-align: left;
-        vertical-align: top;
+
+      .cell-id {
+        white-space: nowrap;
       }
-      .ok {
-        color: #166534;
-        font-weight: 600;
+
+      .actions-col {
+        display: flex;
+        gap: var(--space-2);
+        flex-wrap: wrap;
       }
-      .bad {
-        color: #b91c1c;
-        font-weight: 600;
-      }
-      .error {
+
+      .field-error {
         margin: 0;
-        color: #b91c1c;
+        color: var(--color-danger);
+        font-size: var(--font-size-xs);
+        font-weight: 700;
       }
-      .success {
-        margin: 0;
-        color: #166534;
-      }
+
       @media (max-width: 900px) {
-        .grid {
+        .suppliers-page {
+          padding: var(--space-4);
+        }
+
+        .search-panel {
           grid-template-columns: 1fr;
+        }
+
+        .search-actions {
+          justify-content: flex-start;
+        }
+
+        .form-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .form-actions {
+          justify-content: flex-start;
         }
       }
     `,

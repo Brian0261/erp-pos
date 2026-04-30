@@ -20,15 +20,19 @@ import { SupplierService } from "./data/supplier.service";
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, RouterLink],
   template: `
-    <section class="card">
-      <header class="header">
+    <section class="ui-card purchase-orders-page">
+      <header class="ui-page-head">
         <div>
-          <h1>Compras - Ordenes de compra</h1>
-          <p class="muted">Listado y acciones de ciclo de vida de ordenes.</p>
+          <p class="ui-page-kicker">Compras InkToy</p>
+          <h1 class="ui-page-title">Ordenes de compra</h1>
+          <p class="ui-page-description">
+            Consulta el ciclo de vida completo de cada orden, desde borrador
+            hasta recepcion total o cancelacion.
+          </p>
         </div>
         <a
           *ngIf="canManage"
-          class="button"
+          class="ui-button ui-button--primary"
           [routerLink]="['/compras/ordenes/nueva']"
         >
           Nueva orden
@@ -37,11 +41,11 @@ import { SupplierService } from "./data/supplier.service";
 
       <form
         [formGroup]="filterForm"
-        class="filters"
+        class="filters-panel"
         (ngSubmit)="applyFilters()"
       >
-        <label>
-          Estado
+        <label class="field">
+          <span>Estado</span>
           <select formControlName="status">
             <option value="">Todos</option>
             <option *ngFor="let status of statusOptions" [value]="status">
@@ -50,8 +54,8 @@ import { SupplierService } from "./data/supplier.service";
           </select>
         </label>
 
-        <label>
-          Proveedor
+        <label class="field">
+          <span>Proveedor</span>
           <select formControlName="supplierId">
             <option [ngValue]="null">Todos</option>
             <option *ngFor="let supplier of suppliers" [ngValue]="supplier.id">
@@ -60,29 +64,40 @@ import { SupplierService } from "./data/supplier.service";
           </select>
         </label>
 
-        <label>
-          Desde
+        <label class="field">
+          <span>Desde</span>
           <input type="date" formControlName="from" />
         </label>
 
-        <label>
-          Hasta
+        <label class="field">
+          <span>Hasta</span>
           <input type="date" formControlName="to" />
         </label>
 
-        <div class="actions">
-          <button type="submit">Aplicar filtros</button>
-          <button type="button" class="secondary" (click)="resetFilters()">
+        <div class="filter-actions">
+          <button type="submit" class="ui-button ui-button--primary">
+            Aplicar filtros
+          </button>
+          <button
+            type="button"
+            class="ui-button ui-button--secondary"
+            (click)="resetFilters()"
+          >
             Limpiar
           </button>
         </div>
       </form>
 
-      <p class="error" *ngIf="errorMessage">{{ errorMessage }}</p>
-      <p class="success" *ngIf="successMessage">{{ successMessage }}</p>
+      <p class="ui-alert ui-alert--error" *ngIf="errorMessage">
+        {{ errorMessage }}
+      </p>
+      <p class="ui-alert ui-alert--success" *ngIf="successMessage">
+        {{ successMessage }}
+      </p>
+      <p class="ui-alert ui-alert--info" *ngIf="loading">Cargando ordenes...</p>
 
-      <section class="table-wrap">
-        <table>
+      <div class="ui-table-wrapper" *ngIf="!loading">
+        <table class="ui-table orders-table">
           <thead>
             <tr>
               <th>ID</th>
@@ -96,32 +111,43 @@ import { SupplierService } from "./data/supplier.service";
           </thead>
           <tbody>
             <tr *ngFor="let order of orders">
-              <td>#{{ order.id }}</td>
+              <td class="cell-id">#{{ order.id }}</td>
               <td>{{ order.orderDate | date: "yyyy-MM-dd" }}</td>
               <td>{{ supplierName(order.supplierId) }}</td>
               <td>{{ warehouseName(order.warehouseId) }}</td>
               <td>
-                <span class="status" [class]="statusClass(order.status)">
+                <span
+                  class="ui-badge status-badge"
+                  [ngClass]="statusClass(order.status)"
+                >
                   {{ statusLabel(order.status) }}
                 </span>
               </td>
-              <td>{{ order.totalAmount | number: "1.2-2" }}</td>
+              <td class="amount">{{ order.totalAmount | number: "1.2-2" }}</td>
               <td class="row-actions">
-                <a [routerLink]="['/compras/ordenes', order.id]">Detalle</a>
+                <a
+                  class="ui-button ui-button--secondary"
+                  [routerLink]="['/compras/ordenes', order.id]"
+                >
+                  Detalle
+                </a>
                 <a
                   *ngIf="canEdit(order)"
+                  class="ui-button ui-button--secondary"
                   [routerLink]="['/compras/ordenes', order.id, 'editar']"
                 >
                   Editar
                 </a>
                 <a
                   *ngIf="canReceive(order)"
+                  class="ui-button ui-button--primary"
                   [routerLink]="['/compras/ordenes', order.id, 'recibir']"
                 >
                   Recibir
                 </a>
                 <button
                   type="button"
+                  class="ui-button ui-button--primary"
                   *ngIf="canApprove(order)"
                   (click)="approve(order)"
                   [disabled]="actionOrderId === order.id"
@@ -130,7 +156,7 @@ import { SupplierService } from "./data/supplier.service";
                 </button>
                 <button
                   type="button"
-                  class="danger"
+                  class="ui-button ui-button--danger"
                   *ngIf="canCancel(order)"
                   (click)="cancel(order)"
                   [disabled]="actionOrderId === order.id"
@@ -139,142 +165,133 @@ import { SupplierService } from "./data/supplier.service";
                 </button>
               </td>
             </tr>
-            <tr *ngIf="!loading && orders.length === 0">
-              <td colspan="7">No hay ordenes para los filtros aplicados.</td>
+            <tr *ngIf="orders.length === 0">
+              <td colspan="7" class="ui-table__empty">
+                <div class="ui-empty-state">
+                  No hay ordenes para los filtros aplicados.
+                </div>
+              </td>
             </tr>
           </tbody>
         </table>
-      </section>
+      </div>
     </section>
   `,
   styles: [
     `
-      .card {
-        background: #fff;
-        border-radius: 0.5rem;
-        padding: 1rem;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      .purchase-orders-page {
+        padding: var(--space-5);
         display: grid;
-        gap: 1rem;
+        gap: var(--space-4);
       }
-      h1 {
-        margin: 0;
-      }
-      .muted {
-        margin: 0.25rem 0 0;
-        color: #4b5563;
-      }
-      .header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 1rem;
-      }
-      .filters {
+
+      .filters-panel {
         display: grid;
-        grid-template-columns: repeat(4, minmax(180px, 1fr));
-        gap: 0.65rem;
+        grid-template-columns: repeat(4, minmax(170px, 1fr));
+        gap: var(--space-3);
         align-items: end;
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-md);
+        background: var(--color-bg-soft);
+        padding: var(--space-3);
       }
-      label {
+
+      .field {
         display: grid;
-        gap: 0.35rem;
+        gap: var(--space-1);
       }
+
+      .field span {
+        font-size: var(--font-size-sm);
+        color: var(--color-text-secondary);
+        font-weight: 700;
+      }
+
       input,
       select {
-        padding: 0.5rem;
-        border: 1px solid #d1d5db;
-        border-radius: 0.35rem;
+        padding: 0.6rem 0.7rem;
+        border: 1px solid var(--color-border-strong);
+        border-radius: var(--radius-sm);
+        background: var(--color-bg-surface);
       }
-      .actions {
+
+      .filter-actions {
         display: flex;
-        gap: 0.5rem;
+        gap: var(--space-2);
+        flex-wrap: wrap;
       }
-      .table-wrap {
-        overflow: auto;
+
+      .orders-table {
+        min-width: 1080px;
       }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-      }
-      th,
-      td {
-        border-bottom: 1px solid #e5e7eb;
-        padding: 0.5rem;
-        text-align: left;
-        vertical-align: middle;
-      }
+
       .row-actions {
         display: flex;
         flex-wrap: wrap;
-        gap: 0.35rem;
+        gap: var(--space-2);
       }
-      .status {
+
+      .status-badge {
         font-weight: 700;
       }
+
       .status-draft {
-        color: #92400e;
+        background: #fef3c7;
+        color: var(--color-warning);
       }
+
       .status-approved {
-        color: #1d4ed8;
+        background: #dbeafe;
+        color: var(--color-info);
       }
+
       .status-partially {
-        color: #0369a1;
+        background: #e0f2fe;
+        color: #075985;
       }
+
       .status-received {
-        color: #166534;
+        background: #dcfce7;
+        color: var(--color-success);
       }
+
       .status-cancelled {
-        color: #b91c1c;
+        background: #fee2e2;
+        color: var(--color-danger);
       }
-      .button,
-      button,
-      a {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 0.35rem;
-        padding: 0.42rem 0.75rem;
-        border-radius: 0.35rem;
+
+      .cell-id {
+        white-space: nowrap;
+        font-weight: 700;
       }
-      .button,
-      button {
-        border: 0;
-        background: #0f766e;
-        color: #fff;
-        cursor: pointer;
+
+      .amount {
+        white-space: nowrap;
+        font-weight: 700;
       }
-      .secondary {
-        background: #374151;
+
+      .ui-button[disabled] {
+        opacity: 0.55;
+        cursor: not-allowed;
       }
-      .danger {
-        background: #b91c1c;
-      }
-      a {
-        background: #eef2ff;
-        color: #1e3a8a;
-        text-decoration: none;
-      }
-      .error {
-        margin: 0;
-        color: #b91c1c;
-      }
-      .success {
-        margin: 0;
-        color: #166534;
-      }
+
       @media (max-width: 1100px) {
-        .filters {
+        .filters-panel {
           grid-template-columns: 1fr 1fr;
         }
       }
+
       @media (max-width: 700px) {
-        .filters {
+        .purchase-orders-page {
+          padding: var(--space-4);
+        }
+
+        .filters-panel {
           grid-template-columns: 1fr;
         }
-        .header {
-          flex-direction: column;
-          align-items: flex-start;
+
+        .filter-actions {
+          justify-content: flex-start;
         }
       }
     `,

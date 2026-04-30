@@ -29,62 +29,103 @@ import { SupplierService } from "./data/supplier.service";
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, RouterLink],
   template: `
-    <section class="card" *ngIf="order">
-      <header class="header">
+    <section class="ui-card order-edit-page" *ngIf="order">
+      <header class="ui-page-head">
         <div>
-          <h1>Editar orden #{{ order.id }}</h1>
-          <p class="muted">Solo se pueden editar ordenes en estado borrador.</p>
+          <p class="ui-page-kicker">Compras InkToy</p>
+          <h1 class="ui-page-title">Editar orden #{{ order.id }}</h1>
+          <p class="ui-page-description">
+            Solo las ordenes en estado BORRADOR se pueden modificar.
+          </p>
         </div>
-        <a [routerLink]="['/compras/ordenes', order.id]">Volver al detalle</a>
+        <a
+          class="ui-button ui-button--secondary"
+          [routerLink]="['/compras/ordenes', order.id]"
+        >
+          Volver al detalle
+        </a>
       </header>
 
-      <p class="error" *ngIf="order.status !== 'DRAFT'">
+      <p class="ui-alert ui-alert--error" *ngIf="order.status !== 'DRAFT'">
         Esta orden no esta en borrador. No es posible editarla.
+      </p>
+      <p class="ui-alert ui-alert--error" *ngIf="errorMessage">
+        {{ errorMessage }}
+      </p>
+      <p class="ui-alert ui-alert--success" *ngIf="successMessage">
+        {{ successMessage }}
       </p>
 
       <form
         *ngIf="order.status === 'DRAFT'"
         [formGroup]="form"
         (ngSubmit)="submit()"
-        class="grid"
+        class="form-layout"
       >
-        <label>
-          Proveedor *
-          <select formControlName="supplierId">
-            <option [ngValue]="null">Selecciona proveedor</option>
-            <option *ngFor="let supplier of suppliers" [ngValue]="supplier.id">
-              {{ supplier.name }}
-            </option>
-          </select>
-        </label>
+        <section class="form-section">
+          <header class="section-head">
+            <h2>Proveedor y almacen</h2>
+          </header>
 
-        <label>
-          Almacen *
-          <select formControlName="warehouseId">
-            <option [ngValue]="null">Selecciona almacen</option>
-            <option
-              *ngFor="let warehouse of warehouses"
-              [ngValue]="warehouse.id"
-            >
-              {{ warehouse.code }} - {{ warehouse.name }}
-            </option>
-          </select>
-        </label>
+          <div class="form-grid form-grid--two">
+            <label class="field">
+              <span>Proveedor *</span>
+              <select formControlName="supplierId">
+                <option [ngValue]="null">Selecciona proveedor</option>
+                <option
+                  *ngFor="let supplier of suppliers"
+                  [ngValue]="supplier.id"
+                >
+                  {{ supplier.name }}
+                </option>
+              </select>
+            </label>
 
-        <label>
-          Fecha esperada
-          <input type="date" formControlName="expectedDate" />
-        </label>
+            <label class="field">
+              <span>Almacen *</span>
+              <select formControlName="warehouseId">
+                <option [ngValue]="null">Selecciona almacen</option>
+                <option
+                  *ngFor="let warehouse of warehouses"
+                  [ngValue]="warehouse.id"
+                >
+                  {{ warehouse.code }} - {{ warehouse.name }}
+                </option>
+              </select>
+            </label>
+          </div>
+        </section>
 
-        <label class="full">
-          Notas
-          <textarea rows="3" maxlength="400" formControlName="notes"></textarea>
-        </label>
+        <section class="form-section">
+          <header class="section-head">
+            <h2>Datos generales</h2>
+          </header>
 
-        <section class="items full">
-          <header class="items-header">
+          <div class="form-grid form-grid--two">
+            <label class="field">
+              <span>Fecha esperada</span>
+              <input type="date" formControlName="expectedDate" />
+            </label>
+
+            <label class="field full">
+              <span>Notas</span>
+              <textarea
+                rows="3"
+                maxlength="400"
+                formControlName="notes"
+              ></textarea>
+            </label>
+          </div>
+        </section>
+
+        <section class="form-section">
+          <header class="section-head section-head--actions">
             <h2>Items</h2>
-            <button type="button" class="secondary" (click)="addItem()">
+            <button
+              type="button"
+              class="ui-button ui-button--secondary"
+              (click)="addItem()"
+            >
               Agregar item
             </button>
           </header>
@@ -95,8 +136,8 @@ import { SupplierService } from "./data/supplier.service";
               *ngFor="let item of items.controls; let i = index"
               [formGroupName]="i"
             >
-              <label>
-                Producto *
+              <label class="field item-product">
+                <span>Producto *</span>
                 <select formControlName="productId">
                   <option [ngValue]="null">Selecciona producto</option>
                   <option
@@ -108,8 +149,8 @@ import { SupplierService } from "./data/supplier.service";
                 </select>
               </label>
 
-              <label>
-                Cantidad *
+              <label class="field">
+                <span>Cantidad *</span>
                 <input
                   type="number"
                   min="0.0001"
@@ -118,8 +159,8 @@ import { SupplierService } from "./data/supplier.service";
                 />
               </label>
 
-              <label>
-                Costo unitario *
+              <label class="field">
+                <span>Costo unitario *</span>
                 <input
                   type="number"
                   min="0"
@@ -130,7 +171,7 @@ import { SupplierService } from "./data/supplier.service";
 
               <button
                 type="button"
-                class="danger"
+                class="ui-button ui-button--danger"
                 (click)="removeItem(i)"
                 [disabled]="items.length === 1"
               >
@@ -138,133 +179,168 @@ import { SupplierService } from "./data/supplier.service";
               </button>
             </div>
           </div>
+
+          <aside class="totals-panel">
+            <p class="label">Total estimado</p>
+            <p class="value">{{ totalAmount | number: "1.2-2" }}</p>
+          </aside>
         </section>
 
-        <p class="muted full total">
-          Total estimado: {{ totalAmount | number: "1.2-2" }}
-        </p>
-
-        <div class="actions full">
-          <button type="submit" [disabled]="saving">
+        <div class="form-actions">
+          <button
+            type="submit"
+            class="ui-button ui-button--primary"
+            [disabled]="saving"
+          >
             {{ saving ? "Actualizando..." : "Guardar cambios" }}
           </button>
         </div>
       </form>
-
-      <p class="error" *ngIf="errorMessage">{{ errorMessage }}</p>
-      <p class="success" *ngIf="successMessage">{{ successMessage }}</p>
     </section>
   `,
   styles: [
     `
-      .card {
-        background: #fff;
-        border-radius: 0.5rem;
-        padding: 1rem;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      .order-edit-page {
+        padding: var(--space-5);
         display: grid;
-        gap: 1rem;
+        gap: var(--space-4);
       }
-      h1,
+
       h2 {
         margin: 0;
+        font-size: 1.05rem;
       }
-      .header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 1rem;
-      }
-      .header a {
-        color: #1e3a8a;
-        text-decoration: none;
-      }
-      .muted {
-        margin: 0.25rem 0 0;
-        color: #4b5563;
-      }
-      .grid {
+
+      .form-layout {
         display: grid;
-        grid-template-columns: repeat(2, minmax(220px, 1fr));
-        gap: 0.65rem;
+        gap: var(--space-4);
       }
+
+      .form-section {
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-md);
+        background: var(--color-bg-surface);
+        padding: var(--space-3);
+        display: grid;
+        gap: var(--space-3);
+      }
+
+      .section-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-2);
+        flex-wrap: wrap;
+      }
+
+      .section-head--actions {
+        border-bottom: 1px solid var(--color-border-default);
+        padding-bottom: var(--space-2);
+      }
+
+      .form-grid {
+        display: grid;
+        gap: var(--space-3);
+      }
+
+      .form-grid--two {
+        grid-template-columns: repeat(2, minmax(220px, 1fr));
+      }
+
       .full {
         grid-column: 1 / -1;
       }
-      label {
+
+      .field {
         display: grid;
-        gap: 0.35rem;
+        gap: var(--space-1);
       }
+
+      .field span {
+        font-size: var(--font-size-sm);
+        color: var(--color-text-secondary);
+        font-weight: 700;
+      }
+
       input,
       select,
       textarea {
-        padding: 0.5rem;
-        border: 1px solid #d1d5db;
-        border-radius: 0.35rem;
+        padding: 0.6rem 0.7rem;
+        border: 1px solid var(--color-border-strong);
+        border-radius: var(--radius-sm);
+        background: var(--color-bg-surface);
       }
-      .items {
-        border: 1px solid #e5e7eb;
-        border-radius: 0.5rem;
-        padding: 0.75rem;
-        display: grid;
-        gap: 0.7rem;
-      }
-      .items-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-      }
+
       .items-list {
         display: grid;
-        gap: 0.55rem;
+        gap: var(--space-3);
       }
+
       .item-row {
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-sm);
+        background: var(--color-bg-soft);
+        padding: var(--space-3);
         display: grid;
-        grid-template-columns: 1fr 180px 180px auto;
-        gap: 0.55rem;
+        grid-template-columns: minmax(220px, 1fr) 170px 170px auto;
+        gap: var(--space-2);
         align-items: end;
       }
-      button {
-        padding: 0.45rem 0.8rem;
-        border: 0;
-        border-radius: 0.35rem;
-        background: #0f766e;
-        color: #fff;
-        cursor: pointer;
-      }
-      .secondary {
-        background: #374151;
-      }
-      .danger {
-        background: #b91c1c;
-      }
-      .actions {
+
+      .totals-panel {
+        border-top: 1px dashed var(--color-border-default);
+        padding-top: var(--space-3);
         display: flex;
-        justify-content: flex-end;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: var(--space-2);
       }
-      .total {
+
+      .totals-panel .label {
+        margin: 0;
+        font-size: var(--font-size-sm);
+        color: var(--color-text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
         font-weight: 700;
       }
-      .error {
+
+      .totals-panel .value {
         margin: 0;
-        color: #b91c1c;
+        font-size: 1.35rem;
+        font-family: var(--font-family-display);
+        font-weight: 700;
       }
-      .success {
-        margin: 0;
-        color: #166534;
+
+      .form-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: var(--space-2);
+        flex-wrap: wrap;
       }
+
+      .ui-button[disabled] {
+        opacity: 0.55;
+        cursor: not-allowed;
+      }
+
       @media (max-width: 1100px) {
         .item-row {
           grid-template-columns: 1fr;
         }
       }
+
       @media (max-width: 800px) {
-        .grid {
+        .order-edit-page {
+          padding: var(--space-4);
+        }
+
+        .form-grid--two {
           grid-template-columns: 1fr;
         }
-        .header {
-          flex-direction: column;
-          align-items: flex-start;
+
+        .form-actions {
+          justify-content: flex-start;
         }
       }
     `,

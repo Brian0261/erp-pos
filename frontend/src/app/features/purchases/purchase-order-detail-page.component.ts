@@ -19,58 +19,96 @@ import { SupplierService } from "./data/supplier.service";
   standalone: true,
   imports: [CommonModule, RouterLink],
   template: `
-    <section class="card" *ngIf="order">
-      <header class="header">
+    <section class="ui-card order-detail-page" *ngIf="order">
+      <header class="ui-page-head">
         <div>
-          <h1>Orden de compra #{{ order.id }}</h1>
-          <p class="muted">
-            Estado: <strong>{{ statusLabel(order.status) }}</strong>
+          <p class="ui-page-kicker">Compras InkToy</p>
+          <h1 class="ui-page-title">Orden de compra #{{ order.id }}</h1>
+          <p class="ui-page-description">
+            Consulta proveedor, almacen, estado de recepcion y totales por item.
           </p>
         </div>
-        <a [routerLink]="['/compras/ordenes']">Volver al listado</a>
+
+        <div class="header-actions">
+          <span
+            class="ui-badge status-badge"
+            [ngClass]="{
+              'status-draft': order.status === 'DRAFT',
+              'status-approved': order.status === 'APPROVED',
+              'status-partially': order.status === 'PARTIALLY_RECEIVED',
+              'status-received': order.status === 'RECEIVED',
+              'status-cancelled': order.status === 'CANCELLED',
+            }"
+          >
+            {{ statusLabel(order.status) }}
+          </span>
+          <a
+            class="ui-button ui-button--secondary"
+            [routerLink]="['/compras/ordenes']"
+          >
+            Volver al listado
+          </a>
+        </div>
       </header>
 
-      <section class="summary">
-        <article>
+      <p class="ui-alert ui-alert--error" *ngIf="errorMessage">
+        {{ errorMessage }}
+      </p>
+      <p class="ui-alert ui-alert--success" *ngIf="successMessage">
+        {{ successMessage }}
+      </p>
+
+      <section class="summary-grid">
+        <article class="summary-card">
           <h2>Datos generales</h2>
           <p>
-            <strong>Proveedor:</strong> {{ supplierName(order.supplierId) }}
+            <span class="label">Proveedor</span>
+            <strong>{{ supplierName(order.supplierId) }}</strong>
           </p>
           <p>
-            <strong>Almacen:</strong> {{ warehouseName(order.warehouseId) }}
+            <span class="label">Almacen</span>
+            <strong>{{ warehouseName(order.warehouseId) }}</strong>
           </p>
           <p>
-            <strong>Fecha orden:</strong>
-            {{ order.orderDate | date: "yyyy-MM-dd" }}
+            <span class="label">Fecha orden</span>
+            <strong>{{ order.orderDate | date: "yyyy-MM-dd" }}</strong>
           </p>
           <p *ngIf="order.expectedDate">
-            <strong>Fecha esperada:</strong>
-            {{ order.expectedDate | date: "yyyy-MM-dd" }}
+            <span class="label">Fecha esperada</span>
+            <strong>{{ order.expectedDate | date: "yyyy-MM-dd" }}</strong>
           </p>
         </article>
 
-        <article>
-          <h2>Totales</h2>
+        <article class="summary-card">
+          <h2>Totales y seguimiento</h2>
           <p>
-            <strong>Total:</strong> {{ order.totalAmount | number: "1.2-2" }}
+            <span class="label">Total</span>
+            <strong class="amount">{{
+              order.totalAmount | number: "1.2-2"
+            }}</strong>
           </p>
           <p>
-            <strong>Actualizado:</strong>
-            {{ order.updatedAt | date: "yyyy-MM-dd HH:mm" }}
+            <span class="label">Actualizado</span>
+            <strong>{{ order.updatedAt | date: "yyyy-MM-dd HH:mm" }}</strong>
           </p>
-          <p *ngIf="order.notes"><strong>Notas:</strong> {{ order.notes }}</p>
+          <p *ngIf="order.notes">
+            <span class="label">Notas</span>
+            <strong>{{ order.notes }}</strong>
+          </p>
         </article>
       </section>
 
-      <section class="actions" *ngIf="canManage">
+      <section class="workflow-actions" *ngIf="canManage">
         <a
           *ngIf="order.status === 'DRAFT'"
+          class="ui-button ui-button--secondary"
           [routerLink]="['/compras/ordenes', order.id, 'editar']"
         >
           Editar orden
         </a>
         <button
           type="button"
+          class="ui-button ui-button--primary"
           *ngIf="order.status === 'DRAFT'"
           (click)="approve()"
           [disabled]="savingAction"
@@ -81,13 +119,14 @@ import { SupplierService } from "./data/supplier.service";
           *ngIf="
             order.status === 'APPROVED' || order.status === 'PARTIALLY_RECEIVED'
           "
+          class="ui-button ui-button--primary"
           [routerLink]="['/compras/ordenes', order.id, 'recibir']"
         >
           Registrar recepcion
         </a>
         <button
           type="button"
-          class="danger"
+          class="ui-button ui-button--danger"
           *ngIf="order.status === 'DRAFT' || order.status === 'APPROVED'"
           (click)="cancel()"
           [disabled]="savingAction"
@@ -96,8 +135,8 @@ import { SupplierService } from "./data/supplier.service";
         </button>
       </section>
 
-      <section class="table-wrap">
-        <table>
+      <div class="ui-table-wrapper">
+        <table class="ui-table detail-table">
           <thead>
             <tr>
               <th>Item</th>
@@ -126,111 +165,137 @@ import { SupplierService } from "./data/supplier.service";
             </tr>
           </tbody>
         </table>
-      </section>
-
-      <p class="error" *ngIf="errorMessage">{{ errorMessage }}</p>
-      <p class="success" *ngIf="successMessage">{{ successMessage }}</p>
+      </div>
     </section>
 
-    <section class="card" *ngIf="!order && !loading">
-      <p class="error">No se encontro la orden solicitada.</p>
-      <a [routerLink]="['/compras/ordenes']">Volver al listado</a>
+    <section class="ui-card order-detail-page" *ngIf="!order && !loading">
+      <p class="ui-alert ui-alert--error">
+        No se encontro la orden solicitada.
+      </p>
+      <a
+        class="ui-button ui-button--secondary"
+        [routerLink]="['/compras/ordenes']"
+      >
+        Volver al listado
+      </a>
     </section>
   `,
   styles: [
     `
-      .card {
-        background: #fff;
-        border-radius: 0.5rem;
-        padding: 1rem;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      .order-detail-page {
+        padding: var(--space-5);
         display: grid;
-        gap: 1rem;
+        gap: var(--space-4);
       }
-      h1,
+
       h2 {
         margin: 0;
+        font-size: 1.05rem;
       }
-      .header {
+
+      .header-actions {
         display: flex;
-        justify-content: space-between;
         align-items: center;
-        gap: 1rem;
+        gap: var(--space-2);
+        flex-wrap: wrap;
       }
-      .header a {
-        color: #1e3a8a;
-        text-decoration: none;
+
+      .status-badge {
+        font-weight: 700;
       }
-      .muted {
-        margin: 0.25rem 0 0;
-        color: #4b5563;
+
+      .status-draft {
+        background: #fef3c7;
+        color: var(--color-warning);
       }
-      .summary {
+
+      .status-approved {
+        background: #dbeafe;
+        color: var(--color-info);
+      }
+
+      .status-partially {
+        background: #e0f2fe;
+        color: #075985;
+      }
+
+      .status-received {
+        background: #dcfce7;
+        color: var(--color-success);
+      }
+
+      .status-cancelled {
+        background: #fee2e2;
+        color: var(--color-danger);
+      }
+
+      .summary-grid {
         display: grid;
-        grid-template-columns: repeat(2, minmax(250px, 1fr));
-        gap: 0.75rem;
+        grid-template-columns: repeat(2, minmax(260px, 1fr));
+        gap: var(--space-3);
       }
-      article {
-        border: 1px solid #e5e7eb;
-        border-radius: 0.5rem;
-        padding: 0.75rem;
+
+      .summary-card {
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-md);
+        background: var(--color-bg-surface);
+        padding: var(--space-3);
+        display: grid;
+        gap: var(--space-2);
       }
-      article p {
-        margin: 0.4rem 0 0;
+
+      .summary-card p {
+        margin: 0;
+        display: grid;
+        gap: 0.2rem;
       }
-      .actions {
+
+      .summary-card .label {
+        font-size: var(--font-size-xs);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--color-text-secondary);
+        font-weight: 700;
+      }
+
+      .summary-card .amount {
+        font-family: var(--font-family-display);
+        font-size: 1.25rem;
+      }
+
+      .workflow-actions {
         display: flex;
         flex-wrap: wrap;
-        gap: 0.45rem;
+        gap: var(--space-2);
       }
-      .actions a,
-      .actions button {
-        padding: 0.42rem 0.75rem;
-        border-radius: 0.35rem;
+
+      .detail-table {
+        min-width: 980px;
       }
-      .actions a {
-        background: #eef2ff;
-        color: #1e3a8a;
-        text-decoration: none;
+
+      .ui-button[disabled] {
+        opacity: 0.55;
+        cursor: not-allowed;
       }
-      .actions button {
-        border: 0;
-        background: #0f766e;
-        color: #fff;
-        cursor: pointer;
-      }
-      .actions .danger {
-        background: #b91c1c;
-      }
-      .table-wrap {
-        overflow: auto;
-      }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-      }
-      th,
-      td {
-        border-bottom: 1px solid #e5e7eb;
-        padding: 0.5rem;
-        text-align: left;
-      }
-      .error {
-        margin: 0;
-        color: #b91c1c;
-      }
-      .success {
-        margin: 0;
-        color: #166534;
-      }
-      @media (max-width: 800px) {
-        .summary {
+
+      @media (max-width: 900px) {
+        .summary-grid {
           grid-template-columns: 1fr;
         }
-        .header {
-          flex-direction: column;
-          align-items: flex-start;
+      }
+
+      @media (max-width: 700px) {
+        .order-detail-page {
+          padding: var(--space-4);
         }
+      }
+
+      .summary-card .label,
+      .summary-card strong,
+      .detail-table td,
+      .detail-table th,
+      h2 {
+        word-break: break-word;
       }
     `,
   ],

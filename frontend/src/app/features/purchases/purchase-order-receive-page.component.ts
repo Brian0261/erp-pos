@@ -31,63 +31,114 @@ interface ReceiveItemView {
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, RouterLink],
   template: `
-    <section class="card" *ngIf="order">
-      <header class="header">
+    <section class="ui-card receive-page" *ngIf="order">
+      <header class="ui-page-head">
         <div>
-          <h1>Recepcion de orden #{{ order.id }}</h1>
-          <p class="muted">
-            Registra ingreso parcial o total contra pendientes.
+          <p class="ui-page-kicker">Compras InkToy</p>
+          <h1 class="ui-page-title">Recepcion de orden #{{ order.id }}</h1>
+          <p class="ui-page-description">
+            Registra el ingreso parcial o total respetando cantidades pendientes
+            por item.
           </p>
         </div>
-        <a [routerLink]="['/compras/ordenes', order.id]">Volver al detalle</a>
+        <a
+          class="ui-button ui-button--secondary"
+          [routerLink]="['/compras/ordenes', order.id]"
+        >
+          Volver al detalle
+        </a>
       </header>
 
-      <p class="error" *ngIf="!isReceivableStatus(order.status)">
+      <section class="summary-strip">
+        <p>
+          <span>Estado actual</span>
+          <strong>{{ order.status }}</strong>
+        </p>
+        <p>
+          <span>Items</span>
+          <strong>{{ order.items.length }}</strong>
+        </p>
+      </section>
+
+      <p
+        class="ui-alert ui-alert--error"
+        *ngIf="!isReceivableStatus(order.status)"
+      >
         Solo se puede recibir una orden en estado aprobada o recepcion parcial.
+      </p>
+      <p class="ui-alert ui-alert--error" *ngIf="errorMessage">
+        {{ errorMessage }}
+      </p>
+      <p class="ui-alert ui-alert--success" *ngIf="successMessage">
+        {{ successMessage }}
       </p>
 
       <form
         *ngIf="isReceivableStatus(order.status)"
         [formGroup]="form"
         (ngSubmit)="submit()"
-        class="grid"
+        class="form-layout"
       >
-        <label>
-          Fecha de recepcion
-          <input type="date" formControlName="receiptDate" />
-        </label>
+        <section class="form-section">
+          <header class="section-head">
+            <h2>Datos de recepcion</h2>
+          </header>
 
-        <label class="full">
-          Notas
-          <textarea rows="3" maxlength="400" formControlName="notes"></textarea>
-        </label>
+          <div class="form-grid form-grid--two">
+            <label class="field">
+              <span>Fecha de recepcion</span>
+              <input type="date" formControlName="receiptDate" />
+            </label>
 
-        <section class="items full">
-          <h2>Items pendientes</h2>
+            <label class="field full">
+              <span>Notas</span>
+              <textarea
+                rows="3"
+                maxlength="400"
+                formControlName="notes"
+              ></textarea>
+            </label>
+          </div>
+        </section>
+
+        <section class="form-section">
+          <header class="section-head">
+            <h2>Items pendientes</h2>
+          </header>
+
           <div formArrayName="items" class="items-list">
             <div
               class="item-row"
               *ngFor="let control of items.controls; let i = index"
               [formGroupName]="i"
             >
-              <p class="product">
-                {{ productName(receiveItems[i].productId) }}
-              </p>
-              <p>
-                Ordenado:
-                {{ receiveItems[i].quantityOrdered | number: "1.3-3" }}
-              </p>
-              <p>
-                Recibido:
-                {{ receiveItems[i].quantityReceived | number: "1.3-3" }}
-              </p>
-              <p>
-                Pendiente:
-                {{ receiveItems[i].quantityPending | number: "1.3-3" }}
-              </p>
+              <div class="item-head">
+                <p class="product">
+                  {{ productName(receiveItems[i].productId) }}
+                </p>
+                <span class="ui-badge ui-badge--warning">
+                  Pendiente
+                  {{ receiveItems[i].quantityPending | number: "1.3-3" }}
+                </span>
+              </div>
 
-              <label>
-                Recibir ahora
+              <div class="item-metrics">
+                <p>
+                  <span>Ordenado</span>
+                  <strong>{{
+                    receiveItems[i].quantityOrdered | number: "1.3-3"
+                  }}</strong>
+                </p>
+                <p>
+                  <span>Recibido</span>
+                  <strong>{{
+                    receiveItems[i].quantityReceived | number: "1.3-3"
+                  }}</strong>
+                </p>
+              </div>
+
+              <label class="field field-inline">
+                <span>Recibir ahora</span>
                 <input
                   type="number"
                   min="0"
@@ -99,111 +150,186 @@ interface ReceiveItemView {
           </div>
         </section>
 
-        <div class="actions full">
-          <button type="submit" [disabled]="saving">
+        <div class="form-actions">
+          <button
+            type="submit"
+            class="ui-button ui-button--primary"
+            [disabled]="saving"
+          >
             {{ saving ? "Registrando..." : "Registrar recepcion" }}
           </button>
         </div>
       </form>
-
-      <p class="error" *ngIf="errorMessage">{{ errorMessage }}</p>
-      <p class="success" *ngIf="successMessage">{{ successMessage }}</p>
     </section>
   `,
   styles: [
     `
-      .card {
-        background: #fff;
-        border-radius: 0.5rem;
-        padding: 1rem;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      .receive-page {
+        padding: var(--space-5);
         display: grid;
-        gap: 1rem;
+        gap: var(--space-4);
       }
-      h1,
+
       h2 {
         margin: 0;
+        font-size: 1.05rem;
       }
-      .header {
+
+      .summary-strip {
         display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 1rem;
+        gap: var(--space-3);
+        flex-wrap: wrap;
       }
-      .header a {
-        color: #1e3a8a;
-        text-decoration: none;
-      }
-      .muted {
-        margin: 0.25rem 0 0;
-        color: #4b5563;
-      }
-      .grid {
+
+      .summary-strip p {
+        margin: 0;
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-sm);
+        padding: var(--space-2) var(--space-3);
+        background: var(--color-bg-soft);
         display: grid;
-        gap: 0.7rem;
+        gap: 0.2rem;
       }
+
+      .summary-strip span {
+        font-size: var(--font-size-xs);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--color-text-secondary);
+        font-weight: 700;
+      }
+
+      .form-layout {
+        display: grid;
+        gap: var(--space-4);
+      }
+
+      .form-section {
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-md);
+        background: var(--color-bg-surface);
+        padding: var(--space-3);
+        display: grid;
+        gap: var(--space-3);
+      }
+
+      .section-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-2);
+        flex-wrap: wrap;
+      }
+
+      .form-grid {
+        display: grid;
+        gap: var(--space-3);
+      }
+
+      .form-grid--two {
+        grid-template-columns: repeat(2, minmax(220px, 1fr));
+      }
+
       .full {
         grid-column: 1 / -1;
       }
-      label {
+
+      .field {
         display: grid;
-        gap: 0.35rem;
+        gap: var(--space-1);
       }
+
+      .field span {
+        font-size: var(--font-size-sm);
+        color: var(--color-text-secondary);
+        font-weight: 700;
+      }
+
       input,
       textarea {
-        padding: 0.5rem;
-        border: 1px solid #d1d5db;
-        border-radius: 0.35rem;
+        padding: 0.6rem 0.7rem;
+        border: 1px solid var(--color-border-strong);
+        border-radius: var(--radius-sm);
+        background: var(--color-bg-surface);
       }
-      .items {
-        border: 1px solid #e5e7eb;
-        border-radius: 0.5rem;
-        padding: 0.75rem;
-        display: grid;
-        gap: 0.6rem;
-      }
+
       .items-list {
         display: grid;
-        gap: 0.55rem;
+        gap: var(--space-3);
       }
+
       .item-row {
-        border: 1px solid #e5e7eb;
-        border-radius: 0.45rem;
-        padding: 0.6rem;
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-sm);
+        background: var(--color-bg-soft);
+        padding: var(--space-3);
         display: grid;
-        gap: 0.35rem;
+        gap: var(--space-2);
       }
+
+      .item-head {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: var(--space-2);
+        align-items: center;
+      }
+
       .product {
         margin: 0;
         font-weight: 700;
       }
-      p {
-        margin: 0;
+
+      .item-metrics {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-3);
       }
-      .actions {
+
+      .item-metrics p {
+        margin: 0;
+        display: grid;
+        gap: 0.2rem;
+      }
+
+      .item-metrics span {
+        font-size: var(--font-size-xs);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--color-text-secondary);
+        font-weight: 700;
+      }
+
+      .field-inline {
+        grid-template-columns: 1fr;
+      }
+
+      .form-actions {
         display: flex;
         justify-content: flex-end;
+        gap: var(--space-2);
+        flex-wrap: wrap;
       }
-      button {
-        border: 0;
-        border-radius: 0.35rem;
-        padding: 0.45rem 0.8rem;
-        background: #0f766e;
-        color: #fff;
-        cursor: pointer;
+
+      .ui-button[disabled] {
+        opacity: 0.55;
+        cursor: not-allowed;
       }
-      .error {
-        margin: 0;
-        color: #b91c1c;
-      }
-      .success {
-        margin: 0;
-        color: #166534;
-      }
+
       @media (max-width: 800px) {
-        .header {
-          flex-direction: column;
-          align-items: flex-start;
+        .receive-page {
+          padding: var(--space-4);
+        }
+
+        .form-grid--two {
+          grid-template-columns: 1fr;
+        }
+
+        .item-head {
+          grid-template-columns: 1fr;
+        }
+
+        .form-actions {
+          justify-content: flex-start;
         }
       }
     `,

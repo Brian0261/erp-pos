@@ -30,3 +30,5 @@ Alcance: Angular frontend, integracion REST real, Docker/Nginx, rutas SPA y perm
 - Smoke funcional E2 inventario ejecutado con operaciones reales (ajuste IN/OUT, ajuste invalido controlado, transferencia y kardex) sin errores 500.
 - Bloque E3 POS/Caja/Ventas (visual-only) validado con smoke por roles (ADMIN/CAJERO/ALMACENERO/SUPERVISOR) sin nuevos hallazgos funcionales ni de seguridad.
 - Smoke transaccional E3 (venta real + detalle + anulacion + stock + kardex) completado sin nuevos defectos frontend; se observaron solo respuestas esperadas de pruebas negativas (`403`).
+- Bloque E4 Compras/Proveedores (visual-only) validado por rutas y matriz RBAC (frontend + API) sin nuevos hallazgos funcionales ni de seguridad.
+- Smoke transaccional E4 (crear proveedor, crear/ aprobar/ recibir OC, validar stock y kardex `PURCHASE_IN`) completado sin defectos frontend; solo `403` esperados en pruebas negativas por rol.
