@@ -15,11 +15,12 @@ Alcance: Angular frontend, integracion REST real, Docker/Nginx, rutas SPA y perm
 | FE-008 | Facturacion E6 (emision)   | HIGH      | `CAJERO` no podia completar `/facturacion/emitir/:saleId`; la vista quedaba sin datos por respuestas `403`                    | Desalineacion RBAC entre flujo de emision y endpoint dependiente de series             | backend/src/main/java/com/erppos/backend/erp/billing/adapter/rest/BillingSeriesController.java, frontend/src/app/features/billing/billing-issue-from-sale-page.component.ts                             | Se ajusto RBAC de lectura en `GET /billing/series` para `ADMIN/SUPERVISOR/CAJERO`; emision desde venta validada para `CAJERO` manteniendo bloqueo en configuracion/series admin | Cerrado                   |
 | FE-009 | Facturacion E6 (detalle)   | LOW       | En comprobantes sin XML se observaba error de consola por `404` al consultar XML                                              | La pantalla intentaba cargar XML aun cuando no existia archivo generado                | frontend/src/app/features/billing/billing-document-detail-page.component.ts                                                                                                                             | Se condiciono la carga de XML a `xmlGeneratedAt` y se muestra estado informativo cuando no existe XML; validado sin ruido tecnico y con visualizacion correcta tras generar XML | Cerrado                   |
 | FE-010 | POS (post-venta)           | HIGH      | Tras registrar una venta exitosa desaparecia la accion `Ver venta #ID`, impidiendo navegar de inmediato al detalle            | `clearCart()` reiniciaba `lastSaleId` justo despues de asignarlo en `finalizeSale()`   | frontend/src/app/features/sales/pos-page.component.ts                                                                                                                                                   | Se desacoplo el reseteo del carrito del reseteo de `lastSaleId`; ahora se conserva el enlace post-venta y se limpia al iniciar una nueva operacion                              | Cerrado                   |
+| FE-011 | POS (finalizar venta)      | HIGH      | `Finalizar venta` ejecutaba una accion critica sin confirmacion previa                                                          | No existia paso de confirmacion antes de invocar `salesService.create` en `finalizeSale` | frontend/src/app/features/sales/pos-page.component.ts                                                                                                                                                   | Se agrego confirmacion nativa previa con resumen de `items/total/pagado/vuelto`; al cancelar no se envia la venta y al confirmar se mantiene el flujo original                  | Cerrado                   |
 
 ## Resumen de severidades
 
 - CRITICAL: 0
-- HIGH: 5 (5 corregidos, 0 abiertos)
+- HIGH: 6 (6 corregidos, 0 abiertos)
 - MEDIUM: 0
 - LOW: 5 (2 corregidos, 3 abiertos)
 
@@ -40,6 +41,7 @@ Alcance: Angular frontend, integracion REST real, Docker/Nginx, rutas SPA y perm
 - FE-008 corregido: `CAJERO` emite desde venta en `/facturacion/emitir/:saleId` con series cargadas y sin habilitar gestion administrativa de series/configuracion.
 - FE-009 corregido: detalle evita request XML prematuro y muestra mensaje informativo limpio cuando aun no existe XML.
 - FE-010 corregido: luego de registrar venta en POS se mantiene visible `Ver venta #ID`; navegacion al detalle `/ventas/:id` validada sin errores `500`.
+- FE-011 corregido: POS solicita confirmacion antes de cerrar la venta y muestra `items`, `total`, `monto pagado` y `vuelto`; cancelar no crea venta ni altera stock.
 - FE-007 corregido: `/inventario/stock-inicial`, `/inventario/ajustes` y `/inventario/transferencias` muestran solo productos activos en selectores operativos; pruebas funcionales IN/OUT/transferencia con activos completadas sin `500`.
 - Bloque E7 Reportes y Outbox/Eventos (visual-only) validado en build/docker/smoke UI (`http://localhost:4200`) con rutas E7 completas y matriz RBAC (`ADMIN`, `SUPERVISOR`, `ALMACENERO`, `CAJERO`) sin nuevos hallazgos funcionales ni de seguridad.
 - Auditoria final full-stack InkToy (2026-04-30): validacion tecnica, visual, SPA, smoke y RBAC completada sin nuevos hallazgos `CRITICAL`/`HIGH`; deudas `LOW` vigentes se mantienen sin cambio de severidad.

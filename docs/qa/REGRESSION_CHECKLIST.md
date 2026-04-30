@@ -446,6 +446,35 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
   - [x] Sin solicitudes a `fonts.googleapis.com`.
   - [x] Proxy `/api` operativo.
 
+## Hotfix UX-002 Confirmacion previa en POS (2026-04-30)
+
+- [x] Alcance limitado aplicado solo en `frontend/src/app/features/sales/pos-page.component.ts`.
+- [x] Build y runtime de verificacion ejecutados:
+  - [x] `cd frontend` + `npm run build` => OK.
+  - [x] `docker compose up --build -d` => OK.
+  - [x] `docker compose ps` => `postgres` healthy, `backend` up, `frontend` up.
+- [x] Flujo validado en navegador (`http://localhost:4200/login?ngsw-bypass=true`) con `admin@erp.local`:
+  - [x] Ruta objetivo: `/pos`.
+  - [x] Caja abierta confirmada (`#15`) tras `Refrescar caja`.
+  - [x] Almacen de prueba: `S3DST1777141469 - Almacen Destino S3 1777141469`.
+  - [x] Producto de prueba: `Producto QA Sprint3 1777141469 (SKU-S3-1777141469)`.
+- [x] Confirmacion previa UX-002:
+  - [x] Al presionar `Finalizar venta` se abre modal nativo `confirm`.
+  - [x] El texto de confirmacion muestra al menos: `Cantidad de items`, `Total`, `Monto pagado`, `Vuelto`.
+- [x] Escenario cancelar confirmacion:
+  - [x] Se cancela el dialogo (`Cancel`).
+  - [x] No se crea venta en backend (sin mensaje de exito ni ID nueva de venta).
+  - [x] Stock se mantiene sin cambios tras cancelar (visible en resultados POS: `1` antes y `1` despues de cancelar).
+- [x] Escenario confirmar venta:
+  - [x] Se acepta el dialogo (`OK`).
+  - [x] Venta creada correctamente: `S-1777592459816` (ID `41`).
+  - [x] Se mantiene flujo original: mensaje de exito y CTA `Ver venta #41`.
+  - [x] Navegacion a `/ventas/41` valida y detalle cargado correctamente.
+  - [x] Stock cambia tras confirmar (resultado POS: `1` -> `0`).
+- [x] Consola/runtime durante UX-002:
+  - [x] Sin `pageerror`.
+  - [x] Sin HTTP `500` inesperados.
+
 ## Correccion UX FE-007 inventario (2026-04-30)
 
 - [x] Revision tecnica completada en:

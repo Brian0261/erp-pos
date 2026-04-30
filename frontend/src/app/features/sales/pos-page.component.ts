@@ -624,6 +624,19 @@ export class PosPageComponent implements OnInit {
     return this.paidTotal > this.total ? this.paidTotal - this.total : 0;
   }
 
+  private buildFinalizeConfirmationMessage(): string {
+    return [
+      "Estas a punto de registrar una venta real.",
+      "",
+      `Cantidad de items: ${this.cart.length}`,
+      `Total: S/ ${this.total.toFixed(2)}`,
+      `Monto pagado: S/ ${this.paidTotal.toFixed(2)}`,
+      `Vuelto: S/ ${this.change.toFixed(2)}`,
+      "",
+      "Confirmas finalizar la venta?",
+    ].join("\n");
+  }
+
   lookupByCode(): void {
     const code = (this.saleForm.value.code ?? "").trim();
     if (!code) {
@@ -850,6 +863,11 @@ export class PosPageComponent implements OnInit {
     const validationError = this.validateSaleBeforeSubmit();
     if (validationError) {
       this.errorMessage = validationError;
+      return;
+    }
+
+    const confirmed = window.confirm(this.buildFinalizeConfirmationMessage());
+    if (!confirmed) {
       return;
     }
 
