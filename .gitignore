@@ -32,15 +32,11 @@ skills-lock.json
 !.agents/skills/brainstorm-safe/**
 !.agents/skills/changelog-safe/
 !.agents/skills/changelog-safe/**
-<<<<<<< ours
-<<<<<<< ours
-=======
 !.agents/skills/error-handling-safe/
 !.agents/skills/error-handling-safe/**
->>>>>>> theirs
-=======
-!.agents/skills/error-handling-safe/
-!.agents/skills/error-handling-safe/**
->>>>>>> theirs
 !.agents/skills/api-design-safe/
+<<<<<<< ours
 !.agents/skills/api-design-safe/**
+=======
+!.agents/skills/api-design-safe/**
+>>>>>>> theirs
