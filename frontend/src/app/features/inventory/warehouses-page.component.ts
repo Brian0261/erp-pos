@@ -16,78 +16,106 @@ import { WarehouseService } from "./data/warehouse.service";
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule],
   template: `
-    <section class="card">
-      <header class="header">
+    <section class="ui-card inventory-page">
+      <header class="ui-page-head">
         <div>
-          <h1>Inventario - Almacenes</h1>
-          <p class="muted">Lista, crea y desactiva almacenes del sistema.</p>
+          <p class="ui-page-kicker">Inventario InkToy</p>
+          <h1 class="ui-page-title">Almacenes</h1>
+          <p class="ui-page-description">
+            Lista, crea y desactiva almacenes para controlar stock por
+            ubicacion.
+          </p>
         </div>
       </header>
 
       <form [formGroup]="form" (ngSubmit)="submit()" class="form-grid">
-        <label>
-          Codigo *
-          <input type="text" formControlName="code" />
-          <small class="error" *ngIf="isInvalid('code')"
+        <label class="field">
+          <span>Codigo *</span>
+          <input type="text" formControlName="code" placeholder="Ej. ALM-CEN" />
+          <small class="field-error" *ngIf="isInvalid('code')"
             >Codigo es obligatorio.</small
           >
         </label>
 
-        <label>
-          Nombre *
-          <input type="text" formControlName="name" />
-          <small class="error" *ngIf="isInvalid('name')"
+        <label class="field">
+          <span>Nombre *</span>
+          <input
+            type="text"
+            formControlName="name"
+            placeholder="Nombre operativo del almacen"
+          />
+          <small class="field-error" *ngIf="isInvalid('name')"
             >Nombre es obligatorio.</small
           >
         </label>
 
-        <label>
-          Tipo *
+        <label class="field">
+          <span>Tipo *</span>
           <select formControlName="type">
             <option [ngValue]="null">Selecciona un tipo</option>
             <option *ngFor="let type of warehouseTypes" [ngValue]="type">
               {{ type }}
             </option>
           </select>
-          <small class="error" *ngIf="isInvalid('type')"
+          <small class="field-error" *ngIf="isInvalid('type')"
             >Tipo es obligatorio.</small
           >
         </label>
 
-        <button type="submit" [disabled]="saving || !canManageWarehouses">
-          {{ saving ? "Guardando..." : "Crear almacen" }}
-        </button>
+        <div class="field-action">
+          <button
+            type="submit"
+            class="ui-button ui-button--primary"
+            [disabled]="saving || !canManageWarehouses"
+          >
+            {{ saving ? "Guardando..." : "Crear almacen" }}
+          </button>
+        </div>
       </form>
 
-      <p class="muted" *ngIf="!canManageWarehouses">
+      <p class="ui-alert ui-alert--info" *ngIf="!canManageWarehouses">
         Tu rol puede consultar almacenes, pero no crear ni desactivar.
       </p>
-      <p class="error" *ngIf="errorMessage">{{ errorMessage }}</p>
-      <p class="success" *ngIf="successMessage">{{ successMessage }}</p>
+      <p class="ui-alert ui-alert--error" *ngIf="errorMessage">
+        {{ errorMessage }}
+      </p>
+      <p class="ui-alert ui-alert--success" *ngIf="successMessage">
+        {{ successMessage }}
+      </p>
 
-      <div class="table-wrapper">
-        <table>
+      <div class="ui-table-wrapper">
+        <table class="ui-table inventory-table">
           <thead>
             <tr>
               <th>ID</th>
               <th>Codigo</th>
               <th>Nombre</th>
               <th>Tipo</th>
-              <th>Activo</th>
+              <th>Estado</th>
               <th>Acciones</th>
             </tr>
           </thead>
           <tbody>
             <tr *ngFor="let warehouse of warehouses">
-              <td>{{ warehouse.id }}</td>
-              <td>{{ warehouse.code }}</td>
+              <td class="cell-id">{{ warehouse.id }}</td>
+              <td class="cell-code">{{ warehouse.code }}</td>
               <td>{{ warehouse.name }}</td>
-              <td>{{ warehouse.type }}</td>
-              <td>{{ warehouse.active ? "Si" : "No" }}</td>
               <td>
+                <span class="ui-badge">{{ warehouse.type }}</span>
+              </td>
+              <td>
+                <span
+                  class="ui-badge"
+                  [class.ui-badge--success]="warehouse.active"
+                  [class.ui-badge--danger]="!warehouse.active"
+                >
+                  {{ warehouse.active ? "Activa" : "Inactiva" }}
+                </span>
+              </td>
+              <td class="actions">
                 <button
                   type="button"
-                  class="danger"
+                  class="ui-button ui-button--danger"
                   [disabled]="!warehouse.active || !canManageWarehouses"
                   (click)="deactivate(warehouse)"
                 >
@@ -96,7 +124,9 @@ import { WarehouseService } from "./data/warehouse.service";
               </td>
             </tr>
             <tr *ngIf="warehouses.length === 0">
-              <td colspan="6" class="empty">No hay almacenes registrados.</td>
+              <td colspan="6" class="ui-table__empty">
+                <div class="ui-empty-state">No hay almacenes registrados.</div>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -105,77 +135,81 @@ import { WarehouseService } from "./data/warehouse.service";
   `,
   styles: [
     `
-      .card {
-        background: #fff;
-        border-radius: 0.5rem;
-        padding: 1rem;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      .inventory-page {
+        padding: var(--space-5);
         display: grid;
-        gap: 1rem;
+        gap: var(--space-4);
       }
-      .header h1 {
-        margin: 0;
-      }
+
       .form-grid {
         display: grid;
         grid-template-columns: repeat(4, minmax(180px, 1fr));
-        gap: 0.75rem;
+        gap: var(--space-3);
         align-items: end;
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-md);
+        background: var(--color-bg-soft);
+        padding: var(--space-3);
       }
-      label {
+
+      .field {
         display: grid;
-        gap: 0.35rem;
+        gap: var(--space-1);
       }
+
+      .field > span {
+        font-size: var(--font-size-sm);
+        font-weight: 700;
+        color: var(--color-text-secondary);
+      }
+
       input,
       select {
-        padding: 0.55rem;
-        border: 1px solid #d1d5db;
-        border-radius: 0.35rem;
+        padding: 0.6rem 0.7rem;
+        border: 1px solid var(--color-border-strong);
+        border-radius: var(--radius-sm);
       }
-      button {
-        padding: 0.55rem 0.9rem;
-        border: 0;
-        border-radius: 0.35rem;
-        background: #0f766e;
-        color: #fff;
-        cursor: pointer;
+
+      .field-error {
+        color: var(--color-danger);
+        font-size: var(--font-size-xs);
       }
-      .danger {
-        background: #b91c1c;
+
+      .field-action {
+        display: flex;
+        justify-content: flex-end;
       }
-      .table-wrapper {
-        overflow-x: auto;
+
+      .actions {
+        display: flex;
+        justify-content: flex-start;
       }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        min-width: 820px;
+
+      .ui-button[disabled] {
+        opacity: 0.55;
+        cursor: not-allowed;
       }
-      th,
-      td {
-        text-align: left;
-        padding: 0.55rem;
-        border-bottom: 1px solid #e5e7eb;
+
+      .inventory-table {
+        min-width: 860px;
       }
-      .muted {
-        color: #6b7280;
-        margin: 0;
+
+      .cell-id,
+      .cell-code {
+        white-space: nowrap;
       }
-      .error {
-        color: #b91c1c;
-        margin: 0;
-      }
-      .success {
-        color: #166534;
-        margin: 0;
-      }
-      .empty {
-        text-align: center;
-        color: #6b7280;
-      }
+
       @media (max-width: 1000px) {
+        .inventory-page {
+          padding: var(--space-4);
+        }
+
         .form-grid {
           grid-template-columns: 1fr;
+        }
+
+        .field-action {
+          justify-content: flex-start;
         }
       }
     `,

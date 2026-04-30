@@ -15,33 +15,41 @@ import { WarehouseService } from "./data/warehouse.service";
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule],
   template: `
-    <section class="card">
-      <h1>Inventario - Ajustes</h1>
+    <section class="ui-card inventory-page">
+      <header class="ui-page-head">
+        <div>
+          <p class="ui-page-kicker">Inventario InkToy</p>
+          <h1 class="ui-page-title">Ajustes</h1>
+          <p class="ui-page-description">
+            Registra ajustes positivos o negativos para regularizacion de stock.
+          </p>
+        </div>
+      </header>
 
       <form [formGroup]="form" (ngSubmit)="submit()" class="form-grid">
-        <label>
-          Tipo de ajuste *
+        <label class="field">
+          <span>Tipo de ajuste *</span>
           <select formControlName="type">
             <option [ngValue]="'IN'">Positivo (IN)</option>
             <option [ngValue]="'OUT'">Negativo (OUT)</option>
           </select>
         </label>
 
-        <label>
-          Producto *
+        <label class="field">
+          <span>Producto *</span>
           <select formControlName="productId">
             <option [ngValue]="null">Selecciona un producto</option>
             <option *ngFor="let product of products" [ngValue]="product.id">
               {{ product.name }} (SKU: {{ product.sku }})
             </option>
           </select>
-          <small class="error" *ngIf="isInvalid('productId')"
+          <small class="field-error" *ngIf="isInvalid('productId')"
             >Producto es obligatorio.</small
           >
         </label>
 
-        <label>
-          Almacen *
+        <label class="field">
+          <span>Almacen *</span>
           <select formControlName="warehouseId">
             <option [ngValue]="null">Selecciona un almacen</option>
             <option
@@ -51,98 +59,128 @@ import { WarehouseService } from "./data/warehouse.service";
               {{ warehouse.code }} - {{ warehouse.name }}
             </option>
           </select>
-          <small class="error" *ngIf="isInvalid('warehouseId')"
+          <small class="field-error" *ngIf="isInvalid('warehouseId')"
             >Almacen es obligatorio.</small
           >
         </label>
 
-        <label>
-          Cantidad *
+        <label class="field">
+          <span>Cantidad *</span>
           <input
             type="number"
             min="0.001"
             step="0.001"
             formControlName="quantity"
+            placeholder="0.000"
           />
-          <small class="error" *ngIf="isInvalid('quantity')">
+          <small class="field-error" *ngIf="isInvalid('quantity')">
             Cantidad es obligatoria y debe ser mayor que 0.
           </small>
         </label>
 
-        <label class="full">
-          Motivo *
-          <textarea rows="3" formControlName="reason"></textarea>
-          <small class="error" *ngIf="isInvalid('reason')"
+        <label class="field full">
+          <span>Motivo *</span>
+          <textarea
+            rows="3"
+            formControlName="reason"
+            placeholder="Describe por que se realiza el ajuste"
+          ></textarea>
+          <small class="field-error" *ngIf="isInvalid('reason')"
             >Motivo es obligatorio.</small
           >
         </label>
 
         <div class="actions full">
-          <button type="submit" [disabled]="saving">
+          <button
+            type="submit"
+            class="ui-button ui-button--primary"
+            [disabled]="saving"
+          >
             {{ saving ? "Registrando..." : "Registrar ajuste" }}
           </button>
         </div>
       </form>
 
-      <p class="error" *ngIf="errorMessage">{{ errorMessage }}</p>
-      <p class="success" *ngIf="successMessage">{{ successMessage }}</p>
+      <p class="ui-alert ui-alert--error" *ngIf="errorMessage">
+        {{ errorMessage }}
+      </p>
+      <p class="ui-alert ui-alert--success" *ngIf="successMessage">
+        {{ successMessage }}
+      </p>
     </section>
   `,
   styles: [
     `
-      .card {
-        background: #fff;
-        border-radius: 0.5rem;
-        padding: 1rem;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      .inventory-page {
+        padding: var(--space-5);
         display: grid;
-        gap: 1rem;
+        gap: var(--space-4);
       }
-      h1 {
-        margin: 0;
-      }
+
       .form-grid {
         display: grid;
         grid-template-columns: repeat(3, minmax(220px, 1fr));
-        gap: 0.75rem;
+        gap: var(--space-3);
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-md);
+        background: var(--color-bg-soft);
+        padding: var(--space-3);
       }
+
       .full {
         grid-column: 1 / -1;
       }
-      label {
+
+      .field {
         display: grid;
-        gap: 0.35rem;
+        gap: var(--space-1);
       }
+
+      .field > span {
+        font-size: var(--font-size-sm);
+        font-weight: 700;
+        color: var(--color-text-secondary);
+      }
+
       input,
       select,
       textarea {
-        padding: 0.55rem;
-        border: 1px solid #d1d5db;
-        border-radius: 0.35rem;
+        padding: 0.6rem 0.7rem;
+        border: 1px solid var(--color-border-strong);
+        border-radius: var(--radius-sm);
       }
+
+      textarea {
+        resize: vertical;
+        min-height: 90px;
+      }
+
+      .field-error {
+        color: var(--color-danger);
+        font-size: var(--font-size-xs);
+      }
+
       .actions {
         display: flex;
         justify-content: flex-end;
       }
-      button {
-        padding: 0.55rem 0.9rem;
-        border: 0;
-        border-radius: 0.35rem;
-        background: #0f766e;
-        color: #fff;
-        cursor: pointer;
+
+      .ui-button[disabled] {
+        opacity: 0.55;
+        cursor: not-allowed;
       }
-      .error {
-        color: #b91c1c;
-        margin: 0;
-      }
-      .success {
-        color: #166534;
-        margin: 0;
-      }
+
       @media (max-width: 1000px) {
+        .inventory-page {
+          padding: var(--space-4);
+        }
+
         .form-grid {
           grid-template-columns: 1fr;
+        }
+
+        .actions {
+          justify-content: flex-start;
         }
       }
     `,

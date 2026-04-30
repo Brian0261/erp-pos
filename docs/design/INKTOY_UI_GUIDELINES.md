@@ -46,6 +46,15 @@ Apply visual consistency across the ERP/POS while preserving MVP behavior.
 6. Keep empty, loading, success, and error messages visually consistent with reusable alert styles.
 7. Do not alter routes, guards, interceptors, or service endpoint contracts for catalog modules.
 
+## Inventory-Specific Rules (Block E2)
+
+1. Keep inventory workflows unchanged; E2 is visual-only for warehouses, stock, initial stock, adjustments, transfers, and kardex.
+2. Reuse shared wrappers for page head, alerts, and data tables (.ui-page-head, .ui-alert, .ui-table-wrapper, .ui-table).
+3. Use semantic badges and labels for stock levels/movement types without changing backend contracts.
+4. Preserve existing role behavior in inventory pages (for example: supervisor access to warehouses and kardex, operation routes for admin/almacenero).
+5. Keep form validation, submit payload shape, and service calls exactly as implemented before E2.
+6. Keep all inventory route names, guards, interceptors, and permission matrix untouched in E2.
+
 ## Rollout Sequence (Recommended)
 
 1. Block A: foundation (tokens/assets/base classes) - completed.
@@ -53,9 +62,10 @@ Apply visual consistency across the ERP/POS while preserving MVP behavior.
 3. Block C: shell/layout adaptation - completed.
 4. Block D: dashboard identity refresh - completed.
 5. Block E1: catalog visual upgrade (products/forms/categories/units) - completed.
-6. Block E2+: remaining modules cards/forms.
-7. Block F: tables, statuses, and badges across remaining modules.
-8. Block G: final responsive and QA pass.
+6. Block E2: inventory visual upgrade (warehouses/stock/initial stock/adjustments/transfers/kardex) - completed.
+7. Block E3+: remaining modules cards/forms.
+8. Block F: tables, statuses, and badges across remaining modules.
+9. Block G: final responsive and QA pass.
 
 ## Validation Checklist
 

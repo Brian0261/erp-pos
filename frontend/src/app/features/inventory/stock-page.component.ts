@@ -15,19 +15,25 @@ import { WarehouseService } from "./data/warehouse.service";
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule],
   template: `
-    <section class="card">
-      <header>
-        <h1>Inventario - Stock</h1>
-        <p class="muted">Consulta el stock por producto y almacen.</p>
+    <section class="ui-card inventory-page">
+      <header class="ui-page-head">
+        <div>
+          <p class="ui-page-kicker">Inventario InkToy</p>
+          <h1 class="ui-page-title">Stock</h1>
+          <p class="ui-page-description">
+            Consulta existencias por producto y almacen, con foco en niveles
+            criticos.
+          </p>
+        </div>
       </header>
 
       <form
         [formGroup]="filtersForm"
         (ngSubmit)="applyFilters()"
-        class="form-grid"
+        class="filters-grid"
       >
-        <label>
-          Producto
+        <label class="field">
+          <span>Producto</span>
           <select formControlName="productId">
             <option [ngValue]="null">Todos</option>
             <option *ngFor="let product of products" [ngValue]="product.id">
@@ -36,8 +42,8 @@ import { WarehouseService } from "./data/warehouse.service";
           </select>
         </label>
 
-        <label>
-          Almacen
+        <label class="field">
+          <span>Almacen</span>
           <select formControlName="warehouseId">
             <option [ngValue]="null">Todos</option>
             <option
@@ -49,44 +55,87 @@ import { WarehouseService } from "./data/warehouse.service";
           </select>
         </label>
 
-        <button type="submit" [disabled]="loading">Buscar</button>
-        <button
-          type="button"
-          class="secondary"
-          (click)="clearFilters()"
-          [disabled]="loading"
-        >
-          Limpiar
-        </button>
+        <div class="field-action">
+          <button
+            type="submit"
+            class="ui-button ui-button--primary"
+            [disabled]="loading"
+          >
+            Buscar
+          </button>
+        </div>
+        <div class="field-action">
+          <button
+            type="button"
+            class="ui-button ui-button--secondary"
+            (click)="clearFilters()"
+            [disabled]="loading"
+          >
+            Limpiar
+          </button>
+        </div>
       </form>
 
-      <p class="error" *ngIf="errorMessage">{{ errorMessage }}</p>
-      <p class="muted" *ngIf="loading">Cargando stock...</p>
+      <section class="stock-summary" *ngIf="!loading && stocks.length > 0">
+        <span class="ui-badge">{{ totalElements }} registros</span>
+        <span class="ui-badge ui-badge--danger" *ngIf="criticalCount > 0"
+          >{{ criticalCount }} criticos</span
+        >
+        <span class="ui-badge ui-badge--warning" *ngIf="lowCount > 0"
+          >{{ lowCount }} bajos</span
+        >
+      </section>
 
-      <div class="table-wrapper" *ngIf="!loading">
-        <table>
+      <p class="ui-alert ui-alert--error" *ngIf="errorMessage">
+        {{ errorMessage }}
+      </p>
+      <p class="ui-alert ui-alert--info" *ngIf="loading">Cargando stock...</p>
+
+      <div class="ui-table-wrapper" *ngIf="!loading">
+        <table class="ui-table stock-table">
           <thead>
             <tr>
               <th>ID</th>
               <th>Producto</th>
               <th>Almacen</th>
               <th>Cantidad</th>
+              <th>Nivel</th>
               <th>Version</th>
               <th>Ultima actualizacion</th>
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let stock of stocks">
-              <td>{{ stock.id }}</td>
+            <tr
+              *ngFor="let stock of stocks"
+              [class.row-critical]="isCritical(stock)"
+              [class.row-low]="isLow(stock)"
+            >
+              <td class="cell-id">{{ stock.id }}</td>
               <td>{{ resolveProductName(stock.productId) }}</td>
               <td>{{ resolveWarehouseName(stock.warehouseId) }}</td>
-              <td>{{ stock.quantity | number: "1.0-3" }}</td>
+              <td class="cell-qty">{{ stock.quantity | number: "1.0-3" }}</td>
+              <td>
+                <span
+                  class="ui-badge"
+                  [class.ui-badge--danger]="isCritical(stock)"
+                  [class.ui-badge--warning]="isLow(stock)"
+                  [class.ui-badge--success]="
+                    !isCritical(stock) && !isLow(stock)
+                  "
+                >
+                  {{ stockLevelLabel(stock) }}
+                </span>
+              </td>
               <td>{{ stock.version }}</td>
-              <td>{{ stock.updatedAt | date: "yyyy-MM-dd HH:mm" }}</td>
+              <td class="cell-date">
+                {{ stock.updatedAt | date: "yyyy-MM-dd HH:mm" }}
+              </td>
             </tr>
             <tr *ngIf="stocks.length === 0">
-              <td colspan="6" class="empty">
-                No hay stock para los filtros seleccionados.
+              <td colspan="7" class="ui-table__empty">
+                <div class="ui-empty-state">
+                  No hay stock para los filtros seleccionados.
+                </div>
               </td>
             </tr>
           </tbody>
@@ -94,102 +143,136 @@ import { WarehouseService } from "./data/warehouse.service";
       </div>
 
       <footer class="pagination">
-        <button
-          type="button"
-          (click)="previousPage()"
-          [disabled]="page === 0 || loading"
-        >
-          Anterior
-        </button>
-        <span
-          >Pagina {{ page + 1 }} de {{ totalPages }} -
-          {{ totalElements }} registros</span
-        >
-        <button
-          type="button"
-          (click)="nextPage()"
-          [disabled]="page + 1 >= totalPages || loading"
-        >
-          Siguiente
-        </button>
+        <p class="ui-muted pagination-copy">
+          Pagina {{ page + 1 }} de {{ totalPages }} -
+          {{ totalElements }} registros
+        </p>
+
+        <div class="pagination-actions">
+          <button
+            type="button"
+            class="ui-button ui-button--secondary"
+            (click)="previousPage()"
+            [disabled]="page === 0 || loading"
+          >
+            Anterior
+          </button>
+          <button
+            type="button"
+            class="ui-button ui-button--secondary"
+            (click)="nextPage()"
+            [disabled]="page + 1 >= totalPages || loading"
+          >
+            Siguiente
+          </button>
+        </div>
       </footer>
     </section>
   `,
   styles: [
     `
-      .card {
-        background: #fff;
-        border-radius: 0.5rem;
-        padding: 1rem;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      .inventory-page {
+        padding: var(--space-5);
         display: grid;
-        gap: 1rem;
+        gap: var(--space-4);
       }
-      h1 {
-        margin: 0;
-      }
-      .form-grid {
+
+      .filters-grid {
         display: grid;
         grid-template-columns: repeat(4, minmax(180px, 1fr));
-        gap: 0.75rem;
+        gap: var(--space-3);
         align-items: end;
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-md);
+        background: var(--color-bg-soft);
+        padding: var(--space-3);
       }
-      label {
+
+      .field {
         display: grid;
-        gap: 0.35rem;
+        gap: var(--space-1);
       }
+
+      .field > span {
+        font-size: var(--font-size-sm);
+        font-weight: 700;
+        color: var(--color-text-secondary);
+      }
+
       select {
-        padding: 0.55rem;
-        border: 1px solid #d1d5db;
-        border-radius: 0.35rem;
+        padding: 0.6rem 0.7rem;
+        border: 1px solid var(--color-border-strong);
+        border-radius: var(--radius-sm);
       }
-      button {
-        padding: 0.55rem 0.9rem;
-        border: 0;
-        border-radius: 0.35rem;
-        background: #111827;
-        color: #fff;
-        cursor: pointer;
+
+      .field-action {
+        display: flex;
+        justify-content: flex-end;
       }
-      .secondary {
-        background: #4b5563;
+
+      .stock-summary {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-2);
       }
-      .table-wrapper {
-        overflow-x: auto;
+
+      .stock-table {
+        min-width: 980px;
       }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        min-width: 900px;
+
+      .cell-id,
+      .cell-qty,
+      .cell-date {
+        white-space: nowrap;
       }
-      th,
-      td {
-        text-align: left;
-        padding: 0.55rem;
-        border-bottom: 1px solid #e5e7eb;
+
+      .row-critical td {
+        background: rgba(185, 28, 28, 0.04);
       }
+
+      .row-low td {
+        background: rgba(146, 64, 14, 0.04);
+      }
+
       .pagination {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        gap: 0.75rem;
+        gap: var(--space-3);
         flex-wrap: wrap;
       }
-      .muted {
-        color: #6b7280;
+
+      .pagination-copy {
         margin: 0;
       }
-      .error {
-        color: #b91c1c;
-        margin: 0;
+
+      .pagination-actions {
+        display: flex;
+        gap: var(--space-2);
+        flex-wrap: wrap;
       }
-      .empty {
-        text-align: center;
-        color: #6b7280;
+
+      .ui-button[disabled] {
+        opacity: 0.55;
+        cursor: not-allowed;
       }
+
       @media (max-width: 1000px) {
-        .form-grid {
+        .inventory-page {
+          padding: var(--space-4);
+        }
+
+        .filters-grid {
           grid-template-columns: 1fr;
+        }
+
+        .field-action {
+          justify-content: flex-start;
+        }
+
+        .pagination {
+          flex-direction: column;
+          align-items: flex-start;
         }
       }
     `,
@@ -265,6 +348,37 @@ export class StockPageComponent implements OnInit {
     return warehouse
       ? `${warehouse.code} - ${warehouse.name}`
       : `Almacen #${warehouseId}`;
+  }
+
+  get criticalCount(): number {
+    return this.stocks.filter((stock) => Number(stock.quantity) <= 0).length;
+  }
+
+  get lowCount(): number {
+    return this.stocks.filter(
+      (stock) => Number(stock.quantity) > 0 && Number(stock.quantity) <= 5,
+    ).length;
+  }
+
+  isCritical(stock: StockResponse): boolean {
+    return Number(stock.quantity) <= 0;
+  }
+
+  isLow(stock: StockResponse): boolean {
+    const quantity = Number(stock.quantity);
+    return quantity > 0 && quantity <= 5;
+  }
+
+  stockLevelLabel(stock: StockResponse): string {
+    if (this.isCritical(stock)) {
+      return "Critico";
+    }
+
+    if (this.isLow(stock)) {
+      return "Bajo";
+    }
+
+    return "Estable";
   }
 
   private loadLookupsAndStock(): void {

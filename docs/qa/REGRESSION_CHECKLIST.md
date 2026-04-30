@@ -129,3 +129,47 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [x] Build frontend (`npm run build`) exitoso.
 - [x] `docker compose up --build -d` y `docker compose ps` exitosos.
 - [x] Revalidacion puntual en `/pos` (SUPERVISOR): no se reprodujo respuesta `403`; sin impacto en bloqueo de rutas.
+
+## Bloque E2 Inventario InkToy (2026-04-29)
+
+- [x] Pantallas aplicadas: `/inventario/almacenes`, `/inventario/stock`, `/inventario/stock-inicial`, `/inventario/ajustes`, `/inventario/transferencias`, `/inventario/kardex`.
+- [x] Build frontend (`npm run build`) exitoso tras cambios visuales E2.
+- [x] `docker compose up --build -d` y `docker compose ps` exitosos.
+- [x] Validacion visual base de E2: estructura `ui-page-head` presente en pantallas de inventario intervenidas.
+- [x] Matriz de acceso por ruta (frontend) validada en navegador:
+  - [x] ADMIN: acceso a las 6 rutas E2.
+  - [x] ALMACENERO: acceso a `almacenes/stock/stock-inicial/ajustes/transferencias`; bloqueo en `/inventario/kardex` (redirige a `/dashboard`).
+  - [x] SUPERVISOR: acceso a `almacenes/stock/kardex`; bloqueo en `stock-inicial/ajustes/transferencias` (redirige a `/dashboard`).
+- [x] Refresh directo SPA sin `404` en rutas E2 intervenidas.
+- [x] Servicios/endpoints de inventario sin cambios de contrato en E2.
+- [x] Backend, rutas, auth, guards, interceptor y permisos no modificados por E2 (solo presentacion).
+
+### Smoke funcional corto Inventario E2 (2026-04-29)
+
+- [x] Usuario/rol de ejecucion principal: `admin@erp.local` (ADMIN).
+- [x] Rutas abiertas en navegador: `almacenes`, `stock`, `stock-inicial`, `ajustes`, `transferencias`, `kardex`.
+- [x] Dato de prueba operativo utilizado:
+  - Producto: `Producto Sprint5 1777163753 (SKU: SKU-S5-1777163753)`
+  - Almacen origen: `WH-01 - Almacen Principal`
+  - Almacen destino: `S3DST1777141364 - Almacen Destino S3 1777141364`
+- [x] Ajuste positivo valido (`+1`): `201` y mensaje `Ajuste registrado correctamente.`.
+- [x] Verificacion stock post ajuste positivo: `30` -> `31`.
+- [x] Ajuste negativo valido (`-0.5`): `201` y mensaje `Ajuste registrado correctamente.`.
+- [x] Verificacion stock post ajuste negativo: `31` -> `30.5`.
+- [x] Ajuste negativo invalido (cantidad excesiva): `422` controlado con mensaje `Validacion fallida: Adjustment leaves negative stock`.
+- [x] Verificacion stock tras intento invalido: se mantiene en `30.5` (sin mutacion).
+- [x] Transferencia valida (`0.2`) origen->destino: `201` y mensaje `Transferencia registrada correctamente.`.
+- [x] Verificacion stock transferencia:
+  - Origen `WH-01`: `30.5` -> `30.3`
+  - Destino `S3DST1777141364`: `0` -> `0.2`
+- [x] Kardex consultado y confirmado por motivos de prueba:
+  - `ADJUSTMENT_IN`
+  - `ADJUSTMENT_OUT`
+  - `TRANSFER_OUT` y `TRANSFER_IN`
+- [x] Estado vacio validado en kardex con rango futuro (`2099-01-01`): mensaje `No hay movimientos para los filtros seleccionados.`.
+- [x] Seguridad/rutas protegidas revalidadas:
+  - Sin sesion en `/inventario/stock` redirige a `/login`.
+  - `almacenero@erp.local` bloqueado en `/inventario/kardex` (redirige a `/dashboard`).
+  - `almacenero@erp.local` mantiene acceso a `/inventario/ajustes`.
+- [x] Sin errores `500` ni `pageerror` durante el smoke.
+- [x] Registro de consola con `422` esperado unicamente en la prueba negativa invalida.

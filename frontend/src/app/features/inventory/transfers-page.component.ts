@@ -21,12 +21,21 @@ import { WarehouseService } from "./data/warehouse.service";
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule],
   template: `
-    <section class="card">
-      <h1>Inventario - Transferencias</h1>
+    <section class="ui-card inventory-page">
+      <header class="ui-page-head">
+        <div>
+          <p class="ui-page-kicker">Inventario InkToy</p>
+          <h1 class="ui-page-title">Transferencias</h1>
+          <p class="ui-page-description">
+            Mueve stock entre almacenes con trazabilidad por motivo y detalle de
+            items.
+          </p>
+        </div>
+      </header>
 
       <form [formGroup]="form" (ngSubmit)="submit()" class="grid">
-        <label>
-          Almacen origen *
+        <label class="field">
+          <span>Almacen origen *</span>
           <select formControlName="sourceWarehouseId">
             <option [ngValue]="null">Selecciona origen</option>
             <option
@@ -36,13 +45,13 @@ import { WarehouseService } from "./data/warehouse.service";
               {{ warehouse.code }} - {{ warehouse.name }}
             </option>
           </select>
-          <small class="error" *ngIf="isInvalid('sourceWarehouseId')"
+          <small class="field-error" *ngIf="isInvalid('sourceWarehouseId')"
             >Almacen origen es obligatorio.</small
           >
         </label>
 
-        <label>
-          Almacen destino *
+        <label class="field">
+          <span>Almacen destino *</span>
           <select formControlName="targetWarehouseId">
             <option [ngValue]="null">Selecciona destino</option>
             <option
@@ -52,15 +61,19 @@ import { WarehouseService } from "./data/warehouse.service";
               {{ warehouse.code }} - {{ warehouse.name }}
             </option>
           </select>
-          <small class="error" *ngIf="isInvalid('targetWarehouseId')"
+          <small class="field-error" *ngIf="isInvalid('targetWarehouseId')"
             >Almacen destino es obligatorio.</small
           >
         </label>
 
-        <label class="full">
-          Motivo *
-          <textarea rows="2" formControlName="reason"></textarea>
-          <small class="error" *ngIf="isInvalid('reason')"
+        <label class="field full">
+          <span>Motivo *</span>
+          <textarea
+            rows="2"
+            formControlName="reason"
+            placeholder="Motivo operativo de la transferencia"
+          ></textarea>
+          <small class="field-error" *ngIf="isInvalid('reason')"
             >Motivo es obligatorio.</small
           >
         </label>
@@ -68,7 +81,11 @@ import { WarehouseService } from "./data/warehouse.service";
         <section class="items full">
           <header class="items-header">
             <h2>Productos a transferir</h2>
-            <button type="button" class="secondary" (click)="addItem()">
+            <button
+              type="button"
+              class="ui-button ui-button--secondary"
+              (click)="addItem()"
+            >
               Agregar producto
             </button>
           </header>
@@ -79,8 +96,10 @@ import { WarehouseService } from "./data/warehouse.service";
               *ngFor="let item of items.controls; let i = index"
               [formGroupName]="i"
             >
-              <label>
-                Producto *
+              <span class="item-index">Item {{ i + 1 }}</span>
+
+              <label class="field">
+                <span>Producto *</span>
                 <select formControlName="productId">
                   <option [ngValue]="null">Selecciona producto</option>
                   <option
@@ -92,19 +111,20 @@ import { WarehouseService } from "./data/warehouse.service";
                 </select>
               </label>
 
-              <label>
-                Cantidad *
+              <label class="field">
+                <span>Cantidad *</span>
                 <input
                   type="number"
                   min="0.001"
                   step="0.001"
                   formControlName="quantity"
+                  placeholder="0.000"
                 />
               </label>
 
               <button
                 type="button"
-                class="danger"
+                class="ui-button ui-button--danger"
                 (click)="removeItem(i)"
                 [disabled]="items.length === 1"
               >
@@ -115,104 +135,148 @@ import { WarehouseService } from "./data/warehouse.service";
         </section>
 
         <div class="actions full">
-          <button type="submit" [disabled]="saving">
+          <button
+            type="submit"
+            class="ui-button ui-button--primary"
+            [disabled]="saving"
+          >
             {{ saving ? "Registrando..." : "Registrar transferencia" }}
           </button>
         </div>
       </form>
 
-      <p class="error" *ngIf="errorMessage">{{ errorMessage }}</p>
-      <p class="success" *ngIf="successMessage">{{ successMessage }}</p>
+      <p class="ui-alert ui-alert--error" *ngIf="errorMessage">
+        {{ errorMessage }}
+      </p>
+      <p class="ui-alert ui-alert--success" *ngIf="successMessage">
+        {{ successMessage }}
+      </p>
     </section>
   `,
   styles: [
     `
-      .card {
-        background: #fff;
-        border-radius: 0.5rem;
-        padding: 1rem;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      .inventory-page {
+        padding: var(--space-5);
         display: grid;
-        gap: 1rem;
+        gap: var(--space-4);
       }
+
       h1,
       h2 {
         margin: 0;
       }
+
       .grid {
         display: grid;
-        gap: 0.8rem;
+        gap: var(--space-3);
         grid-template-columns: repeat(2, minmax(240px, 1fr));
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-md);
+        background: var(--color-bg-soft);
+        padding: var(--space-3);
       }
+
       .full {
         grid-column: 1 / -1;
       }
-      label {
+
+      .field {
         display: grid;
-        gap: 0.35rem;
+        gap: var(--space-1);
       }
+
+      .field > span {
+        font-size: var(--font-size-sm);
+        font-weight: 700;
+        color: var(--color-text-secondary);
+      }
+
       input,
       select,
       textarea {
-        padding: 0.55rem;
-        border: 1px solid #d1d5db;
-        border-radius: 0.35rem;
+        padding: 0.6rem 0.7rem;
+        border: 1px solid var(--color-border-strong);
+        border-radius: var(--radius-sm);
       }
+
+      textarea {
+        resize: vertical;
+      }
+
+      .field-error {
+        color: var(--color-danger);
+        font-size: var(--font-size-xs);
+      }
+
       .items {
-        border: 1px solid #e5e7eb;
-        border-radius: 0.5rem;
-        padding: 0.75rem;
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-md);
+        background: var(--color-bg-surface);
+        padding: var(--space-3);
         display: grid;
-        gap: 0.75rem;
+        gap: var(--space-3);
       }
+
       .items-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        gap: 0.75rem;
+        gap: var(--space-3);
+        flex-wrap: wrap;
       }
+
       .items-list {
         display: grid;
-        gap: 0.6rem;
+        gap: var(--space-2);
       }
+
       .item-row {
         display: grid;
-        grid-template-columns: 1fr 180px auto;
-        gap: 0.6rem;
+        grid-template-columns: auto 1fr 180px auto;
+        gap: var(--space-2);
         align-items: end;
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-sm);
+        background: var(--color-bg-soft);
+        padding: var(--space-2);
       }
-      button {
-        padding: 0.55rem 0.9rem;
-        border: 0;
-        border-radius: 0.35rem;
-        background: #0f766e;
-        color: #fff;
-        cursor: pointer;
+
+      .item-index {
+        align-self: center;
+        font-size: var(--font-size-xs);
+        font-weight: 700;
+        color: var(--color-text-secondary);
+        background: var(--color-bg-surface);
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-pill);
+        padding: var(--space-1) var(--space-2);
       }
-      .secondary {
-        background: #374151;
+
+      .ui-button[disabled] {
+        opacity: 0.55;
+        cursor: not-allowed;
       }
-      .danger {
-        background: #b91c1c;
-      }
+
       .actions {
         display: flex;
         justify-content: flex-end;
       }
-      .error {
-        color: #b91c1c;
-        margin: 0;
-      }
-      .success {
-        color: #166534;
-        margin: 0;
-      }
+
       @media (max-width: 1000px) {
+        .inventory-page {
+          padding: var(--space-4);
+        }
+
         .grid {
           grid-template-columns: 1fr;
         }
+
         .item-row {
           grid-template-columns: 1fr;
+        }
+
+        .actions {
+          justify-content: flex-start;
         }
       }
     `,

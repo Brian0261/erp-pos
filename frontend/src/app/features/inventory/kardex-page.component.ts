@@ -18,17 +18,24 @@ import { WarehouseService } from "./data/warehouse.service";
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule],
   template: `
-    <section class="card">
-      <header>
-        <h1>Inventario - Kardex</h1>
-        <p class="muted">
-          Consulta movimientos por producto, almacen y fechas.
-        </p>
+    <section class="ui-card inventory-page">
+      <header class="ui-page-head">
+        <div>
+          <p class="ui-page-kicker">Inventario InkToy</p>
+          <h1 class="ui-page-title">Kardex</h1>
+          <p class="ui-page-description">
+            Consulta movimientos por producto, almacen y fechas.
+          </p>
+        </div>
       </header>
 
-      <form [formGroup]="filtersForm" (ngSubmit)="search()" class="form-grid">
-        <label>
-          Producto
+      <form
+        [formGroup]="filtersForm"
+        (ngSubmit)="search()"
+        class="filters-grid"
+      >
+        <label class="field">
+          <span>Producto</span>
           <select formControlName="productId">
             <option [ngValue]="null">Todos</option>
             <option *ngFor="let product of products" [ngValue]="product.id">
@@ -37,8 +44,8 @@ import { WarehouseService } from "./data/warehouse.service";
           </select>
         </label>
 
-        <label>
-          Almacen
+        <label class="field">
+          <span>Almacen</span>
           <select formControlName="warehouseId">
             <option [ngValue]="null">Todos</option>
             <option
@@ -50,32 +57,46 @@ import { WarehouseService } from "./data/warehouse.service";
           </select>
         </label>
 
-        <label>
-          Desde
+        <label class="field">
+          <span>Desde</span>
           <input type="date" formControlName="from" />
         </label>
 
-        <label>
-          Hasta
+        <label class="field">
+          <span>Hasta</span>
           <input type="date" formControlName="to" />
         </label>
 
-        <button type="submit" [disabled]="loading">Buscar</button>
-        <button
-          type="button"
-          class="secondary"
-          (click)="clearFilters()"
-          [disabled]="loading"
-        >
-          Limpiar
-        </button>
+        <div class="field-action">
+          <button
+            type="submit"
+            class="ui-button ui-button--primary"
+            [disabled]="loading"
+          >
+            Buscar
+          </button>
+        </div>
+        <div class="field-action">
+          <button
+            type="button"
+            class="ui-button ui-button--secondary"
+            (click)="clearFilters()"
+            [disabled]="loading"
+          >
+            Limpiar
+          </button>
+        </div>
       </form>
 
-      <p class="error" *ngIf="errorMessage">{{ errorMessage }}</p>
-      <p class="muted" *ngIf="loading">Consultando movimientos...</p>
+      <p class="ui-alert ui-alert--error" *ngIf="errorMessage">
+        {{ errorMessage }}
+      </p>
+      <p class="ui-alert ui-alert--info" *ngIf="loading">
+        Consultando movimientos...
+      </p>
 
-      <div class="table-wrapper" *ngIf="!loading">
-        <table>
+      <div class="ui-table-wrapper" *ngIf="!loading">
+        <table class="ui-table kardex-table">
           <thead>
             <tr>
               <th>Fecha</th>
@@ -83,6 +104,7 @@ import { WarehouseService } from "./data/warehouse.service";
               <th>Almacen</th>
               <th>Movimiento</th>
               <th>Cantidad</th>
+              <th>Delta</th>
               <th>Stock anterior</th>
               <th>Stock nuevo</th>
               <th>Motivo</th>
@@ -91,19 +113,42 @@ import { WarehouseService } from "./data/warehouse.service";
           </thead>
           <tbody>
             <tr *ngFor="let movement of movements">
-              <td>{{ movement.createdAt | date: "yyyy-MM-dd HH:mm" }}</td>
+              <td class="cell-date">
+                {{ movement.createdAt | date: "yyyy-MM-dd HH:mm" }}
+              </td>
               <td>{{ resolveProductName(movement.productId) }}</td>
               <td>{{ resolveWarehouseName(movement.warehouseId) }}</td>
-              <td>{{ movement.movementType }}</td>
-              <td>{{ movement.quantity | number: "1.0-3" }}</td>
-              <td>{{ movement.previousStock | number: "1.0-3" }}</td>
-              <td>{{ movement.newStock | number: "1.0-3" }}</td>
+              <td>
+                <span class="ui-badge" [class]="movementBadgeClass(movement)">
+                  {{ movement.movementType }}
+                </span>
+              </td>
+              <td class="cell-number">
+                {{ movement.quantity | number: "1.0-3" }}
+              </td>
+              <td>
+                <span
+                  class="delta"
+                  [class.delta--in]="stockDelta(movement) > 0"
+                  [class.delta--out]="stockDelta(movement) < 0"
+                >
+                  {{ stockDelta(movement) | number: "1.0-3" }}
+                </span>
+              </td>
+              <td class="cell-number">
+                {{ movement.previousStock | number: "1.0-3" }}
+              </td>
+              <td class="cell-number">
+                {{ movement.newStock | number: "1.0-3" }}
+              </td>
               <td>{{ movement.reason }}</td>
               <td>{{ movement.createdBy || "-" }}</td>
             </tr>
             <tr *ngIf="movements.length === 0">
-              <td colspan="9" class="empty">
-                No hay movimientos para los filtros seleccionados.
+              <td colspan="10" class="ui-table__empty">
+                <div class="ui-empty-state">
+                  No hay movimientos para los filtros seleccionados.
+                </div>
               </td>
             </tr>
           </tbody>
@@ -113,73 +158,102 @@ import { WarehouseService } from "./data/warehouse.service";
   `,
   styles: [
     `
-      .card {
-        background: #fff;
-        border-radius: 0.5rem;
-        padding: 1rem;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      .inventory-page {
+        padding: var(--space-5);
         display: grid;
-        gap: 1rem;
+        gap: var(--space-4);
       }
-      h1 {
-        margin: 0;
-      }
-      .form-grid {
+
+      .filters-grid {
         display: grid;
         grid-template-columns: repeat(6, minmax(150px, 1fr));
-        gap: 0.75rem;
+        gap: var(--space-3);
         align-items: end;
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-md);
+        background: var(--color-bg-soft);
+        padding: var(--space-3);
       }
-      label {
+
+      .field {
         display: grid;
-        gap: 0.35rem;
+        gap: var(--space-1);
       }
+
+      .field > span {
+        font-size: var(--font-size-sm);
+        font-weight: 700;
+        color: var(--color-text-secondary);
+      }
+
       input,
       select {
-        padding: 0.55rem;
-        border: 1px solid #d1d5db;
-        border-radius: 0.35rem;
+        padding: 0.6rem 0.7rem;
+        border: 1px solid var(--color-border-strong);
+        border-radius: var(--radius-sm);
       }
-      button {
-        padding: 0.55rem 0.9rem;
-        border: 0;
-        border-radius: 0.35rem;
-        background: #111827;
-        color: #fff;
-        cursor: pointer;
+
+      .field-action {
+        display: flex;
+        justify-content: flex-end;
       }
-      .secondary {
-        background: #4b5563;
+
+      .kardex-table {
+        min-width: 1380px;
       }
-      .table-wrapper {
-        overflow-x: auto;
+
+      .cell-date,
+      .cell-number {
+        white-space: nowrap;
       }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        min-width: 1300px;
+
+      .cell-number {
+        text-align: right;
       }
-      th,
-      td {
-        text-align: left;
-        padding: 0.55rem;
-        border-bottom: 1px solid #e5e7eb;
+
+      .delta {
+        font-weight: 700;
       }
-      .muted {
-        color: #6b7280;
-        margin: 0;
+
+      .delta--in {
+        color: var(--color-success);
       }
-      .error {
-        color: #b91c1c;
-        margin: 0;
+
+      .delta--out {
+        color: var(--color-danger);
       }
-      .empty {
-        text-align: center;
-        color: #6b7280;
+
+      .ui-badge--movement-in {
+        background: #dcfce7;
+        color: var(--color-success);
       }
+
+      .ui-badge--movement-out {
+        background: #fee2e2;
+        color: var(--color-danger);
+      }
+
+      .ui-badge--movement-neutral {
+        background: #dbeafe;
+        color: var(--color-info);
+      }
+
+      .ui-button[disabled] {
+        opacity: 0.55;
+        cursor: not-allowed;
+      }
+
       @media (max-width: 1200px) {
-        .form-grid {
+        .inventory-page {
+          padding: var(--space-4);
+        }
+
+        .filters-grid {
           grid-template-columns: 1fr;
+        }
+
+        .field-action {
+          justify-content: flex-start;
         }
       }
     `,
@@ -261,6 +335,27 @@ export class KardexPageComponent implements OnInit {
     return warehouse
       ? `${warehouse.code} - ${warehouse.name}`
       : `Almacen #${warehouseId}`;
+  }
+
+  stockDelta(movement: InventoryMovementResponse): number {
+    return Number(movement.newStock) - Number(movement.previousStock);
+  }
+
+  movementBadgeClass(movement: InventoryMovementResponse): string {
+    const type = (movement.movementType || "").toUpperCase();
+    if (type.includes("OUT") || type.includes("VOID")) {
+      return "ui-badge--movement-out";
+    }
+
+    if (
+      type.includes("IN") ||
+      type.includes("INITIAL") ||
+      type.includes("ADJUST")
+    ) {
+      return "ui-badge--movement-in";
+    }
+
+    return "ui-badge--movement-neutral";
   }
 
   private loadLookupsAndSearch(): void {
