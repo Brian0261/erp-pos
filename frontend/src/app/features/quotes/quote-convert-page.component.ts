@@ -28,165 +28,232 @@ interface PaymentLine {
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, RouterLink],
   template: `
-    <section class="card" *ngIf="quote">
-      <header class="header">
+    <section class="ui-card quote-convert-page" *ngIf="quote">
+      <header class="ui-page-head">
         <div>
-          <h1>Convertir cotizacion a venta</h1>
-          <p class="muted">
+          <p class="ui-page-kicker">Comercial InkToy</p>
+          <h1 class="ui-page-title">Convertir cotizacion a venta</h1>
+          <p class="ui-page-description">
             Cotizacion {{ quote.quoteNumber }} | Estado {{ quote.status }}
           </p>
         </div>
-        <a [routerLink]="['/cotizaciones', quote.id]">Volver al detalle</a>
+        <a
+          class="ui-button ui-button--secondary"
+          [routerLink]="['/cotizaciones', quote.id]"
+        >
+          Volver al detalle
+        </a>
       </header>
 
-      <p class="error" *ngIf="errorMessage">{{ errorMessage }}</p>
-      <p class="success" *ngIf="successMessage">{{ successMessage }}</p>
-
-      <p class="alert" *ngIf="!currentCashSession">
-        No hay caja abierta para el usuario actual. Abre caja en
-        <a [routerLink]="['/caja']">/caja</a> antes de convertir.
+      <p class="ui-alert ui-alert--error" *ngIf="errorMessage">
+        {{ errorMessage }}
       </p>
-      <p class="success" *ngIf="currentCashSession">
+      <p class="ui-alert ui-alert--success" *ngIf="successMessage">
+        {{ successMessage }}
+      </p>
+
+      <p class="ui-alert ui-alert--error" *ngIf="!currentCashSession">
+        No hay caja abierta para el usuario actual. Abre caja en
+        <a class="inline-link" [routerLink]="['/caja']">/caja</a> antes de
+        convertir.
+      </p>
+      <p class="ui-alert ui-alert--success" *ngIf="currentCashSession">
         Caja abierta #{{ currentCashSession.id }} desde
         {{ currentCashSession.openedAt | date: "yyyy-MM-dd HH:mm" }}.
       </p>
+      <p class="ui-alert ui-alert--info">
+        El stock disponible y reglas de negocio se validan al convertir.
+      </p>
 
-      <section class="summary">
-        <p><strong>Cliente:</strong> {{ quote.customerName }}</p>
-        <p><strong>Vencimiento:</strong> {{ quote.expiresAt }}</p>
-        <p>
-          <strong>Total cotizacion:</strong>
-          {{ quote.totalAmount | number: "1.2-2" }}
-        </p>
-        <p *ngIf="quote.convertedSaleId" class="converted">
-          Esta cotizacion ya fue convertida. Venta #{{ quote.convertedSaleId }}
-          <a [routerLink]="['/ventas', quote.convertedSaleId]">Ver venta</a>
-        </p>
+      <section class="summary-grid">
+        <article class="summary-card">
+          <h2>Cotizacion</h2>
+          <p>
+            <span class="label">Cliente</span>
+            <strong>{{ quote.customerName }}</strong>
+          </p>
+          <p>
+            <span class="label">Vencimiento</span>
+            <strong>{{ quote.expiresAt }}</strong>
+          </p>
+          <p>
+            <span class="label">Total cotizacion</span>
+            <strong class="amount">{{
+              quote.totalAmount | number: "1.2-2"
+            }}</strong>
+          </p>
+        </article>
+
+        <article class="summary-card" *ngIf="quote.convertedSaleId">
+          <h2>Resultado conversion</h2>
+          <p>
+            <span class="label">Venta generada</span>
+            <strong>#{{ quote.convertedSaleId }}</strong>
+          </p>
+          <a
+            class="ui-button ui-button--secondary"
+            [routerLink]="['/ventas', quote.convertedSaleId]"
+          >
+            Ver venta
+          </a>
+        </article>
       </section>
 
-      <section class="table-wrap">
-        <h2>Items de la cotizacion</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>Producto</th>
-              <th>Cantidad</th>
-              <th>Precio unitario</th>
-              <th>Descuento</th>
-              <th>Total linea</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let item of quote.items">
-              <td>#{{ item.productId }}</td>
-              <td>{{ item.quantity | number: "1.0-3" }}</td>
-              <td>{{ item.unitPrice | number: "1.2-2" }}</td>
-              <td>{{ item.discountAmount | number: "1.2-2" }}</td>
-              <td>{{ item.lineTotal | number: "1.2-2" }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </section>
-
-      <form [formGroup]="form" class="form-grid">
-        <label>
-          Almacen de salida *
-          <select formControlName="warehouseId">
-            <option [ngValue]="null">Selecciona almacen</option>
-            <option
-              *ngFor="let warehouse of warehouses"
-              [ngValue]="warehouse.id"
-            >
-              {{ warehouse.code }} - {{ warehouse.name }}
-            </option>
-          </select>
-        </label>
-
-        <label class="full">
-          Comentario
-          <textarea
-            rows="2"
-            maxlength="400"
-            formControlName="comment"
-          ></textarea>
-        </label>
-      </form>
-
-      <section class="payments">
-        <header class="payments-header">
-          <h2>Pagos</h2>
-          <button type="button" (click)="addPaymentLine()">Agregar pago</button>
+      <section class="data-section">
+        <header class="section-head">
+          <h2>Items de la cotizacion</h2>
         </header>
 
-        <table>
-          <thead>
-            <tr>
-              <th>Metodo *</th>
-              <th>Monto *</th>
-              <th>Referencia</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let payment of payments; let index = index">
-              <td>
-                <select
-                  [value]="payment.paymentMethod"
-                  (change)="setPaymentMethod(index, $any($event.target).value)"
-                >
-                  <option value="CASH">CASH</option>
-                  <option value="CARD">CARD</option>
-                  <option value="TRANSFER">TRANSFER</option>
-                </select>
-              </td>
-              <td>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  [value]="payment.amount"
-                  (input)="setPaymentAmount(index, $any($event.target).value)"
-                />
-              </td>
-              <td>
-                <input
-                  type="text"
-                  maxlength="120"
-                  [value]="payment.reference"
-                  (input)="
-                    setPaymentReference(index, $any($event.target).value)
-                  "
-                />
-              </td>
-              <td>
-                <button
-                  type="button"
-                  class="danger"
-                  (click)="removePaymentLine(index)"
-                  [disabled]="payments.length === 1"
-                >
-                  Quitar
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        <div class="ui-table-wrapper">
+          <table class="ui-table convert-table">
+            <thead>
+              <tr>
+                <th>Producto</th>
+                <th>Cantidad</th>
+                <th>Precio unitario</th>
+                <th>Descuento</th>
+                <th>Total linea</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let item of quote.items">
+                <td>#{{ item.productId }}</td>
+                <td>{{ item.quantity | number: "1.0-3" }}</td>
+                <td>{{ item.unitPrice | number: "1.2-2" }}</td>
+                <td>{{ item.discountAmount | number: "1.2-2" }}</td>
+                <td>{{ item.lineTotal | number: "1.2-2" }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </section>
 
-      <section class="totals">
-        <p>
-          <strong>Total cotizacion:</strong>
-          {{ quote.totalAmount | number: "1.2-2" }}
-        </p>
-        <p><strong>Total pagado:</strong> {{ paidTotal | number: "1.2-2" }}</p>
+      <section class="data-section">
+        <header class="section-head">
+          <h2>Datos de conversion</h2>
+        </header>
+
+        <form [formGroup]="form" class="form-grid form-grid--two">
+          <label class="field">
+            <span>Almacen de salida *</span>
+            <select formControlName="warehouseId">
+              <option [ngValue]="null">Selecciona almacen</option>
+              <option
+                *ngFor="let warehouse of warehouses"
+                [ngValue]="warehouse.id"
+              >
+                {{ warehouse.code }} - {{ warehouse.name }}
+              </option>
+            </select>
+          </label>
+
+          <label class="field full">
+            <span>Comentario</span>
+            <textarea
+              rows="2"
+              maxlength="400"
+              formControlName="comment"
+            ></textarea>
+          </label>
+        </form>
       </section>
 
-      <footer class="actions">
-        <button type="button" class="secondary" (click)="refreshCashSession()">
+      <section class="data-section payments-section">
+        <header class="section-head section-head--actions">
+          <h2>Pagos</h2>
+          <button
+            type="button"
+            class="ui-button ui-button--secondary"
+            (click)="addPaymentLine()"
+          >
+            Agregar pago
+          </button>
+        </header>
+
+        <div class="ui-table-wrapper">
+          <table class="ui-table convert-table">
+            <thead>
+              <tr>
+                <th>Metodo *</th>
+                <th>Monto *</th>
+                <th>Referencia</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let payment of payments; let index = index">
+                <td>
+                  <select
+                    [value]="payment.paymentMethod"
+                    (change)="
+                      setPaymentMethod(index, $any($event.target).value)
+                    "
+                  >
+                    <option value="CASH">CASH</option>
+                    <option value="CARD">CARD</option>
+                    <option value="TRANSFER">TRANSFER</option>
+                  </select>
+                </td>
+                <td>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    [value]="payment.amount"
+                    (input)="setPaymentAmount(index, $any($event.target).value)"
+                  />
+                </td>
+                <td>
+                  <input
+                    type="text"
+                    maxlength="120"
+                    [value]="payment.reference"
+                    (input)="
+                      setPaymentReference(index, $any($event.target).value)
+                    "
+                  />
+                </td>
+                <td>
+                  <button
+                    type="button"
+                    class="ui-button ui-button--danger"
+                    (click)="removePaymentLine(index)"
+                    [disabled]="payments.length === 1"
+                  >
+                    Quitar
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="totals-strip">
+        <article class="total-box">
+          <p class="label">Total cotizacion</p>
+          <p class="value">{{ quote.totalAmount | number: "1.2-2" }}</p>
+        </article>
+        <article
+          class="total-box"
+          [class.total-box--strong]="paidTotal >= quote.totalAmount"
+        >
+          <p class="label">Total pagado</p>
+          <p class="value">{{ paidTotal | number: "1.2-2" }}</p>
+        </article>
+      </section>
+
+      <footer class="actions-bar">
+        <button
+          type="button"
+          class="ui-button ui-button--secondary"
+          (click)="refreshCashSession()"
+        >
           Refrescar caja
         </button>
         <button
           type="button"
+          class="ui-button ui-button--primary"
           (click)="convert()"
           [disabled]="submitting || !canAttemptConversion()"
         >
@@ -194,7 +261,7 @@ interface PaymentLine {
         </button>
         <a
           *ngIf="quote.convertedSaleId"
-          class="button"
+          class="ui-button ui-button--secondary"
           [routerLink]="['/ventas', quote.convertedSaleId]"
         >
           Ver venta #{{ quote.convertedSaleId }}
@@ -204,133 +271,185 @@ interface PaymentLine {
   `,
   styles: [
     `
-      .card {
-        background: #fff;
-        border-radius: 0.5rem;
-        padding: 1rem;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      .quote-convert-page {
+        padding: var(--space-5);
         display: grid;
-        gap: 1rem;
+        gap: var(--space-4);
       }
-      .header {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        gap: 1rem;
-      }
-      h1,
+
       h2 {
         margin: 0;
+        font-size: 1.05rem;
       }
-      .muted {
-        color: #6b7280;
-        margin: 0.25rem 0 0;
+
+      .inline-link {
+        font-weight: 700;
+        text-decoration: underline;
       }
-      .alert {
+
+      .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(240px, 1fr));
+        gap: var(--space-3);
+      }
+
+      .summary-card {
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-md);
+        background: var(--color-bg-surface);
+        padding: var(--space-3);
+        display: grid;
+        gap: var(--space-2);
+      }
+
+      .summary-card p {
         margin: 0;
-        color: #b91c1c;
-      }
-      .summary {
         display: grid;
-        gap: 0.4rem;
+        gap: 0.1rem;
       }
-      .summary p {
-        margin: 0;
+
+      .summary-card .label {
+        font-size: var(--font-size-xs);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--color-text-secondary);
+        font-weight: 700;
       }
-      .converted {
-        color: #166534;
+
+      .summary-card .amount {
+        font-family: var(--font-family-display);
+        font-size: 1.2rem;
       }
-      .form-grid {
+
+      .data-section {
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-md);
+        background: var(--color-bg-surface);
+        padding: var(--space-3);
         display: grid;
-        grid-template-columns: repeat(2, minmax(220px, 1fr));
-        gap: 0.65rem;
+        gap: var(--space-3);
       }
-      .full {
-        grid-column: 1 / -1;
-      }
-      label {
-        display: grid;
-        gap: 0.35rem;
-      }
-      input,
-      select,
-      textarea,
-      button,
-      .button {
-        padding: 0.5rem 0.7rem;
-        border-radius: 0.35rem;
-        border: 1px solid #d1d5db;
-      }
-      button,
-      .button {
-        border: 0;
-        background: #0f766e;
-        color: #fff;
-        cursor: pointer;
-      }
-      .button {
-        text-decoration: none;
-      }
-      .secondary {
-        background: #374151;
-      }
-      .danger {
-        background: #b91c1c;
-      }
-      .table-wrap,
-      .payments {
-        overflow-x: auto;
-      }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-      }
-      th,
-      td {
-        text-align: left;
-        padding: 0.45rem;
-        border-bottom: 1px solid #e5e7eb;
-      }
-      .payments-header {
+
+      .section-head {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 0.5rem;
-      }
-      .totals {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(140px, 1fr));
-        gap: 0.5rem;
-      }
-      .totals p {
-        margin: 0;
-        background: #f3f4f6;
-        padding: 0.5rem;
-        border-radius: 0.35rem;
-      }
-      .actions {
-        display: flex;
-        gap: 0.5rem;
+        gap: var(--space-2);
         flex-wrap: wrap;
       }
-      .error {
-        margin: 0;
-        color: #b91c1c;
+
+      .section-head--actions {
+        border-bottom: 1px solid var(--color-border-default);
+        padding-bottom: var(--space-2);
       }
-      .success {
-        margin: 0;
-        color: #166534;
+
+      .form-grid {
+        display: grid;
+        gap: var(--space-3);
       }
+
+      .form-grid--two {
+        grid-template-columns: repeat(2, minmax(220px, 1fr));
+      }
+
+      .full {
+        grid-column: 1 / -1;
+      }
+
+      .field {
+        display: grid;
+        gap: var(--space-1);
+      }
+
+      .field span {
+        font-size: var(--font-size-sm);
+        color: var(--color-text-secondary);
+        font-weight: 700;
+      }
+
+      input,
+      select,
+      textarea {
+        padding: 0.6rem 0.7rem;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--color-border-strong);
+        background: var(--color-bg-surface);
+      }
+
+      .convert-table {
+        min-width: 900px;
+      }
+
+      .payments-section td,
+      .payments-section th {
+        vertical-align: middle;
+      }
+
+      .payments-section input,
+      .payments-section select {
+        width: 100%;
+      }
+
+      .totals-strip {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(140px, 1fr));
+        gap: var(--space-3);
+      }
+
+      .total-box {
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-sm);
+        background: var(--color-bg-surface);
+        padding: var(--space-3);
+        display: grid;
+        gap: 0.15rem;
+      }
+
+      .total-box--strong {
+        border-color: #c7d2fe;
+        background: #eef2ff;
+      }
+
+      .total-box .label {
+        margin: 0;
+        font-size: var(--font-size-xs);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--color-text-secondary);
+        font-weight: 700;
+      }
+
+      .total-box .value {
+        margin: 0;
+        font-size: 1.15rem;
+        font-family: var(--font-family-display);
+        font-weight: 700;
+      }
+
+      .actions-bar {
+        display: flex;
+        gap: var(--space-2);
+        flex-wrap: wrap;
+      }
+
+      .ui-button[disabled] {
+        opacity: 0.55;
+        cursor: not-allowed;
+      }
+
       @media (max-width: 900px) {
-        .header {
-          flex-direction: column;
-          align-items: flex-start;
+        .quote-convert-page {
+          padding: var(--space-4);
         }
-        .form-grid {
+
+        .summary-grid,
+        .form-grid--two,
+        .totals-strip {
           grid-template-columns: 1fr;
         }
-        .totals {
-          grid-template-columns: 1fr;
+
+        .actions-bar {
+          justify-content: flex-start;
         }
       }
     `,

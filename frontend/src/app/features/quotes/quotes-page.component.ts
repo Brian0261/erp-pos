@@ -12,24 +12,31 @@ import { QuoteResponse, QuoteStatus } from "./data/quotes.models";
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, RouterLink],
   template: `
-    <section class="card">
-      <header class="header">
+    <section class="ui-card quotes-page">
+      <header class="ui-page-head">
         <div>
-          <h1>Cotizaciones</h1>
-          <p class="muted">Gestiona cotizaciones y sus estados operativos.</p>
+          <p class="ui-page-kicker">Comercial InkToy</p>
+          <h1 class="ui-page-title">Cotizaciones</h1>
+          <p class="ui-page-description">
+            Gestiona cotizaciones, estados operativos y acciones de conversion a
+            venta con visibilidad clara por etapa.
+          </p>
         </div>
-        <a class="button" [routerLink]="['/cotizaciones/nueva']"
-          >Nueva cotizacion</a
+        <a
+          class="ui-button ui-button--primary"
+          [routerLink]="['/cotizaciones/nueva']"
         >
+          Nueva cotizacion
+        </a>
       </header>
 
       <form
         [formGroup]="filtersForm"
-        class="filters"
+        class="filters-panel"
         (ngSubmit)="applyFilters()"
       >
-        <label>
-          Estado
+        <label class="field">
+          <span>Estado</span>
           <select formControlName="status">
             <option value="">Todos</option>
             <option value="DRAFT">DRAFT</option>
@@ -40,8 +47,8 @@ import { QuoteResponse, QuoteStatus } from "./data/quotes.models";
           </select>
         </label>
 
-        <label>
-          Cliente
+        <label class="field">
+          <span>Cliente</span>
           <input
             type="text"
             formControlName="customerQuery"
@@ -50,21 +57,27 @@ import { QuoteResponse, QuoteStatus } from "./data/quotes.models";
           />
         </label>
 
-        <label>
-          Desde
+        <label class="field">
+          <span>Desde</span>
           <input type="date" formControlName="from" />
         </label>
 
-        <label>
-          Hasta
+        <label class="field">
+          <span>Hasta</span>
           <input type="date" formControlName="to" />
         </label>
 
-        <div class="actions">
-          <button type="submit" [disabled]="loading">Filtrar</button>
+        <div class="filter-actions">
+          <button
+            type="submit"
+            class="ui-button ui-button--primary"
+            [disabled]="loading"
+          >
+            Filtrar
+          </button>
           <button
             type="button"
-            class="secondary"
+            class="ui-button ui-button--secondary"
             (click)="clearFilters()"
             [disabled]="loading"
           >
@@ -73,11 +86,18 @@ import { QuoteResponse, QuoteStatus } from "./data/quotes.models";
         </div>
       </form>
 
-      <p class="error" *ngIf="errorMessage">{{ errorMessage }}</p>
-      <p class="success" *ngIf="successMessage">{{ successMessage }}</p>
+      <p class="ui-alert ui-alert--error" *ngIf="errorMessage">
+        {{ errorMessage }}
+      </p>
+      <p class="ui-alert ui-alert--success" *ngIf="successMessage">
+        {{ successMessage }}
+      </p>
+      <p class="ui-alert ui-alert--info" *ngIf="loading">
+        Cargando cotizaciones...
+      </p>
 
-      <section class="table-wrap">
-        <table>
+      <div class="ui-table-wrapper" *ngIf="!loading">
+        <table class="ui-table quotes-table">
           <thead>
             <tr>
               <th>Numero</th>
@@ -90,37 +110,46 @@ import { QuoteResponse, QuoteStatus } from "./data/quotes.models";
           </thead>
           <tbody>
             <tr *ngFor="let quote of quotes">
-              <td>{{ quote.quoteNumber }}</td>
-              <td>
+              <td class="quote-number">{{ quote.quoteNumber }}</td>
+              <td class="customer-cell">
                 <strong>{{ quote.customerName }}</strong>
-                <div class="muted tiny">
+                <div class="customer-meta">
                   {{ quote.customerDocument || "Sin documento" }}
                 </div>
               </td>
               <td>
-                <span class="status" [ngClass]="statusClass(quote.status)">
+                <span
+                  class="ui-badge status-badge"
+                  [ngClass]="statusClass(quote.status)"
+                >
                   {{ quote.status }}
                 </span>
               </td>
-              <td>{{ quote.totalAmount | number: "1.2-2" }}</td>
-              <td>
+              <td class="amount">{{ quote.totalAmount | number: "1.2-2" }}</td>
+              <td class="expires-col">
                 {{ quote.expiresAt }}
-                <span class="expired" *ngIf="isExpired(quote)">Vencida</span>
+                <span class="expired-note" *ngIf="isExpired(quote)">
+                  Vencida
+                </span>
               </td>
               <td class="row-actions">
-                <a class="link-btn" [routerLink]="['/cotizaciones', quote.id]"
-                  >Ver detalle</a
+                <a
+                  class="ui-button ui-button--secondary"
+                  [routerLink]="['/cotizaciones', quote.id]"
                 >
+                  Ver detalle
+                </a>
                 <a
                   *ngIf="canEdit(quote)"
-                  class="link-btn"
+                  class="ui-button ui-button--secondary"
                   [routerLink]="['/cotizaciones', quote.id, 'editar']"
-                  >Editar</a
                 >
+                  Editar
+                </a>
                 <button
                   *ngIf="canSend(quote)"
                   type="button"
-                  class="link-btn"
+                  class="ui-button ui-button--primary"
                   [disabled]="processingQuoteId === quote.id"
                   (click)="sendQuote(quote)"
                 >
@@ -129,7 +158,7 @@ import { QuoteResponse, QuoteStatus } from "./data/quotes.models";
                 <button
                   *ngIf="canCancel(quote)"
                   type="button"
-                  class="link-btn danger"
+                  class="ui-button ui-button--danger"
                   [disabled]="processingQuoteId === quote.id"
                   (click)="cancelQuote(quote)"
                 >
@@ -137,171 +166,161 @@ import { QuoteResponse, QuoteStatus } from "./data/quotes.models";
                 </button>
                 <a
                   *ngIf="canConvert(quote)"
-                  class="link-btn"
+                  class="ui-button ui-button--primary"
                   [routerLink]="['/cotizaciones', quote.id, 'convertir']"
-                  >Convertir</a
                 >
+                  Convertir
+                </a>
               </td>
             </tr>
-            <tr *ngIf="!loading && quotes.length === 0">
-              <td colspan="6" class="empty">
-                No hay cotizaciones para los filtros seleccionados.
+            <tr *ngIf="quotes.length === 0">
+              <td colspan="6" class="ui-table__empty">
+                <div class="ui-empty-state">
+                  No hay cotizaciones para los filtros seleccionados.
+                </div>
               </td>
             </tr>
           </tbody>
         </table>
-      </section>
+      </div>
     </section>
   `,
   styles: [
     `
-      .card {
-        background: #fff;
-        border-radius: 0.5rem;
-        padding: 1rem;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      .quotes-page {
+        padding: var(--space-5);
         display: grid;
-        gap: 1rem;
+        gap: var(--space-4);
       }
-      .header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 1rem;
-      }
-      h1 {
-        margin: 0;
-      }
-      .muted {
-        color: #6b7280;
-        margin: 0.25rem 0 0;
-      }
-      .tiny {
-        font-size: 0.8rem;
-      }
-      .filters {
+
+      .filters-panel {
         display: grid;
-        grid-template-columns: repeat(4, minmax(180px, 1fr));
-        gap: 0.65rem;
+        grid-template-columns: repeat(4, minmax(170px, 1fr));
+        gap: var(--space-3);
         align-items: end;
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-md);
+        background: var(--color-bg-soft);
+        padding: var(--space-3);
       }
-      label {
+
+      .field {
         display: grid;
-        gap: 0.35rem;
+        gap: var(--space-1);
       }
-      input,
-      select,
-      button,
-      .button {
-        padding: 0.5rem 0.7rem;
-        border-radius: 0.35rem;
-        border: 1px solid #d1d5db;
-      }
-      button,
-      .button {
-        border: 0;
-        background: #0f766e;
-        color: #fff;
-        cursor: pointer;
-      }
-      .button {
-        text-decoration: none;
-      }
-      .secondary {
-        background: #374151;
-      }
-      .actions {
-        display: flex;
-        gap: 0.5rem;
-      }
-      .table-wrap {
-        overflow-x: auto;
-      }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-      }
-      th,
-      td {
-        text-align: left;
-        padding: 0.45rem;
-        border-bottom: 1px solid #e5e7eb;
-        vertical-align: top;
-      }
-      .row-actions {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.35rem;
-      }
-      .link-btn {
-        padding: 0.35rem 0.55rem;
-        border-radius: 0.3rem;
-        background: #1f2937;
-        color: #fff;
-        border: 0;
-        cursor: pointer;
-        text-decoration: none;
-        font-size: 0.85rem;
-      }
-      .danger {
-        background: #b91c1c;
-      }
-      .status {
-        display: inline-flex;
-        padding: 0.2rem 0.5rem;
-        border-radius: 999px;
-        font-size: 0.75rem;
+
+      .field span {
+        font-size: var(--font-size-sm);
+        color: var(--color-text-secondary);
         font-weight: 700;
       }
+
+      input,
+      select {
+        padding: 0.6rem 0.7rem;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--color-border-strong);
+        background: var(--color-bg-surface);
+      }
+
+      .filter-actions {
+        display: flex;
+        gap: var(--space-2);
+        flex-wrap: wrap;
+      }
+
+      .quotes-table {
+        min-width: 1080px;
+      }
+
+      .quote-number {
+        white-space: nowrap;
+        font-weight: 700;
+      }
+
+      .customer-cell {
+        display: grid;
+        gap: 0.2rem;
+      }
+
+      .customer-meta {
+        font-size: var(--font-size-xs);
+        color: var(--color-text-secondary);
+      }
+
+      .status-badge {
+        font-weight: 700;
+      }
+
       .status-draft {
         background: #dbeafe;
-        color: #1d4ed8;
+        color: var(--color-info);
       }
+
       .status-sent {
         background: #ede9fe;
         color: #6d28d9;
       }
+
       .status-expired {
         background: #fee2e2;
-        color: #b91c1c;
+        color: var(--color-danger);
       }
+
       .status-converted {
         background: #dcfce7;
-        color: #166534;
+        color: var(--color-success);
       }
+
       .status-cancelled {
         background: #e5e7eb;
         color: #1f2937;
       }
-      .expired {
-        display: block;
-        font-size: 0.75rem;
-        color: #b91c1c;
+
+      .amount {
+        white-space: nowrap;
+        font-weight: 700;
       }
-      .error {
-        margin: 0;
-        color: #b91c1c;
+
+      .expires-col {
+        display: grid;
+        gap: 0.15rem;
       }
-      .success {
-        margin: 0;
-        color: #166534;
+
+      .expired-note {
+        font-size: var(--font-size-xs);
+        color: var(--color-danger);
+        font-weight: 700;
       }
-      .empty {
-        text-align: center;
-        color: #6b7280;
+
+      .row-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-2);
       }
+
+      .ui-button[disabled] {
+        opacity: 0.55;
+        cursor: not-allowed;
+      }
+
       @media (max-width: 1080px) {
-        .filters {
+        .filters-panel {
           grid-template-columns: 1fr 1fr;
         }
       }
+
       @media (max-width: 640px) {
-        .header {
-          flex-direction: column;
-          align-items: flex-start;
+        .quotes-page {
+          padding: var(--space-4);
         }
-        .filters {
+
+        .filters-panel {
           grid-template-columns: 1fr;
+        }
+
+        .filter-actions {
+          justify-content: flex-start;
         }
       }
     `,

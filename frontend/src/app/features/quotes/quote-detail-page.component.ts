@@ -18,49 +18,108 @@ import {
   standalone: true,
   imports: [CommonModule, RouterLink],
   template: `
-    <section class="card" *ngIf="quote">
-      <header class="header">
+    <section class="ui-card quote-detail-page" *ngIf="quote">
+      <header class="ui-page-head">
         <div>
-          <h1>Detalle de cotizacion</h1>
-          <p class="muted">
-            {{ quote.quoteNumber }} | Estado:
-            <span class="status" [ngClass]="statusClass(quote.status)">{{
-              quote.status
-            }}</span>
+          <p class="ui-page-kicker">Comercial InkToy</p>
+          <h1 class="ui-page-title">
+            Detalle de cotizacion {{ quote.quoteNumber }}
+          </h1>
+          <p class="ui-page-description">
+            Consulta cliente, items, historial de estados y conversion a venta.
           </p>
         </div>
-        <a [routerLink]="['/cotizaciones']">Volver al listado</a>
+
+        <div class="header-actions">
+          <span
+            class="ui-badge status-badge"
+            [ngClass]="statusClass(quote.status)"
+          >
+            {{ quote.status }}
+          </span>
+          <a
+            class="ui-button ui-button--secondary"
+            [routerLink]="['/cotizaciones']"
+          >
+            Volver al listado
+          </a>
+        </div>
       </header>
 
-      <p class="error" *ngIf="errorMessage">{{ errorMessage }}</p>
-      <p class="success" *ngIf="successMessage">{{ successMessage }}</p>
-
-      <section class="summary grid">
-        <p><strong>Cliente:</strong> {{ quote.customerName }}</p>
-        <p><strong>Documento:</strong> {{ quote.customerDocument || "-" }}</p>
-        <p><strong>Telefono:</strong> {{ quote.customerPhone || "-" }}</p>
-        <p><strong>Correo:</strong> {{ quote.customerEmail || "-" }}</p>
-        <p><strong>Emision:</strong> {{ quote.issueDate }}</p>
-        <p><strong>Vencimiento:</strong> {{ quote.expiresAt }}</p>
-        <p><strong>Creado por:</strong> {{ quote.createdBy }}</p>
-        <p><strong>Notas:</strong> {{ quote.notes || "-" }}</p>
-      </section>
-
-      <p class="converted" *ngIf="quote.convertedSaleId">
-        Venta generada: #{{ quote.convertedSaleId }}
-        <a [routerLink]="['/ventas', quote.convertedSaleId]">Ver venta</a>
+      <p class="ui-alert ui-alert--error" *ngIf="errorMessage">
+        {{ errorMessage }}
+      </p>
+      <p class="ui-alert ui-alert--success" *ngIf="successMessage">
+        {{ successMessage }}
       </p>
 
-      <section class="actions">
+      <section class="summary-grid">
+        <article class="summary-card">
+          <h2>Cliente</h2>
+          <p>
+            <span class="label">Nombre</span>
+            <strong>{{ quote.customerName }}</strong>
+          </p>
+          <p>
+            <span class="label">Documento</span>
+            <strong>{{ quote.customerDocument || "-" }}</strong>
+          </p>
+          <p>
+            <span class="label">Telefono</span>
+            <strong>{{ quote.customerPhone || "-" }}</strong>
+          </p>
+          <p>
+            <span class="label">Correo</span>
+            <strong>{{ quote.customerEmail || "-" }}</strong>
+          </p>
+        </article>
+
+        <article class="summary-card">
+          <h2>Datos de operacion</h2>
+          <p>
+            <span class="label">Emision</span>
+            <strong>{{ quote.issueDate }}</strong>
+          </p>
+          <p>
+            <span class="label">Vencimiento</span>
+            <strong>{{ quote.expiresAt }}</strong>
+          </p>
+          <p>
+            <span class="label">Creado por</span>
+            <strong>{{ quote.createdBy }}</strong>
+          </p>
+          <p>
+            <span class="label">Notas</span>
+            <strong>{{ quote.notes || "-" }}</strong>
+          </p>
+        </article>
+      </section>
+
+      <p
+        class="ui-alert ui-alert--info converted-note"
+        *ngIf="quote.convertedSaleId"
+      >
+        Venta generada: #{{ quote.convertedSaleId }}
+        <a
+          class="inline-link"
+          [routerLink]="['/ventas', quote.convertedSaleId]"
+        >
+          Ver venta
+        </a>
+      </p>
+
+      <section class="workflow-actions">
         <a
           *ngIf="canEdit(quote)"
-          class="button"
+          class="ui-button ui-button--secondary"
           [routerLink]="['/cotizaciones', quote.id, 'editar']"
-          >Editar</a
         >
+          Editar
+        </a>
         <button
           *ngIf="canSend(quote)"
           type="button"
+          class="ui-button ui-button--primary"
           [disabled]="processing"
           (click)="sendQuote()"
         >
@@ -69,7 +128,7 @@ import {
         <button
           *ngIf="canCancel(quote)"
           type="button"
-          class="danger"
+          class="ui-button ui-button--danger"
           [disabled]="processing"
           (click)="cancelQuote()"
         >
@@ -77,206 +136,260 @@ import {
         </button>
         <a
           *ngIf="canConvert(quote)"
-          class="button"
+          class="ui-button ui-button--primary"
           [routerLink]="['/cotizaciones', quote.id, 'convertir']"
-          >Convertir a venta</a
         >
+          Convertir a venta
+        </a>
       </section>
 
-      <section class="table-wrap">
-        <h2>Items</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>Producto</th>
-              <th>Cantidad</th>
-              <th>Precio unitario</th>
-              <th>Descuento</th>
-              <th>Total linea</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let item of quote.items">
-              <td>{{ productName(item.productId) }}</td>
-              <td>{{ item.quantity | number: "1.0-3" }}</td>
-              <td>{{ item.unitPrice | number: "1.2-2" }}</td>
-              <td>{{ item.discountAmount | number: "1.2-2" }}</td>
-              <td>{{ item.lineTotal | number: "1.2-2" }}</td>
-            </tr>
-          </tbody>
-        </table>
+      <section class="data-section">
+        <header class="section-head">
+          <h2>Items</h2>
+        </header>
+
+        <div class="ui-table-wrapper">
+          <table class="ui-table detail-table">
+            <thead>
+              <tr>
+                <th>Producto</th>
+                <th>Cantidad</th>
+                <th>Precio unitario</th>
+                <th>Descuento</th>
+                <th>Total linea</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let item of quote.items">
+                <td>{{ productName(item.productId) }}</td>
+                <td>{{ item.quantity | number: "1.0-3" }}</td>
+                <td>{{ item.unitPrice | number: "1.2-2" }}</td>
+                <td>{{ item.discountAmount | number: "1.2-2" }}</td>
+                <td>{{ item.lineTotal | number: "1.2-2" }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </section>
 
-      <section class="totals">
-        <p>
-          <strong>Subtotal:</strong>
-          {{ quote.subtotalAmount | number: "1.2-2" }}
-        </p>
-        <p>
-          <strong>Descuento:</strong>
-          {{ quote.discountAmount | number: "1.2-2" }}
-        </p>
-        <p><strong>Total:</strong> {{ quote.totalAmount | number: "1.2-2" }}</p>
+      <section class="totals-strip">
+        <article class="total-box">
+          <p class="label">Subtotal</p>
+          <p class="value">{{ quote.subtotalAmount | number: "1.2-2" }}</p>
+        </article>
+        <article class="total-box">
+          <p class="label">Descuento</p>
+          <p class="value">{{ quote.discountAmount | number: "1.2-2" }}</p>
+        </article>
+        <article class="total-box total-box--strong">
+          <p class="label">Total</p>
+          <p class="value">{{ quote.totalAmount | number: "1.2-2" }}</p>
+        </article>
       </section>
 
-      <section class="table-wrap">
-        <h2>Historial de estados</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>Fecha</th>
-              <th>Estado previo</th>
-              <th>Nuevo estado</th>
-              <th>Comentario</th>
-              <th>Usuario</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let event of history">
-              <td>{{ event.changedAt | date: "yyyy-MM-dd HH:mm" }}</td>
-              <td>{{ event.previousStatus || "-" }}</td>
-              <td>{{ event.newStatus }}</td>
-              <td>{{ event.comment || "-" }}</td>
-              <td>{{ event.changedBy }}</td>
-            </tr>
-            <tr *ngIf="history.length === 0">
-              <td colspan="5" class="empty">No hay historial disponible.</td>
-            </tr>
-          </tbody>
-        </table>
+      <section class="data-section">
+        <header class="section-head">
+          <h2>Historial de estados</h2>
+        </header>
+
+        <div class="ui-table-wrapper">
+          <table class="ui-table detail-table">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Estado previo</th>
+                <th>Nuevo estado</th>
+                <th>Comentario</th>
+                <th>Usuario</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let event of history">
+                <td>{{ event.changedAt | date: "yyyy-MM-dd HH:mm" }}</td>
+                <td>{{ event.previousStatus || "-" }}</td>
+                <td>{{ event.newStatus }}</td>
+                <td>{{ event.comment || "-" }}</td>
+                <td>{{ event.changedBy }}</td>
+              </tr>
+              <tr *ngIf="history.length === 0">
+                <td colspan="5" class="ui-table__empty">
+                  <div class="ui-empty-state">No hay historial disponible.</div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </section>
     </section>
   `,
   styles: [
     `
-      .card {
-        background: #fff;
-        border-radius: 0.5rem;
-        padding: 1rem;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      .quote-detail-page {
+        padding: var(--space-5);
         display: grid;
-        gap: 1rem;
+        gap: var(--space-4);
       }
-      .header {
+
+      h2 {
+        margin: 0;
+        font-size: 1.05rem;
+      }
+
+      .header-actions {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+        flex-wrap: wrap;
+      }
+
+      .status-badge {
+        font-weight: 700;
+      }
+
+      .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(260px, 1fr));
+        gap: var(--space-3);
+      }
+
+      .summary-card {
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-md);
+        background: var(--color-bg-surface);
+        padding: var(--space-3);
+        display: grid;
+        gap: var(--space-2);
+      }
+
+      .summary-card p {
+        margin: 0;
+        display: grid;
+        gap: 0.15rem;
+      }
+
+      .summary-card .label {
+        font-size: var(--font-size-xs);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--color-text-secondary);
+        font-weight: 700;
+      }
+
+      .converted-note {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: var(--space-2);
+      }
+
+      .inline-link {
+        font-weight: 700;
+        text-decoration: underline;
+      }
+
+      .workflow-actions {
+        display: flex;
+        gap: var(--space-2);
+        flex-wrap: wrap;
+      }
+
+      .data-section {
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-md);
+        background: var(--color-bg-surface);
+        padding: var(--space-3);
+        display: grid;
+        gap: var(--space-3);
+      }
+
+      .section-head {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        gap: 1rem;
-      }
-      h1,
-      h2 {
-        margin: 0;
-      }
-      .muted {
-        color: #6b7280;
-        margin: 0.25rem 0 0;
-      }
-      .grid {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(220px, 1fr));
-        gap: 0.5rem;
-      }
-      .grid p {
-        margin: 0;
-      }
-      .converted {
-        margin: 0;
-        color: #166534;
-      }
-      .converted a {
-        margin-left: 0.5rem;
-      }
-      .actions {
-        display: flex;
-        gap: 0.5rem;
+        gap: var(--space-2);
         flex-wrap: wrap;
       }
-      button,
-      .button {
-        padding: 0.45rem 0.75rem;
-        border: 0;
-        border-radius: 0.35rem;
-        background: #0f766e;
-        color: #fff;
-        cursor: pointer;
-        text-decoration: none;
+
+      .detail-table {
+        min-width: 920px;
       }
-      .danger {
-        background: #b91c1c;
-      }
-      .table-wrap {
-        overflow-x: auto;
-      }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-      }
-      th,
-      td {
-        text-align: left;
-        padding: 0.45rem;
-        border-bottom: 1px solid #e5e7eb;
-      }
-      .totals {
+
+      .totals-strip {
         display: grid;
-        grid-template-columns: repeat(3, minmax(140px, 1fr));
-        gap: 0.5rem;
+        grid-template-columns: repeat(3, minmax(180px, 1fr));
+        gap: var(--space-3);
       }
-      .totals p {
+
+      .total-box {
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-sm);
+        background: var(--color-bg-surface);
+        padding: var(--space-3);
+        display: grid;
+        gap: 0.15rem;
+      }
+
+      .total-box--strong {
+        border-color: #c7d2fe;
+        background: #eef2ff;
+      }
+
+      .total-box .label {
         margin: 0;
-        background: #f3f4f6;
-        padding: 0.5rem;
-        border-radius: 0.35rem;
-      }
-      .status {
-        display: inline-flex;
-        padding: 0.2rem 0.5rem;
-        border-radius: 999px;
-        font-size: 0.75rem;
+        font-size: var(--font-size-xs);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--color-text-secondary);
         font-weight: 700;
       }
+
+      .total-box .value {
+        margin: 0;
+        font-size: 1.15rem;
+        font-family: var(--font-family-display);
+        font-weight: 700;
+      }
+
       .status-draft {
         background: #dbeafe;
-        color: #1d4ed8;
+        color: var(--color-info);
       }
+
       .status-sent {
         background: #ede9fe;
         color: #6d28d9;
       }
+
       .status-expired {
         background: #fee2e2;
-        color: #b91c1c;
+        color: var(--color-danger);
       }
+
       .status-converted {
         background: #dcfce7;
-        color: #166534;
+        color: var(--color-success);
       }
+
       .status-cancelled {
         background: #e5e7eb;
         color: #1f2937;
       }
-      .error {
-        margin: 0;
-        color: #b91c1c;
+
+      .ui-button[disabled] {
+        opacity: 0.55;
+        cursor: not-allowed;
       }
-      .success {
-        margin: 0;
-        color: #166534;
-      }
-      .empty {
-        text-align: center;
-        color: #6b7280;
-      }
-      @media (max-width: 900px) {
-        .header {
-          flex-direction: column;
-          align-items: flex-start;
-        }
-        .grid {
+
+      @media (max-width: 960px) {
+        .summary-grid,
+        .totals-strip {
           grid-template-columns: 1fr;
         }
-        .totals {
-          grid-template-columns: 1fr;
+      }
+
+      @media (max-width: 700px) {
+        .quote-detail-page {
+          padding: var(--space-4);
         }
       }
     `,

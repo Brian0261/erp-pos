@@ -282,3 +282,37 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
   - [x] Stock despues de recepcion: `3`.
   - [x] Delta confirmado: `+1`.
   - [x] Kardex con movimiento `PURCHASE_IN` encontrado (motivo: `Purchase receipt #19`).
+
+## Bloque E5 Cotizaciones InkToy (2026-04-30)
+
+- [x] Pantallas aplicadas:
+  - [x] `/cotizaciones`
+  - [x] `/cotizaciones/nueva`
+  - [x] `/cotizaciones/:id`
+  - [x] `/cotizaciones/:id/editar`
+  - [x] `/cotizaciones/:id/convertir`
+- [x] Build frontend (`npm run build`) exitoso tras cambios visuales E5.
+- [x] `docker compose up --build -d` y `docker compose ps` exitosos (`postgres` healthy, `backend` up, `frontend` up).
+- [x] Smoke funcional E5 en navegador (ADMIN):
+  - [x] Crear cotizacion desde `/cotizaciones/nueva`.
+  - [x] Editar cotizacion desde `/cotizaciones/:id/editar`.
+  - [x] Enviar cotizacion desde detalle (`DRAFT` -> `SENT`).
+  - [x] Validar historial de estados en `/cotizaciones/:id`.
+  - [x] Convertir a venta en `/cotizaciones/:id/convertir` con caja abierta y stock suficiente.
+  - [x] Validar venta generada y `convertedSaleId` visible en detalle.
+- [x] Evidencia de corrida E5:
+  - [x] Cotizacion creada/editada/enviada/convertida: `#34` (`Q-1777515320376`).
+  - [x] Venta generada por conversion: `#39`.
+  - [x] Historial confirmado con transicion `SENT` -> `CONVERTED` y comentario `Conversion smoke E5`.
+- [x] Doble conversion bloqueada:
+  - [x] `POST /api/v1/quotes/34/convert-to-sale` (segundo intento) => `409 Quote already converted`.
+  - [x] Boton `Convertir a venta` deshabilitado en UI despues de convertir.
+- [x] Validacion de estabilidad E5:
+  - [x] Sin errores de consola JS durante smoke E5 (navegador en `http://localhost:4200`).
+  - [x] Sin respuestas HTTP `500` durante validacion E5.
+- [x] Validacion de roles E5 (frontend + API):
+  - [x] `ADMIN`: acceso a `/cotizaciones` y `/cotizaciones/nueva`; API `GET/POST/send` en quotes => `200/201/200`.
+  - [x] `CAJERO`: acceso a `/cotizaciones` y `/cotizaciones/nueva`; API `GET/POST/send` en quotes => `200/201/200`.
+  - [x] `SUPERVISOR`: acceso a `/cotizaciones` y `/cotizaciones/nueva`; API `GET/POST/send` en quotes => `200/201/200`.
+  - [x] `ALMACENERO`: bloqueo frontend en `/cotizaciones` y `/cotizaciones/nueva` con redireccion a `/dashboard`; API quotes (`GET/POST`) => `403/403`.
+- [x] Alcance tecnico preservado: sin cambios en backend, endpoints, contratos de servicio, guards, interceptor ni reglas de negocio de cotizaciones.

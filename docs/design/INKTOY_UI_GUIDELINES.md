@@ -64,6 +64,16 @@ Apply visual consistency across the ERP/POS while preserving MVP behavior.
 5. Reuse shared UI wrappers and tokens (`.ui-page-head`, `.ui-alert`, `.ui-table`, `.ui-button`, `.ui-badge`) before introducing local classes.
 6. Keep all purchases route names, guards, interceptor logic, and backend authorization untouched in E4.
 
+## Quotes-Specific Rules (Block E5)
+
+1. Keep quotes workflows unchanged; E5 is visual-only for quotes list, create, detail, edit, and convert pages.
+2. Preserve lifecycle behavior and status transitions exactly as implemented (`DRAFT`, `SENT`, `EXPIRED`, `CONVERTED`, `CANCELLED`).
+3. Keep conversion validations untouched: open cash session, warehouse selection, payment totals, stock checks, and duplicate-conversion protection.
+4. Preserve all reactive-form control names, validators, payload fields, and QuoteService endpoint contracts.
+5. Keep role behavior unchanged: `ADMIN/CAJERO/SUPERVISOR` allowed in quotes routes, `ALMACENERO` blocked by current guard rules.
+6. Reuse shared InkToy wrappers (`.ui-page-head`, `.ui-alert`, `.ui-table`, `.ui-button`, `.ui-badge`) before adding local styles.
+7. Keep quotes routes, guards, interceptor behavior, backend authorization, and business logic untouched in E5.
+
 ## Rollout Sequence (Recommended)
 
 1. Block A: foundation (tokens/assets/base classes) - completed.
@@ -74,9 +84,10 @@ Apply visual consistency across the ERP/POS while preserving MVP behavior.
 6. Block E2: inventory visual upgrade (warehouses/stock/initial stock/adjustments/transfers/kardex) - completed.
 7. Block E3: POS/Caja/Ventas visual upgrade - completed.
 8. Block E4: Compras/Proveedores visual upgrade - completed.
-9. Block E5+: remaining modules cards/forms.
-10. Block F: tables, statuses, and badges across remaining modules.
-11. Block G: final responsive and QA pass.
+9. Block E5: Cotizaciones visual upgrade - completed.
+10. Block E6+: remaining modules cards/forms.
+11. Block F: tables, statuses, and badges across remaining modules.
+12. Block G: final responsive and QA pass.
 
 ## Validation Checklist
 

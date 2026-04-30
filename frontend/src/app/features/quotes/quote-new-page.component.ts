@@ -20,65 +20,117 @@ import { CreateQuoteRequest, QuoteItemRequest } from "./data/quotes.models";
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, RouterLink],
   template: `
-    <section class="card">
-      <header class="header">
+    <section class="ui-card quote-form-page">
+      <header class="ui-page-head">
         <div>
-          <h1>Nueva cotizacion</h1>
-          <p class="muted">Crea una cotizacion en estado DRAFT.</p>
+          <p class="ui-page-kicker">Comercial InkToy</p>
+          <h1 class="ui-page-title">Nueva cotizacion</h1>
+          <p class="ui-page-description">
+            Registra una cotizacion en estado DRAFT con cliente, items,
+            descuentos y totales listos para envio o conversion.
+          </p>
         </div>
-        <a [routerLink]="['/cotizaciones']">Volver al listado</a>
+        <a
+          class="ui-button ui-button--secondary"
+          [routerLink]="['/cotizaciones']"
+        >
+          Volver al listado
+        </a>
       </header>
 
-      <form [formGroup]="form" (ngSubmit)="submit()" class="grid">
-        <label>
-          Cliente *
-          <input type="text" formControlName="customerName" maxlength="180" />
-          <small class="error" *ngIf="isInvalid('customerName')">
-            customerName es obligatorio.
-          </small>
-        </label>
+      <p class="ui-alert ui-alert--error" *ngIf="errorMessage">
+        {{ errorMessage }}
+      </p>
+      <p class="ui-alert ui-alert--success" *ngIf="successMessage">
+        {{ successMessage }}
+      </p>
 
-        <label>
-          Documento
-          <input
-            type="text"
-            formControlName="customerDocument"
-            maxlength="40"
-          />
-        </label>
+      <form [formGroup]="form" (ngSubmit)="submit()" class="form-layout">
+        <section class="form-section">
+          <header class="section-head">
+            <h2>Cliente</h2>
+          </header>
 
-        <label>
-          Telefono
-          <input type="text" formControlName="customerPhone" maxlength="40" />
-        </label>
+          <div class="form-grid form-grid--two">
+            <label class="field">
+              <span>Cliente *</span>
+              <input
+                type="text"
+                formControlName="customerName"
+                maxlength="180"
+              />
+              <small class="field-error" *ngIf="isInvalid('customerName')">
+                customerName es obligatorio.
+              </small>
+            </label>
 
-        <label>
-          Correo
-          <input type="email" formControlName="customerEmail" maxlength="160" />
-        </label>
+            <label class="field">
+              <span>Documento</span>
+              <input
+                type="text"
+                formControlName="customerDocument"
+                maxlength="40"
+              />
+            </label>
 
-        <label>
-          Fecha emision
-          <input type="date" formControlName="issueDate" />
-        </label>
+            <label class="field">
+              <span>Telefono</span>
+              <input
+                type="text"
+                formControlName="customerPhone"
+                maxlength="40"
+              />
+            </label>
 
-        <label>
-          Fecha vencimiento *
-          <input type="date" formControlName="expiresAt" />
-          <small class="error" *ngIf="isInvalid('expiresAt')">
-            expiresAt es obligatorio.
-          </small>
-        </label>
+            <label class="field">
+              <span>Correo</span>
+              <input
+                type="email"
+                formControlName="customerEmail"
+                maxlength="160"
+              />
+            </label>
+          </div>
+        </section>
 
-        <label class="full">
-          Notas
-          <textarea rows="3" maxlength="400" formControlName="notes"></textarea>
-        </label>
+        <section class="form-section">
+          <header class="section-head">
+            <h2>Datos generales</h2>
+          </header>
 
-        <section class="items full">
-          <header class="items-header">
+          <div class="form-grid form-grid--two">
+            <label class="field">
+              <span>Fecha emision</span>
+              <input type="date" formControlName="issueDate" />
+            </label>
+
+            <label class="field">
+              <span>Fecha vencimiento *</span>
+              <input type="date" formControlName="expiresAt" />
+              <small class="field-error" *ngIf="isInvalid('expiresAt')">
+                expiresAt es obligatorio.
+              </small>
+            </label>
+
+            <label class="field full">
+              <span>Notas</span>
+              <textarea
+                rows="3"
+                maxlength="400"
+                formControlName="notes"
+              ></textarea>
+            </label>
+          </div>
+        </section>
+
+        <section class="form-section">
+          <header class="section-head section-head--actions">
             <h2>Items</h2>
-            <button type="button" class="secondary" (click)="addItem()">
+            <button
+              type="button"
+              class="ui-button ui-button--secondary"
+              (click)="addItem()"
+            >
               Agregar item
             </button>
           </header>
@@ -89,8 +141,8 @@ import { CreateQuoteRequest, QuoteItemRequest } from "./data/quotes.models";
               *ngFor="let item of items.controls; let i = index"
               [formGroupName]="i"
             >
-              <label>
-                Producto *
+              <label class="field item-product">
+                <span>Producto *</span>
                 <select formControlName="productId">
                   <option [ngValue]="null">Selecciona producto</option>
                   <option
@@ -100,49 +152,54 @@ import { CreateQuoteRequest, QuoteItemRequest } from "./data/quotes.models";
                     {{ product.name }} ({{ product.sku }})
                   </option>
                 </select>
-                <small class="error" *ngIf="itemInvalid(i, 'productId')">
+                <small class="field-error" *ngIf="itemInvalid(i, 'productId')">
                   productId es obligatorio.
                 </small>
               </label>
 
-              <label>
-                Cantidad *
+              <label class="field">
+                <span>Cantidad *</span>
                 <input
                   type="number"
                   min="0.0001"
                   step="0.0001"
                   formControlName="quantity"
                 />
-                <small class="error" *ngIf="itemInvalid(i, 'quantity')">
+                <small class="field-error" *ngIf="itemInvalid(i, 'quantity')">
                   quantity debe ser mayor que 0.
                 </small>
               </label>
 
-              <label>
-                Descuento
+              <label class="field">
+                <span>Descuento</span>
                 <input
                   type="number"
                   min="0"
                   step="0.01"
                   formControlName="discountAmount"
                 />
-                <small class="error" *ngIf="itemInvalid(i, 'discountAmount')">
+                <small
+                  class="field-error"
+                  *ngIf="itemInvalid(i, 'discountAmount')"
+                >
                   discountAmount debe ser mayor o igual que 0.
                 </small>
               </label>
 
               <div class="line-total">
-                <span
-                  >Subtotal: {{ lineSubtotal(item) | number: "1.2-2" }}</span
-                >
-                <span
-                  >Total linea: {{ lineTotal(item) | number: "1.2-2" }}</span
-                >
+                <p>
+                  <span>Subtotal</span>
+                  <strong>{{ lineSubtotal(item) | number: "1.2-2" }}</strong>
+                </p>
+                <p>
+                  <span>Total linea</span>
+                  <strong>{{ lineTotal(item) | number: "1.2-2" }}</strong>
+                </p>
               </div>
 
               <button
                 type="button"
-                class="danger"
+                class="ui-button ui-button--danger"
                 (click)="removeItem(i)"
                 [disabled]="items.length === 1"
               >
@@ -152,151 +209,229 @@ import { CreateQuoteRequest, QuoteItemRequest } from "./data/quotes.models";
           </div>
         </section>
 
-        <section class="totals full">
-          <p><strong>Subtotal:</strong> {{ subtotal | number: "1.2-2" }}</p>
-          <p>
-            <strong>Descuento:</strong> {{ discountTotal | number: "1.2-2" }}
-          </p>
-          <p><strong>Total visual:</strong> {{ total | number: "1.2-2" }}</p>
+        <section class="totals-panel">
+          <article class="total-box">
+            <p class="label">Subtotal</p>
+            <p class="value">{{ subtotal | number: "1.2-2" }}</p>
+          </article>
+          <article class="total-box">
+            <p class="label">Descuento</p>
+            <p class="value">{{ discountTotal | number: "1.2-2" }}</p>
+          </article>
+          <article class="total-box total-box--strong">
+            <p class="label">Total visual</p>
+            <p class="value">{{ total | number: "1.2-2" }}</p>
+          </article>
         </section>
 
-        <div class="actions full">
-          <button type="submit" [disabled]="saving">
+        <div class="form-actions">
+          <button
+            type="submit"
+            class="ui-button ui-button--primary"
+            [disabled]="saving"
+          >
             {{ saving ? "Guardando..." : "Crear cotizacion" }}
           </button>
         </div>
       </form>
-
-      <p class="error" *ngIf="errorMessage">{{ errorMessage }}</p>
-      <p class="success" *ngIf="successMessage">{{ successMessage }}</p>
     </section>
   `,
   styles: [
     `
-      .card {
-        background: #fff;
-        border-radius: 0.5rem;
-        padding: 1rem;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      .quote-form-page {
+        padding: var(--space-5);
         display: grid;
-        gap: 1rem;
+        gap: var(--space-4);
       }
-      .header {
+
+      h2 {
+        margin: 0;
+        font-size: 1.05rem;
+      }
+
+      .form-layout {
+        display: grid;
+        gap: var(--space-4);
+      }
+
+      .form-section {
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-md);
+        background: var(--color-bg-surface);
+        padding: var(--space-3);
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-3);
+      }
+
+      .section-head {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        gap: 1rem;
+        gap: var(--space-2);
+        flex-wrap: wrap;
       }
-      h1,
-      h2 {
-        margin: 0;
+
+      .section-head--actions {
+        border-bottom: 1px solid var(--color-border-default);
+        padding-bottom: var(--space-2);
       }
-      .header a {
-        color: #1e3a8a;
-        text-decoration: none;
-      }
-      .muted {
-        margin: 0.25rem 0 0;
-        color: #4b5563;
-      }
-      .grid {
+
+      .form-grid {
         display: grid;
-        grid-template-columns: repeat(2, minmax(220px, 1fr));
-        gap: 0.65rem;
+        gap: var(--space-3);
       }
+
+      .form-grid--two {
+        grid-template-columns: repeat(2, minmax(220px, 1fr));
+      }
+
       .full {
         grid-column: 1 / -1;
       }
-      label {
+
+      .field {
         display: grid;
-        gap: 0.35rem;
+        gap: var(--space-1);
       }
+
+      .field span {
+        font-size: var(--font-size-sm);
+        color: var(--color-text-secondary);
+        font-weight: 700;
+      }
+
       input,
       select,
-      textarea,
-      button {
-        padding: 0.5rem;
-        border: 1px solid #d1d5db;
-        border-radius: 0.35rem;
+      textarea {
+        padding: 0.6rem 0.7rem;
+        border: 1px solid var(--color-border-strong);
+        border-radius: var(--radius-sm);
+        background: var(--color-bg-surface);
       }
-      button {
-        border: 0;
-        background: #0f766e;
-        color: #fff;
-        cursor: pointer;
-      }
-      .secondary {
-        background: #374151;
-      }
-      .danger {
-        background: #b91c1c;
-      }
-      .items {
-        border: 1px solid #e5e7eb;
-        border-radius: 0.5rem;
-        padding: 0.75rem;
-        display: grid;
-        gap: 0.7rem;
-      }
-      .items-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-      }
+
       .items-list {
         display: grid;
-        gap: 0.75rem;
+        gap: var(--space-3);
       }
+
       .item-row {
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-sm);
+        background: var(--color-bg-soft);
+        padding: var(--space-3);
         display: grid;
-        grid-template-columns: 2fr 1fr 1fr auto auto;
-        gap: 0.55rem;
+        grid-template-columns: minmax(220px, 1.8fr) 150px 150px minmax(
+            180px,
+            1fr
+          ) auto;
+        gap: var(--space-2);
         align-items: end;
-        border: 1px solid #e5e7eb;
-        border-radius: 0.4rem;
-        padding: 0.55rem;
       }
+
+      .item-product {
+        min-width: 0;
+      }
+
       .line-total {
         display: grid;
-        gap: 0.2rem;
-        font-size: 0.85rem;
-        color: #374151;
+        gap: var(--space-1);
       }
-      .totals {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(140px, 1fr));
-        gap: 0.5rem;
-      }
-      .totals p {
+
+      .line-total p {
         margin: 0;
-        background: #f3f4f6;
-        padding: 0.5rem;
-        border-radius: 0.35rem;
+        display: grid;
+        gap: 0.1rem;
       }
-      .actions {
+
+      .line-total span {
+        font-size: var(--font-size-xs);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--color-text-secondary);
+        font-weight: 700;
+      }
+
+      .line-total strong {
+        font-size: var(--font-size-sm);
+      }
+
+      .totals-panel {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(180px, 1fr));
+        gap: var(--space-3);
+      }
+
+      .total-box {
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-sm);
+        background: var(--color-bg-surface);
+        padding: var(--space-3);
+        display: grid;
+        gap: 0.15rem;
+      }
+
+      .total-box--strong {
+        border-color: #c7d2fe;
+        background: #eef2ff;
+      }
+
+      .total-box .label {
+        margin: 0;
+        font-size: var(--font-size-xs);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--color-text-secondary);
+        font-weight: 700;
+      }
+
+      .total-box .value {
+        margin: 0;
+        font-size: 1.15rem;
+        font-family: var(--font-family-display);
+        font-weight: 700;
+      }
+
+      .form-actions {
         display: flex;
         justify-content: flex-end;
+        gap: var(--space-2);
+        flex-wrap: wrap;
       }
-      .error {
+
+      .field-error {
         margin: 0;
-        color: #b91c1c;
+        color: var(--color-danger);
+        font-size: var(--font-size-xs);
+        font-weight: 700;
       }
-      .success {
-        margin: 0;
-        color: #166534;
+
+      .ui-button[disabled] {
+        opacity: 0.55;
+        cursor: not-allowed;
       }
+
       @media (max-width: 1200px) {
         .item-row {
           grid-template-columns: 1fr;
         }
-      }
-      @media (max-width: 800px) {
-        .grid {
+
+        .totals-panel {
           grid-template-columns: 1fr;
         }
-        .header {
-          flex-direction: column;
-          align-items: flex-start;
+      }
+
+      @media (max-width: 800px) {
+        .quote-form-page {
+          padding: var(--space-4);
+        }
+
+        .form-grid--two {
+          grid-template-columns: 1fr;
+        }
+
+        .form-actions {
+          justify-content: flex-start;
         }
       }
     `,
