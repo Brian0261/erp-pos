@@ -12,146 +12,117 @@ import { ReportsService } from "./data/reports.service";
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule],
   template: `
-    <section class="card">
-      <header>
-        <h1>Reporte de cotizaciones</h1>
-        <p class="muted">
-          Consulta volumen total, conversiones, cancelaciones y tasa de
-          conversion.
-        </p>
+    <section class="ui-card ui-module-page quotes-report-page">
+      <header class="ui-page-head">
+        <div>
+          <p class="ui-page-kicker">Reporteria comercial</p>
+          <h1 class="ui-page-title">Reporte de cotizaciones</h1>
+          <p class="ui-page-description">
+            Consulta volumen total, conversiones, cancelaciones y tasa de
+            conversion.
+          </p>
+        </div>
       </header>
 
-      <p class="error" *ngIf="permissionMessage">{{ permissionMessage }}</p>
-      <p class="error" *ngIf="errorMessage">{{ errorMessage }}</p>
+      <p class="ui-alert ui-alert--error" *ngIf="permissionMessage">
+        {{ permissionMessage }}
+      </p>
+      <p class="ui-alert ui-alert--error" *ngIf="errorMessage">
+        {{ errorMessage }}
+      </p>
 
-      <form
-        class="filters"
-        [formGroup]="filtersForm"
-        (ngSubmit)="applyFilters()"
-      >
-        <label>
-          Desde
-          <input type="date" formControlName="from" />
-        </label>
+      <section class="ui-module-section">
+        <header class="ui-module-section__head">
+          <h2 class="ui-module-section__title">Filtros de periodo</h2>
+        </header>
 
-        <label>
-          Hasta
-          <input type="date" formControlName="to" />
-        </label>
+        <form
+          class="ui-filter-grid quotes-filters"
+          [formGroup]="filtersForm"
+          (ngSubmit)="applyFilters()"
+        >
+          <label class="ui-field">
+            <span>Desde</span>
+            <input type="date" formControlName="from" />
+          </label>
 
-        <div class="actions">
-          <button type="submit" [disabled]="loading || !canView">
-            Filtrar
-          </button>
-          <button
-            type="button"
-            class="secondary"
-            [disabled]="loading || !canView"
-            (click)="clearFilters()"
-          >
-            Limpiar
-          </button>
-        </div>
-      </form>
+          <label class="ui-field">
+            <span>Hasta</span>
+            <input type="date" formControlName="to" />
+          </label>
 
-      <section class="kpis" *ngIf="report">
-        <article>
-          <h2>Total cotizaciones</h2>
-          <p>{{ report.totalQuotes }}</p>
+          <div class="ui-filter-actions quotes-actions">
+            <button
+              type="submit"
+              class="ui-button ui-button--primary"
+              [disabled]="loading || !canView"
+            >
+              Filtrar
+            </button>
+            <button
+              type="button"
+              class="ui-button ui-button--secondary"
+              [disabled]="loading || !canView"
+              (click)="clearFilters()"
+            >
+              Limpiar
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <section class="ui-kpi-grid" *ngIf="report">
+        <article class="ui-kpi-card">
+          <p class="ui-kpi-label">Total cotizaciones</p>
+          <p class="ui-kpi-value">{{ report.totalQuotes }}</p>
         </article>
-        <article>
-          <h2>Convertidas</h2>
-          <p>{{ report.convertedQuotes }}</p>
+        <article class="ui-kpi-card">
+          <p class="ui-kpi-label">Convertidas</p>
+          <p class="ui-kpi-value">{{ report.convertedQuotes }}</p>
         </article>
-        <article>
-          <h2>Canceladas</h2>
-          <p>{{ report.cancelledQuotes }}</p>
+        <article class="ui-kpi-card">
+          <p class="ui-kpi-label">Canceladas</p>
+          <p class="ui-kpi-value">{{ report.cancelledQuotes }}</p>
         </article>
-        <article>
-          <h2>Tasa conversion (%)</h2>
-          <p>{{ numberOf(report.conversionRate) | number: "1.2-2" }}</p>
+        <article class="ui-kpi-card">
+          <p class="ui-kpi-label">Tasa de conversion (%)</p>
+          <p class="ui-kpi-value">
+            {{ numberOf(report.conversionRate) | number: "1.2-2" }}
+          </p>
+          <p class="quotes-rate-chip">
+            <span
+              class="ui-chip"
+              [ngClass]="conversionChipClass(report.conversionRate)"
+            >
+              {{ conversionLabel(report.conversionRate) }}
+            </span>
+          </p>
         </article>
-        <article>
-          <h2>Monto convertido</h2>
-          <p>{{ numberOf(report.totalConvertedAmount) | number: "1.2-2" }}</p>
+        <article class="ui-kpi-card">
+          <p class="ui-kpi-label">Monto convertido</p>
+          <p class="ui-kpi-value">
+            {{ numberOf(report.totalConvertedAmount) | number: "1.2-2" }}
+          </p>
         </article>
       </section>
     </section>
   `,
   styles: [
     `
-      .card {
-        background: #fff;
-        border-radius: 0.5rem;
-        padding: 1rem;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-        display: grid;
-        gap: 1rem;
-      }
-      h1,
-      h2 {
-        margin: 0;
-      }
-      .muted {
-        margin: 0.25rem 0 0;
-        color: #6b7280;
-      }
-      .filters {
-        display: grid;
+      .quotes-filters {
         grid-template-columns: 1fr 1fr auto;
-        align-items: end;
-        gap: 0.6rem;
       }
-      label {
-        display: grid;
-        gap: 0.35rem;
+
+      .quotes-actions {
+        align-self: end;
       }
-      input,
-      button {
-        padding: 0.5rem 0.7rem;
-        border: 1px solid #d1d5db;
-        border-radius: 0.35rem;
-      }
-      button {
-        border: 0;
-        background: #0f766e;
-        color: #fff;
-        cursor: pointer;
-      }
-      .secondary {
-        background: #374151;
-      }
-      .actions {
-        display: flex;
-        gap: 0.5rem;
-      }
-      .kpis {
-        display: grid;
-        grid-template-columns: repeat(5, minmax(170px, 1fr));
-        gap: 0.65rem;
-      }
-      .kpis article {
-        border: 1px solid #e5e7eb;
-        border-radius: 0.45rem;
-        padding: 0.65rem;
-      }
-      .kpis p {
-        margin: 0.3rem 0 0;
-        font-size: 1.2rem;
-        font-weight: 700;
-      }
-      .error {
+
+      .quotes-rate-chip {
         margin: 0;
-        color: #b91c1c;
       }
-      @media (max-width: 980px) {
-        .kpis {
-          grid-template-columns: 1fr 1fr;
-        }
-      }
-      @media (max-width: 720px) {
-        .filters,
-        .kpis {
+
+      @media (max-width: 760px) {
+        .quotes-filters {
           grid-template-columns: 1fr;
         }
       }
@@ -209,6 +180,28 @@ export class QuotesReportPageComponent implements OnInit {
   numberOf(value: unknown): number {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  conversionChipClass(value: unknown): string {
+    const rate = this.numberOf(value);
+    if (rate >= 60) {
+      return "ui-chip--success";
+    }
+    if (rate >= 30) {
+      return "ui-chip--warning";
+    }
+    return "ui-chip--danger";
+  }
+
+  conversionLabel(value: unknown): string {
+    const rate = this.numberOf(value);
+    if (rate >= 60) {
+      return "Conversion alta";
+    }
+    if (rate >= 30) {
+      return "Conversion media";
+    }
+    return "Conversion baja";
   }
 
   private loadReport(): void {

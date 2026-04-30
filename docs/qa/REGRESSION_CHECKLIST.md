@@ -342,3 +342,30 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [x] Sin respuestas HTTP `500` inesperadas durante validacion E6.
 - [x] Sin errores de consola en rutas E6 por carga de XML prematura; comprobantes sin XML muestran estado informativo sin `404` tecnico visible.
 - [x] Alcance tecnico preservado en E6: sin cambios de contratos API; ajuste puntual aplicado en backend (RBAC lectura de series) y frontend (carga condicional de XML) manteniendo reglas de negocio.
+
+## Bloque E7 Reportes y Outbox/Eventos InkToy (2026-04-30)
+
+- [x] Pantallas aplicadas:
+  - [x] `/reportes`
+  - [x] `/reportes/ventas`
+  - [x] `/reportes/caja`
+  - [x] `/reportes/stock-bajo`
+  - [x] `/reportes/movimientos-inventario`
+  - [x] `/reportes/compras`
+  - [x] `/reportes/productos-mas-vendidos`
+  - [x] `/reportes/cotizaciones`
+  - [x] `/reportes/comprobantes`
+  - [x] `/integraciones/eventos`
+  - [x] `/integraciones/eventos/:id`
+- [x] Build frontend (`npm run build`) exitoso tras cambios visuales E7.
+- [x] `docker compose up --build -d` y `docker compose ps` exitosos (`postgres` healthy, `backend` up, `frontend` up).
+- [x] Smoke UI E7 en navegador (`http://localhost:4200`) con `admin`:
+  - [x] Carga correcta de todas las rutas E7 sin errores de compilacion/runtime.
+  - [x] Filtros basicos ejecutados (accion `Filtrar`) en reportes y outbox list sin regresiones funcionales.
+  - [x] Detalle de outbox validado en `/integraciones/eventos/4` con metadata, payload y acciones administrativas visibles.
+- [x] Matriz RBAC frontend validada para rutas E7:
+  - [x] `ADMIN`: acceso permitido a `/reportes` y `/integraciones/eventos`.
+  - [x] `SUPERVISOR`: acceso permitido a `/reportes`; bloqueo en `/integraciones/eventos` (redirige a `/dashboard`).
+  - [x] `ALMACENERO`: acceso permitido a `/reportes`; bloqueo en `/reportes/ventas` y `/integraciones/eventos` (redirige a `/dashboard`).
+  - [x] `CAJERO`: bloqueo en `/reportes` y `/integraciones/eventos` (redirige a `/dashboard`).
+- [x] Alcance tecnico preservado en E7: sin cambios en backend, contratos API, guards, interceptor, rutas ni reglas RBAC.

@@ -12,161 +12,135 @@ import { ReportsService } from "./data/reports.service";
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule],
   template: `
-    <section class="card">
-      <header>
-        <h1>Reporte de productos mas vendidos</h1>
-        <p class="muted">Ranking por cantidad vendida y monto total.</p>
+    <section class="ui-card ui-module-page top-products-report-page">
+      <header class="ui-page-head">
+        <div>
+          <p class="ui-page-kicker">Reporteria comercial</p>
+          <h1 class="ui-page-title">Productos mas vendidos</h1>
+          <p class="ui-page-description">
+            Ranking por unidades vendidas y monto total para priorizar
+            reposicion.
+          </p>
+        </div>
       </header>
 
-      <p class="error" *ngIf="permissionMessage">{{ permissionMessage }}</p>
-      <p class="error" *ngIf="errorMessage">{{ errorMessage }}</p>
+      <p class="ui-alert ui-alert--error" *ngIf="permissionMessage">
+        {{ permissionMessage }}
+      </p>
+      <p class="ui-alert ui-alert--error" *ngIf="errorMessage">
+        {{ errorMessage }}
+      </p>
 
-      <form
-        class="filters"
-        [formGroup]="filtersForm"
-        (ngSubmit)="applyFilters()"
-      >
-        <label>
-          Desde
-          <input type="date" formControlName="from" />
-        </label>
+      <section class="ui-module-section">
+        <header class="ui-module-section__head">
+          <h2 class="ui-module-section__title">Filtros de ranking</h2>
+        </header>
 
-        <label>
-          Hasta
-          <input type="date" formControlName="to" />
-        </label>
+        <form
+          class="ui-filter-grid top-products-filters"
+          [formGroup]="filtersForm"
+          (ngSubmit)="applyFilters()"
+        >
+          <label class="ui-field">
+            <span>Desde</span>
+            <input type="date" formControlName="from" />
+          </label>
 
-        <label>
-          Limite
-          <input
-            type="number"
-            min="1"
-            max="100"
-            step="1"
-            formControlName="limit"
-          />
-        </label>
+          <label class="ui-field">
+            <span>Hasta</span>
+            <input type="date" formControlName="to" />
+          </label>
 
-        <div class="actions">
-          <button type="submit" [disabled]="loading || !canView">
-            Filtrar
-          </button>
-          <button
-            type="button"
-            class="secondary"
-            (click)="clearFilters()"
-            [disabled]="loading || !canView"
-          >
-            Limpiar
-          </button>
+          <label class="ui-field">
+            <span>Limite</span>
+            <input
+              type="number"
+              min="1"
+              max="100"
+              step="1"
+              formControlName="limit"
+            />
+          </label>
+
+          <div class="ui-filter-actions top-products-actions">
+            <button
+              type="submit"
+              class="ui-button ui-button--primary"
+              [disabled]="loading || !canView"
+            >
+              Filtrar
+            </button>
+            <button
+              type="button"
+              class="ui-button ui-button--secondary"
+              (click)="clearFilters()"
+              [disabled]="loading || !canView"
+            >
+              Limpiar
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <section class="ui-module-section">
+        <header class="ui-module-section__head">
+          <h2 class="ui-module-section__title">Ranking de productos</h2>
+        </header>
+
+        <div class="ui-table-wrapper">
+          <table class="ui-table top-products-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Producto</th>
+                <th>SKU</th>
+                <th>Barcode</th>
+                <th>Cantidad vendida</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let row of items; index as i">
+                <td>
+                  <span class="ui-chip" [ngClass]="rankingChipClass(i)">
+                    {{ i + 1 }}
+                  </span>
+                </td>
+                <td>{{ row.productName }}</td>
+                <td>{{ row.sku }}</td>
+                <td>{{ row.barcode || "-" }}</td>
+                <td>{{ numberOf(row.quantitySold) | number: "1.2-2" }}</td>
+                <td>{{ numberOf(row.totalAmount) | number: "1.2-2" }}</td>
+              </tr>
+              <tr *ngIf="!loading && items.length === 0">
+                <td colspan="6" class="ui-table__empty">
+                  <div class="ui-empty-state">
+                    No hay datos para los filtros seleccionados.
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
-      </form>
-
-      <section class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Producto</th>
-              <th>SKU</th>
-              <th>Barcode</th>
-              <th>Cantidad vendida</th>
-              <th>Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let row of items; index as i">
-              <td>{{ i + 1 }}</td>
-              <td>{{ row.productName }}</td>
-              <td>{{ row.sku }}</td>
-              <td>{{ row.barcode || "-" }}</td>
-              <td>{{ numberOf(row.quantitySold) | number: "1.2-2" }}</td>
-              <td>{{ numberOf(row.totalAmount) | number: "1.2-2" }}</td>
-            </tr>
-            <tr *ngIf="!loading && items.length === 0">
-              <td colspan="6" class="empty">
-                No hay datos para los filtros seleccionados.
-              </td>
-            </tr>
-          </tbody>
-        </table>
       </section>
     </section>
   `,
   styles: [
     `
-      .card {
-        background: #fff;
-        border-radius: 0.5rem;
-        padding: 1rem;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-        display: grid;
-        gap: 1rem;
+      .top-products-filters {
+        grid-template-columns: 1fr 1fr minmax(120px, 180px) auto;
       }
-      h1 {
-        margin: 0;
+
+      .top-products-actions {
+        align-self: end;
       }
-      .muted {
-        margin: 0.25rem 0 0;
-        color: #6b7280;
+
+      .top-products-table {
+        min-width: 860px;
       }
-      .filters {
-        display: grid;
-        grid-template-columns: repeat(4, minmax(180px, 1fr));
-        gap: 0.6rem;
-        align-items: end;
-      }
-      label {
-        display: grid;
-        gap: 0.35rem;
-      }
-      input,
-      button {
-        padding: 0.5rem 0.7rem;
-        border: 1px solid #d1d5db;
-        border-radius: 0.35rem;
-      }
-      button {
-        border: 0;
-        background: #0f766e;
-        color: #fff;
-        cursor: pointer;
-      }
-      .secondary {
-        background: #374151;
-      }
-      .actions {
-        display: flex;
-        gap: 0.5rem;
-      }
-      .table-wrap {
-        overflow-x: auto;
-      }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-      }
-      th,
-      td {
-        text-align: left;
-        padding: 0.45rem;
-        border-bottom: 1px solid #e5e7eb;
-      }
-      .empty {
-        text-align: center;
-        color: #6b7280;
-      }
-      .error {
-        margin: 0;
-        color: #b91c1c;
-      }
-      @media (max-width: 980px) {
-        .filters {
-          grid-template-columns: 1fr 1fr;
-        }
-      }
-      @media (max-width: 640px) {
-        .filters {
+
+      @media (max-width: 760px) {
+        .top-products-filters {
           grid-template-columns: 1fr;
         }
       }
@@ -229,6 +203,19 @@ export class TopProductsReportPageComponent implements OnInit {
   numberOf(value: unknown): number {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  rankingChipClass(index: number): string {
+    if (index === 0) {
+      return "ui-chip--success";
+    }
+    if (index === 1) {
+      return "ui-chip--info";
+    }
+    if (index === 2) {
+      return "ui-chip--warning";
+    }
+    return "ui-chip--neutral";
   }
 
   private loadReport(): void {

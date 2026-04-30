@@ -38,3 +38,4 @@ Alcance: Angular frontend, integracion REST real, Docker/Nginx, rutas SPA y perm
 - Bloque E6 Facturacion (visual-only) validado en build/docker/smoke por rutas y roles; se confirma flujo completo en ADMIN y envio mock en SUPERVISOR.
 - FE-008 corregido: `CAJERO` emite desde venta en `/facturacion/emitir/:saleId` con series cargadas y sin habilitar gestion administrativa de series/configuracion.
 - FE-009 corregido: detalle evita request XML prematuro y muestra mensaje informativo limpio cuando aun no existe XML.
+- Bloque E7 Reportes y Outbox/Eventos (visual-only) validado en build/docker/smoke UI (`http://localhost:4200`) con rutas E7 completas y matriz RBAC (`ADMIN`, `SUPERVISOR`, `ALMACENERO`, `CAJERO`) sin nuevos hallazgos funcionales ni de seguridad.

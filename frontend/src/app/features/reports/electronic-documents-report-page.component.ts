@@ -16,192 +16,164 @@ import { ReportsService } from "./data/reports.service";
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule],
   template: `
-    <section class="card">
-      <header>
-        <h1>Reporte de comprobantes electronicos</h1>
-        <p class="muted">Totales por estado y tipo de documento.</p>
+    <section class="ui-card ui-module-page electronic-documents-report-page">
+      <header class="ui-page-head">
+        <div>
+          <p class="ui-page-kicker">Reporteria comercial</p>
+          <h1 class="ui-page-title">Comprobantes electronicos</h1>
+          <p class="ui-page-description">
+            Consulta volumen por estado y tipo de comprobante en el periodo
+            seleccionado.
+          </p>
+        </div>
       </header>
 
-      <p class="error" *ngIf="permissionMessage">{{ permissionMessage }}</p>
-      <p class="error" *ngIf="errorMessage">{{ errorMessage }}</p>
+      <p class="ui-alert ui-alert--error" *ngIf="permissionMessage">
+        {{ permissionMessage }}
+      </p>
+      <p class="ui-alert ui-alert--error" *ngIf="errorMessage">
+        {{ errorMessage }}
+      </p>
 
-      <form
-        class="filters"
-        [formGroup]="filtersForm"
-        (ngSubmit)="applyFilters()"
-      >
-        <label>
-          Desde
-          <input type="date" formControlName="from" />
-        </label>
+      <section class="ui-module-section">
+        <header class="ui-module-section__head">
+          <h2 class="ui-module-section__title">Filtros de comprobantes</h2>
+        </header>
 
-        <label>
-          Hasta
-          <input type="date" formControlName="to" />
-        </label>
+        <form
+          class="ui-filter-grid documents-filters"
+          [formGroup]="filtersForm"
+          (ngSubmit)="applyFilters()"
+        >
+          <label class="ui-field">
+            <span>Desde</span>
+            <input type="date" formControlName="from" />
+          </label>
 
-        <label>
-          Estado
-          <select formControlName="status">
-            <option value="">Todos</option>
-            <option *ngFor="let status of statuses" [value]="status">
-              {{ status }}
-            </option>
-          </select>
-        </label>
+          <label class="ui-field">
+            <span>Hasta</span>
+            <input type="date" formControlName="to" />
+          </label>
 
-        <div class="actions">
-          <button type="submit" [disabled]="loading || !canView">
-            Filtrar
-          </button>
-          <button
-            type="button"
-            class="secondary"
-            [disabled]="loading || !canView"
-            (click)="clearFilters()"
-          >
-            Limpiar
-          </button>
-        </div>
-      </form>
+          <label class="ui-field">
+            <span>Estado</span>
+            <select formControlName="status">
+              <option value="">Todos</option>
+              <option *ngFor="let status of statuses" [value]="status">
+                {{ status }}
+              </option>
+            </select>
+          </label>
 
-      <section class="kpis" *ngIf="report">
-        <article>
-          <h2>Total</h2>
-          <p>{{ report.totalDocuments }}</p>
+          <div class="ui-filter-actions documents-actions">
+            <button
+              type="submit"
+              class="ui-button ui-button--primary"
+              [disabled]="loading || !canView"
+            >
+              Filtrar
+            </button>
+            <button
+              type="button"
+              class="ui-button ui-button--secondary"
+              [disabled]="loading || !canView"
+              (click)="clearFilters()"
+            >
+              Limpiar
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <section class="ui-kpi-grid" *ngIf="report">
+        <article class="ui-kpi-card">
+          <p class="ui-kpi-label">Total</p>
+          <p class="ui-kpi-value">{{ report.totalDocuments }}</p>
         </article>
-        <article>
-          <h2>Aceptados</h2>
-          <p>{{ report.acceptedCount }}</p>
+        <article class="ui-kpi-card">
+          <p class="ui-kpi-label">Aceptados</p>
+          <p class="ui-kpi-value">{{ report.acceptedCount }}</p>
+          <p class="status-chip-wrap">
+            <span class="ui-chip ui-chip--success">ACCEPTED</span>
+          </p>
         </article>
-        <article>
-          <h2>Rechazados</h2>
-          <p>{{ report.rejectedCount }}</p>
+        <article class="ui-kpi-card">
+          <p class="ui-kpi-label">Rechazados</p>
+          <p class="ui-kpi-value">{{ report.rejectedCount }}</p>
+          <p class="status-chip-wrap">
+            <span class="ui-chip ui-chip--warning">REJECTED</span>
+          </p>
         </article>
-        <article>
-          <h2>Error</h2>
-          <p>{{ report.errorCount }}</p>
+        <article class="ui-kpi-card">
+          <p class="ui-kpi-label">Error</p>
+          <p class="ui-kpi-value">{{ report.errorCount }}</p>
+          <p class="status-chip-wrap">
+            <span class="ui-chip ui-chip--danger">ERROR</span>
+          </p>
         </article>
-        <article>
-          <h2>Monto total</h2>
-          <p>{{ numberOf(report.totalAmount) | number: "1.2-2" }}</p>
+        <article class="ui-kpi-card">
+          <p class="ui-kpi-label">Monto total</p>
+          <p class="ui-kpi-value">
+            {{ numberOf(report.totalAmount) | number: "1.2-2" }}
+          </p>
         </article>
       </section>
 
-      <section *ngIf="report">
-        <h2>Documentos por tipo</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>Tipo</th>
-              <th>Cantidad</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let row of report.documentsByType">
-              <td>{{ row.documentType }}</td>
-              <td>{{ row.count }}</td>
-            </tr>
-            <tr *ngIf="report.documentsByType.length === 0">
-              <td colspan="2" class="empty">
-                Sin datos para los filtros seleccionados.
-              </td>
-            </tr>
-          </tbody>
-        </table>
+      <section class="ui-module-section" *ngIf="report">
+        <header class="ui-module-section__head">
+          <h2 class="ui-module-section__title">Documentos por tipo</h2>
+        </header>
+
+        <div class="ui-table-wrapper">
+          <table class="ui-table documents-table">
+            <thead>
+              <tr>
+                <th>Tipo</th>
+                <th>Cantidad</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let row of report.documentsByType">
+                <td>
+                  <span class="ui-chip ui-chip--info">{{
+                    row.documentType
+                  }}</span>
+                </td>
+                <td>{{ row.count }}</td>
+              </tr>
+              <tr *ngIf="report.documentsByType.length === 0">
+                <td colspan="2" class="ui-table__empty">
+                  <div class="ui-empty-state">
+                    Sin datos para los filtros seleccionados.
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </section>
     </section>
   `,
   styles: [
     `
-      .card {
-        background: #fff;
-        border-radius: 0.5rem;
-        padding: 1rem;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-        display: grid;
-        gap: 1rem;
+      .documents-filters {
+        grid-template-columns: 1fr 1fr minmax(180px, 240px) auto;
       }
-      h1,
-      h2 {
+
+      .documents-actions {
+        align-self: end;
+      }
+
+      .status-chip-wrap {
         margin: 0;
       }
-      .muted {
-        color: #6b7280;
-        margin: 0.25rem 0 0;
+
+      .documents-table {
+        min-width: 420px;
       }
-      .filters {
-        display: grid;
-        grid-template-columns: repeat(4, minmax(180px, 1fr));
-        gap: 0.6rem;
-        align-items: end;
-      }
-      label {
-        display: grid;
-        gap: 0.35rem;
-      }
-      input,
-      select,
-      button {
-        padding: 0.5rem 0.7rem;
-        border: 1px solid #d1d5db;
-        border-radius: 0.35rem;
-      }
-      button {
-        border: 0;
-        background: #0f766e;
-        color: #fff;
-        cursor: pointer;
-      }
-      .secondary {
-        background: #374151;
-      }
-      .actions {
-        display: flex;
-        gap: 0.5rem;
-      }
-      .kpis {
-        display: grid;
-        grid-template-columns: repeat(5, minmax(160px, 1fr));
-        gap: 0.65rem;
-      }
-      .kpis article {
-        border: 1px solid #e5e7eb;
-        border-radius: 0.45rem;
-        padding: 0.65rem;
-      }
-      .kpis p {
-        margin: 0.3rem 0 0;
-        font-size: 1.2rem;
-        font-weight: 700;
-      }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-      }
-      th,
-      td {
-        text-align: left;
-        padding: 0.45rem;
-        border-bottom: 1px solid #e5e7eb;
-      }
-      .empty {
-        text-align: center;
-        color: #6b7280;
-      }
-      .error {
-        margin: 0;
-        color: #b91c1c;
-      }
-      @media (max-width: 980px) {
-        .filters,
-        .kpis {
-          grid-template-columns: 1fr 1fr;
-        }
-      }
-      @media (max-width: 640px) {
-        .filters,
-        .kpis {
+
+      @media (max-width: 760px) {
+        .documents-filters {
           grid-template-columns: 1fr;
         }
       }

@@ -84,6 +84,16 @@ Apply visual consistency across the ERP/POS while preserving MVP behavior.
 6. Keep workflow actions (generate XML, sign, send mock/sandbox) visually differentiated without changing existing enable/disable logic.
 7. Keep billing routes, guards, interceptor behavior, backend authorization, and business rules untouched in E6.
 
+## Reports/Outbox-Specific Rules (Block E7)
+
+1. Keep reports and outbox workflows unchanged; E7 is visual-only for reports dashboard, reports detail pages, outbox list, and outbox detail pages.
+2. Preserve all filter form controls, defaults, and query parameter mapping used by `ReportsService` and `OutboxService`.
+3. Keep role behavior unchanged in routing and views: reports by `ROLES_REPORTS` / `ROLES_REPORTS_COMMERCIAL`, outbox by `ADMIN` only.
+4. Reuse shared wrappers and primitives (`.ui-module-page`, `.ui-module-section`, `.ui-filter-grid`, `.ui-kpi-grid`, `.ui-chip`, `.ui-table-actions`) before creating local style variants.
+5. Keep visual helper methods (for example, status/movement/ranking/conversion chip class mappers) presentation-only, without changing data contracts.
+6. Keep outbox actions (`markPublished`, `retry`) with the same endpoint calls and enable/disable rules as before E7.
+7. Keep reports/outbox routes, guards, interceptor behavior, backend authorization, and business logic untouched in E7.
+
 ## Rollout Sequence (Recommended)
 
 1. Block A: foundation (tokens/assets/base classes) - completed.
@@ -96,8 +106,9 @@ Apply visual consistency across the ERP/POS while preserving MVP behavior.
 8. Block E4: Compras/Proveedores visual upgrade - completed.
 9. Block E5: Cotizaciones visual upgrade - completed.
 10. Block E6: Facturacion visual upgrade (configuracion/series/comprobantes/detalle/emitir) - completed.
-11. Block F: tables, statuses, and badges across remaining modules.
-12. Block G: final responsive and QA pass.
+11. Block E7: Reportes/Outbox visual upgrade (dashboard reportes, reportes detalle, outbox list/detail) - completed.
+12. Block F: tables, statuses, and badges across remaining modules.
+13. Block G: final responsive and QA pass.
 
 ## Validation Checklist
 

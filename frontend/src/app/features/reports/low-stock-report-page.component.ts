@@ -12,129 +12,146 @@ import { ReportsService } from "./data/reports.service";
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule],
   template: `
-    <section class="card">
-      <header>
-        <h1>Reporte de stock bajo</h1>
-        <p class="muted">
-          Lista productos con cantidad menor o igual al umbral definido.
-        </p>
+    <section class="ui-card ui-module-page low-stock-report-page">
+      <header class="ui-page-head">
+        <div>
+          <p class="ui-page-kicker">Reporteria de inventario</p>
+          <h1 class="ui-page-title">Reporte de stock bajo</h1>
+          <p class="ui-page-description">
+            Identifica productos con cantidad menor o igual al umbral definido.
+          </p>
+        </div>
       </header>
 
-      <p class="error" *ngIf="permissionMessage">{{ permissionMessage }}</p>
-      <p class="error" *ngIf="errorMessage">{{ errorMessage }}</p>
+      <p class="ui-alert ui-alert--error" *ngIf="permissionMessage">
+        {{ permissionMessage }}
+      </p>
+      <p class="ui-alert ui-alert--error" *ngIf="errorMessage">
+        {{ errorMessage }}
+      </p>
 
-      <form
-        class="filters"
-        [formGroup]="filtersForm"
-        (ngSubmit)="applyFilters()"
-      >
-        <label>
-          Threshold
-          <input
-            type="number"
-            min="0"
-            step="0.01"
-            formControlName="threshold"
-          />
-        </label>
+      <section class="ui-module-section">
+        <header class="ui-module-section__head">
+          <h2 class="ui-module-section__title">Filtro de umbral</h2>
+        </header>
 
-        <button type="submit" [disabled]="loading || !canView">Aplicar</button>
-      </form>
+        <form
+          class="ui-filter-grid low-stock-filters"
+          [formGroup]="filtersForm"
+          (ngSubmit)="applyFilters()"
+        >
+          <label class="ui-field">
+            <span>Threshold</span>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              formControlName="threshold"
+            />
+          </label>
 
-      <section class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Producto</th>
-              <th>SKU</th>
-              <th>Barcode</th>
-              <th>Almacen</th>
-              <th>Stock actual</th>
-              <th>Threshold</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let row of items">
-              <td>{{ row.productName }}</td>
-              <td>{{ row.sku }}</td>
-              <td>{{ row.barcode || "-" }}</td>
-              <td>{{ row.warehouseName }} (#{{ row.warehouseId }})</td>
-              <td>{{ numberOf(row.currentStock) | number: "1.2-2" }}</td>
-              <td>{{ numberOf(row.threshold) | number: "1.2-2" }}</td>
-            </tr>
-            <tr *ngIf="!loading && items.length === 0">
-              <td colspan="6" class="empty">
-                No hay registros para el threshold seleccionado.
-              </td>
-            </tr>
-          </tbody>
-        </table>
+          <div class="ui-filter-actions low-stock-actions">
+            <button
+              type="submit"
+              class="ui-button ui-button--primary"
+              [disabled]="loading || !canView"
+            >
+              Aplicar
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <section class="ui-kpi-grid" *ngIf="canView">
+        <article class="ui-kpi-card">
+          <p class="ui-kpi-label">Registros encontrados</p>
+          <p class="ui-kpi-value">{{ items.length }}</p>
+        </article>
+        <article class="ui-kpi-card">
+          <p class="ui-kpi-label">Umbral aplicado</p>
+          <p class="ui-kpi-value">
+            {{
+              numberOf(filtersForm.controls.threshold.value) | number: "1.2-2"
+            }}
+          </p>
+        </article>
+        <article class="ui-kpi-card">
+          <p class="ui-kpi-label">Estado</p>
+          <p class="low-stock-state">
+            <span class="ui-chip ui-chip--warning">Alerta de reposicion</span>
+          </p>
+        </article>
+      </section>
+
+      <section class="ui-module-section">
+        <header class="ui-module-section__head">
+          <h2 class="ui-module-section__title">
+            Detalle por producto y almacen
+          </h2>
+        </header>
+
+        <div class="ui-table-wrapper">
+          <table class="ui-table low-stock-table">
+            <thead>
+              <tr>
+                <th>Producto</th>
+                <th>SKU</th>
+                <th>Barcode</th>
+                <th>Almacen</th>
+                <th>Stock actual</th>
+                <th>Threshold</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let row of items">
+                <td>{{ row.productName }}</td>
+                <td>{{ row.sku }}</td>
+                <td>{{ row.barcode || "-" }}</td>
+                <td>{{ row.warehouseName }} (#{{ row.warehouseId }})</td>
+                <td>
+                  <span
+                    class="ui-chip"
+                    [ngClass]="stockChipClass(row.currentStock)"
+                  >
+                    {{ numberOf(row.currentStock) | number: "1.2-2" }}
+                  </span>
+                </td>
+                <td>{{ numberOf(row.threshold) | number: "1.2-2" }}</td>
+              </tr>
+              <tr *ngIf="!loading && items.length === 0">
+                <td colspan="6" class="ui-table__empty">
+                  <div class="ui-empty-state">
+                    No hay registros para el threshold seleccionado.
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </section>
     </section>
   `,
   styles: [
     `
-      .card {
-        background: #fff;
-        border-radius: 0.5rem;
-        padding: 1rem;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-        display: grid;
-        gap: 1rem;
+      .low-stock-filters {
+        grid-template-columns: minmax(220px, 340px) auto;
       }
-      .muted {
-        color: #6b7280;
-        margin: 0.25rem 0 0;
+
+      .low-stock-actions {
+        align-self: end;
       }
-      h1 {
+
+      .low-stock-state {
         margin: 0;
       }
-      .filters {
-        display: flex;
-        align-items: end;
-        gap: 0.6rem;
+
+      .low-stock-table {
+        min-width: 860px;
       }
-      label {
-        display: grid;
-        gap: 0.35rem;
-      }
-      input,
-      button {
-        padding: 0.5rem 0.7rem;
-        border: 1px solid #d1d5db;
-        border-radius: 0.35rem;
-      }
-      button {
-        border: 0;
-        background: #0f766e;
-        color: #fff;
-        cursor: pointer;
-      }
-      .table-wrap {
-        overflow-x: auto;
-      }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-      }
-      th,
-      td {
-        text-align: left;
-        padding: 0.45rem;
-        border-bottom: 1px solid #e5e7eb;
-      }
-      .empty {
-        text-align: center;
-        color: #6b7280;
-      }
-      .error {
-        margin: 0;
-        color: #b91c1c;
-      }
-      @media (max-width: 720px) {
-        .filters {
-          flex-direction: column;
-          align-items: stretch;
+
+      @media (max-width: 760px) {
+        .low-stock-filters {
+          grid-template-columns: 1fr;
         }
       }
     `,
@@ -185,6 +202,17 @@ export class LowStockReportPageComponent implements OnInit {
   numberOf(value: unknown): number {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  stockChipClass(stock: unknown): string {
+    const value = this.numberOf(stock);
+    if (value <= 0) {
+      return "ui-chip--danger";
+    }
+    if (value < 3) {
+      return "ui-chip--warning";
+    }
+    return "ui-chip--info";
   }
 
   private loadReport(): void {

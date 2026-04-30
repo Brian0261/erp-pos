@@ -16,203 +16,166 @@ import { ReportsService } from "./data/reports.service";
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule],
   template: `
-    <section class="card">
-      <header>
-        <h1>Reporte de ventas</h1>
-        <p class="muted">Analiza montos, volumen y comportamiento diario.</p>
+    <section class="ui-card ui-module-page sales-report-page">
+      <header class="ui-page-head">
+        <div>
+          <p class="ui-page-kicker">Reporteria comercial</p>
+          <h1 class="ui-page-title">Reporte de ventas</h1>
+          <p class="ui-page-description">
+            Analiza monto vendido, volumen de tickets y comportamiento diario.
+          </p>
+        </div>
       </header>
 
-      <p class="error" *ngIf="permissionMessage">{{ permissionMessage }}</p>
-      <p class="error" *ngIf="errorMessage">{{ errorMessage }}</p>
+      <p class="ui-alert ui-alert--error" *ngIf="permissionMessage">
+        {{ permissionMessage }}
+      </p>
+      <p class="ui-alert ui-alert--error" *ngIf="errorMessage">
+        {{ errorMessage }}
+      </p>
 
-      <form
-        class="filters"
-        [formGroup]="filtersForm"
-        (ngSubmit)="applyFilters()"
-      >
-        <label>
-          Desde
-          <input type="date" formControlName="from" />
-        </label>
+      <section class="ui-module-section">
+        <header class="ui-module-section__head">
+          <h2 class="ui-module-section__title">Filtros</h2>
+        </header>
 
-        <label>
-          Hasta
-          <input type="date" formControlName="to" />
-        </label>
+        <form
+          class="ui-filter-grid sales-filters"
+          [formGroup]="filtersForm"
+          (ngSubmit)="applyFilters()"
+        >
+          <label class="ui-field">
+            <span>Desde</span>
+            <input type="date" formControlName="from" />
+          </label>
 
-        <div class="actions">
-          <button type="submit" [disabled]="loading || !canView">
-            Filtrar
-          </button>
-          <button
-            type="button"
-            class="secondary"
-            (click)="clearFilters()"
-            [disabled]="loading || !canView"
-          >
-            Limpiar
-          </button>
+          <label class="ui-field">
+            <span>Hasta</span>
+            <input type="date" formControlName="to" />
+          </label>
+
+          <div class="ui-filter-actions sales-filter-actions">
+            <button
+              type="submit"
+              class="ui-button ui-button--primary"
+              [disabled]="loading || !canView"
+            >
+              Filtrar
+            </button>
+            <button
+              type="button"
+              class="ui-button ui-button--secondary"
+              (click)="clearFilters()"
+              [disabled]="loading || !canView"
+            >
+              Limpiar
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <section class="ui-kpi-grid" *ngIf="report">
+        <article class="ui-kpi-card">
+          <p class="ui-kpi-label">Total vendido</p>
+          <p class="ui-kpi-value">
+            {{ numberOf(report.totalSalesAmount) | number: "1.2-2" }}
+          </p>
+        </article>
+        <article class="ui-kpi-card">
+          <p class="ui-kpi-label">Cantidad de ventas</p>
+          <p class="ui-kpi-value">{{ report.totalSalesCount }}</p>
+        </article>
+        <article class="ui-kpi-card">
+          <p class="ui-kpi-label">Ticket promedio</p>
+          <p class="ui-kpi-value">
+            {{ numberOf(report.averageTicket) | number: "1.2-2" }}
+          </p>
+        </article>
+        <article class="ui-kpi-card">
+          <p class="ui-kpi-label">Ventas anuladas</p>
+          <p class="ui-kpi-value">{{ report.voidedSalesCount }}</p>
+        </article>
+      </section>
+
+      <section class="ui-module-section" *ngIf="report">
+        <header class="ui-module-section__head">
+          <h2 class="ui-module-section__title">Ventas por metodo de pago</h2>
+        </header>
+
+        <div class="ui-table-wrapper">
+          <table class="ui-table sales-table">
+            <thead>
+              <tr>
+                <th>Metodo</th>
+                <th>Monto</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let row of report.salesByPaymentMethod">
+                <td>{{ row.paymentMethod }}</td>
+                <td>{{ numberOf(row.amount) | number: "1.2-2" }}</td>
+              </tr>
+              <tr *ngIf="report.salesByPaymentMethod.length === 0">
+                <td colspan="2" class="ui-table__empty">
+                  <div class="ui-empty-state">
+                    Sin datos en el rango seleccionado.
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
-      </form>
-
-      <section class="kpis" *ngIf="report">
-        <article>
-          <h2>Total vendido</h2>
-          <p>{{ numberOf(report.totalSalesAmount) | number: "1.2-2" }}</p>
-        </article>
-        <article>
-          <h2>Cantidad ventas</h2>
-          <p>{{ report.totalSalesCount }}</p>
-        </article>
-        <article>
-          <h2>Ticket promedio</h2>
-          <p>{{ numberOf(report.averageTicket) | number: "1.2-2" }}</p>
-        </article>
-        <article>
-          <h2>Ventas anuladas</h2>
-          <p>{{ report.voidedSalesCount }}</p>
-        </article>
       </section>
 
-      <section *ngIf="report">
-        <h2>Ventas por metodo de pago</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>Metodo</th>
-              <th>Monto</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let row of report.salesByPaymentMethod">
-              <td>{{ row.paymentMethod }}</td>
-              <td>{{ numberOf(row.amount) | number: "1.2-2" }}</td>
-            </tr>
-            <tr *ngIf="report.salesByPaymentMethod.length === 0">
-              <td colspan="2" class="empty">
-                Sin datos en el rango seleccionado.
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </section>
+      <section class="ui-module-section" *ngIf="report">
+        <header class="ui-module-section__head">
+          <h2 class="ui-module-section__title">Ventas por dia</h2>
+        </header>
 
-      <section *ngIf="report">
-        <h2>Ventas por dia</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>Dia</th>
-              <th>Cantidad</th>
-              <th>Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let row of report.salesByDay">
-              <td>{{ row.day }}</td>
-              <td>{{ row.salesCount }}</td>
-              <td>{{ numberOf(row.totalAmount) | number: "1.2-2" }}</td>
-            </tr>
-            <tr *ngIf="report.salesByDay.length === 0">
-              <td colspan="3" class="empty">
-                Sin datos en el rango seleccionado.
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        <div class="ui-table-wrapper">
+          <table class="ui-table sales-table">
+            <thead>
+              <tr>
+                <th>Dia</th>
+                <th>Cantidad</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let row of report.salesByDay">
+                <td>{{ row.day }}</td>
+                <td>{{ row.salesCount }}</td>
+                <td>{{ numberOf(row.totalAmount) | number: "1.2-2" }}</td>
+              </tr>
+              <tr *ngIf="report.salesByDay.length === 0">
+                <td colspan="3" class="ui-table__empty">
+                  <div class="ui-empty-state">
+                    Sin datos en el rango seleccionado.
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </section>
     </section>
   `,
   styles: [
     `
-      .card {
-        background: #fff;
-        border-radius: 0.5rem;
-        padding: 1rem;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-        display: grid;
-        gap: 1rem;
-      }
-      h1,
-      h2 {
-        margin: 0;
-      }
-      .muted {
-        color: #6b7280;
-        margin: 0.25rem 0 0;
-      }
-      .filters {
-        display: grid;
+      .sales-filters {
         grid-template-columns: 1fr 1fr auto;
-        gap: 0.6rem;
-        align-items: end;
       }
-      label {
-        display: grid;
-        gap: 0.3rem;
+
+      .sales-filter-actions {
+        align-self: end;
       }
-      input,
-      button {
-        padding: 0.5rem 0.7rem;
-        border: 1px solid #d1d5db;
-        border-radius: 0.35rem;
+
+      .sales-table {
+        min-width: 560px;
       }
-      button {
-        border: 0;
-        background: #0f766e;
-        color: #fff;
-        cursor: pointer;
-      }
-      .secondary {
-        background: #374151;
-      }
-      .actions {
-        display: flex;
-        gap: 0.5rem;
-      }
-      .kpis {
-        display: grid;
-        grid-template-columns: repeat(4, minmax(160px, 1fr));
-        gap: 0.6rem;
-      }
-      .kpis article {
-        border: 1px solid #e5e7eb;
-        border-radius: 0.45rem;
-        padding: 0.65rem;
-      }
-      .kpis p {
-        margin: 0.3rem 0 0;
-        font-size: 1.2rem;
-        font-weight: 700;
-      }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-      }
-      th,
-      td {
-        text-align: left;
-        padding: 0.5rem;
-        border-bottom: 1px solid #e5e7eb;
-      }
-      .empty {
-        text-align: center;
-        color: #6b7280;
-      }
-      .error {
-        margin: 0;
-        color: #b91c1c;
-      }
-      @media (max-width: 900px) {
-        .filters {
-          grid-template-columns: 1fr;
-        }
-        .kpis {
-          grid-template-columns: 1fr 1fr;
-        }
-      }
-      @media (max-width: 560px) {
-        .kpis {
+
+      @media (max-width: 760px) {
+        .sales-filters {
           grid-template-columns: 1fr;
         }
       }

@@ -14,183 +14,138 @@ import { ReportsService } from "./data/reports.service";
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule],
   template: `
-    <section class="card">
-      <header>
-        <h1>Reporte de compras</h1>
-        <p class="muted">Resumen de compras y montos por proveedor.</p>
+    <section class="ui-card ui-module-page purchases-report-page">
+      <header class="ui-page-head">
+        <div>
+          <p class="ui-page-kicker">Reporteria comercial</p>
+          <h1 class="ui-page-title">Reporte de compras</h1>
+          <p class="ui-page-description">
+            Consulta montos, volumen de ordenes y distribucion por proveedor.
+          </p>
+        </div>
       </header>
 
-      <p class="error" *ngIf="permissionMessage">{{ permissionMessage }}</p>
-      <p class="error" *ngIf="errorMessage">{{ errorMessage }}</p>
+      <p class="ui-alert ui-alert--error" *ngIf="permissionMessage">
+        {{ permissionMessage }}
+      </p>
+      <p class="ui-alert ui-alert--error" *ngIf="errorMessage">
+        {{ errorMessage }}
+      </p>
 
-      <form
-        class="filters"
-        [formGroup]="filtersForm"
-        (ngSubmit)="applyFilters()"
-      >
-        <label>
-          Desde
-          <input type="date" formControlName="from" />
-        </label>
+      <section class="ui-module-section">
+        <header class="ui-module-section__head">
+          <h2 class="ui-module-section__title">Filtros de compras</h2>
+        </header>
 
-        <label>
-          Hasta
-          <input type="date" formControlName="to" />
-        </label>
+        <form
+          class="ui-filter-grid purchases-filters"
+          [formGroup]="filtersForm"
+          (ngSubmit)="applyFilters()"
+        >
+          <label class="ui-field">
+            <span>Desde</span>
+            <input type="date" formControlName="from" />
+          </label>
 
-        <label>
-          Proveedor
-          <select formControlName="supplierId">
-            <option value="">Todos</option>
-            <option *ngFor="let supplier of suppliers" [value]="supplier.id">
-              {{ supplier.name }}
-            </option>
-          </select>
-        </label>
+          <label class="ui-field">
+            <span>Hasta</span>
+            <input type="date" formControlName="to" />
+          </label>
 
-        <div class="actions">
-          <button type="submit" [disabled]="loading || !canView">
-            Filtrar
-          </button>
-          <button
-            type="button"
-            class="secondary"
-            (click)="clearFilters()"
-            [disabled]="loading || !canView"
-          >
-            Limpiar
-          </button>
-        </div>
-      </form>
+          <label class="ui-field">
+            <span>Proveedor</span>
+            <select formControlName="supplierId">
+              <option value="">Todos</option>
+              <option *ngFor="let supplier of suppliers" [value]="supplier.id">
+                {{ supplier.name }}
+              </option>
+            </select>
+          </label>
 
-      <section class="kpis" *ngIf="report">
-        <article>
-          <h2>Monto total</h2>
-          <p>{{ numberOf(report.totalPurchaseAmount) | number: "1.2-2" }}</p>
+          <div class="ui-filter-actions purchases-actions">
+            <button
+              type="submit"
+              class="ui-button ui-button--primary"
+              [disabled]="loading || !canView"
+            >
+              Filtrar
+            </button>
+            <button
+              type="button"
+              class="ui-button ui-button--secondary"
+              (click)="clearFilters()"
+              [disabled]="loading || !canView"
+            >
+              Limpiar
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <section class="ui-kpi-grid" *ngIf="report">
+        <article class="ui-kpi-card">
+          <p class="ui-kpi-label">Monto total</p>
+          <p class="ui-kpi-value">
+            {{ numberOf(report.totalPurchaseAmount) | number: "1.2-2" }}
+          </p>
         </article>
-        <article>
-          <h2>Ordenes</h2>
-          <p>{{ report.purchaseOrderCount }}</p>
+        <article class="ui-kpi-card">
+          <p class="ui-kpi-label">Ordenes</p>
+          <p class="ui-kpi-value">{{ report.purchaseOrderCount }}</p>
         </article>
-        <article>
-          <h2>Ordenes recibidas</h2>
-          <p>{{ report.receivedOrdersCount }}</p>
+        <article class="ui-kpi-card">
+          <p class="ui-kpi-label">Ordenes recibidas</p>
+          <p class="ui-kpi-value">{{ report.receivedOrdersCount }}</p>
         </article>
       </section>
 
-      <section *ngIf="report">
-        <h2>Compras por proveedor</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>Proveedor</th>
-              <th>Monto</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let row of report.purchasesBySupplier">
-              <td>{{ row.supplierName }} (#{{ row.supplierId }})</td>
-              <td>{{ numberOf(row.amount) | number: "1.2-2" }}</td>
-            </tr>
-            <tr *ngIf="report.purchasesBySupplier.length === 0">
-              <td colspan="2" class="empty">
-                Sin compras para los filtros seleccionados.
-              </td>
-            </tr>
-          </tbody>
-        </table>
+      <section class="ui-module-section" *ngIf="report">
+        <header class="ui-module-section__head">
+          <h2 class="ui-module-section__title">Compras por proveedor</h2>
+        </header>
+
+        <div class="ui-table-wrapper">
+          <table class="ui-table purchases-table">
+            <thead>
+              <tr>
+                <th>Proveedor</th>
+                <th>Monto</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let row of report.purchasesBySupplier">
+                <td>{{ row.supplierName }} (#{{ row.supplierId }})</td>
+                <td>{{ numberOf(row.amount) | number: "1.2-2" }}</td>
+              </tr>
+              <tr *ngIf="report.purchasesBySupplier.length === 0">
+                <td colspan="2" class="ui-table__empty">
+                  <div class="ui-empty-state">
+                    Sin compras para los filtros seleccionados.
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </section>
     </section>
   `,
   styles: [
     `
-      .card {
-        background: #fff;
-        border-radius: 0.5rem;
-        padding: 1rem;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-        display: grid;
-        gap: 1rem;
+      .purchases-filters {
+        grid-template-columns: 1fr 1fr 1fr auto;
       }
-      h1,
-      h2 {
-        margin: 0;
+
+      .purchases-actions {
+        align-self: end;
       }
-      .muted {
-        color: #6b7280;
-        margin: 0.25rem 0 0;
+
+      .purchases-table {
+        min-width: 540px;
       }
-      .filters {
-        display: grid;
-        grid-template-columns: repeat(4, minmax(180px, 1fr));
-        gap: 0.6rem;
-        align-items: end;
-      }
-      label {
-        display: grid;
-        gap: 0.35rem;
-      }
-      input,
-      select,
-      button {
-        padding: 0.5rem 0.7rem;
-        border: 1px solid #d1d5db;
-        border-radius: 0.35rem;
-      }
-      button {
-        border: 0;
-        background: #0f766e;
-        color: #fff;
-        cursor: pointer;
-      }
-      .secondary {
-        background: #374151;
-      }
-      .actions {
-        display: flex;
-        gap: 0.5rem;
-      }
-      .kpis {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(180px, 1fr));
-        gap: 0.65rem;
-      }
-      .kpis article {
-        border: 1px solid #e5e7eb;
-        border-radius: 0.45rem;
-        padding: 0.65rem;
-      }
-      .kpis p {
-        margin: 0.3rem 0 0;
-        font-size: 1.2rem;
-        font-weight: 700;
-      }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-      }
-      th,
-      td {
-        text-align: left;
-        padding: 0.45rem;
-        border-bottom: 1px solid #e5e7eb;
-      }
-      .empty {
-        text-align: center;
-        color: #6b7280;
-      }
-      .error {
-        margin: 0;
-        color: #b91c1c;
-      }
-      @media (max-width: 980px) {
-        .filters {
-          grid-template-columns: 1fr 1fr;
-        }
-      }
-      @media (max-width: 640px) {
-        .filters,
-        .kpis {
+
+      @media (max-width: 760px) {
+        .purchases-filters {
           grid-template-columns: 1fr;
         }
       }

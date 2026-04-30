@@ -12,171 +12,139 @@ import { ReportsService } from "./data/reports.service";
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule],
   template: `
-    <section class="card">
-      <header>
-        <h1>Reporte de movimientos de inventario</h1>
-        <p class="muted">Consulta movimientos por fecha, producto o almacen.</p>
+    <section class="ui-card ui-module-page inventory-movements-report-page">
+      <header class="ui-page-head">
+        <div>
+          <p class="ui-page-kicker">Reporteria de inventario</p>
+          <h1 class="ui-page-title">Movimientos de inventario</h1>
+          <p class="ui-page-description">
+            Consulta entradas y salidas por fecha, producto o almacen.
+          </p>
+        </div>
       </header>
 
-      <p class="error" *ngIf="permissionMessage">{{ permissionMessage }}</p>
-      <p class="error" *ngIf="errorMessage">{{ errorMessage }}</p>
+      <p class="ui-alert ui-alert--error" *ngIf="permissionMessage">
+        {{ permissionMessage }}
+      </p>
+      <p class="ui-alert ui-alert--error" *ngIf="errorMessage">
+        {{ errorMessage }}
+      </p>
 
-      <form
-        class="filters"
-        [formGroup]="filtersForm"
-        (ngSubmit)="applyFilters()"
-      >
-        <label>
-          Desde
-          <input type="date" formControlName="from" />
-        </label>
+      <section class="ui-module-section">
+        <header class="ui-module-section__head">
+          <h2 class="ui-module-section__title">Filtros de consulta</h2>
+        </header>
 
-        <label>
-          Hasta
-          <input type="date" formControlName="to" />
-        </label>
+        <form
+          class="ui-filter-grid movements-filters"
+          [formGroup]="filtersForm"
+          (ngSubmit)="applyFilters()"
+        >
+          <label class="ui-field">
+            <span>Desde</span>
+            <input type="date" formControlName="from" />
+          </label>
 
-        <label>
-          ProductId
-          <input type="number" min="1" step="1" formControlName="productId" />
-        </label>
+          <label class="ui-field">
+            <span>Hasta</span>
+            <input type="date" formControlName="to" />
+          </label>
 
-        <label>
-          WarehouseId
-          <input type="number" min="1" step="1" formControlName="warehouseId" />
-        </label>
+          <label class="ui-field">
+            <span>ProductId</span>
+            <input type="number" min="1" step="1" formControlName="productId" />
+          </label>
 
-        <div class="actions full">
-          <button type="submit" [disabled]="loading || !canView">
-            Filtrar
-          </button>
-          <button
-            type="button"
-            class="secondary"
-            [disabled]="loading || !canView"
-            (click)="clearFilters()"
-          >
-            Limpiar
-          </button>
+          <label class="ui-field">
+            <span>WarehouseId</span>
+            <input
+              type="number"
+              min="1"
+              step="1"
+              formControlName="warehouseId"
+            />
+          </label>
+
+          <div class="ui-filter-actions movements-actions">
+            <button
+              type="submit"
+              class="ui-button ui-button--primary"
+              [disabled]="loading || !canView"
+            >
+              Filtrar
+            </button>
+            <button
+              type="button"
+              class="ui-button ui-button--secondary"
+              [disabled]="loading || !canView"
+              (click)="clearFilters()"
+            >
+              Limpiar
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <section class="ui-module-section">
+        <header class="ui-module-section__head">
+          <h2 class="ui-module-section__title">Detalle de movimientos</h2>
+        </header>
+
+        <div class="ui-table-wrapper">
+          <table class="ui-table movements-table">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Tipo</th>
+                <th>Producto</th>
+                <th>Almacen</th>
+                <th>Cantidad</th>
+                <th>Stock previo</th>
+                <th>Stock nuevo</th>
+                <th>Motivo</th>
+                <th>Usuario</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let row of items">
+                <td>{{ row.createdAt | date: "yyyy-MM-dd HH:mm" }}</td>
+                <td>
+                  <span
+                    class="ui-chip"
+                    [ngClass]="movementChipClass(row.movementType)"
+                  >
+                    {{ row.movementType }}
+                  </span>
+                </td>
+                <td>{{ row.productName }}</td>
+                <td>{{ row.warehouseName }}</td>
+                <td>{{ numberOf(row.quantity) | number: "1.2-2" }}</td>
+                <td>{{ numberOf(row.previousStock) | number: "1.2-2" }}</td>
+                <td>{{ numberOf(row.newStock) | number: "1.2-2" }}</td>
+                <td>{{ row.reason || "-" }}</td>
+                <td>{{ row.createdBy || "-" }}</td>
+              </tr>
+              <tr *ngIf="!loading && items.length === 0">
+                <td colspan="9" class="ui-table__empty">
+                  <div class="ui-empty-state">
+                    No hay movimientos para los filtros seleccionados.
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
-      </form>
-
-      <section class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Fecha</th>
-              <th>Tipo</th>
-              <th>Producto</th>
-              <th>Almacen</th>
-              <th>Cantidad</th>
-              <th>Stock previo</th>
-              <th>Stock nuevo</th>
-              <th>Motivo</th>
-              <th>Usuario</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let row of items">
-              <td>{{ row.createdAt | date: "yyyy-MM-dd HH:mm" }}</td>
-              <td>{{ row.movementType }}</td>
-              <td>{{ row.productName }}</td>
-              <td>{{ row.warehouseName }}</td>
-              <td>{{ numberOf(row.quantity) | number: "1.2-2" }}</td>
-              <td>{{ numberOf(row.previousStock) | number: "1.2-2" }}</td>
-              <td>{{ numberOf(row.newStock) | number: "1.2-2" }}</td>
-              <td>{{ row.reason || "-" }}</td>
-              <td>{{ row.createdBy || "-" }}</td>
-            </tr>
-            <tr *ngIf="!loading && items.length === 0">
-              <td colspan="9" class="empty">
-                No hay movimientos para los filtros seleccionados.
-              </td>
-            </tr>
-          </tbody>
-        </table>
       </section>
     </section>
   `,
   styles: [
     `
-      .card {
-        background: #fff;
-        border-radius: 0.5rem;
-        padding: 1rem;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-        display: grid;
-        gap: 1rem;
-      }
-      h1 {
-        margin: 0;
-      }
-      .muted {
-        margin: 0.25rem 0 0;
-        color: #6b7280;
-      }
-      .filters {
-        display: grid;
-        grid-template-columns: repeat(4, minmax(180px, 1fr));
-        gap: 0.6rem;
-      }
-      label {
-        display: grid;
-        gap: 0.35rem;
-      }
-      input,
-      button {
-        padding: 0.5rem 0.7rem;
-        border: 1px solid #d1d5db;
-        border-radius: 0.35rem;
-      }
-      .actions {
-        display: flex;
-        justify-content: flex-end;
-        gap: 0.5rem;
-      }
-      .full {
+      .movements-actions {
         grid-column: 1 / -1;
       }
-      button {
-        border: 0;
-        background: #0f766e;
-        color: #fff;
-        cursor: pointer;
-      }
-      .secondary {
-        background: #374151;
-      }
-      .table-wrap {
-        overflow-x: auto;
-      }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-      }
-      th,
-      td {
-        text-align: left;
-        padding: 0.45rem;
-        border-bottom: 1px solid #e5e7eb;
-      }
-      .empty {
-        text-align: center;
-        color: #6b7280;
-      }
-      .error {
-        margin: 0;
-        color: #b91c1c;
-      }
-      @media (max-width: 980px) {
-        .filters {
-          grid-template-columns: 1fr 1fr;
-        }
-      }
-      @media (max-width: 640px) {
-        .filters {
-          grid-template-columns: 1fr;
-        }
+
+      .movements-table {
+        min-width: 1120px;
       }
     `,
   ],
@@ -239,6 +207,26 @@ export class InventoryMovementsReportPageComponent implements OnInit {
   numberOf(value: unknown): number {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  movementChipClass(movementType: string): string {
+    if (
+      movementType.includes("IN") ||
+      movementType.includes("RECEIPT") ||
+      movementType.includes("RETURN")
+    ) {
+      return "ui-chip--success";
+    }
+
+    if (movementType.includes("OUT") || movementType.includes("VOID")) {
+      return "ui-chip--warning";
+    }
+
+    if (movementType.includes("ADJUSTMENT")) {
+      return "ui-chip--info";
+    }
+
+    return "ui-chip--neutral";
   }
 
   private loadReport(): void {

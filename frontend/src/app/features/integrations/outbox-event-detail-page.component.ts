@@ -12,161 +12,197 @@ import { OutboxService } from "./data/outbox.service";
   standalone: true,
   imports: [CommonModule, RouterLink],
   template: `
-    <section class="card">
-      <header class="header">
+    <section class="ui-card ui-module-page outbox-event-detail-page">
+      <header class="ui-page-head">
         <div>
-          <h1>Detalle de evento outbox</h1>
-          <p class="muted">Inspeccion y acciones administrativas del evento.</p>
+          <p class="ui-page-kicker">Integraciones</p>
+          <h1 class="ui-page-title">Detalle de evento outbox</h1>
+          <p class="ui-page-description">
+            Inspeccion y acciones administrativas del evento.
+          </p>
         </div>
-        <a class="link-btn" routerLink="/integraciones/eventos"
-          >Volver al listado</a
+        <a
+          class="ui-button ui-button--secondary"
+          routerLink="/integraciones/eventos"
         >
+          Volver al listado
+        </a>
       </header>
 
-      <p class="error" *ngIf="permissionMessage">{{ permissionMessage }}</p>
-      <p class="error" *ngIf="errorMessage">{{ errorMessage }}</p>
-      <p class="success" *ngIf="successMessage">{{ successMessage }}</p>
+      <p class="ui-alert ui-alert--error" *ngIf="permissionMessage">
+        {{ permissionMessage }}
+      </p>
+      <p class="ui-alert ui-alert--error" *ngIf="errorMessage">
+        {{ errorMessage }}
+      </p>
+      <p class="ui-alert ui-alert--success" *ngIf="successMessage">
+        {{ successMessage }}
+      </p>
 
-      <section *ngIf="event" class="grid">
-        <article>
-          <h2>Evento</h2>
-          <p><strong>ID:</strong> #{{ event.id }}</p>
-          <p><strong>EventType:</strong> {{ event.eventType }}</p>
-          <p><strong>Status:</strong> {{ event.status }}</p>
-          <p>
-            <strong>Aggregate:</strong> {{ event.aggregateType }}:{{
-              event.aggregateId
-            }}
+      <section *ngIf="event" class="ui-kpi-grid">
+        <article class="ui-kpi-card">
+          <p class="ui-kpi-label">ID</p>
+          <p class="ui-kpi-value">#{{ event.id }}</p>
+        </article>
+        <article class="ui-kpi-card">
+          <p class="ui-kpi-label">Status</p>
+          <p class="status-wrap">
+            <span class="ui-chip" [ngClass]="statusChipClass(event.status)">
+              {{ event.status }}
+            </span>
           </p>
-          <p><strong>Retries:</strong> {{ event.retryCount }}</p>
-          <p>
-            <strong>Creado:</strong>
-            {{ event.createdAt | date: "yyyy-MM-dd HH:mm" }}
+        </article>
+        <article class="ui-kpi-card">
+          <p class="ui-kpi-label">Retries</p>
+          <p class="ui-kpi-value">{{ event.retryCount }}</p>
+        </article>
+      </section>
+
+      <section *ngIf="event" class="detail-grid">
+        <article class="ui-module-section">
+          <header class="ui-module-section__head">
+            <h2 class="ui-module-section__title">Metadatos del evento</h2>
+          </header>
+
+          <p class="meta-row">
+            <span class="meta-label">EventType</span>{{ event.eventType }}
           </p>
-          <p>
-            <strong>Publicado:</strong>
+          <p class="meta-row">
+            <span class="meta-label">Aggregate</span
+            >{{ event.aggregateType }}:{{ event.aggregateId }}
+          </p>
+          <p class="meta-row">
+            <span class="meta-label">Creado</span
+            >{{ event.createdAt | date: "yyyy-MM-dd HH:mm" }}
+          </p>
+          <p class="meta-row">
+            <span class="meta-label">Publicado</span>
             {{
               event.publishedAt
                 ? (event.publishedAt | date: "yyyy-MM-dd HH:mm")
                 : "-"
             }}
           </p>
-          <p><strong>Last error:</strong> {{ event.lastError || "-" }}</p>
+          <p class="meta-row meta-row--error">
+            <span class="meta-label">Last error</span>
+            {{ event.lastError || "-" }}
+          </p>
         </article>
 
-        <article>
-          <h2>Payload JSON</h2>
-          <pre>{{ event.payloadJson }}</pre>
+        <article class="ui-module-section payload-panel">
+          <header class="ui-module-section__head">
+            <h2 class="ui-module-section__title">Payload JSON</h2>
+          </header>
+          <pre class="payload-content">{{ event.payloadJson }}</pre>
         </article>
       </section>
 
-      <section *ngIf="event" class="actions">
-        <button
-          type="button"
-          class="secondary"
-          [disabled]="loading || event.status === 'PUBLISHED'"
-          (click)="markPublished()"
-        >
-          Mark published
-        </button>
-        <button
-          type="button"
-          [disabled]="loading || event.status === 'PUBLISHED'"
-          (click)="retry()"
-        >
-          Retry
-        </button>
+      <section *ngIf="event" class="ui-module-section">
+        <header class="ui-module-section__head">
+          <h2 class="ui-module-section__title">Acciones administrativas</h2>
+        </header>
+
+        <div class="detail-actions">
+          <a
+            class="ui-button ui-button--secondary"
+            routerLink="/integraciones/eventos"
+          >
+            Volver al listado
+          </a>
+          <button
+            type="button"
+            class="ui-button ui-button--secondary"
+            [disabled]="loading || event.status === 'PUBLISHED'"
+            (click)="markPublished()"
+          >
+            Mark published
+          </button>
+          <button
+            type="button"
+            class="ui-button ui-button--primary"
+            [disabled]="loading || event.status === 'PUBLISHED'"
+            (click)="retry()"
+          >
+            Retry
+          </button>
+        </div>
+      </section>
+
+      <section *ngIf="event" class="ui-module-section">
+        <header class="ui-module-section__head">
+          <h2 class="ui-module-section__title">Operacion segura</h2>
+        </header>
+        <p class="operation-note">
+          Mark published y Retry mantienen el contrato actual con backend.
+          Ejecuta acciones solo cuando el contexto operativo lo permita.
+        </p>
       </section>
     </section>
   `,
   styles: [
     `
-      .card {
-        background: #fff;
-        border-radius: 0.5rem;
-        padding: 1rem;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-        display: grid;
-        gap: 1rem;
-      }
-      .header {
+      .detail-grid {
         display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 0.75rem;
+        gap: var(--space-3);
+        align-items: stretch;
       }
-      h1,
-      h2 {
+
+      .detail-grid > * {
+        flex: 1;
+      }
+
+      .status-wrap {
         margin: 0;
       }
-      .muted {
-        margin: 0.25rem 0 0;
-        color: #6b7280;
-      }
-      .link-btn {
-        text-decoration: none;
-        border: 0;
-        background: #374151;
-        color: #fff;
-        border-radius: 0.35rem;
-        padding: 0.5rem 0.75rem;
-      }
-      .grid {
+
+      .meta-row {
+        margin: 0;
         display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 0.75rem;
+        gap: 0.2rem;
       }
-      article {
-        border: 1px solid #e5e7eb;
-        border-radius: 0.45rem;
-        padding: 0.75rem;
+
+      .meta-label {
+        font-size: var(--font-size-xs);
+        color: var(--color-text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-weight: 700;
       }
-      p {
-        margin: 0.35rem 0;
+
+      .meta-row--error {
+        color: var(--color-danger);
       }
-      pre {
-        margin: 0.5rem 0 0;
+
+      .payload-panel {
+        min-width: 0;
+      }
+
+      .payload-content {
+        margin: 0;
         white-space: pre-wrap;
         word-break: break-word;
-        background: #111827;
-        color: #e5e7eb;
-        border-radius: 0.4rem;
-        padding: 0.75rem;
-        max-height: 320px;
+        background: #0f172a;
+        color: #e2e8f0;
+        border-radius: var(--radius-sm);
+        padding: var(--space-3);
+        max-height: 420px;
         overflow: auto;
       }
-      .actions {
+
+      .detail-actions {
         display: flex;
-        gap: 0.5rem;
+        gap: var(--space-2);
+        flex-wrap: wrap;
       }
-      button {
-        border: 0;
-        background: #0f766e;
-        color: #fff;
-        cursor: pointer;
-        border-radius: 0.35rem;
-        padding: 0.55rem 0.8rem;
-      }
-      .secondary {
-        background: #374151;
-      }
-      .error {
+
+      .operation-note {
         margin: 0;
-        color: #b91c1c;
+        color: var(--color-text-secondary);
       }
-      .success {
-        margin: 0;
-        color: #166534;
-      }
+
       @media (max-width: 900px) {
-        .grid {
-          grid-template-columns: 1fr;
-        }
-      }
-      @media (max-width: 640px) {
-        .header {
+        .detail-grid {
           flex-direction: column;
-          align-items: flex-start;
         }
       }
     `,
@@ -281,5 +317,15 @@ export class OutboxEventDetailPageComponent implements OnInit {
         );
       },
     });
+  }
+
+  statusChipClass(status: string): string {
+    if (status === "PUBLISHED") {
+      return "ui-chip--success";
+    }
+    if (status === "FAILED") {
+      return "ui-chip--danger";
+    }
+    return "ui-chip--warning";
   }
 }

@@ -12,162 +12,164 @@ import { ReportsService } from "./data/reports.service";
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule],
   template: `
-    <section class="card">
-      <header>
-        <h1>Reporte de caja</h1>
-        <p class="muted">Consulta resumen por sesion de caja.</p>
+    <section class="ui-card ui-module-page cash-report-page">
+      <header class="ui-page-head">
+        <div>
+          <p class="ui-page-kicker">Reporteria comercial</p>
+          <h1 class="ui-page-title">Reporte de caja</h1>
+          <p class="ui-page-description">
+            Consulta apertura, cierre y diferencia operativa por sesion de caja.
+          </p>
+        </div>
       </header>
 
-      <p class="error" *ngIf="permissionMessage">{{ permissionMessage }}</p>
-      <p class="error" *ngIf="errorMessage">{{ errorMessage }}</p>
+      <p class="ui-alert ui-alert--error" *ngIf="permissionMessage">
+        {{ permissionMessage }}
+      </p>
+      <p class="ui-alert ui-alert--error" *ngIf="errorMessage">
+        {{ errorMessage }}
+      </p>
 
-      <form class="filters" [formGroup]="filtersForm" (ngSubmit)="loadById()">
-        <label>
-          CashRegisterId
-          <input
-            type="number"
-            min="1"
-            step="1"
-            formControlName="cashRegisterId"
-          />
-        </label>
+      <section class="ui-module-section">
+        <header class="ui-module-section__head">
+          <h2 class="ui-module-section__title">Consulta por sesion</h2>
+        </header>
 
-        <div class="actions">
-          <button type="submit" [disabled]="loading || !canView">
-            Consultar
-          </button>
-        </div>
-      </form>
+        <form
+          class="ui-filter-grid cash-filters"
+          [formGroup]="filtersForm"
+          (ngSubmit)="loadById()"
+        >
+          <label class="ui-field">
+            <span>CashRegisterId</span>
+            <input
+              type="number"
+              min="1"
+              step="1"
+              formControlName="cashRegisterId"
+            />
+          </label>
 
-      <section class="kpis" *ngIf="report">
-        <article>
-          <h2>Apertura</h2>
-          <p>{{ numberOf(report.openingAmount) | number: "1.2-2" }}</p>
+          <div class="ui-filter-actions cash-filter-actions">
+            <button
+              type="submit"
+              class="ui-button ui-button--primary"
+              [disabled]="loading || !canView"
+            >
+              Consultar
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <section class="ui-kpi-grid" *ngIf="report">
+        <article class="ui-kpi-card">
+          <p class="ui-kpi-label">Apertura</p>
+          <p class="ui-kpi-value">
+            {{ numberOf(report.openingAmount) | number: "1.2-2" }}
+          </p>
         </article>
-        <article>
-          <h2>Esperado</h2>
-          <p>{{ numberOf(report.expectedCashAmount) | number: "1.2-2" }}</p>
+        <article class="ui-kpi-card">
+          <p class="ui-kpi-label">Esperado</p>
+          <p class="ui-kpi-value">
+            {{ numberOf(report.expectedCashAmount) | number: "1.2-2" }}
+          </p>
         </article>
-        <article>
-          <h2>Contado</h2>
-          <p>{{ numberOf(report.countedAmount) | number: "1.2-2" }}</p>
+        <article class="ui-kpi-card">
+          <p class="ui-kpi-label">Contado</p>
+          <p class="ui-kpi-value">
+            {{ numberOf(report.countedAmount) | number: "1.2-2" }}
+          </p>
         </article>
-        <article>
-          <h2>Diferencia</h2>
-          <p>{{ numberOf(report.differenceAmount) | number: "1.2-2" }}</p>
+        <article class="ui-kpi-card">
+          <p class="ui-kpi-label">Diferencia</p>
+          <p
+            class="ui-kpi-value"
+            [ngClass]="differenceClass(report.differenceAmount)"
+          >
+            {{ numberOf(report.differenceAmount) | number: "1.2-2" }}
+          </p>
+          <p class="ui-kpi-note">Contado - Esperado</p>
         </article>
-        <article>
-          <h2>Total ventas</h2>
-          <p>{{ numberOf(report.totalSales) | number: "1.2-2" }}</p>
+        <article class="ui-kpi-card">
+          <p class="ui-kpi-label">Total ventas</p>
+          <p class="ui-kpi-value">
+            {{ numberOf(report.totalSales) | number: "1.2-2" }}
+          </p>
         </article>
-        <article>
-          <h2>Estado</h2>
-          <p>{{ report.status }}</p>
+        <article class="ui-kpi-card">
+          <p class="ui-kpi-label">Estado</p>
+          <p class="status-chip-wrap">
+            <span class="ui-chip" [ngClass]="statusChipClass(report.status)">
+              {{ report.status }}
+            </span>
+          </p>
         </article>
       </section>
 
-      <section *ngIf="report">
-        <h2>Ventas por metodo de pago</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>Metodo</th>
-              <th>Monto</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let row of report.salesByPaymentMethod">
-              <td>{{ row.paymentMethod }}</td>
-              <td>{{ numberOf(row.amount) | number: "1.2-2" }}</td>
-            </tr>
-            <tr *ngIf="report.salesByPaymentMethod.length === 0">
-              <td colspan="2" class="empty">
-                Sin ventas registradas para esta caja.
-              </td>
-            </tr>
-          </tbody>
-        </table>
+      <section class="ui-module-section" *ngIf="report">
+        <header class="ui-module-section__head">
+          <h2 class="ui-module-section__title">Ventas por metodo de pago</h2>
+        </header>
+
+        <div class="ui-table-wrapper">
+          <table class="ui-table cash-table">
+            <thead>
+              <tr>
+                <th>Metodo</th>
+                <th>Monto</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let row of report.salesByPaymentMethod">
+                <td>{{ row.paymentMethod }}</td>
+                <td>{{ numberOf(row.amount) | number: "1.2-2" }}</td>
+              </tr>
+              <tr *ngIf="report.salesByPaymentMethod.length === 0">
+                <td colspan="2" class="ui-table__empty">
+                  <div class="ui-empty-state">
+                    Sin ventas registradas para esta caja.
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </section>
     </section>
   `,
   styles: [
     `
-      .card {
-        background: #fff;
-        border-radius: 0.5rem;
-        padding: 1rem;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-        display: grid;
-        gap: 1rem;
+      .cash-filters {
+        grid-template-columns: minmax(260px, 420px) auto;
       }
-      h1,
-      h2 {
+
+      .cash-filter-actions {
+        align-self: end;
+      }
+
+      .cash-table {
+        min-width: 460px;
+      }
+
+      .status-chip-wrap {
         margin: 0;
       }
-      .muted {
-        color: #6b7280;
-        margin: 0.25rem 0 0;
+
+      .value-positive {
+        color: var(--color-success);
       }
-      .filters {
-        display: flex;
-        align-items: end;
-        gap: 0.6rem;
+
+      .value-negative {
+        color: var(--color-danger);
       }
-      label {
-        display: grid;
-        gap: 0.35rem;
+
+      .value-neutral {
+        color: var(--color-text-primary);
       }
-      input,
-      button {
-        padding: 0.5rem 0.7rem;
-        border: 1px solid #d1d5db;
-        border-radius: 0.35rem;
-      }
-      button {
-        border: 0;
-        background: #0f766e;
-        color: #fff;
-        cursor: pointer;
-      }
-      .kpis {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(160px, 1fr));
-        gap: 0.65rem;
-      }
-      .kpis article {
-        border: 1px solid #e5e7eb;
-        border-radius: 0.45rem;
-        padding: 0.65rem;
-      }
-      .kpis p {
-        margin: 0.3rem 0 0;
-        font-size: 1.15rem;
-        font-weight: 700;
-      }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-      }
-      th,
-      td {
-        text-align: left;
-        padding: 0.45rem;
-        border-bottom: 1px solid #e5e7eb;
-      }
-      .empty {
-        text-align: center;
-        color: #6b7280;
-      }
-      .error {
-        margin: 0;
-        color: #b91c1c;
-      }
-      @media (max-width: 720px) {
-        .filters {
-          flex-direction: column;
-          align-items: stretch;
-        }
-        .kpis {
+
+      @media (max-width: 760px) {
+        .cash-filters {
           grid-template-columns: 1fr;
         }
       }
@@ -255,5 +257,20 @@ export class CashRegisterReportPageComponent implements OnInit {
   numberOf(value: unknown): number {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  differenceClass(value: unknown): string {
+    const amount = this.numberOf(value);
+    if (amount > 0) {
+      return "value-positive";
+    }
+    if (amount < 0) {
+      return "value-negative";
+    }
+    return "value-neutral";
+  }
+
+  statusChipClass(status: string): string {
+    return status === "CLOSED" ? "ui-chip--success" : "ui-chip--warning";
   }
 }
