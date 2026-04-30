@@ -1,0 +1,2 @@
+Internal project skill for ERP/POS UI standards.
+Based on adapted best practices for consistency, clarity, and operational safety.

@@ -22,3 +22,10 @@ frontend/dist/
 Thumbs.db
 .agents/
 skills-lock.json
+
+# Allow tracked Copilot skills under .agents
+.agents/*
+!.agents/skills/
+.agents/skills/*
+!.agents/skills/product-ui-standards/
+!.agents/skills/product-ui-standards/**
