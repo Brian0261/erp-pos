@@ -215,19 +215,7 @@ public class QuoteApplicationService implements QuoteUseCase {
     public Quote convertToSale(Long id, ConvertQuoteToSaleCommand command) {
         Quote current = getById(id);
 
-        // Prioridad: una cotización ya convertida siempre responde conflicto (409).
-        if (current.convertedSaleId() != null || current.status() == QuoteStatus.CONVERTED) {
-            throw new QuoteConflictException("Quote already converted");
-        }
-        if (current.status() == QuoteStatus.CANCELLED) {
-            throw new QuoteConflictException("Cancelled quote cannot be converted");
-        }
-        if (current.expiresAt().isBefore(LocalDate.now()) || current.status() == QuoteStatus.EXPIRED) {
-            throw new QuoteBusinessRuleException("Quote is expired and cannot be converted");
-        }
-        if (current.status() != QuoteStatus.DRAFT && current.status() != QuoteStatus.SENT) {
-            throw new QuoteConflictException("Only DRAFT or SENT quotes can be converted");
-        }
+        assertQuoteCanBeConverted(current);
         if (command.warehouseId() == null) {
             throw new QuoteBusinessRuleException("warehouseId is required");
         }
@@ -268,6 +256,22 @@ public class QuoteApplicationService implements QuoteUseCase {
     public List<QuoteStatusHistory> history(Long id) {
         getById(id);
         return quoteHistoryRepositoryPort.findByQuoteId(id);
+    }
+
+    private void assertQuoteCanBeConverted(Quote quote) {
+        // Regla UX-003: una cotizacion convertida (por estado o por referencia de venta) es siempre conflicto.
+        if (quote.convertedSaleId() != null || quote.status() == QuoteStatus.CONVERTED) {
+            throw new QuoteConflictException("Quote already converted");
+        }
+        if (quote.status() == QuoteStatus.CANCELLED) {
+            throw new QuoteConflictException("Cancelled quote cannot be converted");
+        }
+        if (quote.expiresAt().isBefore(LocalDate.now()) || quote.status() == QuoteStatus.EXPIRED) {
+            throw new QuoteBusinessRuleException("Quote is expired and cannot be converted");
+        }
+        if (quote.status() != QuoteStatus.DRAFT && quote.status() != QuoteStatus.SENT) {
+            throw new QuoteConflictException("Only DRAFT or SENT quotes can be converted");
+        }
     }
 
     private Quote asExpiredIfNeeded(Quote quote) {

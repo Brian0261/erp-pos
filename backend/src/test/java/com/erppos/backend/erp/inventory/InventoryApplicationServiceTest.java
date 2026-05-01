@@ -1,5 +1,6 @@
 package com.erppos.backend.erp.inventory;
 
+import com.erppos.backend.erp.inventory.adapter.rest.WarehouseController;
 import com.erppos.backend.erp.inventory.application.service.AuditUserProvider;
 import com.erppos.backend.erp.inventory.application.service.InventoryApplicationService;
 import com.erppos.backend.erp.inventory.application.service.WarehouseApplicationService;
@@ -28,8 +29,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.math.BigDecimal;
+import java.lang.reflect.Method;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
@@ -259,6 +262,33 @@ class InventoryApplicationServiceTest {
 
         assertThrows(InventoryBusinessRuleException.class,
                 () -> inventoryService.registerInitialStock(new RegisterInitialStockCommand(productId, inactive.id(), BigDecimal.ONE, "Carga")));
+    }
+
+    @Test
+    void shouldConfigureWarehouseControllerRolesForCashierReadOnly() throws NoSuchMethodException {
+        Method listMethod = WarehouseController.class.getMethod("list", Boolean.class);
+        PreAuthorize listPreAuthorize = listMethod.getAnnotation(PreAuthorize.class);
+        assertNotNull(listPreAuthorize);
+        assertTrue(listPreAuthorize.value().contains("ADMIN"));
+        assertTrue(listPreAuthorize.value().contains("SUPERVISOR"));
+        assertTrue(listPreAuthorize.value().contains("ALMACENERO"));
+        assertTrue(listPreAuthorize.value().contains("CAJERO"));
+
+        Method createMethod = WarehouseController.class.getMethod("create", com.erppos.backend.erp.inventory.adapter.dto.WarehouseCreateRequest.class);
+        PreAuthorize createPreAuthorize = createMethod.getAnnotation(PreAuthorize.class);
+        assertNotNull(createPreAuthorize);
+        assertTrue(createPreAuthorize.value().contains("ADMIN"));
+        assertTrue(createPreAuthorize.value().contains("ALMACENERO"));
+        assertFalse(createPreAuthorize.value().contains("SUPERVISOR"));
+        assertFalse(createPreAuthorize.value().contains("CAJERO"));
+
+        Method deactivateMethod = WarehouseController.class.getMethod("deactivate", Long.class);
+        PreAuthorize deactivatePreAuthorize = deactivateMethod.getAnnotation(PreAuthorize.class);
+        assertNotNull(deactivatePreAuthorize);
+        assertTrue(deactivatePreAuthorize.value().contains("ADMIN"));
+        assertTrue(deactivatePreAuthorize.value().contains("ALMACENERO"));
+        assertFalse(deactivatePreAuthorize.value().contains("SUPERVISOR"));
+        assertFalse(deactivatePreAuthorize.value().contains("CAJERO"));
     }
 
     private Long seedWarehouse(String code) {

@@ -506,3 +506,105 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
   - [x] Registro transferencia valida con producto activo: OK.
   - [x] Sin errores de consola inesperados, sin `pageerror` y sin `500` durante corrida final FE-007.
 - [x] Nota operativa QA: para evitar shell cacheada por service worker en auditoria browser se uso `?ngsw-bypass=true` en rutas de verificacion.
+
+## Hotfix UX-003 Confirmacion en Cotizaciones (2026-04-30)
+
+- [x] Alcance limitado aplicado solo en:
+  - [x] `frontend/src/app/features/quotes/quotes-page.component.ts`
+  - [x] `frontend/src/app/features/quotes/quote-detail-page.component.ts`
+  - [x] `frontend/src/app/features/quotes/quote-convert-page.component.ts`
+- [x] Build y runtime de verificacion ejecutados:
+  - [x] `cd frontend` + `npm run build` => OK.
+  - [x] `docker compose up --build -d` => OK.
+  - [x] `docker compose ps` => `postgres` healthy, `backend` up, `frontend` up.
+- [x] Confirmaciones criticas UX-003 validadas en navegador (`admin@erp.local`):
+  - [x] Listado `/cotizaciones`: `Enviar` muestra confirmacion previa.
+  - [x] Listado `/cotizaciones`: `Cancelar` muestra confirmacion previa.
+  - [x] Conversion `/cotizaciones/:id/convertir`: `Convertir a venta` muestra confirmacion previa con numero de cotizacion, total cotizacion, total pagado y advertencia de impacto en caja/stock.
+- [x] Escenarios cancelados (no ejecucion de accion):
+  - [x] Cotizacion `#13`: cancelar confirmacion de `Enviar` mantiene estado sin cambio (sin mutacion en backend).
+  - [x] Cotizacion `#13`: cancelar confirmacion de `Convertir a venta` no genera venta ni muestra resultado de conversion.
+- [x] Escenarios confirmados (flujo original preservado):
+  - [x] Cotizacion `#13`: confirmar `Enviar` cambia estado `DRAFT -> SENT`.
+  - [x] Cotizacion `#6`: confirmar `Cancelar` cambia estado a `CANCELLED` y registra historial de estado.
+  - [x] Cotizacion `#13`: confirmar `Convertir a venta` con almacen `S3DST1777141364 - Almacen Destino S3 1777141364` y pago `25.5` genera venta `#42`.
+  - [x] Detalle `/cotizaciones/13` muestra estado `CONVERTED`, historial `SENT -> CONVERTED` y link `Ver venta`.
+  - [x] Listado `/cotizaciones` muestra la cotizacion `Q-1777180203427` en estado `CONVERTED`.
+- [x] Validacion de doble conversion (conflicto esperado):
+  - [x] `POST /api/v1/quotes/13/convert-to-sale` tras conversion exitosa devuelve `409 Conflict` con mensaje `Quote already converted`.
+- [x] Consola/runtime durante UX-003:
+  - [x] Sin `pageerror`.
+  - [x] Sin HTTP `500` inesperados en los flujos validados.
+  - [x] Solo `409` esperados y controlados en pruebas de conflicto de conversion.
+
+## Smoke corto por roles UX-003 (2026-04-30)
+
+- [x] Build/runtime previo del smoke por roles ejecutado:
+  - [x] `cd frontend`.
+  - [x] `npm run build` => OK.
+  - [x] `docker compose up --build -d` => OK.
+  - [x] `docker compose ps` => `postgres` healthy, `backend` up, `frontend` up.
+- [x] `ADMIN`:
+  - [x] Acceso a `/cotizaciones` y `/cotizaciones/nueva`.
+  - [x] Confirmacion `Enviar` visible y flujo aceptado (`#10`: `DRAFT -> SENT`).
+  - [x] Confirmacion `Cancelar` visible y cancelada; sin mutacion (`#10` permanece `SENT`, historial sin cambios).
+  - [x] Confirmacion `Convertir` visible y cancelada; sin mutacion (`#10` mantiene `convertedSaleId` null).
+- [x] `CAJERO`:
+  - [x] Acceso a `/cotizaciones` y `/cotizaciones/nueva`.
+  - [x] Confirmacion `Enviar` visible y flujo aceptado (`#3`: `DRAFT -> SENT`, historial registra `changedBy=cajero`).
+  - [x] Confirmacion `Cancelar` visible y cancelada; sin mutacion (`#3` permanece `SENT`, historial sin cambios).
+  - [ ] Convertir con `CAJERO` presenta bloqueo funcional en `/cotizaciones/3/convertir`.
+    - Evidencia: `GET /api/v1/warehouses?active=true` => `403 Forbidden` para `CAJERO`.
+    - Impacto: la pantalla de conversion queda sin contenido operativo (no se alcanza confirmacion de `Convertir`).
+- [x] `SUPERVISOR`:
+  - [x] Acceso a `/cotizaciones` y `/cotizaciones/nueva`.
+  - [x] Confirmacion `Enviar` visible y flujo aceptado (`#7`: `DRAFT -> SENT`, historial registra `changedBy=supervisor`).
+  - [x] Confirmacion `Cancelar` visible y cancelada; sin mutacion (`#7` permanece `SENT`).
+  - [x] Confirmacion `Convertir` visible y cancelada; sin mutacion (`#7` mantiene `convertedSaleId` null).
+- [x] `ALMACENERO`:
+  - [x] No visualiza `Cotizaciones` en menu lateral.
+  - [x] Navegacion directa a `/cotizaciones` redirige a `/dashboard`.
+  - [x] Navegacion directa a `/cotizaciones/nueva` redirige a `/dashboard`.
+- [x] Estabilidad general del smoke por roles:
+  - [x] Sin `pageerror`.
+  - [x] Sin respuestas HTTP `500` inesperadas.
+  - [x] Se observo `403` en flujo de conversion de `CAJERO` (hallazgo de permisos), no asociado a UX-003 de confirmaciones.
+
+## Revalidacion UX-003 post-fix permisos de almacenes para CAJERO (2026-04-30)
+
+- [x] Build/runtime previo de revalidacion ejecutado:
+  - [x] `cd frontend`.
+  - [x] `npm run build` => OK.
+  - [x] `docker compose up --build -d` => OK.
+  - [x] `docker compose ps` => `postgres` healthy, `backend` up, `frontend` up.
+- [x] Caso controlado de `CAJERO` preparado y validado:
+  - [x] Cotizacion propia creada por API: `#41` (`Q-1777598147957`) en estado `DRAFT`.
+  - [x] Stock confirmado para conversion (producto `#13`, almacen `#8` `S3DST1777141364 - Almacen Destino S3 1777141364`, cantidad `18`).
+- [x] Confirmaciones UX-003 en `CAJERO` (UI + API) validadas en ambos caminos:
+  - [x] `Enviar` cancelado: sin mutacion (`STATUS=DRAFT`, `HISTORY_COUNT=0`).
+  - [x] `Enviar` confirmado: ejecuta flujo (`STATUS=SENT`, historial `DRAFT -> SENT`, `changedBy=cajero`).
+  - [x] `Cancelar` visible en detalle y cancelado (sin mutacion).
+  - [x] `Convertir` cancelado: sin mutacion (`STATUS=SENT`, `convertedSaleId` null).
+  - [x] `Convertir` confirmado: conversion exitosa con venta `#43`; UI muestra `Cotizacion convertida correctamente` y `Ver venta #43`.
+- [x] Fix backend de permisos de almacenes para `CAJERO` revalidado:
+  - [x] `GET /api/v1/warehouses?active=true` => `200` (11 almacenes visibles).
+  - [x] `POST /api/v1/warehouses` => `403` (mutacion bloqueada).
+  - [x] `DELETE /api/v1/warehouses/8` => `403` (mutacion bloqueada).
+- [x] Revalidacion de restricciones por rol (sin regresion):
+  - [x] `ALMACENERO` no visualiza `Cotizaciones` en menu y navegacion directa a `/cotizaciones` redirige a `/dashboard`.
+  - [x] `ALMACENERO` en API quotes (`GET /api/v1/quotes`) => `403`.
+  - [x] `SUPERVISOR` mantiene acceso a `/cotizaciones` y confirmacion de `Cancelar` visible.
+  - [x] `ADMIN` mantiene acceso a `/cotizaciones` y confirmacion de `Cancelar` visible.
+- [x] Cierre de incidencia backend de doble conversion (revalidacion final 2026-04-30):
+  - [x] Caso final validado con `CAJERO`: cotizacion `#42` (`Q-1777611293014`) convertida a venta `#44`.
+  - [x] Segundo intento oficial `POST /api/v1/quotes/42/convert-to-sale` => `409 Conflict` con mensaje `Quote already converted`.
+  - [x] Confirmado que no se reproduce `500` en el flujo oficial de conversion.
+- [x] Revalidacion final de roles y confirmaciones UX-003:
+  - [x] `CAJERO`: confirmacion de `Enviar` operativa; confirmacion de `Convertir` validada en cancelar (sin mutacion) y aceptar (conversion exitosa).
+  - [x] `SUPERVISOR`: confirmacion de `Cancelar` visible y cancelada sin mutacion.
+  - [x] `ADMIN`: confirmacion de `Cancelar` visible y cancelada sin mutacion.
+  - [x] `ALMACENERO`: bloqueo mantenido en UI (`/cotizaciones` redirige a `/dashboard`) y API quotes (`403`).
+- [x] Estabilidad de la corrida final:
+  - [x] Sin `pageerror`.
+  - [x] Sin errores de consola inesperados en los flujos UI validados.
+  - [x] Sin respuestas `500` en el flujo oficial validado de UX-003.

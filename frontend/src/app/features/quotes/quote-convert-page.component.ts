@@ -560,9 +560,6 @@ export class QuoteConvertPageComponent implements OnInit {
   }
 
   convert(): void {
-    this.errorMessage = "";
-    this.successMessage = "";
-
     if (!this.quote) {
       this.errorMessage = "Cotizacion no disponible.";
       return;
@@ -573,6 +570,16 @@ export class QuoteConvertPageComponent implements OnInit {
       this.errorMessage = validation;
       return;
     }
+
+    const confirmed = window.confirm(
+      this.buildConvertConfirmationMessage(this.quote),
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    this.errorMessage = "";
+    this.successMessage = "";
 
     const warehouseId = Number(this.form.value.warehouseId);
     const comment = this.normalizeOptional(this.form.value.comment);
@@ -690,6 +697,19 @@ export class QuoteConvertPageComponent implements OnInit {
       amount,
       reference: this.normalizeOptional(payment.reference),
     };
+  }
+
+  private buildConvertConfirmationMessage(quote: QuoteResponse): string {
+    return [
+      `Vas a convertir la cotizacion ${quote.quoteNumber} a venta.`,
+      "",
+      `Total cotizacion: S/ ${this.normalizeNumber(quote.totalAmount).toFixed(2)}`,
+      `Total pagado: S/ ${this.paidTotal.toFixed(2)}`,
+      "",
+      "Se generara una venta real y podria impactar caja/stock segun el flujo actual.",
+      "",
+      "Confirmas convertir la cotizacion?",
+    ].join("\n");
   }
 
   private normalizeOptional(value: string | null | undefined): string | null {

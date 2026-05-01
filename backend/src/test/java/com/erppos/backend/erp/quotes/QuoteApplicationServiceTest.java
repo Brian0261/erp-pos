@@ -210,7 +210,49 @@ class QuoteApplicationServiceTest {
     void shouldRejectDoubleConversion() {
         Quote quote = quoteService.create(validCreateCommand());
         quoteService.convertToSale(quote.id(), validConvertCommand());
+
         assertThrows(QuoteConflictException.class, () -> quoteService.convertToSale(quote.id(), validConvertCommand()));
+    }
+
+    @Test
+    void shouldRejectConvertedStatusWithoutCallingSalesPort() {
+        Quote quote = quoteService.create(validCreateCommand());
+        quoteService.convertToSale(quote.id(), validConvertCommand());
+
+        long callsBeforeSecondAttempt = quoteSalesPort.callCount;
+        assertThrows(QuoteConflictException.class, () -> quoteService.convertToSale(quote.id(), validConvertCommand()));
+        assertEquals(callsBeforeSecondAttempt, quoteSalesPort.callCount);
+    }
+
+    @Test
+    void shouldRejectQuoteWithConvertedSaleIdWithoutCallingSalesPort() {
+        Quote draft = quoteService.create(validCreateCommand());
+        Quote inconsistentDraftWithSaleId = new Quote(
+                draft.id(),
+                draft.quoteNumber(),
+                draft.customerName(),
+                draft.customerDocument(),
+                draft.customerPhone(),
+                draft.customerEmail(),
+                QuoteStatus.DRAFT,
+                draft.issueDate(),
+                draft.expiresAt(),
+                draft.sentAt(),
+                999L,
+                draft.subtotalAmount(),
+                draft.discountAmount(),
+                draft.totalAmount(),
+                draft.notes(),
+                draft.createdAt(),
+                draft.updatedAt(),
+                draft.createdBy(),
+                draft.updatedBy(),
+                draft.items()
+        );
+        quoteRepository.save(inconsistentDraftWithSaleId);
+
+        assertThrows(QuoteConflictException.class, () -> quoteService.convertToSale(draft.id(), validConvertCommand()));
+        assertEquals(0, quoteSalesPort.callCount);
     }
 
     @Test
@@ -373,11 +415,13 @@ class QuoteApplicationServiceTest {
 
     static class InMemoryQuoteSalesPort implements QuoteSalesPort {
         private long saleIdSeq = 1;
+        private long callCount;
         private boolean failNoOpenCash;
         private boolean failStock;
 
         @Override
         public Long createSaleFromQuote(Quote quote, Long warehouseId, List<QuotePaymentCommand> payments) {
+            callCount++;
             if (failNoOpenCash) {
                 throw new QuoteBusinessRuleException("No open cash register");
             }

@@ -428,6 +428,13 @@ export class QuoteDetailPageComponent implements OnInit {
       return;
     }
 
+    const confirmed = window.confirm(
+      this.buildSendConfirmationMessage(this.quote),
+    );
+    if (!confirmed) {
+      return;
+    }
+
     this.processing = true;
     this.errorMessage = "";
     this.successMessage = "";
@@ -450,6 +457,13 @@ export class QuoteDetailPageComponent implements OnInit {
 
   cancelQuote(): void {
     if (!this.quote || !this.canCancel(this.quote)) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      this.buildCancelConfirmationMessage(this.quote),
+    );
+    if (!confirmed) {
       return;
     }
 
@@ -548,5 +562,25 @@ export class QuoteDetailPageComponent implements OnInit {
 
     const today = new Date().toISOString().slice(0, 10);
     return quote.expiresAt < today;
+  }
+
+  private buildSendConfirmationMessage(quote: QuoteResponse): string {
+    return [
+      `Vas a enviar la cotizacion ${quote.quoteNumber}.`,
+      "",
+      "La cotizacion cambiara de estado.",
+      "",
+      "Confirmas enviar la cotizacion?",
+    ].join("\n");
+  }
+
+  private buildCancelConfirmationMessage(quote: QuoteResponse): string {
+    return [
+      `Vas a cancelar la cotizacion ${quote.quoteNumber}.`,
+      "",
+      "La cotizacion quedara cancelada.",
+      "",
+      "Confirmas cancelar la cotizacion?",
+    ].join("\n");
   }
 }

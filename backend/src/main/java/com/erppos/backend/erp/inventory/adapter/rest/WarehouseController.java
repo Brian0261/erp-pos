@@ -38,7 +38,7 @@ public class WarehouseController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR','ALMACENERO')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR','ALMACENERO','CAJERO')")
     public ResponseEntity<List<WarehouseResponse>> list(@RequestParam(required = false) Boolean active) {
         return ResponseEntity.ok(warehouseUseCase.list(active).stream().map(this::toResponse).toList());
     }

@@ -364,6 +364,11 @@ export class QuotesPageComponent implements OnInit {
   }
 
   sendQuote(quote: QuoteResponse): void {
+    const confirmed = window.confirm(this.buildSendConfirmationMessage(quote));
+    if (!confirmed) {
+      return;
+    }
+
     this.processingQuoteId = quote.id;
     this.errorMessage = "";
     this.successMessage = "";
@@ -385,6 +390,13 @@ export class QuotesPageComponent implements OnInit {
   }
 
   cancelQuote(quote: QuoteResponse): void {
+    const confirmed = window.confirm(
+      this.buildCancelConfirmationMessage(quote),
+    );
+    if (!confirmed) {
+      return;
+    }
+
     this.processingQuoteId = quote.id;
     this.errorMessage = "";
     this.successMessage = "";
@@ -483,5 +495,25 @@ export class QuotesPageComponent implements OnInit {
 
     const trimmed = value.trim();
     return trimmed.length > 0 ? trimmed : null;
+  }
+
+  private buildSendConfirmationMessage(quote: QuoteResponse): string {
+    return [
+      `Vas a enviar la cotizacion ${quote.quoteNumber}.`,
+      "",
+      "La cotizacion cambiara de estado.",
+      "",
+      "Confirmas enviar la cotizacion?",
+    ].join("\n");
+  }
+
+  private buildCancelConfirmationMessage(quote: QuoteResponse): string {
+    return [
+      `Vas a cancelar la cotizacion ${quote.quoteNumber}.`,
+      "",
+      "La cotizacion quedara cancelada.",
+      "",
+      "Confirmas cancelar la cotizacion?",
+    ].join("\n");
   }
 }
