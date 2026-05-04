@@ -27,6 +27,7 @@ import com.erppos.backend.erp.sales.domain.port.SaleRepositoryPort;
 import com.erppos.backend.erp.sales.domain.port.WarehouseReadPort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.lang.reflect.Method;
@@ -51,6 +52,7 @@ class SalesApplicationServiceTest {
     private InMemoryCatalogReadPort catalogReadPort;
     private InMemoryWarehouseReadPort warehouseReadPort;
     private InMemoryInventorySalesPort inventoryPort;
+    private TestAuditUserProvider auditUserProvider;
 
     private CashRegisterApplicationService cashService;
     private SalesApplicationService salesService;
@@ -63,7 +65,7 @@ class SalesApplicationServiceTest {
         warehouseReadPort = new InMemoryWarehouseReadPort();
         inventoryPort = new InMemoryInventorySalesPort();
 
-        AuditUserProvider auditUserProvider = new AuditUserProvider();
+        auditUserProvider = new TestAuditUserProvider();
         cashService = new CashRegisterApplicationService(cashRepo, auditUserProvider);
         salesService = new SalesApplicationService(saleRepo, cashRepo, catalogReadPort, warehouseReadPort, inventoryPort, auditUserProvider);
 
@@ -83,6 +85,40 @@ class SalesApplicationServiceTest {
     void shouldRejectSecondOpenCashRegisterForSameUser() {
         cashService.open(new OpenCashRegisterCommand(BigDecimal.ZERO, null));
         assertThrows(SalesConflictException.class, () -> cashService.open(new OpenCashRegisterCommand(BigDecimal.ONE, null)));
+    }
+
+    @Test
+    void shouldAllowOpenCashRegisterForDifferentUsers() {
+        auditUserProvider.setCurrentUserId(UUID.fromString("00000000-0000-0000-0000-000000000001"));
+        CashRegisterSession first = cashService.open(new OpenCashRegisterCommand(BigDecimal.ZERO, null));
+
+        auditUserProvider.setCurrentUserId(UUID.fromString("00000000-0000-0000-0000-000000000002"));
+        CashRegisterSession second = cashService.open(new OpenCashRegisterCommand(BigDecimal.ONE, null));
+
+        assertNotNull(first.id());
+        assertNotNull(second.id());
+        assertNotEquals(first.id(), second.id());
+    }
+
+    @Test
+    void shouldAllowReopenCashRegisterAfterCloseForSameUser() {
+        CashRegisterSession opened = cashService.open(new OpenCashRegisterCommand(BigDecimal.TEN, null));
+        CashRegisterSession closed = cashService.close(opened.id(), new CloseCashRegisterCommand(BigDecimal.TEN, null));
+        CashRegisterSession reopened = cashService.open(new OpenCashRegisterCommand(BigDecimal.ONE, "Reapertura"));
+
+        assertEquals(CashRegisterStatus.CLOSED, closed.status());
+        assertEquals(CashRegisterStatus.OPEN, reopened.status());
+        assertNotEquals(opened.id(), reopened.id());
+    }
+
+    @Test
+    void shouldTranslateDbUniqueViolationToSalesConflictWhenOpeningCashRegister() {
+        cashRepo.failNextOpenSaveWithUniqueViolation();
+
+        SalesConflictException exception = assertThrows(SalesConflictException.class,
+                () -> cashService.open(new OpenCashRegisterCommand(BigDecimal.ZERO, null)));
+
+        assertEquals("El usuario ya tiene una caja abierta.", exception.getMessage());
     }
 
     @Test
@@ -221,13 +257,35 @@ class SalesApplicationServiceTest {
         return productId + "-" + warehouseId;
     }
 
+    static class TestAuditUserProvider extends AuditUserProvider {
+        private UUID currentUserId = UUID.fromString("00000000-0000-0000-0000-000000000000");
+
+        @Override
+        public UUID currentUserId() {
+            return currentUserId;
+        }
+
+        void setCurrentUserId(UUID currentUserId) {
+            this.currentUserId = currentUserId;
+        }
+    }
+
     static class InMemoryCashRegisterRepository implements CashRegisterRepositoryPort {
         private final AtomicLong seq = new AtomicLong(1);
         private final Map<Long, CashRegisterSession> storage = new HashMap<>();
         private final UUID fixedUser = UUID.fromString("00000000-0000-0000-0000-000000000000");
+        private boolean failNextOpenSaveWithUniqueViolation = false;
+
+        void failNextOpenSaveWithUniqueViolation() {
+            failNextOpenSaveWithUniqueViolation = true;
+        }
 
         @Override
         public CashRegisterSession save(CashRegisterSession session) {
+            if (session.id() == null && session.status() == CashRegisterStatus.OPEN && failNextOpenSaveWithUniqueViolation) {
+                failNextOpenSaveWithUniqueViolation = false;
+                throw new DataIntegrityViolationException("duplicate key value violates unique constraint \"uq_cash_register_sessions_opened_by_user_open\"");
+            }
             Long id = session.id() == null ? seq.getAndIncrement() : session.id();
             Instant now = Instant.now();
             CashRegisterSession stored = new CashRegisterSession(

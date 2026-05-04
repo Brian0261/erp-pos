@@ -3,6 +3,7 @@ package com.erppos.backend.erp.shared;
 import com.erppos.backend.erp.quotes.domain.exception.QuoteBusinessRuleException;
 import com.erppos.backend.erp.quotes.domain.exception.QuoteConflictException;
 import com.erppos.backend.erp.quotes.domain.exception.QuoteNotFoundException;
+import com.erppos.backend.erp.sales.domain.exception.SalesConflictException;
 import com.erppos.backend.erp.shared.adapter.rest.ApiError;
 import com.erppos.backend.erp.shared.adapter.rest.ErrorResponseFactory;
 import com.erppos.backend.erp.shared.adapter.rest.GlobalExceptionHandler;
@@ -55,6 +56,16 @@ class GlobalExceptionHandlerTest {
         assertNotNull(response.getBody());
         assertEquals(404, response.getBody().status());
         assertEquals("Quote not found", response.getBody().message());
+    }
+
+    @Test
+    void shouldMapSalesConflictExceptionTo409() {
+        ResponseEntity<ApiError> response = exceptionHandler.handleConflict(new SalesConflictException("El usuario ya tiene una caja abierta."), request);
+
+        assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals(409, response.getBody().status());
+        assertEquals("El usuario ya tiene una caja abierta.", response.getBody().message());
     }
 }
 

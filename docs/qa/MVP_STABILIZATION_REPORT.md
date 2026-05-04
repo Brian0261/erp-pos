@@ -156,3 +156,45 @@ Riesgo de falsos positivos/falsos negativos en QA visual por validar shell o ass
 ### Deuda post-piloto recomendada (sin aplicar ahora)
 
 - Evaluar ajuste minimo de cache-control en Nginx para `index.html` (por ejemplo `Cache-Control: no-store`) manteniendo cache agresiva para bundles con hash.
+
+## Addendum - Validacion full-stack BT-001 (2026-05-04)
+
+### Objetivo
+
+Validar correccion backend BT-001 para garantizar **una sola caja OPEN por usuario** en condiciones reales de Docker/runtime, incluyendo API y UI.
+
+### Resultado
+
+- BT-001 validado end-to-end en entorno local Docker.
+- Sin hallazgos CRITICAL/HIGH nuevos en el flujo evaluado.
+
+### Evidencia principal
+
+- Backend build:
+  - `mvn clean test` y `mvn clean verify` => SUCCESS.
+- Runtime:
+  - `docker compose up --build -d` y `docker compose ps` => OK.
+  - Backend recuperado tras corregir deriva de credenciales DB runtime (validadas desde env real del contenedor).
+- DB/Flyway:
+  - Migracion `V13__cash_register_open_unique.sql` aplicada en DB activa (`inktoy_name_local`).
+  - Indice parcial unico `uq_cash_register_sessions_opened_by_user_open` presente.
+- API BT-001:
+  - Primera apertura por usuario => `201`.
+  - Segunda apertura del mismo usuario => `409`.
+  - Usuarios distintos con aperturas simultaneas => permitido (`201`).
+  - Cierre y reapertura => correcto (`200`/`201`).
+  - No se observaron `500` en la corrida principal BT-001.
+- UI BT-001:
+  - `/caja`: apertura, bloqueo visual de doble apertura, cierre y reapertura validados.
+  - `/pos`: carga correcta con estado de caja y acciones base sin errores bloqueantes.
+
+### Limites de la corrida BT-001
+
+- Limite inicial resuelto en corrida controlada posterior (mismo dia): se crearon datos QA operativos por API y se ejecuto venta real con evidencia completa de no regresion.
+- Evidencia de cierre controlado:
+  - Producto QA: `#2` (`SKU-BT001-1777916163`) en almacen `#2` (`WH-01`).
+  - Stock `5.000 -> 4.000` tras venta `#2` (`S-1777916164455`) `COMPLETED`.
+  - Kardex con `SALE_OUT` (`id=4`, `referenceType=SALE`, `referenceId=2`).
+  - Sin stock negativo global (`stock_balances.quantity < 0` => 0).
+  - Restriccion BT-001 revalidada en la misma corrida (`409`, `200`, `201`, `409`).
+  - Sin respuestas `500` en la corrida controlada.

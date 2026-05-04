@@ -10,6 +10,7 @@ import com.erppos.backend.erp.sales.domain.exception.SalesNotFoundException;
 import com.erppos.backend.erp.sales.domain.model.CashRegisterSession;
 import com.erppos.backend.erp.sales.domain.model.CashRegisterStatus;
 import com.erppos.backend.erp.sales.domain.port.CashRegisterRepositoryPort;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,6 +20,8 @@ import java.util.UUID;
 
 @Service
 public class CashRegisterApplicationService implements CashRegisterUseCase {
+
+    private static final String USER_ALREADY_HAS_OPEN_CASH_REGISTER = "El usuario ya tiene una caja abierta.";
 
     private final CashRegisterRepositoryPort cashRegisterRepositoryPort;
     private final AuditUserProvider auditUserProvider;
@@ -38,7 +41,7 @@ public class CashRegisterApplicationService implements CashRegisterUseCase {
 
         UUID userId = auditUserProvider.currentUserId();
         if (cashRegisterRepositoryPort.findOpenByUserId(userId).isPresent()) {
-            throw new SalesConflictException("User already has an OPEN cash register session");
+            throw new SalesConflictException(USER_ALREADY_HAS_OPEN_CASH_REGISTER);
         }
 
         CashRegisterSession session = new CashRegisterSession(
@@ -55,7 +58,12 @@ public class CashRegisterApplicationService implements CashRegisterUseCase {
                 null,
                 null
         );
-        return cashRegisterRepositoryPort.save(session);
+        try {
+            return cashRegisterRepositoryPort.save(session);
+        } catch (DataIntegrityViolationException ex) {
+            // Defensive DB-level guarantee for concurrent OPEN attempts by same user.
+            throw new SalesConflictException(USER_ALREADY_HAS_OPEN_CASH_REGISTER);
+        }
     }
 
     @Override

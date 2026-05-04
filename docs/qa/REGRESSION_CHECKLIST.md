@@ -277,6 +277,38 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
   - [x] Sin respuestas `500` inesperadas.
   - [x] Solo errores esperados de pruebas negativas/controladas.
 
+  ## Bloque BT-001 Caja abierta unica por usuario (2026-05-04)
+  - [x] Backend: `mvn clean test` => SUCCESS.
+  - [x] Backend: `mvn clean verify` => SUCCESS.
+  - [x] `docker compose up --build -d` ejecutado.
+  - [x] `docker compose ps` con `postgres` healthy, `backend` up, `frontend` up.
+  - [x] Backend runtime recuperado (credenciales DB runtime validadas contra `docker inspect` del contenedor backend).
+  - [x] Flyway V13 verificado en DB activa (`inktoy_name_local`) con `success=true`.
+  - [x] Indice parcial unico `uq_cash_register_sessions_opened_by_user_open` verificado en DB activa.
+  - [x] API BT-001:
+    - [x] Primera apertura por usuario (`/cash-registers/open`) => `201`.
+    - [x] Segunda apertura del mismo usuario => `409`.
+    - [x] Apertura de usuarios distintos en paralelo => `201` por usuario.
+    - [x] Cierre + reapertura => `200`/`201`.
+    - [x] Sin `500` en corrida principal BT-001.
+  - [x] UI `/caja`:
+    - [x] Apertura correcta y estado OPEN visible.
+    - [x] Prevencion de doble apertura visible (boton deshabilitado + mensaje informativo).
+    - [x] Cierre y reapertura validados.
+  - [x] UI `/pos`:
+    - [x] Carga estable con caja abierta.
+    - [x] Busqueda por nombre devuelve estado vacio controlado (sin crash).
+  - [x] Venta real + validacion stock/kardex en corrida controlada BT-001.
+    - [x] Datos QA operativos creados por API (sin cambios de codigo/configuracion).
+    - [x] Producto: `#2` (`SKU-BT001-1777916163`) en almacen `#2` (`WH-01`).
+    - [x] Stock antes: `5.000`.
+    - [x] Venta generada: `#2` (`S-1777916164455`) estado `COMPLETED`, pago `CASH`.
+    - [x] Stock despues: `4.000`.
+    - [x] Kardex con `SALE_OUT` confirmado (`id=4`, `referenceId=2`).
+    - [x] Sin stock negativo global (`stock_balances.quantity < 0` => 0).
+    - [x] Sin errores `500` en corrida controlada.
+    - [x] Cierre/reapertura y restriccion BT-001 revalidadas (`409`, `200`, `201`, `409`).
+
 ## Bloque E4 Compras/Proveedores InkToy (2026-04-30)
 
 - [x] Pantallas aplicadas:
