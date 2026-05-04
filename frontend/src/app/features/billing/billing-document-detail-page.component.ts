@@ -538,6 +538,10 @@ export class BillingDocumentDetailPageComponent implements OnInit {
       return;
     }
 
+    if (!window.confirm(this.buildGenerateXmlConfirmationMessage())) {
+      return;
+    }
+
     this.processing = true;
     this.errorMessage = "";
     this.successMessage = "";
@@ -563,6 +567,10 @@ export class BillingDocumentDetailPageComponent implements OnInit {
       return;
     }
 
+    if (!window.confirm(this.buildSignXmlConfirmationMessage())) {
+      return;
+    }
+
     this.processing = true;
     this.errorMessage = "";
     this.successMessage = "";
@@ -582,6 +590,10 @@ export class BillingDocumentDetailPageComponent implements OnInit {
 
   sendToProvider(): void {
     if (!this.canSend()) {
+      return;
+    }
+
+    if (!window.confirm(this.buildSendConfirmationMessage())) {
       return;
     }
 
@@ -642,5 +654,38 @@ export class BillingDocumentDetailPageComponent implements OnInit {
         );
       },
     });
+  }
+
+  private buildGenerateXmlConfirmationMessage(): string {
+    const number = this.document?.fullNumber ?? `#${this.documentId}`;
+    return [
+      `Vas a generar el XML del comprobante ${number}.`,
+      "",
+      "Se creara/actualizara el archivo XML del comprobante.",
+      "",
+      "Confirmas generar el XML?",
+    ].join("\n");
+  }
+
+  private buildSignXmlConfirmationMessage(): string {
+    const number = this.document?.fullNumber ?? `#${this.documentId}`;
+    return [
+      `Vas a firmar el XML del comprobante ${number}.`,
+      "",
+      "Se aplicara la firma sobre el XML generado.",
+      "",
+      "Confirmas firmar el XML?",
+    ].join("\n");
+  }
+
+  private buildSendConfirmationMessage(): string {
+    const number = this.document?.fullNumber ?? `#${this.documentId}`;
+    return [
+      `Vas a enviar el comprobante ${number} al proveedor mock/sandbox.`,
+      "",
+      "Esta accion intentara cambiar el estado electronico del comprobante.",
+      "",
+      "Confirmas enviar el comprobante?",
+    ].join("\n");
   }
 }

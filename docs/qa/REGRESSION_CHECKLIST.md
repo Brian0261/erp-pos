@@ -343,6 +343,30 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [x] Sin errores de consola en rutas E6 por carga de XML prematura; comprobantes sin XML muestran estado informativo sin `404` tecnico visible.
 - [x] Alcance tecnico preservado en E6: sin cambios de contratos API; ajuste puntual aplicado en backend (RBAC lectura de series) y frontend (carga condicional de XML) manteniendo reglas de negocio.
 
+### Revalidacion UX-004 Facturacion (2026-05-04)
+
+- [x] Alcance UX-004 aplicado solo en frontend: confirmacion previa para `Generar XML`, `Firmar XML` y `Enviar mock/sandbox` en detalle de comprobante.
+- [x] Archivo validado: `frontend/src/app/features/billing/billing-document-detail-page.component.ts`.
+- [x] ADMIN - comprobante `#2` (`DRAFT`):
+  - [x] `Generar XML` muestra confirmacion contextual.
+  - [x] `Cancelar` confirmacion mantiene estado en `DRAFT` y sin nuevo historial.
+  - [x] `Confirmar` ejecuta accion y cambia estado a `GENERATED` con traza `XML generated`.
+- [x] ADMIN - comprobante `#5` (`GENERATED`/`SIGNED`):
+  - [x] `Firmar XML` muestra confirmacion contextual.
+  - [x] `Cancelar` confirmacion mantiene estado en `GENERATED`.
+  - [x] `Confirmar` ejecuta accion y cambia a `SIGNED`.
+  - [x] `Enviar mock/sandbox` muestra confirmacion contextual.
+  - [x] `Cancelar` confirmacion mantiene estado en `SIGNED`.
+  - [x] `Confirmar` ejecuta envio y completa flujo hasta `ACCEPTED`.
+- [x] SUPERVISOR - comprobante `#2`:
+  - [x] `Firmar XML` habilitado y exitoso (estado `GENERATED` -> `SIGNED`).
+  - [x] `Enviar mock/sandbox` habilitado; confirmacion visible y `Cancelar` sin mutacion.
+- [x] CAJERO - comprobante `#2`: botones `Firmar XML` y `Enviar mock/sandbox` deshabilitados (sin ejecucion de accion critica).
+- [x] ALMACENERO: bloqueo de acceso a Facturacion confirmado (sin menu de comprobantes y redireccion a `/dashboard` al forzar URL de detalle).
+- [x] Estabilidad en corrida UX-004:
+  - [x] Sin `pageerror` en flujo validado.
+  - [x] Sin HTTP `500` inesperados en backend durante la corrida UX-004 (solo warning de Spring Security no bloqueante en arranque).
+
 ## Bloque E7 Reportes y Outbox/Eventos InkToy (2026-04-30)
 
 - [x] Pantallas aplicadas:
