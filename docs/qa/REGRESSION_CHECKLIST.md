@@ -385,6 +385,26 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
   - [x] Sin `pageerror` durante la validacion.
   - [x] Sin respuestas HTTP `500` inesperadas en backend durante la corrida.
 
+### Revalidacion UX-010 Cotizaciones (2026-05-04)
+
+- [x] Alcance UX-010 aplicado solo en frontend de edicion de cotizaciones.
+- [x] Archivo validado: `frontend/src/app/features/quotes/quote-edit-page.component.ts`.
+- [x] Ajuste UX aplicado:
+  - [x] Se elimino redireccion inmediata en `/cotizaciones/:id/editar` cuando la cotizacion no es editable.
+  - [x] Se muestra mensaje persistente de bloqueo con contexto y acciones de salida (`Volver al detalle`, `Ir al listado`, `Crear nueva cotizacion`).
+  - [x] Se mantiene bloqueo de guardado para estados no editables (sin llamada de update).
+- [x] Casos validados en UI:
+  - [x] DRAFT (`#43`): formulario editable visible y boton `Guardar cambios` disponible.
+  - [x] SENT (`#32`): sin redireccion, se muestra bloque `Edicion no disponible` y sin formulario de guardado.
+  - [x] CANCELLED (`#2`): sin redireccion, mensaje persistente y acciones de salida visibles.
+  - [x] CONVERTED (`#1`): sin redireccion, mensaje persistente y acciones de salida visibles.
+  - [x] Accion `Volver al detalle` desde estado bloqueado navega correctamente a `/cotizaciones/:id`.
+- [x] Evidencia complementaria:
+  - [x] Se genero cotizacion DRAFT para prueba editable: `#43` (`Q-1777875060899`).
+- [x] Estabilidad en corrida UX-010:
+  - [x] Sin `pageerror` durante la validacion.
+  - [x] Sin respuestas HTTP `500` inesperadas en backend durante la corrida (solo warning no bloqueante de Spring Security en arranque).
+
 ## Bloque E7 Reportes y Outbox/Eventos InkToy (2026-04-30)
 
 - [x] Pantallas aplicadas:

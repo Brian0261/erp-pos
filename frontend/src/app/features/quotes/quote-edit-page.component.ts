@@ -32,7 +32,7 @@ import {
           <p class="ui-page-kicker">Comercial InkToy</p>
           <h1 class="ui-page-title">Editar cotizacion</h1>
           <p class="ui-page-description">
-            Actualiza solo cotizaciones en estado DRAFT o SENT.
+            Actualiza solo cotizaciones en estado DRAFT.
           </p>
         </div>
         <a
@@ -63,7 +63,7 @@ import {
         [formGroup]="form"
         (ngSubmit)="submit()"
         class="form-layout"
-        *ngIf="loaded"
+        *ngIf="loaded && editable"
       >
         <section class="form-section">
           <header class="section-head">
@@ -243,10 +243,6 @@ import {
           </article>
         </section>
 
-        <p class="ui-alert ui-alert--error" *ngIf="!editable">
-          Esta cotizacion no se puede editar en su estado actual.
-        </p>
-
         <div class="form-actions">
           <button
             type="submit"
@@ -257,6 +253,34 @@ import {
           </button>
         </div>
       </form>
+
+      <section
+        class="ui-card blocked-state"
+        *ngIf="loaded && quote && !editable"
+      >
+        <h2>Edicion no disponible</h2>
+        <p>{{ nonEditableMessage }}</p>
+        <div class="blocked-state__actions">
+          <a
+            class="ui-button ui-button--secondary"
+            [routerLink]="['/cotizaciones', quoteId]"
+          >
+            Volver al detalle
+          </a>
+          <a
+            class="ui-button ui-button--primary"
+            [routerLink]="['/cotizaciones']"
+          >
+            Ir al listado
+          </a>
+          <a
+            class="ui-button ui-button--secondary"
+            [routerLink]="['/cotizaciones/nueva']"
+          >
+            Crear nueva cotizacion
+          </a>
+        </div>
+      </section>
     </section>
   `,
   styles: [
@@ -358,10 +382,9 @@ import {
         background: var(--color-bg-soft);
         padding: var(--space-3);
         display: grid;
-        grid-template-columns: minmax(220px, 1.8fr) 150px 150px minmax(
-            180px,
-            1fr
-          ) auto;
+        grid-template-columns:
+          minmax(220px, 1.8fr) 150px 150px minmax(180px, 1fr)
+          auto;
         gap: var(--space-2);
         align-items: end;
       }
@@ -436,6 +459,28 @@ import {
         flex-wrap: wrap;
       }
 
+      .blocked-state {
+        border: 1px solid #fca5a5;
+        background: #fef2f2;
+        display: grid;
+        gap: var(--space-2);
+      }
+
+      .blocked-state h2 {
+        font-size: 1rem;
+      }
+
+      .blocked-state p {
+        margin: 0;
+        color: #7f1d1d;
+      }
+
+      .blocked-state__actions {
+        display: flex;
+        gap: var(--space-2);
+        flex-wrap: wrap;
+      }
+
       .field-error {
         margin: 0;
         color: var(--color-danger);
@@ -500,6 +545,9 @@ import {
   ],
 })
 export class QuoteEditPageComponent implements OnInit {
+  readonly nonEditableMessage =
+    "Esta cotizacion no puede editarse porque ya fue enviada, cancelada o convertida. Puedes revisar el detalle o crear una nueva cotizacion.";
+
   readonly form = this.formBuilder.group({
     customerName: ["", [Validators.required, Validators.maxLength(180)]],
     customerDocument: ["", Validators.maxLength(40)],
@@ -581,7 +629,7 @@ export class QuoteEditPageComponent implements OnInit {
     this.successMessage = "";
 
     if (!this.editable) {
-      this.errorMessage = "Solo se permite editar cotizaciones DRAFT o SENT.";
+      this.errorMessage = this.nonEditableMessage;
       return;
     }
 
@@ -704,10 +752,7 @@ export class QuoteEditPageComponent implements OnInit {
 
         this.editable = this.canEditStatus(quote.status);
         if (!this.editable) {
-          this.errorMessage =
-            "La cotizacion no se puede editar porque esta en estado CONVERTED, CANCELLED o EXPIRED.";
           this.loaded = true;
-          this.router.navigate(["/cotizaciones", id]);
           return;
         }
 
@@ -771,7 +816,7 @@ export class QuoteEditPageComponent implements OnInit {
   }
 
   private canEditStatus(status: QuoteStatus): boolean {
-    return status === "DRAFT" || status === "SENT";
+    return status === "DRAFT";
   }
 
   private mapItem(group: FormGroup): QuoteItemRequest | null {
