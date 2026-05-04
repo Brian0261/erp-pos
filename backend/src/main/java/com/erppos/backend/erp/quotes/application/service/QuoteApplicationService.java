@@ -213,7 +213,8 @@ public class QuoteApplicationService implements QuoteUseCase {
     @Override
     @Transactional
     public Quote convertToSale(Long id, ConvertQuoteToSaleCommand command) {
-        Quote current = getById(id);
+        Quote current = quoteRepositoryPort.findByIdForUpdate(id)
+                .orElseThrow(() -> new QuoteNotFoundException("Quote not found"));
 
         assertQuoteCanBeConverted(current);
         if (command.warehouseId() == null) {

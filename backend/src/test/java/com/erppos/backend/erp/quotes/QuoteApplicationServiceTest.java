@@ -167,6 +167,15 @@ class QuoteApplicationServiceTest {
     }
 
     @Test
+    void shouldUseLockedReadWhenConvertingQuote() {
+        Quote quote = quoteService.create(validCreateCommand());
+
+        quoteService.convertToSale(quote.id(), validConvertCommand());
+
+        assertEquals(1, quoteRepository.findByIdForUpdateCalls);
+    }
+
+    @Test
     void shouldRegisterConvertedSaleIdAndHistory() {
         Quote quote = quoteService.create(validCreateCommand());
         Quote converted = quoteService.convertToSale(quote.id(), validConvertCommand());
@@ -316,6 +325,7 @@ class QuoteApplicationServiceTest {
         private final AtomicLong quoteSeq = new AtomicLong(1);
         private final AtomicLong itemSeq = new AtomicLong(1);
         private final Map<Long, Quote> storage = new HashMap<>();
+        private long findByIdForUpdateCalls;
 
         @Override
         public Quote save(Quote quote) {
@@ -359,6 +369,12 @@ class QuoteApplicationServiceTest {
         @Override
         public Optional<Quote> findById(Long id) {
             return Optional.ofNullable(storage.get(id));
+        }
+
+        @Override
+        public Optional<Quote> findByIdForUpdate(Long id) {
+            findByIdForUpdateCalls++;
+            return findById(id);
         }
 
         @Override

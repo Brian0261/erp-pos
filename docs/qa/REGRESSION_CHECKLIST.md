@@ -309,6 +309,48 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
     - [x] Sin errores `500` en corrida controlada.
     - [x] Cierre/reapertura y restriccion BT-001 revalidadas (`409`, `200`, `201`, `409`).
 
+## Bloque BT-002 Doble conversion concurrente de cotizacion (2026-05-04)
+
+- [x] Backend: `mvn clean test` => SUCCESS (120 tests, 0 fail/error).
+- [x] Backend: `mvn clean verify` => SUCCESS.
+- [x] `docker compose up --build -d` ejecutado.
+- [x] `docker compose ps` con `postgres` healthy, `backend` up, `frontend` up.
+- [x] `GET /api/v1/health` => `200`.
+- [x] Datos QA controlados creados por API:
+  - [x] Producto: `#6` (`SKU-BT002-1777919357`).
+  - [x] Almacen: `#2` (`WH-01`).
+  - [x] Stock seed: ajuste `IN` hasta `20.000`.
+- [x] Conversion normal (`quote #5`):
+  - [x] `POST /quotes/5/convert-to-sale` => `200`.
+  - [x] Cotizacion final `CONVERTED`.
+  - [x] `convertedSaleId` no nulo (`4`).
+  - [x] Venta generada `#4`.
+  - [x] Stock `20.000 -> 19.000`.
+  - [x] Kardex `SALE_OUT` unico (`movementId=10`, `referenceId=4`).
+- [x] Doble conversion secuencial (`quote #5`):
+  - [x] Segundo `POST` => `409` (`Quote already converted`).
+  - [x] Sin `500`.
+  - [x] Sin segunda venta.
+  - [x] Stock sin descuento adicional (`19.000 -> 19.000`).
+- [x] Doble conversion concurrente (`quote #6`):
+  - [x] Dos requests paralelos ejecutados.
+  - [x] Resultado: `200` y `409`.
+  - [x] Solo una venta efectiva (`#5`).
+  - [x] Cotizacion con un solo `convertedSaleId` (`5`).
+  - [x] Stock descontado una sola vez (`19.000 -> 18.000`).
+  - [x] Kardex con un solo `SALE_OUT` nuevo (delta `+1`, `movementId=11`, `referenceId=5`).
+- [x] Roles:
+  - [x] `ADMIN` convierte (`200`).
+  - [x] `CAJERO` convierte (`200`).
+  - [x] `SUPERVISOR` convierte (`200`).
+  - [x] `ALMACENERO` bloqueado en quotes/convert (`403`).
+  - [x] `GET /warehouses?active=true` para `CAJERO` => `200`.
+- [x] Estabilidad:
+  - [x] Sin `500` en corrida final BT-002.
+  - [x] Backend logs del tramo final sin excepciones inesperadas.
+  - [x] UI `/pos` y `/ventas` cargan correctamente.
+  - [x] Sin `pageerror` observado en smoke UI final.
+
 ## Bloque E4 Compras/Proveedores InkToy (2026-04-30)
 
 - [x] Pantallas aplicadas:

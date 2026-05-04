@@ -10,6 +10,7 @@ import java.util.Optional;
 public interface QuoteRepositoryPort {
     Quote save(Quote quote);
     Optional<Quote> findById(Long id);
+    Optional<Quote> findByIdForUpdate(Long id);
     List<Quote> findByFilters(QuoteStatus status, String customerQuery, LocalDate from, LocalDate to);
     boolean existsByQuoteNumber(String quoteNumber);
 }

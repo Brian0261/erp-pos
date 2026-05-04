@@ -42,6 +42,11 @@ public class QuotePersistenceAdapter implements QuoteRepositoryPort {
     }
 
     @Override
+    public Optional<Quote> findByIdForUpdate(Long id) {
+        return quoteJpaRepository.findByIdForUpdate(id).map(QuoteMapper::toDomain);
+    }
+
+    @Override
     public List<Quote> findByFilters(QuoteStatus status, String customerQuery, LocalDate from, LocalDate to) {
         return quoteJpaRepository.findByFilters(status, customerQuery, from, to)
                 .stream()

@@ -95,3 +95,70 @@ Scope: backend Spring Boot + Docker local + Flyway + RBAC + endpoints API
   - Segundo intento tras reapertura: `409`.
 
 Conclusión: BT-001 queda cerrado al **100%** incluyendo la evidencia faltante de no regresión en venta/stock/kardex con datos controlados.
+
+## Addendum - Validacion BT-002 doble conversion concurrente de cotizacion (2026-05-04)
+
+### Resultado
+
+- Estado: **Validado en runtime real** (Maven + Docker + API + smoke UI).
+- Correccion BT-002 confirmada en comportamiento observable:
+  - conversion normal funciona.
+  - segundo intento secuencial retorna `409` (sin `500`).
+  - doble intento concurrente retorna `200`/`409` (solo una conversion efectiva).
+
+### Evidencia tecnica (corrida controlada)
+
+- Build/quality:
+  - `mvn clean test` => SUCCESS (`120` tests, `0` fail/error).
+  - `mvn clean verify` => SUCCESS.
+- Runtime:
+  - `docker compose up --build -d` y `docker compose ps` OK.
+  - Health backend: `GET /api/v1/health` => `200`.
+- Datos QA usados:
+  - Producto: `#6` (`SKU-BT002-1777919357`, `Producto QA BT002 1777919357`).
+  - Almacen: `#2` (`WH-01 - Almacen Principal`).
+  - Seed stock inicial: `20` unidades (ajuste `IN`).
+
+### Conversion normal (cotizacion `#5`)
+
+- `POST /api/v1/quotes/5/convert-to-sale` => `200`.
+- Estado cotizacion final: `CONVERTED`.
+- `convertedSaleId`: `4` (no nulo).
+- Venta generada: `#4`.
+- Stock: `20.000 -> 19.000`.
+- Kardex: `SALE_OUT` unico para la venta (`movementId=10`, `referenceId=4`).
+
+### Doble conversion secuencial (misma cotizacion `#5`)
+
+- Segundo `POST /api/v1/quotes/5/convert-to-sale` => `409` (`Quote already converted`).
+- Sin `500` en el intento secuencial.
+- `convertedSaleId` se mantiene en `4`.
+- Stock no vuelve a descontarse: `19.000 -> 19.000`.
+
+### Doble conversion concurrente (cotizacion `#6`)
+
+- Dos requests paralelos a `POST /api/v1/quotes/6/convert-to-sale`.
+- Resultado observado: `200` y `409`.
+- `successCount=1`, `conflictCount=1`.
+- Cotizacion final: `CONVERTED` con `convertedSaleId=5` (unico).
+- Venta efectiva unica: `#5`.
+- Stock: `19.000 -> 18.000` (descuento unico).
+- Kardex: solo un `SALE_OUT` nuevo para esta conversion (`movementId=11`, `referenceId=5`, delta `+1`).
+
+### Roles y regresion funcional
+
+- `CAJERO`: puede convertir (`200`) y `GET /api/v1/warehouses?active=true` permanece `200`.
+- `ADMIN`: conversion OK (`200`).
+- `SUPERVISOR`: conversion OK (`200`).
+- `ALMACENERO`: bloqueado en cotizaciones y conversion (`403`).
+- Smoke UI final:
+  - `/pos` carga correctamente.
+  - `/ventas` carga correctamente sin `pageerror` observado.
+
+### Observaciones de estabilidad
+
+- No se detectaron respuestas `500` en la corrida final de BT-002.
+- Logs backend del tramo final de validacion: sin excepciones inesperadas.
+- Se registraron `500` previos en intentos de depuracion por payload JSON mal formado en harness de prueba; no corresponden a la correccion BT-002 y quedaron descartados al rerun validado.
+
+Conclusión: BT-002 queda **cerrado en runtime real** con evidencia de bloqueo efectivo ante doble conversion concurrente y sin regresion operativa en cotizaciones/caja/ventas.

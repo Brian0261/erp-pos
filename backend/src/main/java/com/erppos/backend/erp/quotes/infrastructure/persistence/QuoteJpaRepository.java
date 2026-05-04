@@ -1,8 +1,10 @@
 package com.erppos.backend.erp.quotes.infrastructure.persistence;
 
 import com.erppos.backend.erp.quotes.domain.model.QuoteStatus;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -17,6 +19,11 @@ public interface QuoteJpaRepository extends JpaRepository<QuoteEntity, Long> {
     @Override
     @EntityGraph(attributePaths = {"items"})
     Optional<QuoteEntity> findById(Long id);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @EntityGraph(attributePaths = {"items"})
+    @Query("select q from QuoteEntity q where q.id = :id")
+    Optional<QuoteEntity> findByIdForUpdate(@Param("id") Long id);
 
     @Query("""
             SELECT DISTINCT q FROM QuoteEntity q

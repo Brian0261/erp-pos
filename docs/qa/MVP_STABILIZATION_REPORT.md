@@ -198,3 +198,56 @@ Validar correccion backend BT-001 para garantizar **una sola caja OPEN por usuar
   - Sin stock negativo global (`stock_balances.quantity < 0` => 0).
   - Restriccion BT-001 revalidada en la misma corrida (`409`, `200`, `201`, `409`).
   - Sin respuestas `500` en la corrida controlada.
+
+## Addendum - Validacion full-stack BT-002 (2026-05-04)
+
+### Objetivo
+
+Validar en runtime real la correccion backend BT-002 para evitar doble conversion concurrente de una misma cotizacion y preservar consistencia de ventas/stock/kardex.
+
+### Resultado
+
+- BT-002 validado en runtime Docker con evidencia funcional y concurrente.
+- Sin regresion en cotizaciones, caja, ventas ni cargas UI de `/pos` y `/ventas`.
+
+### Evidencia principal
+
+- Build/quality:
+  - `mvn clean test` => SUCCESS (`120` tests, `0` fail/error).
+  - `mvn clean verify` => SUCCESS.
+- Runtime:
+  - `docker compose up --build -d` y `docker compose ps` => OK.
+  - `GET /api/v1/health` => `200`.
+- Datos QA controlados:
+  - Producto `#6` (`SKU-BT002-1777919357`).
+  - Almacen `#2` (`WH-01`).
+  - Stock seed `20.000` por ajuste `IN`.
+- Conversion normal (`quote #5`):
+  - `POST /quotes/5/convert-to-sale` => `200`.
+  - Cotizacion `CONVERTED` con `convertedSaleId=4`.
+  - Venta `#4` creada.
+  - Stock `20.000 -> 19.000`.
+  - Kardex `SALE_OUT` unico (`movementId=10`, `referenceId=4`).
+- Doble conversion secuencial (`quote #5`):
+  - Segundo `POST` => `409` (`Quote already converted`).
+  - Sin `500`, sin segunda venta, stock sin cambio adicional (`19.000 -> 19.000`).
+- Doble conversion concurrente (`quote #6`):
+  - Dos requests paralelos => `200` y `409`.
+  - Solo una conversion efectiva (`convertedSaleId=5`, venta `#5`).
+  - Stock con descuento unico (`19.000 -> 18.000`).
+  - Kardex con un solo `SALE_OUT` nuevo (delta `+1`, `movementId=11`, `referenceId=5`).
+- Roles:
+  - `ADMIN` convierte (`200`).
+  - `CAJERO` convierte (`200`) y mantiene `GET /warehouses?active=true` en `200`.
+  - `SUPERVISOR` convierte (`200`).
+  - `ALMACENERO` bloqueado en cotizaciones/convert (`403`).
+
+### Estabilidad
+
+- Corrida final BT-002 sin respuestas `500`.
+- Logs backend del tramo final de validacion sin excepciones inesperadas.
+- Sin `pageerror` observado en smoke UI final.
+
+### Nota operativa
+
+Se observaron `500` en intentos previos de depuracion por payload JSON concurrente mal formado en el harness de prueba; fueron descartados tras corregir el mecanismo de requests paralelas y no corresponden a la correccion BT-002.
