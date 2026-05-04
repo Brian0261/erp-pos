@@ -26,7 +26,7 @@ import { toHttpErrorMessage } from "./data/http-error-message";
           <h1 class="ui-page-title">Comprobantes electronicos</h1>
           <p class="ui-page-description">
             Consulta estado del ciclo DRAFT a ACCEPTED, revisa datos de cliente
-            y accede al detalle o a la emision desde venta.
+            y accede al detalle o a la venta asociada.
           </p>
         </div>
       </header>
@@ -214,12 +214,6 @@ import { toHttpErrorMessage } from "./data/http-error-message";
                     [routerLink]="['/ventas', document.saleId]"
                   >
                     Ver venta
-                  </a>
-                  <a
-                    class="ui-button ui-button--primary action-btn"
-                    [routerLink]="['/facturacion/emitir', document.saleId]"
-                  >
-                    Emitir desde venta
                   </a>
                 </td>
               </tr>

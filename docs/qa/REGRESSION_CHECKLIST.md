@@ -367,6 +367,24 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
   - [x] Sin `pageerror` en flujo validado.
   - [x] Sin HTTP `500` inesperados en backend durante la corrida UX-004 (solo warning de Spring Security no bloqueante en arranque).
 
+### Revalidacion UX-005 Facturacion (2026-05-04)
+
+- [x] Alcance UX-005 aplicado solo en frontend del listado de comprobantes.
+- [x] Archivo validado: `frontend/src/app/features/billing/billing-documents-page.component.ts`.
+- [x] Ajuste UX aplicado:
+  - [x] Se removio `Emitir desde venta` como accion por fila en la tabla de comprobantes.
+  - [x] Se mantienen acciones por fila claras: `Ver detalle` y `Ver venta`.
+  - [x] Se mantiene emision desde flujo global por `saleId` (campo `Emitir desde venta` + boton `Ir`).
+- [x] Validacion funcional en UI (`/facturacion/comprobantes`):
+  - [x] Listado carga correctamente con comprobantes existentes.
+  - [x] No se muestra `Emitir desde venta` en filas del listado.
+  - [x] Navegacion a detalle (`Ver detalle`) operativa.
+  - [x] Navegacion a venta asociada (`Ver venta`) operativa.
+  - [x] Navegacion al flujo de emision desde accion global (`Ir`) operativa (`/facturacion/emitir/:saleId`).
+- [x] Estabilidad en corrida UX-005:
+  - [x] Sin `pageerror` durante la validacion.
+  - [x] Sin respuestas HTTP `500` inesperadas en backend durante la corrida.
+
 ## Bloque E7 Reportes y Outbox/Eventos InkToy (2026-04-30)
 
 - [x] Pantallas aplicadas:
