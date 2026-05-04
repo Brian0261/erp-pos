@@ -26,6 +26,7 @@ import com.erppos.backend.erp.inventory.domain.port.StockTransferRepositoryPort;
 import com.erppos.backend.erp.inventory.domain.port.WarehouseRepositoryPort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -117,6 +118,37 @@ class InventoryApplicationServiceTest {
 
         assertThrows(InventoryBusinessRuleException.class,
                 () -> inventoryService.registerInitialStock(new RegisterInitialStockCommand(productId, warehouseId, BigDecimal.ONE, "Reintento")));
+    }
+
+    @Test
+    void shouldKeepSingleInitialStockMovementAndStockAfterSecondAttemptFails() {
+        Long warehouseId = seedWarehouse("WH-A");
+        Long productId = seedActiveProduct("SKU-1");
+        inventoryService.registerInitialStock(new RegisterInitialStockCommand(productId, warehouseId, BigDecimal.TEN, "Carga inicial"));
+
+        assertThrows(InventoryBusinessRuleException.class,
+                () -> inventoryService.registerInitialStock(new RegisterInitialStockCommand(productId, warehouseId, BigDecimal.ONE, "Reintento")));
+
+        List<InventoryMovement> kardex = inventoryService.kardex(productId, warehouseId, null, null);
+        long initialStockMovements = kardex.stream()
+                .filter(m -> m.movementType() == InventoryMovementType.INITIAL_STOCK)
+                .count();
+
+        assertEquals(1, initialStockMovements);
+        StockBalance balance = inventoryService.listStocks(productId, warehouseId, Pageable.unpaged()).getContent().get(0);
+        assertEquals(0, balance.quantity().compareTo(BigDecimal.TEN));
+    }
+
+    @Test
+    void shouldTranslateConcurrentInitialStockUniqueViolationToBusinessRuleException() {
+        Long warehouseId = seedWarehouse("WH-A");
+        Long productId = seedActiveProduct("SKU-1");
+        movementRepository.failNextInitialStockSaveWithUniqueViolation();
+
+        InventoryBusinessRuleException exception = assertThrows(InventoryBusinessRuleException.class,
+                () -> inventoryService.registerInitialStock(new RegisterInitialStockCommand(productId, warehouseId, BigDecimal.ONE, "Carga inicial")));
+
+        assertEquals("Initial stock already registered for this product in the warehouse", exception.getMessage());
     }
 
     @Test
@@ -389,9 +421,18 @@ class InventoryApplicationServiceTest {
     static class InMemoryInventoryMovementRepository implements InventoryMovementRepositoryPort {
         private final AtomicLong sequence = new AtomicLong(1);
         private final Map<Long, InventoryMovement> storage = new HashMap<>();
+        private boolean failNextInitialStockSaveWithUniqueViolation;
+
+        void failNextInitialStockSaveWithUniqueViolation() {
+            this.failNextInitialStockSaveWithUniqueViolation = true;
+        }
 
         @Override
         public InventoryMovement save(InventoryMovement movement) {
+            if (failNextInitialStockSaveWithUniqueViolation && movement.movementType() == InventoryMovementType.INITIAL_STOCK) {
+                failNextInitialStockSaveWithUniqueViolation = false;
+                throw new DataIntegrityViolationException("duplicate key value violates unique constraint \"uq_inventory_movements_initial_stock_product_warehouse\"");
+            }
             Long id = movement.id() == null ? sequence.getAndIncrement() : movement.id();
             InventoryMovement stored = new InventoryMovement(
                     id,

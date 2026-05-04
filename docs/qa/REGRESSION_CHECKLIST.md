@@ -351,6 +351,55 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
   - [x] UI `/pos` y `/ventas` cargan correctamente.
   - [x] Sin `pageerror` observado en smoke UI final.
 
+## Bloque BT-003 Stock inicial unico por producto/almacen (2026-05-04)
+
+- [x] Backend: `mvn clean test` => SUCCESS (122 tests, 0 fail/error).
+- [x] Backend: `mvn clean verify` => SUCCESS (122 tests).
+- [x] `docker compose up --build -d` ejecutado.
+- [x] `docker compose ps` con `postgres` healthy, `backend` up, `frontend` up.
+- [x] `GET /api/v1/health` => `200`.
+- [x] Flyway/DB:
+  - [x] Version `14` aplicada en `flyway_schema_history` (`success=true`, `inventory initial stock unique`).
+  - [x] Indice parcial unico `uq_inventory_movements_initial_stock_product_warehouse` presente.
+- [x] Datos QA controlados por API:
+  - [x] Producto secuencial: `#23` (`SKU-BT003-A-1777937972`).
+  - [x] Producto concurrencia: `#24` (`SKU-BT003-B-1777937972`).
+  - [x] Producto rol ALMACENERO: `#25` (`SKU-BT003-C-1777937972`).
+  - [x] Producto roles bloqueados: `#26` (`SKU-BT003-D-1777937972`).
+  - [x] Almacen origen: `#2` (`WH-01`).
+  - [x] Almacen destino: `#3` (`QABT16050`).
+- [x] Stock inicial secuencial (`product #23`, `warehouse #2`):
+  - [x] Stock antes: `0`.
+  - [x] Primer `POST /inventory/initial-stock` => `201`.
+  - [x] Segundo `POST` misma combinacion => `422`.
+  - [x] Error controlado `422` con mensaje `Initial stock already registered for this product in the warehouse`.
+  - [x] Sin `500`.
+  - [x] Stock `0 -> 12.000` y permanece `12.000` tras segundo intento.
+  - [x] Kardex `INITIAL_STOCK`: `0 -> 1 -> 1` (sin duplicacion).
+- [x] Stock inicial concurrente (`product #24`, `warehouse #2`):
+  - [x] Dos requests paralelos ejecutados.
+  - [x] Resultado: `201` y `422`.
+  - [x] `successCount=1`, `status422Count=1`, `status500Count=0`.
+  - [x] Stock final `9.000` (una sola carga inicial).
+  - [x] Kardex `INITIAL_STOCK` final `1` (sin duplicacion).
+- [x] No regresion inventario:
+  - [x] Ajuste positivo `IN` => `201`.
+  - [x] Ajuste negativo `OUT` valido => `201`.
+  - [x] Transferencia valida => `201`.
+  - [x] Stock origen tras ajustes `13.000`; tras transferencia `12.000`.
+  - [x] Stock destino tras transferencia `1.000`.
+  - [x] Kardex transferencia: `TRANSFER_OUT=1`, `TRANSFER_IN=1`.
+  - [x] Sin stock negativo global (`stock_balances.quantity < 0` => `0`).
+- [x] Roles:
+  - [x] `ADMIN` puede registrar stock inicial (`201`).
+  - [x] `ALMACENERO` mantiene permisos operativos (`initial-stock=201`, `adjustments=201`, `transfers=201`).
+  - [x] `CAJERO` bloqueado en `initial-stock` (`403`).
+  - [x] `SUPERVISOR` bloqueado en `initial-stock` (`403`).
+- [x] Estabilidad/UI:
+  - [x] Sin `500` inesperados en corrida BT-003.
+  - [x] Logs backend sin excepciones no controladas (solo warning informativo de seguridad en arranque).
+  - [x] UI `/pos` y `/ventas` cargan correctamente.
+
 ## Bloque E4 Compras/Proveedores InkToy (2026-04-30)
 
 - [x] Pantallas aplicadas:

@@ -162,3 +162,85 @@ Conclusión: BT-001 queda cerrado al **100%** incluyendo la evidencia faltante d
 - Se registraron `500` previos en intentos de depuracion por payload JSON mal formado en harness de prueba; no corresponden a la correccion BT-002 y quedaron descartados al rerun validado.
 
 Conclusión: BT-002 queda **cerrado en runtime real** con evidencia de bloqueo efectivo ante doble conversion concurrente y sin regresion operativa en cotizaciones/caja/ventas.
+
+## Addendum - Validacion BT-003 stock inicial unico por producto/almacen (2026-05-04)
+
+### Resultado
+
+- Estado: **Validado en runtime real** (Maven + Docker + API + smoke UI).
+- Correccion BT-003 confirmada en comportamiento observable:
+  - primera carga de stock inicial permite registro (`201`).
+  - segundo intento secuencial sobre misma combinacion responde `422` controlado.
+  - doble intento concurrente responde `201/422` con una sola carga inicial efectiva.
+
+### Evidencia tecnica (corrida controlada)
+
+- Build/quality:
+  - `mvn clean test` => SUCCESS (`122` tests, `0` fail/error).
+  - `mvn clean verify` => SUCCESS (`122` tests).
+- Runtime:
+  - `docker compose up --build -d` y `docker compose ps` OK.
+  - `GET /api/v1/health` => `200`.
+- Flyway/DB:
+  - `flyway_schema_history`: version `14`, `success=true`, `description=inventory initial stock unique`.
+  - Indice parcial unico presente:
+    - `uq_inventory_movements_initial_stock_product_warehouse`
+    - `CREATE UNIQUE INDEX ... ON inventory_movements(product_id, warehouse_id) WHERE movement_type = 'INITIAL_STOCK'`.
+
+### Datos QA usados
+
+- Producto secuencial: `#23` (`SKU-BT003-A-1777937972`).
+- Producto concurrencia: `#24` (`SKU-BT003-B-1777937972`).
+- Producto rol ALMACENERO: `#25` (`SKU-BT003-C-1777937972`).
+- Producto roles no permitidos: `#26` (`SKU-BT003-D-1777937972`).
+- Almacen origen: `#2` (`WH-01`).
+- Almacen destino transferencia: `#3` (`QABT16050`).
+
+### Stock inicial secuencial (producto `#23`, almacen `#2`)
+
+- Stock antes: `0`.
+- Primer `POST /api/v1/inventory/initial-stock` => `201`.
+- Segundo `POST` misma combinacion => `422`.
+- Payload de error controlado (`422`):
+  - `message`: `Initial stock already registered for this product in the warehouse`.
+  - Sin `500`.
+- Stock despues primer intento: `12.000`.
+- Stock despues segundo intento: `12.000` (sin duplicacion).
+- Kardex `INITIAL_STOCK`:
+  - antes: `0`.
+  - despues primer intento: `1`.
+  - despues segundo intento: `1` (sin duplicacion).
+
+### Stock inicial concurrente (producto `#24`, almacen `#2`)
+
+- Stock antes: `0`.
+- Dos requests paralelos a `/inventory/initial-stock`.
+- Resultado observado: `201` y `422`.
+- `successCount=1`, `status422Count=1`, `status500Count=0`.
+- Stock final: `9.000` (una sola carga inicial aplicada).
+- Kardex `INITIAL_STOCK` final: `1` (sin duplicacion).
+
+### No regresion inventario
+
+- Ajuste positivo (`IN`) => `201`.
+- Ajuste negativo valido (`OUT`) => `201`.
+- Transferencia valida => `201`.
+- Consistencia de stock/kardex en corrida:
+  - Stock origen tras ajustes: `13.000`.
+  - Stock origen tras transferencia: `12.000`.
+  - Stock destino tras transferencia: `1.000`.
+  - Kardex transferencia: `TRANSFER_OUT=1`, `TRANSFER_IN=1`.
+- Stock negativo global: `0` filas (`stock_balances.quantity < 0`).
+
+### Roles y estabilidad
+
+- `ADMIN`: puede registrar stock inicial (`201`).
+- `ALMACENERO`: mantiene permisos operativos (`initial-stock=201`, `adjustment=201`, `transfer=201`).
+- `CAJERO`: bloqueado en `initial-stock` (`403`).
+- `SUPERVISOR`: bloqueado en `initial-stock` (`403`).
+- UI smoke final:
+  - `/pos` carga correctamente.
+  - `/ventas` carga correctamente.
+- Logs backend (ventana de validacion): sin `500` inesperados ni excepciones no controladas; solo warning informativo de configuracion de autenticacion en arranque.
+
+Conclusión: BT-003 queda **cerrado en runtime real** con garantia de unicidad de stock inicial por producto/almacen en secuencial y concurrente, sin duplicacion de stock/kardex y sin regresiones operativas.

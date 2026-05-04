@@ -23,6 +23,7 @@ import com.erppos.backend.erp.inventory.domain.port.InventoryProductReadPort;
 import com.erppos.backend.erp.inventory.domain.port.StockBalanceRepositoryPort;
 import com.erppos.backend.erp.inventory.domain.port.StockTransferRepositoryPort;
 import com.erppos.backend.erp.inventory.domain.port.WarehouseRepositoryPort;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -41,6 +42,8 @@ import java.util.Map;
 public class InventoryApplicationService implements InventoryUseCase {
 
     private static final BigDecimal ZERO = BigDecimal.ZERO;
+    private static final String INITIAL_STOCK_ALREADY_REGISTERED_MESSAGE = "Initial stock already registered for this product in the warehouse";
+    private static final String INITIAL_STOCK_UNIQUE_CONSTRAINT = "uq_inventory_movements_initial_stock_product_warehouse";
 
     private final StockBalanceRepositoryPort stockBalanceRepositoryPort;
     private final InventoryMovementRepositoryPort inventoryMovementRepositoryPort;
@@ -77,7 +80,7 @@ public class InventoryApplicationService implements InventoryUseCase {
         ensureWarehouseActive(command.warehouseId());
 
         if (inventoryMovementRepositoryPort.existsByProductIdAndWarehouseId(command.productId(), command.warehouseId())) {
-            throw new InventoryBusinessRuleException("Initial stock already registered for this product in the warehouse");
+            throw new InventoryBusinessRuleException(INITIAL_STOCK_ALREADY_REGISTERED_MESSAGE);
         }
 
         BigDecimal quantity = normalizeQuantity(command.quantity());
@@ -96,20 +99,27 @@ public class InventoryApplicationService implements InventoryUseCase {
                 current == null ? null : current.updatedAt()
         ));
 
-        return inventoryMovementRepositoryPort.save(new InventoryMovement(
-                null,
-                command.productId(),
-                command.warehouseId(),
-                InventoryMovementType.INITIAL_STOCK,
-                quantity,
-                previous,
-                next,
-                command.reason().trim(),
-                "INITIAL_STOCK",
-                savedBalance.id() == null ? null : savedBalance.id().toString(),
-                null,
-                auditUserProvider.currentUsername()
-        ));
+        try {
+            return inventoryMovementRepositoryPort.save(new InventoryMovement(
+                    null,
+                    command.productId(),
+                    command.warehouseId(),
+                    InventoryMovementType.INITIAL_STOCK,
+                    quantity,
+                    previous,
+                    next,
+                    command.reason().trim(),
+                    "INITIAL_STOCK",
+                    savedBalance.id() == null ? null : savedBalance.id().toString(),
+                    null,
+                    auditUserProvider.currentUsername()
+            ));
+        } catch (DataIntegrityViolationException ex) {
+            if (isInitialStockUniqueViolation(ex)) {
+                throw new InventoryBusinessRuleException(INITIAL_STOCK_ALREADY_REGISTERED_MESSAGE);
+            }
+            throw ex;
+        }
     }
 
     @Override
@@ -426,6 +436,18 @@ public class InventoryApplicationService implements InventoryUseCase {
 
     private BigDecimal normalizeQuantity(BigDecimal quantity) {
         return quantity.stripTrailingZeros();
+    }
+
+    private boolean isInitialStockUniqueViolation(DataIntegrityViolationException ex) {
+        Throwable current = ex;
+        while (current != null) {
+            String message = current.getMessage();
+            if (message != null && message.contains(INITIAL_STOCK_UNIQUE_CONSTRAINT)) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     private List<TransferStockItemCommand> mergeDuplicatedItems(List<TransferStockItemCommand> items) {

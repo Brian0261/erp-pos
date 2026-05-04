@@ -251,3 +251,63 @@ Validar en runtime real la correccion backend BT-002 para evitar doble conversio
 ### Nota operativa
 
 Se observaron `500` en intentos previos de depuracion por payload JSON concurrente mal formado en el harness de prueba; fueron descartados tras corregir el mecanismo de requests paralelas y no corresponden a la correccion BT-002.
+
+## Addendum - Validacion full-stack BT-003 (2026-05-04)
+
+### Objetivo
+
+Validar en runtime real la correccion backend BT-003 para garantizar **stock inicial unico por producto/almacen** en escenarios secuenciales y concurrentes, preservando consistencia de stock/kardex y sin regresion operativa.
+
+### Resultado
+
+- BT-003 validado en runtime Docker con evidencia secuencial y concurrente.
+- Sin regresion en ajustes, transferencias, roles operativos y carga UI de `/pos` y `/ventas`.
+
+### Evidencia principal
+
+- Build/quality:
+  - `mvn clean test` => SUCCESS (`122` tests, `0` fail/error).
+  - `mvn clean verify` => SUCCESS (`122` tests).
+- Runtime:
+  - `docker compose up --build -d` y `docker compose ps` => OK.
+  - `GET /api/v1/health` => `200`.
+- Flyway/DB:
+  - `flyway_schema_history` confirma version `14` aplicada (`success=true`, `inventory initial stock unique`).
+  - Indice parcial unico presente: `uq_inventory_movements_initial_stock_product_warehouse`.
+- Datos QA controlados:
+  - Productos: `#23` (`SKU-BT003-A-1777937972`), `#24` (`SKU-BT003-B-1777937972`), `#25`, `#26`.
+  - Almacenes: origen `#2` (`WH-01`), destino `#3` (`QABT16050`).
+- Secuencial (`product #23`, `warehouse #2`):
+  - Stock antes `0`.
+  - Primer `POST /inventory/initial-stock` => `201`.
+  - Segundo `POST` misma combinacion => `422` (mensaje controlado `Initial stock already registered for this product in the warehouse`).
+  - Stock final `12.000` (sin duplicacion).
+  - Kardex `INITIAL_STOCK`: `0 -> 1 -> 1`.
+- Concurrente (`product #24`, `warehouse #2`):
+  - Dos requests paralelos => `201` y `422`.
+  - `successCount=1`, `status422Count=1`, `status500Count=0`.
+  - Stock final `9.000` (una sola carga inicial efectiva).
+  - Kardex `INITIAL_STOCK` final `1`.
+- No regresion inventario:
+  - Ajuste `IN` => `201`.
+  - Ajuste `OUT` valido => `201`.
+  - Transferencia valida => `201`.
+  - Stock origen: `13.000` tras ajustes, `12.000` tras transferencia.
+  - Stock destino tras transferencia: `1.000`.
+  - Kardex transferencia: `TRANSFER_OUT=1`, `TRANSFER_IN=1`.
+  - Stock negativo global: `0` filas.
+- Roles:
+  - `ADMIN` registra stock inicial (`201`).
+  - `ALMACENERO` mantiene permisos (`initial-stock=201`, `adjustments=201`, `transfers=201`).
+  - `CAJERO` bloqueado en stock inicial (`403`).
+  - `SUPERVISOR` bloqueado en stock inicial (`403`).
+
+### Estabilidad
+
+- Sin respuestas `500` inesperadas en corrida BT-003.
+- Logs backend de la ventana de prueba sin excepciones no controladas.
+- UI smoke: `/pos` y `/ventas` cargan correctamente.
+
+### Conclusión
+
+BT-003 queda cerrado en runtime real con control de unicidad efectivo para `INITIAL_STOCK` (secuencial y concurrente), consistencia de inventario preservada y sin regresiones funcionales en operaciones criticas.
