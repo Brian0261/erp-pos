@@ -14,6 +14,44 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [x] `docker compose up --build -d` OK.
 - [x] `docker compose ps` con `postgres` healthy, `backend` up, `frontend` up.
 
+## Protocolo UX-011 anti-cache frontend (2026-05-04)
+
+- [x] Estado PWA/service worker revisado en configuracion actual:
+  - [x] `frontend/angular.json`: sin bandera `serviceWorker`.
+  - [x] `frontend/src/main.ts`: sin `provideServiceWorker`.
+  - [x] `frontend/package.json`: sin dependencia `@angular/service-worker`.
+  - [x] No se detecta `ngsw-config.json` ni `manifest.webmanifest` en runtime frontend.
+  - [x] Conclusion: hoy no hay PWA activa; el riesgo principal es cache de navegador/CDN local/Nginx, no service worker.
+- [x] Origen oficial QA para frontend en Docker: `http://localhost:4200` (evitar `127.0.0.1` por variaciones CORS/host).
+- [x] Para rutas criticas usar parametro preventivo `?ngsw-bypass=true` (estandar defensivo, compatible con estado actual sin SW).
+- [x] Ejecutar recarga fuerte del navegador (Hard Reload) tras cada `docker compose up --build -d`.
+- [x] Si persisten dudas de cache, repetir validacion en ventana incognita.
+- [x] Confirmar estado runtime:
+  - [x] `docker compose up --build -d`.
+  - [x] `docker compose ps`.
+  - [x] `docker compose logs frontend --tail=150`.
+  - [x] `docker compose logs backend --tail=150`.
+- [x] Confirmaciones tecnicas minimas antes de aprobar UI:
+  - [x] Sin llamadas hardcodeadas a `localhost:8080` desde Angular (`apiUrl` relativo `/api/v1`).
+  - [x] Sin fuentes externas (`fonts.googleapis.com` / `fonts.gstatic.com`).
+  - [x] Assets de InkToy cargan correctamente (logo y recursos locales).
+  - [x] Proxy `/api` operativo desde frontend Nginx.
+
+### Checklist estandar pre-aceptacion UI (obligatorio)
+
+- [x] `cd frontend`.
+- [x] `npm run build`.
+- [x] `cd ..`.
+- [x] `docker compose up --build -d`.
+- [x] `docker compose ps`.
+- [x] Abrir `/login?ngsw-bypass=true` sobre `http://localhost:4200`.
+- [x] Validar login con usuario objetivo.
+- [x] Validar ruta objetivo con `?ngsw-bypass=true`.
+- [x] Validar consola sin errores inesperados.
+- [x] Validar network sin `500` inesperados.
+- [x] Confirmar visualmente que el cambio aparece realmente en el contenedor Docker (no en shell cacheada).
+- [x] Si hay duda, repetir en incognita y con hard reload.
+
 ## Health y auth
 
 - [x] `GET /api/v1/health` => 200.
@@ -405,6 +443,14 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
   - [x] Sin `pageerror` durante la validacion.
   - [x] Sin respuestas HTTP `500` inesperadas en backend durante la corrida (solo warning no bloqueante de Spring Security en arranque).
 
+### Revalidacion UX-011 Protocolo anti-cache (2026-05-04)
+
+- [x] Alcance UX-011 aplicado como deuda de proceso QA (sin cambios funcionales de producto).
+- [x] Configuracion revisada: `angular.json`, `frontend/Dockerfile`, `frontend/nginx.conf`, `docker-compose.yml`, `frontend/src/environments/environment.ts`.
+- [x] Se confirma ausencia de PWA/service worker activo en la version actual.
+- [x] Se formaliza protocolo anti-cache y checklist pre-aceptacion UI en este documento.
+- [x] Se mantiene recomendacion de mejora de cache-control como deuda post-piloto (sin aplicar cambios de configuracion en esta etapa).
+
 ## Bloque E7 Reportes y Outbox/Eventos InkToy (2026-04-30)
 
 - [x] Pantallas aplicadas:
@@ -567,7 +613,7 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
   - [x] Registro ajuste negativo valido con producto activo: OK.
   - [x] Registro transferencia valida con producto activo: OK.
   - [x] Sin errores de consola inesperados, sin `pageerror` y sin `500` durante corrida final FE-007.
-- [x] Nota operativa QA: para evitar shell cacheada por service worker en auditoria browser se uso `?ngsw-bypass=true` en rutas de verificacion.
+- [x] Nota operativa QA: se uso `?ngsw-bypass=true` como bypass preventivo de cache en auditoria browser; en la configuracion actual no hay service worker activo.
 
 ## Hotfix UX-003 Confirmacion en Cotizaciones (2026-04-30)
 

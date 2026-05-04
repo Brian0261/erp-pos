@@ -129,3 +129,30 @@ Validaciones adicionales de cierre:
 ### Decision de liberacion
 
 Rediseño InkToy validado de forma integral y estable para piloto interno controlado.
+
+## Addendum - Cierre UX-011 (deuda de proceso QA)
+
+Fecha: 2026-05-04
+
+### Causa UX-011
+
+Riesgo de falsos positivos/falsos negativos en QA visual por validar shell o assets cacheados despues de rebuilds con Docker/Nginx o recargas parciales del navegador.
+
+### Estado PWA/service worker
+
+- No hay PWA activa en la configuracion actual.
+- Evidencia de configuracion:
+  - `frontend/angular.json` sin `serviceWorker`.
+  - `frontend/src/main.ts` sin `provideServiceWorker`.
+  - `frontend/package.json` sin `@angular/service-worker`.
+  - Sin `ngsw-config.json` ni `manifest.webmanifest` en runtime de frontend.
+
+### Decision y alcance aplicado
+
+- UX-011 se cierra como deuda de proceso.
+- Se formaliza protocolo anti-cache en `docs/qa/REGRESSION_CHECKLIST.md`.
+- No se aplican cambios funcionales en backend/frontend, rutas, servicios, endpoints ni reglas de negocio.
+
+### Deuda post-piloto recomendada (sin aplicar ahora)
+
+- Evaluar ajuste minimo de cache-control en Nginx para `index.html` (por ejemplo `Cache-Control: no-store`) manteniendo cache agresiva para bundles con hash.
