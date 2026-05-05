@@ -839,3 +839,46 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
   - [x] Sin `pageerror`.
   - [x] Sin errores de consola inesperados en los flujos UI validados.
   - [x] Sin respuestas `500` en el flujo oficial validado de UX-003.
+
+## Bloque BT-004 Hardening de usuarios seed Flyway (2026-05-04)
+
+- [x] Auditadas migraciones de seguridad: `V2__seed_initial_admin.sql`, `V7__seed_dev_users_non_admin.sql`.
+- [x] Confirmado riesgo de credenciales seed conocidas en entornos no locales.
+- [x] Nueva migracion de control agregada: `V15__security_seed_users_hardening.sql`.
+- [x] Placeholders Flyway configurados en `backend/src/main/resources/application.yaml`.
+- [x] Variables de entorno documentadas en `.env.example`.
+- [x] `docker-compose.yml` actualizado para exponer flags de hardening.
+- [x] `README.md` actualizado con politica BT-004 por entorno.
+- [x] Validacion build backend:
+  - [x] `mvn clean test`.
+  - [x] `mvn clean verify`.
+- [x] Validacion compose:
+  - [x] `docker compose config`.
+  - [x] `docker compose up --build -d`.
+  - [x] `docker compose ps` con `backend/frontend` arriba y `postgres` healthy.
+- [x] Flyway runtime (DB local en Docker):
+  - [x] `V15` aplicada con `success=true`.
+  - [x] `V2` y `V7` se mantienen aplicadas (`success=true`).
+  - [x] Sin ruptura de checksums historicos (validacion Flyway en logs OK).
+- [x] Modo local por defecto:
+  - [x] `HARDEN_DEFAULT_SEED_USERS=false` efectivo en `docker compose config`.
+  - [x] `HARDEN_DEFAULT_SEED_USERS_INCLUDE_ADMIN=false` efectivo en `docker compose config`.
+  - [x] Usuarios seed activos en DB local (`admin`, `cajero`, `almacenero`, `supervisor` con `active=true`).
+- [x] Login y token por rol:
+  - [x] `admin@erp.local` => login `200`, token valido, `/auth/me` `200`, rol `ADMIN`.
+  - [x] `cajero@erp.local` => login `200`, token valido, `/auth/me` `200`, rol `CAJERO`.
+  - [x] `almacenero@erp.local` => login `200`, token valido, `/auth/me` `200`, rol `ALMACENERO`.
+  - [x] `supervisor@erp.local` => login `200`, token valido, `/auth/me` `200`, rol `SUPERVISOR`.
+- [x] RBAC rapido (sin regresion):
+  - [x] `CAJERO` accede a POS/Caja/Cotizaciones (`200` en endpoints representativos).
+  - [x] `ALMACENERO` bloqueado en Cotizaciones (`GET /api/v1/quotes => 403`).
+  - [x] `ADMIN` mantiene acceso amplio (`quotes`, `cash-registers/current`, `billing/series` => `200`).
+  - [x] `SUPERVISOR` mantiene acceso esperado (`quotes`, `cash-registers/current`, POS search => `200`).
+- [x] Script externo hardening:
+  - [x] `docs/deployment/HARDEN_SEED_USERS.sql` fuera de `db/migration`.
+  - [x] Confirmado que no se ejecuta automaticamente por Flyway local.
+  - [x] Uso documentado en `README.md`.
+- [x] Logs backend (`docker compose logs backend --tail=200`):
+  - [x] Sin errores Flyway.
+  - [x] Sin errores de login/JWT.
+  - [x] Sin `500` inesperados.

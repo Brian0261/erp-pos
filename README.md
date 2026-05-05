@@ -161,6 +161,8 @@ Credenciales seed inicial:
 - email: `admin@erp.local`
 - password: `Admin123!`
 
+> Seguridad BT-004: estas credenciales son de bootstrap para entorno local/QA. No deben considerarse credenciales seguras de piloto/produccion.
+
 Credenciales seed local/dev para pruebas de autorizacion (403 por rol):
 
 - CAJERO
@@ -175,6 +177,20 @@ Credenciales seed local/dev para pruebas de autorizacion (403 por rol):
   - username: `supervisor`
   - email: `supervisor@erp.local`
   - password: `Admin123*`
+
+## Politica de hardening de usuarios seed (BT-004)
+
+- Migraciones historicas `V2` y `V7` no se modifican para no romper checksums de Flyway.
+- Se agrega `V15__security_seed_users_hardening.sql` para endurecer cuentas seed en entornos no locales.
+- Control por variables de entorno:
+  - `HARDEN_DEFAULT_SEED_USERS=false` (default): mantiene activos `cajero`, `almacenero`, `supervisor`.
+  - `HARDEN_DEFAULT_SEED_USERS=true`: desactiva esos usuarios seed.
+  - `HARDEN_DEFAULT_SEED_USERS_INCLUDE_ADMIN=true`: adicionalmente desactiva `admin` seed.
+- Recomendacion de uso:
+  - Local/QA: mantener ambos flags en `false`.
+  - Piloto/Stage/Produccion: usar `HARDEN_DEFAULT_SEED_USERS=true`; evaluar `...INCLUDE_ADMIN=true` segun estrategia operativa.
+- Nota importante: `V15` se ejecuta una sola vez por base de datos. Definir flags antes del primer arranque del entorno objetivo.
+- Para entornos ya provisionados, usar script manual: `docs/deployment/HARDEN_SEED_USERS.sql`.
 
 Endpoints actuales:
 

@@ -15,6 +15,9 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+    placeholders:
+      harden_default_seed_users: ${HARDEN_DEFAULT_SEED_USERS:false}
+      harden_default_seed_users_include_admin: ${HARDEN_DEFAULT_SEED_USERS_INCLUDE_ADMIN:false}
 
 server:
   port: ${SERVER_PORT:8080}

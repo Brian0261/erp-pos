@@ -244,3 +244,69 @@ Conclusión: BT-002 queda **cerrado en runtime real** con evidencia de bloqueo e
 - Logs backend (ventana de validacion): sin `500` inesperados ni excepciones no controladas; solo warning informativo de configuracion de autenticacion en arranque.
 
 Conclusión: BT-003 queda **cerrado en runtime real** con garantia de unicidad de stock inicial por producto/almacen en secuencial y concurrente, sin duplicacion de stock/kardex y sin regresiones operativas.
+
+## Addendum - Validacion BT-004 hardening de usuarios seed Flyway (2026-05-04)
+
+### Resultado
+
+- Estado: **Mitigado con control por entorno** sin cambios destructivos.
+- Se mantiene compatibilidad local/QA por defecto.
+- Se evita modificar migraciones historicas (`V2`, `V7`) para no romper checksums Flyway.
+
+### Riesgo identificado
+
+- `V2__seed_initial_admin.sql` y `V7__seed_dev_users_non_admin.sql` crean usuarios con credenciales conocidas.
+- Si se usan las mismas migraciones sin hardening en piloto/stage/prod, existe riesgo de acceso no autorizado por credenciales predecibles.
+
+### Accion tecnica aplicada
+
+- Nueva migracion `V15__security_seed_users_hardening.sql`:
+  - Desactiva (`active=false`) usuarios seed no-admin cuando `HARDEN_DEFAULT_SEED_USERS=true`.
+  - Opcionalmente desactiva admin seed cuando `HARDEN_DEFAULT_SEED_USERS_INCLUDE_ADMIN=true`.
+- `application.yaml` configurado con placeholders Flyway para flags de hardening.
+- `.env.example`, `docker-compose.yml` y `README.md` actualizados con politica operativa BT-004.
+
+### Decision operativa
+
+- Local/QA: conservar usuarios seed (`false/false`).
+- Piloto/Stage/Produccion: habilitar hardening (`HARDEN_DEFAULT_SEED_USERS=true`) y evaluar include admin.
+
+### Evidencia runtime real (Docker local, 2026-05-04)
+
+- Build backend:
+  - `mvn clean test` => SUCCESS (`122` tests, `0` fallos, `0` errores).
+  - `mvn clean verify` => SUCCESS (`122` tests, `0` fallos, `0` errores).
+- Compose:
+  - `docker compose config` valido con:
+    - `HARDEN_DEFAULT_SEED_USERS: "false"`
+    - `HARDEN_DEFAULT_SEED_USERS_INCLUDE_ADMIN: "false"`
+  - `docker compose up --build -d` => `backend`, `frontend` y `postgres` en `Up` (`postgres` healthy).
+- Flyway (DB runtime):
+  - `V2` (`seed initial admin`) `success=true`, checksum `1142349541`.
+  - `V7` (`seed dev users non admin`) `success=true`, checksum `-2080335429`.
+  - `V15` (`security seed users hardening`) `success=true`, checksum `-105804012`.
+  - Logs backend: `Successfully validated 15 migrations` y `Successfully applied 1 migration ... now at version v15`.
+  - Sin evidencia de ruptura de checksums previos.
+- Modo local por defecto:
+  - Flags efectivas en runtime: `false/false`.
+  - Usuarios seed activos en DB: `admin`, `cajero`, `almacenero`, `supervisor` con `active=true`.
+- Login y `/auth/me` por rol:
+  - `admin@erp.local` / `Admin123!` => login `200`, token emitido, `/auth/me` `200`, `roles=["ADMIN"]`.
+  - `cajero@erp.local` / `Admin123*` => login `200`, token emitido, `/auth/me` `200`, `roles=["CAJERO"]`.
+  - `almacenero@erp.local` / `Admin123*` => login `200`, token emitido, `/auth/me` `200`, `roles=["ALMACENERO"]`.
+  - `supervisor@erp.local` / `Admin123*` => login `200`, token emitido, `/auth/me` `200`, `roles=["SUPERVISOR"]`.
+- RBAC rapido (API):
+  - `CAJERO`: `GET /quotes=200`, `GET /cash-registers/current=200`, `GET /pos/products/search=200`.
+  - `ALMACENERO`: `GET /quotes=403` (bloqueo mantenido).
+  - `ADMIN`: `GET /quotes=200`, `GET /cash-registers/current=200`, `GET /billing/series=200`.
+  - `SUPERVISOR`: `GET /quotes=200`, `GET /cash-registers/current=200`, `GET /pos/products/search=200`.
+- Script externo:
+  - `docs/deployment/HARDEN_SEED_USERS.sql` confirmado fuera de `db/migration`.
+  - No se ejecuta automaticamente por Flyway en local (no aparece en `flyway_schema_history`).
+  - Uso documentado en `README.md`.
+- Logs:
+  - Sin `500` inesperados.
+  - Sin errores Flyway/JWT/login en la ventana de validacion.
+  - Solo warning informativo conocido de Spring Security en arranque.
+
+Conclusión: BT-004 queda **cerrado para MVP/piloto** como control de despliegue seguro, sin romper entorno local actual ni los usuarios de QA.
