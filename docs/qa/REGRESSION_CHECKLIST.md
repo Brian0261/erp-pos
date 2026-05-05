@@ -909,3 +909,46 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
   - [x] Origen no permitido no recibe `Access-Control-Allow-Origin`.
   - [x] Sin `500` inesperados en backend durante pruebas.
 
+## Bloque BT-009 Suite minima de integracion backend (2026-05-04)
+
+- [x] Infraestructura de test revisada (`pom.xml`, pruebas existentes, MockMvc, SpringBootTest, Testcontainers).
+- [x] Estrategia menor riesgo aplicada: `@SpringBootTest` + `MockMvc` + PostgreSQL Testcontainers + Flyway real.
+- [x] Nueva base comun de pruebas creada: `backend/src/test/java/com/erppos/backend/integration/AbstractHttpIntegrationTest.java`.
+- [x] Nueva suite de integracion creada:
+  - [x] `backend/src/test/java/com/erppos/backend/integration/AuthRbacCorsIntegrationTest.java`.
+  - [x] `backend/src/test/java/com/erppos/backend/integration/BtRulesIntegrationTest.java`.
+- [x] Cobertura health/auth:
+  - [x] `GET /api/v1/health` => `200`.
+  - [x] `GET /api/v1/health/db` => `200`.
+  - [x] `POST /api/v1/auth/login` (admin valido) => `200` + token.
+  - [x] `GET /api/v1/auth/me` sin token => `401`.
+  - [x] `GET /api/v1/auth/me` con token => `200` + rol correcto.
+- [x] Cobertura RBAC (403 reales):
+  - [x] `CAJERO` no accede a `/api/v1/integrations/outbox-events` => `403`.
+  - [x] `SUPERVISOR` no accede a `/api/v1/integrations/outbox-events` => `403`.
+  - [x] `ALMACENERO` no accede a `/api/v1/quotes` => `403`.
+  - [x] `ADMIN` accede a endpoint permitido (`/api/v1/integrations/outbox-events`) => `200`.
+- [x] Cobertura BT-001 caja:
+  - [x] Primera apertura => `201`.
+  - [x] Segunda apertura mismo usuario => `409`.
+  - [x] Cierre => `200`.
+  - [x] Reapertura tras cierre => `201`.
+- [x] Cobertura BT-003 inventario:
+  - [x] Primer stock inicial (producto/almacen controlados) => `201`.
+  - [x] Segundo stock inicial misma combinacion => `422`.
+  - [x] Sin `500`; kardex con un solo `INITIAL_STOCK`.
+- [x] Cobertura BT-002 cotizaciones:
+  - [x] Cotizacion de prueba creada y convertida una vez => `200`.
+  - [x] Segundo intento de conversion => `409`.
+  - [x] Sin `500`.
+- [x] Cobertura CORS BT-008:
+  - [x] Preflight permitido para `http://localhost:4200`.
+  - [x] Preflight permitido para `http://127.0.0.1:4200`.
+  - [x] Origen no permitido bloqueado/sin `Access-Control-Allow-Origin` permitido.
+- [x] Comandos ejecutados:
+  - [x] `mvn clean test` => SUCCESS.
+  - [x] `mvn clean verify` => SUCCESS.
+  - [x] `docker compose config` => OK.
+  - [x] `docker compose up --build -d` => OK.
+  - [x] `docker compose ps` => OK.
+

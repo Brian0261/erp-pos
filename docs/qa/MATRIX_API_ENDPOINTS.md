@@ -91,3 +91,17 @@ Ambiente validado: Docker Compose local (`backend`, `postgres`, `frontend`)
 
 - `OK`: validado por compilacion (`mvn clean test`, `mvn clean verify`) y/o ejecucion en Docker (`docker compose up --build -d`) con pruebas manuales de token/rol en endpoints representativos.
 - La auditoria no detecto endpoints caidos por `500` en los flujos revisados de negocio conocido.
+
+## Addendum BT-009 (2026-05-04)
+
+- Se agrega suite automatizada minima HTTP/RBAC/DB real en:
+  - `backend/src/test/java/com/erppos/backend/integration/AuthRbacCorsIntegrationTest.java`
+  - `backend/src/test/java/com/erppos/backend/integration/BtRulesIntegrationTest.java`
+- Endpoints con validacion automatizada explicita en esta deuda:
+  - Health/Auth: `/api/v1/health`, `/api/v1/health/db`, `/api/v1/auth/login`, `/api/v1/auth/me`.
+  - RBAC: `/api/v1/integrations/outbox-events`, `/api/v1/quotes`.
+  - BT-001: `/api/v1/cash-registers/open`, `/api/v1/cash-registers/{id}/close`, `/api/v1/cash-registers/current`.
+  - BT-003: `/api/v1/inventory/initial-stock`, `/api/v1/inventory/kardex`, `/api/v1/inventory/stocks`.
+  - BT-002: `/api/v1/quotes`, `/api/v1/quotes/{id}/convert-to-sale`.
+  - CORS BT-008: `OPTIONS /api/v1/auth/login`.
+

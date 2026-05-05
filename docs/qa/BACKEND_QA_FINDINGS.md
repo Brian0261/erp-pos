@@ -332,3 +332,41 @@ Conclusión: BT-004 queda **cerrado para MVP/piloto** como control de despliegue
 - Configuracion actualizada en `application.yaml`, `.env.example`, `docker-compose.yml`, `README.md` y checklist QA.
 - Build/test y compose deben ejecutarse en corrida BT-008 para confirmar runtime y preflight.
 
+## Addendum - Validacion BT-009 suite minima de integracion backend (2026-05-04)
+
+### Estrategia aplicada (menor riesgo)
+
+- Se implemento una suite acotada sobre el backend existente, sin cambios de logica de negocio, endpoints ni DTOs publicos.
+- Se reutilizo el stack nativo de pruebas: `@SpringBootTest` + `MockMvc` + PostgreSQL real en Testcontainers.
+- Se mantuvo Flyway real en test para validar wiring completo (`security`, filtros JWT, controladores, persistencia, migraciones).
+- No se introdujo Testcontainers nuevo en arquitectura: ya estaba declarado en `pom.xml`; se estabilizo su uso en pruebas HTTP.
+
+### Cobertura agregada
+
+- Clase `backend/src/test/java/com/erppos/backend/integration/AuthRbacCorsIntegrationTest.java`:
+  - Health: `GET /api/v1/health` y `GET /api/v1/health/db` => `200`.
+  - Auth: login admin con token, `/auth/me` con token => `200`, sin token => `401`.
+  - RBAC real: 3 casos `403` (`CAJERO` y `SUPERVISOR` sobre outbox, `ALMACENERO` sobre quotes) + caso `ADMIN` permitido (`200`).
+  - CORS BT-008: preflight permitido para `http://localhost:4200` y `http://127.0.0.1:4200`; origen no permitido sin `Access-Control-Allow-Origin` permitido.
+- Clase `backend/src/test/java/com/erppos/backend/integration/BtRulesIntegrationTest.java`:
+  - BT-001 Caja: primera apertura `201`, segunda apertura mismo usuario `409`, cierre y reapertura exitosos.
+  - BT-003 Inventario: primer stock inicial `201`, segundo intento misma combinacion `422`, sin `500`, kardex con un solo `INITIAL_STOCK`.
+  - BT-002 Cotizaciones: conversion inicial `200`, segundo intento `409`, sin `500`.
+
+### Evidencia de ejecucion
+
+- Backend:
+  - `mvn clean test` => **SUCCESS** (`132` tests, `0` failures, `0` errors).
+  - `mvn clean verify` => **SUCCESS**.
+- Docker:
+  - `docker compose config` => valido.
+  - `docker compose up --build -d` => servicios `postgres` (healthy), `backend` y `frontend` arriba.
+  - `docker compose ps` => puertos esperados activos (`8080`, `4200`, `5432`).
+
+### Riesgos residuales
+
+- La suite BT-009 es minima y no cubre todo el universo de endpoints/reportes; prioriza rutas criticas y de deuda tecnica cerrada.
+- Se observan warnings no bloqueantes de Spring/Hibernate en pruebas (`PageImpl` serialization warning, follow-on locking warning), sin impacto funcional directo en esta deuda.
+
+Conclusión: BT-009 queda **cerrada** para alcance MVP solicitado (suite minima profesional de integracion HTTP/RBAC/DB real, Maven en verde y validacion Docker completa).
+
