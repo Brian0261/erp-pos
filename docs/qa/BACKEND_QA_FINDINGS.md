@@ -370,3 +370,49 @@ Conclusión: BT-004 queda **cerrado para MVP/piloto** como control de despliegue
 
 Conclusión: BT-009 queda **cerrada** para alcance MVP solicitado (suite minima profesional de integracion HTTP/RBAC/DB real, Maven en verde y validacion Docker completa).
 
+## Addendum - Validacion BT-006 Fase 1 paginacion estable v2 (2026-05-05)
+
+### Resultado
+
+- Estado: **Cerrado (Fase 1 backend-only)**.
+- Se agrega contrato paginado estable en `/api/v2` sin romper compatibilidad de `/api/v1`.
+
+### Accion tecnica aplicada
+
+- Nuevo DTO compartido:
+  - `backend/src/main/java/com/erppos/backend/erp/shared/adapter/dto/PageResponse.java`
+  - `backend/src/main/java/com/erppos/backend/erp/shared/adapter/dto/PageResponseMapper.java`
+- Nuevos endpoints v2 (sin tocar v1):
+  - `GET /api/v2/products`
+  - `GET /api/v2/inventory/stocks`
+- Compatibilidad:
+  - `/api/v1/products` y `/api/v1/inventory/stocks` conservan contrato legado (`content`, `number`, `totalElements`, etc.).
+
+### Evidencia de pruebas
+
+- Unit test:
+  - `backend/src/test/java/com/erppos/backend/erp/shared/PageResponseMapperTest.java`
+- Integration tests:
+  - `backend/src/test/java/com/erppos/backend/integration/PaginationContractIntegrationTest.java`
+  - Valida v2 con `items/totalItems/...` y ausencia de `content`.
+  - Valida v1 con `content` para compatibilidad temporal.
+- Maven:
+  - `mvn clean test` => SUCCESS (`135` tests, `0` failures, `0` errors).
+  - `mvn clean verify` => SUCCESS (`135` tests, `0` failures, `0` errors).
+
+### Evidencia runtime (Docker local)
+
+- `docker compose config` => valido.
+- `docker compose up --build -d` => `backend`, `frontend` y `postgres` en `Up` (`postgres` healthy).
+- `docker compose ps` => puertos esperados activos (`8080`, `4200`, `5432`).
+- Validacion HTTP con token `ADMIN`:
+  - `/api/v2/products` y `/api/v2/inventory/stocks` exponen `items` y `totalItems`.
+  - `/api/v2/*` no expone `content`.
+  - `/api/v1/products` y `/api/v1/inventory/stocks` mantienen `content`.
+- Logs backend: sin `500` inesperados en la ventana de validacion.
+
+### Riesgo residual
+
+- Mientras exista consumo de `/api/v1` seguira apareciendo warning de serializacion `PageImpl` en runtime de esos endpoints legado.
+- Mitigacion planificada: migracion frontend por olas P1/P2/P3 a `/api/v2` y posterior deprecacion de `/api/v1`.
+

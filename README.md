@@ -192,6 +192,20 @@ Ejemplos:
 - LAN piloto local:
   - `CORS_ALLOWED_ORIGINS=http://localhost:4200,http://127.0.0.1:4200,http://192.168.1.50:4200,http://EQUIPO-QA:4200`
 
+## Contrato paginado estable v2 (BT-006 Fase 1)
+
+- Se agrega contrato estable para endpoints paginados en `/api/v2`:
+  - `items`
+  - `page`
+  - `size`
+  - `totalItems`
+  - `totalPages`
+- Endpoints nuevos:
+  - `GET /api/v2/products`
+  - `GET /api/v2/inventory/stocks`
+- Compatibilidad temporal:
+  - `GET /api/v1/products` y `GET /api/v1/inventory/stocks` se mantienen sin cambios y siguen devolviendo contrato Spring (`content`, `number`, `totalElements`, etc.).
+
 ## Politica de hardening de usuarios seed (BT-004)
 
 - Migraciones historicas `V2` y `V7` no se modifican para no romper checksums de Flyway.
@@ -216,6 +230,7 @@ Endpoints actuales:
 - `GET /api/v1/units`
 - `POST /api/v1/products`
 - `GET /api/v1/products`
+- `GET /api/v2/products`
 - `GET /api/v1/products/{id}`
 - `PUT /api/v1/products/{id}`
 - `DELETE /api/v1/products/{id}`
@@ -225,6 +240,7 @@ Endpoints actuales:
 - `GET /api/v1/warehouses/{id}`
 - `DELETE /api/v1/warehouses/{id}`
 - `GET /api/v1/inventory/stocks`
+- `GET /api/v2/inventory/stocks`
 - `POST /api/v1/inventory/initial-stock`
 - `POST /api/v1/inventory/adjustments`
 - `POST /api/v1/inventory/transfers`
