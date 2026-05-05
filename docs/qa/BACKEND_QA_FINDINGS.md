@@ -370,6 +370,53 @@ Conclusión: BT-004 queda **cerrado para MVP/piloto** como control de despliegue
 
 Conclusión: BT-009 queda **cerrada** para alcance MVP solicitado (suite minima profesional de integracion HTTP/RBAC/DB real, Maven en verde y validacion Docker completa).
 
+## Addendum - Validacion BT-007 hardening minimo de reportes (2026-05-05)
+
+### Resultado
+
+- Estado: **Cerrado (BT-007A/B)** con enfoque backend-only.
+- Se endurecen rangos de fecha y limites de listas sin cambiar frontend, endpoints ni DTOs.
+
+### Cambios funcionales aplicados
+
+- Politica de fechas para reportes con `from/to`:
+  - default seguro: ultimos 30 dias cuando no se envian fechas.
+  - cuando viene solo `from` o solo `to`, se completa ventana segura de 30 dias.
+  - validacion existente `to >= from` se mantiene.
+  - rango maximo permitido: 90 dias (`422` si se excede).
+- Limites de listas:
+  - `GET /api/v1/reports/low-stock`: `limit` opcional, default `200`, max `1000`.
+  - `GET /api/v1/reports/inventory-movements`: `limit` opcional, default `500`, max `2000`.
+  - `GET /api/v1/reports/top-products`: se mantiene `limit` entre `1..100`.
+- SQL endurecido:
+  - Se eliminan defaults historicos amplios tipo `1970-01-01 .. 9999-12-31`.
+  - Se agrega `LIMIT` en consultas de `low-stock` e `inventory-movements`.
+
+### Evidencia tecnica
+
+- Build/test backend:
+  - `mvn clean test` => SUCCESS (`145` tests, `0` failures, `0` errors).
+  - `mvn clean verify` => SUCCESS (`145` tests, `0` failures, `0` errors).
+- Nuevas pruebas:
+  - `backend/src/test/java/com/erppos/backend/erp/reports/ReportsApplicationServiceTest.java` (fechas y limites).
+  - `backend/src/test/java/com/erppos/backend/integration/ReportsHardeningIntegrationTest.java` (HTTP 200/422 y limites).
+- Runtime Docker:
+  - `docker compose config` valido.
+  - `docker compose up --build -d` y `docker compose ps` OK.
+  - Validaciones HTTP reales:
+    - `/api/v1/reports/sales` sin fechas => `200`.
+    - `/api/v1/reports/inventory-movements` sin fechas => `200`.
+    - `/api/v1/reports/low-stock` sin `limit` => `200`.
+    - rango excesivo (`from=2026-01-01&to=2026-05-01`) => `422`.
+    - `limit=1001` en `low-stock` => `422`.
+    - `limit=2001` en `inventory-movements` => `422`.
+  - Logs backend revisados: sin `500` inesperados en ventana de validacion BT-007.
+
+### Riesgo residual
+
+- BT-007C (indices adicionales para tuning avanzado) puede diferirse: no es bloqueante inmediato tras acotar rangos y listas.
+- Recomendacion post-piloto: evaluar `EXPLAIN ANALYZE` en cargas reales y decidir indice adicional solo si hay evidencia de cuello de botella.
+
 ## Addendum - Validacion BT-006 Fase 1 paginacion estable v2 (2026-05-05)
 
 ### Resultado

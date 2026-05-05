@@ -220,6 +220,19 @@ Ejemplos:
 - Nota importante: `V15` se ejecuta una sola vez por base de datos. Definir flags antes del primer arranque del entorno objetivo.
 - Para entornos ya provisionados, usar script manual: `docs/deployment/HARDEN_SEED_USERS.sql`.
 
+## Politica de hardening de reportes (BT-007)
+
+- Endpoints de reportes mantienen contrato y rutas `v1` (sin cambios de frontend).
+- Politica de fechas en reportes con `from/to`:
+  - Si no se envian fechas: backend aplica ventana segura de los ultimos 30 dias.
+  - Si se envia solo `from` o solo `to`: backend completa la otra fecha con una ventana segura de 30 dias.
+  - Se mantiene la validacion `to >= from`.
+  - Rango maximo permitido: 90 dias (`422` si se excede).
+- Limites para listas:
+  - `GET /api/v1/reports/low-stock`: `limit` opcional, default `200`, max `1000`.
+  - `GET /api/v1/reports/inventory-movements`: `limit` opcional, default `500`, max `2000`.
+  - `GET /api/v1/reports/top-products`: `limit` entre `1..100`.
+
 Endpoints actuales:
 
 - `POST /api/v1/auth/login`

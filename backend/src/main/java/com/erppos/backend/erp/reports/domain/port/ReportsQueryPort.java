@@ -16,8 +16,8 @@ import java.util.List;
 public interface ReportsQueryPort {
     SalesReport sales(LocalDate from, LocalDate to);
     CashRegisterReport cashRegister(Long cashRegisterId);
-    List<LowStockItem> lowStock(double threshold);
-    List<InventoryMovementReportItem> inventoryMovements(LocalDate from, LocalDate to, Long productId, Long warehouseId);
+    List<LowStockItem> lowStock(double threshold, int limit);
+    List<InventoryMovementReportItem> inventoryMovements(LocalDate from, LocalDate to, Long productId, Long warehouseId, int limit);
     PurchasesReport purchases(LocalDate from, LocalDate to, Long supplierId);
     List<TopProductReportItem> topProducts(LocalDate from, LocalDate to, int limit);
     QuotesReport quotes(LocalDate from, LocalDate to);

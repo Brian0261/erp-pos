@@ -33,8 +33,7 @@ import java.util.List;
 public class ReportsJdbcQueryAdapter implements ReportsQueryPort {
 
     private static final BigDecimal ZERO = BigDecimal.ZERO;
-    private static final Instant MIN_INSTANT_FILTER = Instant.parse("1970-01-01T00:00:00Z");
-    private static final Instant MAX_INSTANT_FILTER = Instant.parse("9999-12-31T23:59:59Z");
+    private static final int DEFAULT_RANGE_DAYS = 30;
 
     private final JdbcTemplate jdbcTemplate;
 
@@ -176,7 +175,7 @@ public class ReportsJdbcQueryAdapter implements ReportsQueryPort {
     }
 
     @Override
-    public List<LowStockItem> lowStock(double threshold) {
+    public List<LowStockItem> lowStock(double threshold, int limit) {
         BigDecimal th = BigDecimal.valueOf(threshold);
         return jdbcTemplate.query(
                 """
@@ -188,6 +187,7 @@ public class ReportsJdbcQueryAdapter implements ReportsQueryPort {
                         join warehouses w on w.id = sb.warehouse_id
                         where sb.quantity <= ?
                         order by sb.quantity asc
+                        limit ?
                         """,
                 (rs, rowNum) -> new LowStockItem(
                         rs.getLong("product_id"),
@@ -199,12 +199,13 @@ public class ReportsJdbcQueryAdapter implements ReportsQueryPort {
                         nz(rs.getBigDecimal("quantity")),
                         th
                 ),
-                th
+                th,
+                limit
         );
     }
 
     @Override
-    public List<InventoryMovementReportItem> inventoryMovements(LocalDate from, LocalDate to, Long productId, Long warehouseId) {
+    public List<InventoryMovementReportItem> inventoryMovements(LocalDate from, LocalDate to, Long productId, Long warehouseId, int limit) {
         Instant fromInstant = toFromInstant(from);
         Instant toInstant = toToInstant(to);
 
@@ -229,7 +230,8 @@ public class ReportsJdbcQueryAdapter implements ReportsQueryPort {
             sql.append(" and im.warehouse_id = ?");
             args.add(warehouseId);
         }
-        sql.append(" order by im.created_at desc");
+        sql.append(" order by im.created_at desc limit ?");
+        args.add(limit);
 
         return jdbcTemplate.query(
                 sql.toString(),
@@ -250,8 +252,8 @@ public class ReportsJdbcQueryAdapter implements ReportsQueryPort {
 
     @Override
     public PurchasesReport purchases(LocalDate from, LocalDate to, Long supplierId) {
-        LocalDate fromDay = from == null ? LocalDate.of(1970, 1, 1) : from;
-        LocalDate toDay = to == null ? LocalDate.of(9999, 12, 31) : to;
+        LocalDate fromDay = from == null ? defaultFromDate() : from;
+        LocalDate toDay = to == null ? defaultToDate() : to;
 
         StringBuilder whereSql = new StringBuilder(" where po.order_date >= ? and po.order_date <= ?");
         List<Object> args = new ArrayList<>();
@@ -330,8 +332,8 @@ public class ReportsJdbcQueryAdapter implements ReportsQueryPort {
 
     @Override
     public QuotesReport quotes(LocalDate from, LocalDate to) {
-        LocalDate fromDay = from == null ? LocalDate.of(1970, 1, 1) : from;
-        LocalDate toDay = to == null ? LocalDate.of(9999, 12, 31) : to;
+        LocalDate fromDay = from == null ? defaultFromDate() : from;
+        LocalDate toDay = to == null ? defaultToDate() : to;
 
         Long totalQuotes = nzLong(jdbcTemplate.queryForObject(
                 """
@@ -440,11 +442,20 @@ public class ReportsJdbcQueryAdapter implements ReportsQueryPort {
     }
 
     private Instant toFromInstant(LocalDate from) {
-        return from == null ? MIN_INSTANT_FILTER : from.atStartOfDay().toInstant(ZoneOffset.UTC);
+        return (from == null ? defaultFromDate() : from).atStartOfDay().toInstant(ZoneOffset.UTC);
     }
 
     private Instant toToInstant(LocalDate to) {
-        return to == null ? MAX_INSTANT_FILTER : to.plusDays(1).atStartOfDay().minusSeconds(1).toInstant(ZoneOffset.UTC);
+        LocalDate safeTo = to == null ? defaultToDate() : to;
+        return safeTo.plusDays(1).atStartOfDay().minusSeconds(1).toInstant(ZoneOffset.UTC);
+    }
+
+    private LocalDate defaultToDate() {
+        return LocalDate.now(ZoneOffset.UTC);
+    }
+
+    private LocalDate defaultFromDate() {
+        return defaultToDate().minusDays(DEFAULT_RANGE_DAYS - 1L);
     }
 
     private Instant toInstant(Timestamp value) {

@@ -65,8 +65,11 @@ public class ReportsController {
 
     @GetMapping("/low-stock")
     @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR','ALMACENERO')")
-    public ResponseEntity<List<LowStockItemResponse>> lowStock(@RequestParam(defaultValue = "0") double threshold) {
-        return ResponseEntity.ok(reportsUseCase.lowStock(threshold).stream().map(this::toResponse).toList());
+    public ResponseEntity<List<LowStockItemResponse>> lowStock(
+            @RequestParam(defaultValue = "0") double threshold,
+            @RequestParam(required = false) Integer limit
+    ) {
+        return ResponseEntity.ok(reportsUseCase.lowStock(threshold, limit).stream().map(this::toResponse).toList());
     }
 
     @GetMapping("/inventory-movements")
@@ -75,9 +78,10 @@ public class ReportsController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(required = false) Long productId,
-            @RequestParam(required = false) Long warehouseId
+            @RequestParam(required = false) Long warehouseId,
+            @RequestParam(required = false) Integer limit
     ) {
-        return ResponseEntity.ok(reportsUseCase.inventoryMovements(from, to, productId, warehouseId).stream().map(this::toResponse).toList());
+        return ResponseEntity.ok(reportsUseCase.inventoryMovements(from, to, productId, warehouseId, limit).stream().map(this::toResponse).toList());
     }
 
     @GetMapping("/purchases")
