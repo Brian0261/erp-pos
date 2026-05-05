@@ -952,62 +952,62 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
   - [x] `docker compose up --build -d` => OK.
   - [x] `docker compose ps` => OK.
 
-    ## Bloque BT-007 Hardening minimo de reportes (2026-05-05)
+## Bloque BT-007 Hardening minimo de reportes (2026-05-05)
 
-    - [x] Alcance backend-only aplicado (sin cambios en frontend).
-    - [x] Politica de fechas segura implementada en reportes con `from/to`:
-      - [x] default ultimos 30 dias si faltan ambas fechas.
-      - [x] completado seguro cuando falta solo `from` o `to`.
-      - [x] validacion `to >= from` mantenida.
-      - [x] rango maximo 90 dias con respuesta `422`.
-    - [x] Limites implementados:
-      - [x] `/api/v1/reports/low-stock`: `limit` opcional, default `200`, max `1000`.
-      - [x] `/api/v1/reports/inventory-movements`: `limit` opcional, default `500`, max `2000`.
-      - [x] `/api/v1/reports/top-products`: se mantiene `limit` `1..100`.
-    - [x] SQL endurecido:
-      - [x] eliminados defaults de rango historico amplio (`1970..9999`) en reportes.
-      - [x] agregado `LIMIT` en `low-stock` e `inventory-movements`.
-    - [x] Pruebas agregadas/actualizadas:
-      - [x] `backend/src/test/java/com/erppos/backend/erp/reports/ReportsApplicationServiceTest.java`.
-      - [x] `backend/src/test/java/com/erppos/backend/integration/ReportsHardeningIntegrationTest.java`.
-    - [x] Validacion build backend:
-      - [x] `mvn clean test` => SUCCESS (`145` tests, `0` fail/error).
-      - [x] `mvn clean verify` => SUCCESS (`145` tests, `0` fail/error).
-    - [x] Validacion Docker/runtime:
-      - [x] `docker compose config` => OK.
-      - [x] `docker compose up --build -d` => OK.
-      - [x] `docker compose ps` => OK.
-      - [x] `GET /api/v1/reports/sales` sin fechas => `200`.
-      - [x] `GET /api/v1/reports/inventory-movements` sin fechas => `200`.
-      - [x] `GET /api/v1/reports/low-stock` sin `limit` => `200`.
-      - [x] Rango excesivo en reportes => `422`.
-      - [x] `limit` fuera de maximo en reportes de lista => `422`.
-    - [x] Logs backend revisados sin `500` inesperados durante la validacion BT-007.
+- [x] Alcance backend-only aplicado (sin cambios en frontend).
+- [x] Politica de fechas segura implementada en reportes con `from/to`:
+  - [x] default ultimos 30 dias si faltan ambas fechas.
+  - [x] completado seguro cuando falta solo `from` o `to`.
+  - [x] validacion `to >= from` mantenida.
+  - [x] rango maximo 90 dias con respuesta `422`.
+- [x] Limites implementados:
+  - [x] `/api/v1/reports/low-stock`: `limit` opcional, default `200`, max `1000`.
+  - [x] `/api/v1/reports/inventory-movements`: `limit` opcional, default `500`, max `2000`.
+  - [x] `/api/v1/reports/top-products`: se mantiene `limit` `1..100`.
+- [x] SQL endurecido:
+  - [x] eliminados defaults de rango historico amplio (`1970..9999`) en reportes.
+  - [x] agregado `LIMIT` en `low-stock` e `inventory-movements`.
+- [x] Pruebas agregadas/actualizadas:
+  - [x] `backend/src/test/java/com/erppos/backend/erp/reports/ReportsApplicationServiceTest.java`.
+  - [x] `backend/src/test/java/com/erppos/backend/integration/ReportsHardeningIntegrationTest.java`.
+- [x] Validacion build backend:
+  - [x] `mvn clean test` => SUCCESS (`145` tests, `0` fail/error).
+  - [x] `mvn clean verify` => SUCCESS (`145` tests, `0` fail/error).
+- [x] Validacion Docker/runtime:
+  - [x] `docker compose config` => OK.
+  - [x] `docker compose up --build -d` => OK.
+  - [x] `docker compose ps` => OK.
+  - [x] `GET /api/v1/reports/sales` sin fechas => `200`.
+  - [x] `GET /api/v1/reports/inventory-movements` sin fechas => `200`.
+  - [x] `GET /api/v1/reports/low-stock` sin `limit` => `200`.
+  - [x] Rango excesivo en reportes => `422`.
+  - [x] `limit` fuera de maximo en reportes de lista => `422`.
+- [x] Logs backend revisados sin `500` inesperados durante la validacion BT-007.
 
-    ## Bloque BT-006 Fase 1 Contrato paginado estable v2 (2026-05-05)
+## Bloque BT-006 Fase 1 Contrato paginado estable v2 (2026-05-05)
 
-    - [x] Alcance backend-only ejecutado (sin cambios en frontend).
-    - [x] Nuevo DTO compartido agregado:
-      - [x] `backend/src/main/java/com/erppos/backend/erp/shared/adapter/dto/PageResponse.java`.
-      - [x] `backend/src/main/java/com/erppos/backend/erp/shared/adapter/dto/PageResponseMapper.java`.
-    - [x] Endpoints v2 agregados:
-      - [x] `GET /api/v2/products`.
-      - [x] `GET /api/v2/inventory/stocks`.
-    - [x] Compatibilidad v1 preservada:
-      - [x] `GET /api/v1/products` mantiene `content`.
-      - [x] `GET /api/v1/inventory/stocks` mantiene `content`.
-    - [x] Pruebas agregadas:
-      - [x] `backend/src/test/java/com/erppos/backend/erp/shared/PageResponseMapperTest.java`.
-      - [x] `backend/src/test/java/com/erppos/backend/integration/PaginationContractIntegrationTest.java`.
-    - [x] Validacion de contrato JSON:
-      - [x] v2 expone `items`, `page`, `size`, `totalItems`, `totalPages`.
-      - [x] v2 no expone `content`.
-      - [x] v1 sigue exponiendo `content`.
-    - [x] Comandos ejecutados:
-      - [x] `mvn clean test` => SUCCESS (135 tests, 0 fail/error).
-      - [x] `mvn clean verify` => SUCCESS (135 tests, 0 fail/error).
-      - [x] `docker compose config` => OK.
-      - [x] `docker compose up --build -d` => OK.
-      - [x] `docker compose ps` => OK.
-    - [x] Logs backend revisados sin `500` inesperados en ventana de validacion BT-006 F1.
+- [x] Alcance backend-only ejecutado (sin cambios en frontend).
+- [x] Nuevo DTO compartido agregado:
+  - [x] `backend/src/main/java/com/erppos/backend/erp/shared/adapter/dto/PageResponse.java`.
+  - [x] `backend/src/main/java/com/erppos/backend/erp/shared/adapter/dto/PageResponseMapper.java`.
+- [x] Endpoints v2 agregados:
+  - [x] `GET /api/v2/products`.
+  - [x] `GET /api/v2/inventory/stocks`.
+- [x] Compatibilidad v1 preservada:
+  - [x] `GET /api/v1/products` mantiene `content`.
+  - [x] `GET /api/v1/inventory/stocks` mantiene `content`.
+- [x] Pruebas agregadas:
+  - [x] `backend/src/test/java/com/erppos/backend/erp/shared/PageResponseMapperTest.java`.
+  - [x] `backend/src/test/java/com/erppos/backend/integration/PaginationContractIntegrationTest.java`.
+- [x] Validacion de contrato JSON:
+  - [x] v2 expone `items`, `page`, `size`, `totalItems`, `totalPages`.
+  - [x] v2 no expone `content`.
+  - [x] v1 sigue exponiendo `content`.
+- [x] Comandos ejecutados:
+  - [x] `mvn clean test` => SUCCESS (135 tests, 0 fail/error).
+  - [x] `mvn clean verify` => SUCCESS (135 tests, 0 fail/error).
+  - [x] `docker compose config` => OK.
+  - [x] `docker compose up --build -d` => OK.
+  - [x] `docker compose ps` => OK.
+- [x] Logs backend revisados sin `500` inesperados en ventana de validacion BT-006 F1.
 

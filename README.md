@@ -233,6 +233,14 @@ Ejemplos:
   - `GET /api/v1/reports/inventory-movements`: `limit` opcional, default `500`, max `2000`.
   - `GET /api/v1/reports/top-products`: `limit` entre `1..100`.
 
+## Estado de deudas tecnicas pre-piloto
+
+- Cerradas: BT-001, BT-002, BT-003, BT-004, BT-006 Fase 1, BT-007A/B, BT-008, BT-009, BT-010.
+- Diferidas:
+  - BT-005 (planificacion posterior).
+  - BT-006 migracion frontend a contratos `v2` (convivencia temporal con `v1`).
+  - BT-007C (indices/tuning avanzado con evidencia de carga real).
+
 Endpoints actuales:
 
 - `POST /api/v1/auth/login`

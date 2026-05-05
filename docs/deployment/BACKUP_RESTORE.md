@@ -3,13 +3,13 @@
 ## Backup de PostgreSQL
 
 ```powershell
-docker exec -t erp-pos-postgres pg_dump -U erp_user -d erp_pos > backup_erp_pos.sql
+docker exec -t erp-pos-postgres pg_dump -U inktoy_user_local -d inktoy_name_local > backup_inktoy_name_local.sql
 ```
 
 ## Restore de PostgreSQL
 
 ```powershell
-Get-Content .\backup_erp_pos.sql | docker exec -i erp-pos-postgres psql -U erp_user -d erp_pos
+Get-Content .\backup_inktoy_name_local.sql | docker exec -i erp-pos-postgres psql -U inktoy_user_local -d inktoy_name_local
 ```
 
 ## Recomendaciones

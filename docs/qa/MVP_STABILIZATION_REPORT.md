@@ -79,7 +79,7 @@ Comandos adicionales de validacion:
 ## Pendientes no bloqueantes (MEDIUM/LOW)
 
 1. Dependencias frontend con vulnerabilidades reportadas por `npm audit` (riesgo de cadena de suministro, no bloqueo funcional inmediato).
-2. Warning backend de serializacion `PageImpl` en logs (recomendacion de estabilidad de contrato JSON).
+2. Warning backend de serializacion `PageImpl` en endpoints `v1` legacy (mitigado con `v2` estable en BT-006 Fase 1; pendiente migracion frontend gradual).
 3. Riesgo operativo local Windows: `localhost` puede resolver a `::1` y colisionar con proceso local distinto al contenedor en puerto 4200.
 4. Verificacion visual fina de consola de navegador por pantalla/accion queda como paso manual QA UX (no se detectaron fallas en las validaciones API y rutas ejecutadas).
 
@@ -311,3 +311,31 @@ Validar en runtime real la correccion backend BT-003 para garantizar **stock ini
 ### Conclusión
 
 BT-003 queda cerrado en runtime real con control de unicidad efectivo para `INITIAL_STOCK` (secuencial y concurrente), consistencia de inventario preservada y sin regresiones funcionales en operaciones criticas.
+
+## Addendum - Estado consolidado pre-piloto (BT-010, 2026-05-05)
+
+### Deudas cerradas
+
+- BT-001: caja abierta unica por usuario.
+- BT-002: conversion de cotizacion protegida contra concurrencia.
+- BT-003: stock inicial unico por producto/almacen.
+- BT-004: hardening de usuarios seed con control por entorno (Flyway hasta V15).
+- BT-006 Fase 1: contratos paginados estables en `/api/v2` (`products`, `inventory/stocks`) sin romper `v1`.
+- BT-007A/B: hardening de reportes (defaults de fechas, maximo de rango, limites por endpoint de lista).
+- BT-008: CORS configurable por entorno.
+- BT-009: suite minima de integracion HTTP/RBAC/DB real.
+
+### Deudas diferidas activas
+
+- BT-005: pendiente por planificacion funcional fuera de este cierre documental.
+- BT-006 (migracion frontend a `v2`): pendiente, con compatibilidad temporal `v1` vigente.
+- BT-007C (indices/tuning avanzado): diferido; evaluar con evidencia de carga real (`EXPLAIN ANALYZE`) post-piloto.
+
+### Estado operativo documentado
+
+- Stack Docker local: `frontend`, `backend`, `postgres`.
+- CORS configurable por `CORS_ALLOWED_ORIGINS`.
+- Migraciones Flyway validadas hasta `V15`.
+
+Conclusión: con esta actualización documental, el drift menor BT-010 queda alineado con el estado real del proyecto.
+
