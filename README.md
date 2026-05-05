@@ -178,6 +178,20 @@ Credenciales seed local/dev para pruebas de autorizacion (403 por rol):
   - email: `supervisor@erp.local`
   - password: `Admin123*`
 
+## Politica CORS configurable (BT-008)
+
+- El backend no usa origen hardcodeado; toma orígenes permitidos desde `CORS_ALLOWED_ORIGINS`.
+- Propiedad interna: `app.security.cors.allowed-origins`.
+- Default local seguro: `http://localhost:4200,http://127.0.0.1:4200`.
+- Se mantienen credenciales JWT por header `Authorization` (sin abrir wildcard `*`).
+
+Ejemplos:
+
+- Local:
+  - `CORS_ALLOWED_ORIGINS=http://localhost:4200,http://127.0.0.1:4200`
+- LAN piloto local:
+  - `CORS_ALLOWED_ORIGINS=http://localhost:4200,http://127.0.0.1:4200,http://192.168.1.50:4200,http://EQUIPO-QA:4200`
+
 ## Politica de hardening de usuarios seed (BT-004)
 
 - Migraciones historicas `V2` y `V7` no se modifican para no romper checksums de Flyway.

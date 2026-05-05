@@ -19,7 +19,7 @@ Scope: backend Spring Boot + Docker local + Flyway + RBAC + endpoints API
 | QA-002 | docker/startup       | CRITICAL  | No se detectaron fallos de arranque ni Flyway roto.                                                                                     | N/A                                                                                     | N/A                                                                                                                                                                                        | Ejecutado `docker compose up --build -d` + logs backend sin errores bloqueantes.                          | Cerrado  | N/A                                                               |
 | QA-003 | security/RBAC        | HIGH      | No se detectaron rutas criticas con permisos incorrectos en muestra runtime.                                                            | N/A                                                                                     | N/A                                                                                                                                                                                        | Validacion manual: 401 sin token, 403 por rol (CAJERO/ALMACENERO), 200 con ADMIN.                         | Cerrado  | N/A                                                               |
 | QA-004 | reports              | MEDIUM    | Endpoints de reportes son lista agregada (sin paginacion) para datasets potencialmente grandes.                                         | Decisiones MVP de simplicidad y menor complejidad de UI inicial.                        | `backend/src/main/java/com/erppos/backend/erp/reports/adapter/rest/ReportsController.java`                                                                                                 | No se modifica por no ser bloqueante de piloto. Documentado como deuda tecnica.                           | Abierto  | `chore(reports): add pagination for high-volume report endpoints` |
-| QA-005 | CORS/hardening       | MEDIUM    | CORS restringido solo a `http://localhost:4200`; puede requerir ajuste por ambiente en despliegues futuros.                             | Configuracion unica para entorno local MVP.                                             | `backend/src/main/java/com/erppos/backend/erp/security/adapter/security/SecurityConfig.java`                                                                                               | No se modifica para no alterar contrato actual MVP; dejar parametrizable por perfil.                      | Abierto  | `chore(security): externalize allowed CORS origins by profile`    |
+| QA-005 | CORS/hardening       | MEDIUM    | CORS originalmente restringido a `http://localhost:4200`; requeria parametrizacion por ambiente para piloto/staging/LAN local.          | Configuracion unica hardcodeada en seguridad backend.                                    | `backend/src/main/java/com/erppos/backend/erp/security/adapter/security/SecurityConfig.java`, `backend/src/main/resources/application.yaml`                                                 | Se externaliza a `app.security.cors.allowed-origins` via `CORS_ALLOWED_ORIGINS` con default local seguro. | Cerrado  | `chore(security): externalize allowed CORS origins by environment` |
 | QA-006 | observability        | LOW       | Logging y healthcheck son basicos; no hay trazas estructuradas por modulo ni metricas operativas.                                       | Alcance MVP priorizo funcionalidad sobre observabilidad avanzada.                       | `backend/src/main/java/com/erppos/backend/erp/shared/adapter/rest/HealthController.java`                                                                                                   | Sin cambios funcionales. Documentado para hardening post-MVP.                                             | Abierto  | `chore(obs): add structured logs and module-level metrics`        |
 | QA-007 | contracts            | LOW       | Mezcla intencional de endpoints paginados y listas simples; requiere guia de consumo para frontend nuevo.                               | Contratos definidos por sprint de manera incremental.                                   | `docs/qa/MATRIX_API_ENDPOINTS.md`                                                                                                                                                          | Matriz de contratos actualizada para evitar ambiguedad de consumo.                                        | Mitigado | `docs(qa): clarify pagination contracts per endpoint`             |
 | QA-008 | contracts/pagination | MEDIUM    | Spring Data registra warning por serializacion directa de `PageImpl`; estructura JSON puede cambiar entre versiones y afectar frontend. | Uso directo de `Page<T>` en respuestas REST sin `PagedModel`/DTO de paginacion estable. | `backend/src/main/java/com/erppos/backend/erp/catalog/adapter/rest/ProductController.java`, `backend/src/main/java/com/erppos/backend/erp/inventory/adapter/rest/InventoryController.java` | No se cambia en esta estabilizacion para no romper contratos MVP; se documenta deuda tecnica prioritaria. | Abierto  | `refactor(api): wrap paginated responses in stable dto`           |
@@ -310,3 +310,25 @@ Conclusión: BT-003 queda **cerrado en runtime real** con garantia de unicidad d
   - Solo warning informativo conocido de Spring Security en arranque.
 
 Conclusión: BT-004 queda **cerrado para MVP/piloto** como control de despliegue seguro, sin romper entorno local actual ni los usuarios de QA.
+
+## Addendum - Validacion BT-008 CORS configurable por entorno (2026-05-04)
+
+### Resultado
+
+- Estado: **Cerrado** con cambio minimo y seguro en backend.
+- Se elimina hardcode de origen unico y se mantiene compatibilidad local.
+
+### Accion tecnica aplicada
+
+- `SecurityConfig` ahora lee `app.security.cors.allowed-origins`.
+- Variable de entorno expuesta: `CORS_ALLOWED_ORIGINS`.
+- Default local: `http://localhost:4200,http://127.0.0.1:4200`.
+- Metodos permitidos: `GET, POST, PUT, DELETE, OPTIONS`.
+- Headers permitidos: `Authorization, Content-Type, Accept, Origin, X-Trace-Id`.
+- `allowCredentials=false` (sin cookies; JWT por header).
+
+### Evidencia solicitada
+
+- Configuracion actualizada en `application.yaml`, `.env.example`, `docker-compose.yml`, `README.md` y checklist QA.
+- Build/test y compose deben ejecutarse en corrida BT-008 para confirmar runtime y preflight.
+

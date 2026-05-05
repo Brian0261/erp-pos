@@ -882,3 +882,30 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
   - [x] Sin errores Flyway.
   - [x] Sin errores de login/JWT.
   - [x] Sin `500` inesperados.
+
+## Bloque BT-008 CORS configurable por entorno (2026-05-04)
+
+- [x] Revision de configuracion actualizada en:
+  - [x] `backend/src/main/java/com/erppos/backend/erp/security/adapter/security/SecurityConfig.java`
+  - [x] `backend/src/main/resources/application.yaml`
+  - [x] `docker-compose.yml`
+  - [x] `.env.example`
+  - [x] `README.md`
+- [x] Variable nueva documentada: `CORS_ALLOWED_ORIGINS`.
+- [x] Default local confirmado en configuracion: `http://localhost:4200,http://127.0.0.1:4200`.
+- [x] Metodos CORS permitidos confirmados: `GET, POST, PUT, DELETE, OPTIONS`.
+- [x] Headers CORS permitidos confirmados: `Authorization, Content-Type, Accept, Origin, X-Trace-Id`.
+- [x] `allowCredentials=false` confirmado (JWT por header).
+- [x] Validacion build backend:
+  - [x] `mvn clean test`.
+  - [x] `mvn clean verify`.
+- [x] Validacion compose:
+  - [x] `docker compose config`.
+  - [x] `docker compose up --build -d`.
+  - [x] `docker compose ps`.
+- [x] Validacion CORS runtime:
+  - [x] Preflight `OPTIONS /api/v1/auth/login` con origen permitido `http://localhost:4200`.
+  - [x] Preflight `OPTIONS /api/v1/auth/login` con origen permitido `http://127.0.0.1:4200`.
+  - [x] Origen no permitido no recibe `Access-Control-Allow-Origin`.
+  - [x] Sin `500` inesperados en backend durante pruebas.
+
