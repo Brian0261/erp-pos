@@ -13,6 +13,7 @@ import { AuthService } from "../../core/auth/auth.service";
 import { UserProfile } from "../../core/auth/auth.models";
 
 type AppRole = "ADMIN" | "CAJERO" | "ALMACENERO" | "SUPERVISOR";
+type UiTheme = "light" | "dark";
 
 interface SidebarLinkNode {
   kind: "link";
@@ -54,48 +55,50 @@ const ROLES_CONSULTA_CAJERO: AppRole[] = ["CAJERO"];
   template: `
     <div class="layout-shell" [class.is-sidebar-compact]="isSidebarCompact">
       <aside class="sidebar" [class.is-compact]="isSidebarCompact">
-        <div class="sidebar-top">
-          <div class="sidebar-brand">
-            <img
-              src="assets/images/brand/logo-inktoy.png"
-              alt="InkToy"
-              class="sidebar-brand-logo"
-            />
-            <div class="sidebar-brand-copy">
-              <p class="sidebar-brand-kicker">InkToy ERP/POS</p>
-              <h2>Operacion diaria</h2>
+        <div class="sidebar-header">
+          <div class="sidebar-top">
+            <div class="sidebar-brand">
+              <img
+                src="assets/images/brand/logo-inktoy.png"
+                alt="InkToy"
+                class="sidebar-brand-logo"
+              />
+              <div class="sidebar-brand-copy">
+                <p class="sidebar-brand-kicker">InkToy ERP/POS</p>
+                <h2>Operacion diaria</h2>
+              </div>
             </div>
+
+            <button
+              type="button"
+              class="sidebar-toggle"
+              [disabled]="!canToggleCompactMode"
+              [attr.aria-label]="sidebarToggleAriaLabel"
+              [attr.title]="sidebarToggleAriaLabel"
+              (click)="toggleSidebarCompact()"
+            >
+              <span class="sidebar-toggle-glyph" aria-hidden="true">{{
+                isSidebarCompact ? "»" : "«"
+              }}</span>
+              <span class="visually-hidden">{{ sidebarToggleAriaLabel }}</span>
+            </button>
           </div>
 
-          <button
-            type="button"
-            class="sidebar-toggle"
-            [disabled]="!canToggleCompactMode"
-            [attr.aria-label]="sidebarToggleAriaLabel"
-            [attr.title]="sidebarToggleAriaLabel"
-            (click)="toggleSidebarCompact()"
+          <section
+            class="sidebar-user ui-card"
+            aria-label="Usuario actual"
+            *ngIf="!isSidebarCompact"
           >
-            <span class="sidebar-toggle-glyph" aria-hidden="true">{{
-              isSidebarCompact ? "»" : "«"
-            }}</span>
-            <span class="visually-hidden">{{ sidebarToggleAriaLabel }}</span>
-          </button>
+            <p class="sidebar-user-label">Usuario activo</p>
+            <p class="sidebar-user-name">
+              {{ currentUser?.username || "Usuario" }}
+            </p>
+            <p class="sidebar-user-role">
+              Rol:
+              <span class="ui-badge sidebar-role-badge">{{ primaryRole }}</span>
+            </p>
+          </section>
         </div>
-
-        <section
-          class="sidebar-user ui-card"
-          aria-label="Usuario actual"
-          *ngIf="!isSidebarCompact"
-        >
-          <p class="sidebar-user-label">Usuario activo</p>
-          <p class="sidebar-user-name">
-            {{ currentUser?.username || "Usuario" }}
-          </p>
-          <p class="sidebar-user-role">
-            Rol:
-            <span class="ui-badge sidebar-role-badge">{{ primaryRole }}</span>
-          </p>
-        </section>
 
         <nav class="sidebar-menu" aria-label="Menu principal">
           <ng-container
@@ -174,13 +177,15 @@ const ROLES_CONSULTA_CAJERO: AppRole[] = ["CAJERO"];
           </ng-container>
         </nav>
 
-        <button
-          type="button"
-          class="ui-button ui-button--secondary sidebar-logout"
-          (click)="logout()"
-        >
-          Cerrar sesion
-        </button>
+        <footer class="sidebar-footer">
+          <button
+            type="button"
+            class="ui-button ui-button--secondary sidebar-logout"
+            (click)="logout()"
+          >
+            Cerrar sesion
+          </button>
+        </footer>
       </aside>
 
       <section class="workspace">
@@ -189,11 +194,29 @@ const ROLES_CONSULTA_CAJERO: AppRole[] = ["CAJERO"];
             <p class="topbar-kicker">Panel principal</p>
             <h1>{{ currentSectionLabel }}</h1>
           </div>
-          <div class="topbar-user">
-            <span class="topbar-user-name">{{
-              currentUser?.username || "Usuario"
-            }}</span>
-            <span class="ui-badge topbar-role-badge">{{ primaryRole }}</span>
+
+          <div class="topbar-actions">
+            <button
+              type="button"
+              class="ui-button theme-toggle"
+              [attr.aria-label]="themeToggleAriaLabel"
+              [attr.title]="themeToggleAriaLabel"
+              (click)="toggleTheme()"
+            >
+              <span class="theme-toggle-icon" aria-hidden="true">{{
+                isDarkTheme ? "☀" : "☾"
+              }}</span>
+              <span class="theme-toggle-label">{{
+                isDarkTheme ? "Modo claro" : "Modo oscuro"
+              }}</span>
+            </button>
+
+            <div class="topbar-user">
+              <span class="topbar-user-name">{{
+                currentUser?.username || "Usuario"
+              }}</span>
+              <span class="ui-badge topbar-role-badge">{{ primaryRole }}</span>
+            </div>
           </div>
         </header>
 
@@ -208,11 +231,14 @@ const ROLES_CONSULTA_CAJERO: AppRole[] = ["CAJERO"];
       .layout-shell {
         display: grid;
         grid-template-columns: var(--layout-sidebar-width, 250px) 1fr;
+        height: 100vh;
+        height: 100dvh;
         min-height: 100vh;
+        overflow: hidden;
         background: linear-gradient(
           165deg,
-          rgba(18, 23, 184, 0.04) 0%,
-          rgba(242, 74, 11, 0.03) 100%
+          var(--layout-shell-bg-start) 0%,
+          var(--layout-shell-bg-end) 100%
         );
       }
 
@@ -221,14 +247,30 @@ const ROLES_CONSULTA_CAJERO: AppRole[] = ["CAJERO"];
       }
 
       .sidebar {
-        background: linear-gradient(180deg, #0d128e 0%, #101114 65%);
+        background: linear-gradient(
+          180deg,
+          var(--layout-sidebar-bg-start) 0%,
+          var(--layout-sidebar-bg-end) 65%
+        );
         color: var(--color-text-on-dark);
         padding: var(--space-5) var(--space-4);
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr) auto;
+        gap: var(--space-4);
+        height: 100vh;
+        height: 100dvh;
+        min-height: 100vh;
+        max-height: 100dvh;
+        align-self: start;
+        overflow: hidden;
+        border-right: 1px solid var(--layout-sidebar-border);
+      }
+
+      .sidebar-header {
         display: flex;
         flex-direction: column;
         gap: var(--space-4);
         min-height: 0;
-        border-right: 1px solid rgba(255, 255, 255, 0.08);
       }
 
       .sidebar-top {
@@ -236,6 +278,7 @@ const ROLES_CONSULTA_CAJERO: AppRole[] = ["CAJERO"];
         align-items: flex-start;
         justify-content: space-between;
         gap: var(--space-2);
+        flex-shrink: 0;
       }
 
       .sidebar-brand {
@@ -256,7 +299,7 @@ const ROLES_CONSULTA_CAJERO: AppRole[] = ["CAJERO"];
       }
 
       .sidebar-brand-kicker {
-        color: rgba(255, 255, 255, 0.72);
+        color: var(--layout-sidebar-kicker);
         font-size: var(--font-size-xs);
         font-weight: 700;
         letter-spacing: 0.08em;
@@ -304,11 +347,12 @@ const ROLES_CONSULTA_CAJERO: AppRole[] = ["CAJERO"];
       }
 
       .sidebar-user {
-        background: rgba(255, 255, 255, 0.08);
-        border-color: rgba(255, 255, 255, 0.16);
+        background: var(--layout-sidebar-surface-bg);
+        border-color: var(--layout-sidebar-surface-border);
         box-shadow: none;
         color: var(--color-text-on-dark);
         padding: var(--space-3);
+        flex-shrink: 0;
       }
 
       .sidebar-user-label {
@@ -316,7 +360,7 @@ const ROLES_CONSULTA_CAJERO: AppRole[] = ["CAJERO"];
         font-size: var(--font-size-xs);
         text-transform: uppercase;
         letter-spacing: 0.08em;
-        color: rgba(255, 255, 255, 0.74);
+        color: var(--layout-sidebar-muted);
         font-weight: 700;
       }
 
@@ -341,13 +385,43 @@ const ROLES_CONSULTA_CAJERO: AppRole[] = ["CAJERO"];
       }
 
       .sidebar-menu {
-        flex: 1 1 auto;
+        height: 100%;
         min-height: 0;
         display: flex;
         flex-direction: column;
         gap: var(--space-2);
-        overflow: auto;
+        overflow-y: auto;
+        overflow-x: hidden;
         padding-right: var(--space-1);
+        scrollbar-width: thin;
+        scrollbar-color: var(--layout-scrollbar-thumb-end)
+          var(--layout-scrollbar-track);
+      }
+
+      .sidebar-menu::-webkit-scrollbar {
+        width: 0.62rem;
+      }
+
+      .sidebar-menu::-webkit-scrollbar-track {
+        background: var(--layout-scrollbar-track);
+        border-radius: 999px;
+      }
+
+      .sidebar-menu::-webkit-scrollbar-thumb {
+        background: linear-gradient(
+          180deg,
+          var(--layout-scrollbar-thumb-start) 0%,
+          var(--layout-scrollbar-thumb-end) 100%
+        );
+        border-radius: 999px;
+      }
+
+      .sidebar-menu::-webkit-scrollbar-thumb:hover {
+        background: linear-gradient(
+          180deg,
+          var(--layout-scrollbar-thumb-start-hover) 0%,
+          var(--layout-scrollbar-thumb-end-hover) 100%
+        );
       }
 
       .sidebar-group {
@@ -463,8 +537,11 @@ const ROLES_CONSULTA_CAJERO: AppRole[] = ["CAJERO"];
         margin-left: var(--space-2);
       }
 
+      .sidebar-footer {
+        min-height: 0;
+      }
+
       .sidebar-logout {
-        margin-top: auto;
         width: 100%;
         border: 1px solid rgba(255, 255, 255, 0.24);
         background: rgba(255, 255, 255, 0.14);
@@ -538,8 +615,11 @@ const ROLES_CONSULTA_CAJERO: AppRole[] = ["CAJERO"];
 
       .workspace {
         min-width: 0;
+        min-height: 0;
+        height: 100%;
         display: flex;
         flex-direction: column;
+        overflow: hidden;
       }
 
       .topbar {
@@ -548,9 +628,18 @@ const ROLES_CONSULTA_CAJERO: AppRole[] = ["CAJERO"];
         justify-content: space-between;
         gap: var(--space-4);
         padding: var(--space-4) var(--space-5);
-        background: rgba(255, 255, 255, 0.88);
-        border-bottom: 1px solid var(--color-border-default);
+        flex-shrink: 0;
+        background: var(--layout-topbar-bg);
+        border-bottom: 1px solid var(--layout-topbar-border);
         backdrop-filter: blur(6px);
+      }
+
+      .topbar-actions {
+        display: inline-flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: var(--space-2);
+        flex-wrap: wrap;
       }
 
       .topbar-kicker {
@@ -574,8 +663,8 @@ const ROLES_CONSULTA_CAJERO: AppRole[] = ["CAJERO"];
         gap: var(--space-2);
         padding: var(--space-2) var(--space-3);
         border-radius: var(--radius-pill);
-        background: var(--color-bg-soft);
-        border: 1px solid var(--color-border-default);
+        background: var(--layout-topbar-user-bg);
+        border: 1px solid var(--layout-topbar-user-border);
       }
 
       .topbar-user-name {
@@ -585,13 +674,38 @@ const ROLES_CONSULTA_CAJERO: AppRole[] = ["CAJERO"];
       }
 
       .topbar-role-badge {
-        background: #eef2ff;
-        color: #1e3a8a;
+        background: var(--layout-topbar-role-bg);
+        color: var(--layout-topbar-role-text);
+      }
+
+      .theme-toggle {
+        min-height: 2.1rem;
+        border: 1px solid var(--layout-theme-toggle-border);
+        background: var(--layout-theme-toggle-bg);
+        color: var(--color-text-primary);
+        padding-inline: var(--space-3);
+      }
+
+      .theme-toggle:hover {
+        filter: none;
+        background: var(--layout-theme-toggle-hover-bg);
+      }
+
+      .theme-toggle-icon {
+        font-size: 0.9rem;
+        line-height: 1;
+      }
+
+      .theme-toggle-label {
+        font-size: var(--font-size-sm);
+        font-weight: 700;
       }
 
       .content {
         padding: var(--space-5);
         min-width: 0;
+        min-height: 0;
+        overflow: auto;
       }
 
       .visually-hidden {
@@ -610,11 +724,23 @@ const ROLES_CONSULTA_CAJERO: AppRole[] = ["CAJERO"];
         .layout-shell,
         .layout-shell.is-sidebar-compact {
           grid-template-columns: 1fr;
+          height: auto;
+          min-height: 100vh;
+          overflow: visible;
         }
 
         .sidebar {
           border-right: 0;
           border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+        }
+
+        .workspace {
+          height: auto;
+          overflow: visible;
+        }
+
+        .content {
+          overflow: visible;
         }
 
         .sidebar-menu {
@@ -650,6 +776,11 @@ const ROLES_CONSULTA_CAJERO: AppRole[] = ["CAJERO"];
           align-items: flex-start;
         }
 
+        .topbar-actions {
+          width: 100%;
+          justify-content: space-between;
+        }
+
         .topbar-user {
           width: 100%;
           justify-content: space-between;
@@ -666,6 +797,7 @@ export class LayoutComponent implements OnInit, OnDestroy {
   currentUser: UserProfile | null = null;
   primaryRole = "N/A";
   isSidebarCompact = false;
+  activeTheme: UiTheme = "light";
   sidebarNodesForView: VisibleSidebarNode[] = [];
 
   readonly exactMatchOptions = { exact: true };
@@ -674,6 +806,7 @@ export class LayoutComponent implements OnInit, OnDestroy {
   private readonly compactDisabledBreakpoint = 1100;
   private readonly sidebarModeStorageKey = "erp_pos_sidebar_mode";
   private readonly sidebarGroupsStorageKey = "erp_pos_sidebar_groups";
+  private readonly themeStorageKey = "erp_pos_theme";
 
   private readonly subscriptions = new Subscription();
   private groupExpandedState: Record<string, boolean> = {};
@@ -947,6 +1080,7 @@ export class LayoutComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
+    this.restoreThemePreference();
     this.restoreSidebarPreferences();
 
     const navigationSub = this.router.events
@@ -991,6 +1125,14 @@ export class LayoutComponent implements OnInit, OnDestroy {
       : "Compactar menú lateral";
   }
 
+  get isDarkTheme(): boolean {
+    return this.activeTheme === "dark";
+  }
+
+  get themeToggleAriaLabel(): string {
+    return this.isDarkTheme ? "Cambiar a modo claro" : "Cambiar a modo oscuro";
+  }
+
   get currentSectionLabel(): string {
     const activeSection =
       this.router.url.split("?")[0].split("/").filter(Boolean)[0] ||
@@ -1005,6 +1147,12 @@ export class LayoutComponent implements OnInit, OnDestroy {
 
     this.isSidebarCompact = !this.isSidebarCompact;
     this.persistSidebarModePreference();
+  }
+
+  toggleTheme(): void {
+    const nextTheme: UiTheme = this.isDarkTheme ? "light" : "dark";
+    this.applyTheme(nextTheme);
+    this.persistThemePreference();
   }
 
   toggleGroup(groupId: string): void {
@@ -1146,6 +1294,17 @@ export class LayoutComponent implements OnInit, OnDestroy {
     this.restoreGroupExpandedStatePreference();
   }
 
+  private restoreThemePreference(): void {
+    try {
+      const rawTheme = localStorage.getItem(this.themeStorageKey);
+      const normalizedTheme: UiTheme =
+        rawTheme === "dark" || rawTheme === "light" ? rawTheme : "light";
+      this.applyTheme(normalizedTheme);
+    } catch {
+      this.applyTheme("light");
+    }
+  }
+
   private restoreSidebarModePreference(): void {
     try {
       const rawMode = localStorage.getItem(this.sidebarModeStorageKey);
@@ -1194,6 +1353,14 @@ export class LayoutComponent implements OnInit, OnDestroy {
     }
   }
 
+  private persistThemePreference(): void {
+    try {
+      localStorage.setItem(this.themeStorageKey, this.activeTheme);
+    } catch {
+      // Persisting visual preferences is optional; ignore storage failures safely.
+    }
+  }
+
   private persistGroupExpandedState(): void {
     try {
       localStorage.setItem(
@@ -1211,5 +1378,14 @@ export class LayoutComponent implements OnInit, OnDestroy {
     }
 
     return window.innerWidth > this.compactDisabledBreakpoint;
+  }
+
+  private applyTheme(theme: UiTheme): void {
+    this.activeTheme = theme;
+    if (typeof document === "undefined") {
+      return;
+    }
+
+    document.body.setAttribute("data-theme", theme);
   }
 }

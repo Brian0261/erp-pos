@@ -40,6 +40,18 @@ Apply visual consistency across the ERP/POS while preserving MVP behavior.
 9. Keep user and role summary visible in expanded mode; compact mode can prioritize icon-only navigation with tooltips.
 10. Preserve existing login/logout contracts, guards, interceptors, and backend authorization behavior.
 
+## Shell-Specific Rules (Block C3 - Theme and Sidebar Polish)
+
+1. Keep route targets, RBAC visibility, and logout behavior unchanged while applying visual improvements.
+2. Keep sidebar expanded width moderate and readable for long labels, preserving compact mode behavior.
+3. Keep logout fixed at sidebar footer and outside the scrollable menu area.
+4. Style only the sidebar internal scrollbar with InkToy palette accents; avoid intrusive global scrollbar overrides.
+5. Provide a clear theme toggle (light/dark) in shell actions with accessible label/title and keyboard support.
+6. Persist theme preference in localStorage with safe fallback to light mode when value is invalid.
+7. Keep shell layout stable: sidebar fixed to viewport height, right content as primary scroll container.
+8. In dark mode, avoid pure black backgrounds; maintain contrast using tokenized dark surfaces and borders.
+9. Reuse token variables for shell, topbar, cards, and text colors; avoid hardcoded colors when possible.
+
 ## Dashboard-Specific Rules (Block D)
 
 1. Use existing services/endpoints only for KPI data and quick operational summaries.

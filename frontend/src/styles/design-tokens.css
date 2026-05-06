@@ -62,6 +62,71 @@
 
   /* Layout */
   --layout-max-content: 1200px;
-  --layout-sidebar-width: 250px;
+  --layout-sidebar-width: 282px;
   --layout-sidebar-width-compact: 88px;
+
+  /* Shell visual tokens */
+  --layout-shell-bg-start: rgba(18, 23, 184, 0.04);
+  --layout-shell-bg-end: rgba(242, 74, 11, 0.03);
+  --layout-sidebar-bg-start: #0d128e;
+  --layout-sidebar-bg-end: #101114;
+  --layout-sidebar-border: rgba(255, 255, 255, 0.08);
+  --layout-sidebar-surface-bg: rgba(255, 255, 255, 0.08);
+  --layout-sidebar-surface-border: rgba(255, 255, 255, 0.16);
+  --layout-sidebar-kicker: rgba(255, 255, 255, 0.72);
+  --layout-sidebar-muted: rgba(255, 255, 255, 0.74);
+  --layout-topbar-bg: rgba(255, 255, 255, 0.88);
+  --layout-topbar-border: var(--color-border-default);
+  --layout-topbar-user-bg: var(--color-bg-soft);
+  --layout-topbar-user-border: var(--color-border-default);
+  --layout-topbar-role-bg: #eef2ff;
+  --layout-topbar-role-text: #1e3a8a;
+  --layout-theme-toggle-bg: var(--color-bg-surface);
+  --layout-theme-toggle-border: var(--color-border-default);
+  --layout-theme-toggle-hover-bg: var(--color-bg-soft);
+  --layout-scrollbar-track: rgba(255, 255, 255, 0.12);
+  --layout-scrollbar-thumb-start: rgba(244, 194, 13, 0.82);
+  --layout-scrollbar-thumb-end: rgba(242, 74, 11, 0.78);
+  --layout-scrollbar-thumb-start-hover: rgba(255, 206, 37, 0.92);
+  --layout-scrollbar-thumb-end-hover: rgba(248, 96, 38, 0.9);
+}
+
+body[data-theme="dark"] {
+  --color-bg-canvas: #0b1122;
+  --color-bg-surface: #121b33;
+  --color-bg-soft: #1a2543;
+
+  --color-text-primary: #edf2ff;
+  --color-text-secondary: #aab6d3;
+  --color-text-on-dark: #f9fbff;
+
+  --color-border-default: #2b3858;
+  --color-border-strong: #40507a;
+
+  --shadow-sm: 0 2px 10px rgba(2, 6, 23, 0.45);
+  --shadow-md: 0 14px 30px rgba(3, 8, 28, 0.5);
+
+  --layout-shell-bg-start: rgba(34, 44, 140, 0.2);
+  --layout-shell-bg-end: rgba(8, 12, 28, 0.72);
+  --layout-sidebar-bg-start: #0a0f6f;
+  --layout-sidebar-bg-end: #050917;
+  --layout-sidebar-border: rgba(138, 160, 255, 0.22);
+  --layout-sidebar-surface-bg: rgba(125, 146, 255, 0.14);
+  --layout-sidebar-surface-border: rgba(170, 187, 255, 0.28);
+  --layout-sidebar-kicker: rgba(231, 236, 255, 0.8);
+  --layout-sidebar-muted: rgba(223, 230, 255, 0.84);
+  --layout-topbar-bg: rgba(12, 17, 36, 0.9);
+  --layout-topbar-border: rgba(106, 125, 197, 0.28);
+  --layout-topbar-user-bg: rgba(41, 56, 95, 0.44);
+  --layout-topbar-user-border: rgba(113, 136, 214, 0.3);
+  --layout-topbar-role-bg: rgba(74, 93, 170, 0.38);
+  --layout-topbar-role-text: #dbe5ff;
+  --layout-theme-toggle-bg: rgba(35, 48, 83, 0.9);
+  --layout-theme-toggle-border: rgba(113, 136, 214, 0.34);
+  --layout-theme-toggle-hover-bg: rgba(52, 69, 114, 0.95);
+  --layout-scrollbar-track: rgba(84, 99, 153, 0.42);
+  --layout-scrollbar-thumb-start: rgba(244, 194, 13, 0.78);
+  --layout-scrollbar-thumb-end: rgba(242, 74, 11, 0.72);
+  --layout-scrollbar-thumb-start-hover: rgba(255, 211, 46, 0.94);
+  --layout-scrollbar-thumb-end-hover: rgba(251, 110, 57, 0.9);
 }

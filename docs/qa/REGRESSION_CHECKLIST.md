@@ -67,6 +67,63 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [x] Fallback seguro con localStorage invalido para modo/grupos.
 - [x] Logout funcional; ruta protegida redirige a `/login` tras cerrar sesion.
 
+### Hotfix C2 - Logout anclado abajo (2026-05-06)
+
+- [x] Build frontend (`npm run build`) exitoso tras ajuste puntual de layout sidebar.
+- [x] `docker compose up --build -d` y `docker compose ps` exitosos.
+- [x] Fix aplicado solo en `layout.component.ts` (CSS/estructura visual), sin cambios en rutas, guards, auth, interceptor ni backend.
+- [x] `Cerrar sesion` permanece fuera del area scrolleable (`.sidebar-menu`) y anclado al fondo del sidebar.
+- [x] Menu lateral mantiene scroll interno independiente con grupos expandidos.
+- [x] Anclaje validado por rol (`ADMIN`, `CAJERO`, `ALMACENERO`, `SUPERVISOR`) en modo expandido y compacto.
+- [x] Modo responsive validado (simulacion `innerWidth` < 1200): compacto deshabilitado, logout visible y anclado.
+- [x] Estado activo de enlaces y colapsables sin regresion tras el hotfix.
+- [x] Logout funcional por rol; acceso posterior a ruta protegida redirige a `/login`.
+- [x] Sin `pageerror`, sin `500` inesperados, sin CORS, sin llamadas directas a `localhost:8080`.
+
+### Hotfix C2.1 - Footer fijo de logout siempre visible (2026-05-06)
+
+- [x] Sidebar reestructurado en 3 zonas explicitas: header, navegacion scrolleable y footer fijo.
+- [x] `Cerrar sesion` queda fuera de `.sidebar-menu` y no participa del scroll del menu.
+- [x] `Cerrar sesion` visible y usable en todo momento (sin scroll al final del menu).
+- [x] Validado por rol (`ADMIN`, `CAJERO`, `ALMACENERO`, `SUPERVISOR`) en `/dashboard`.
+- [x] En cada rol: abrir grupos, hacer scroll de menu, compactar/expandir, y verificar visibilidad constante del footer.
+- [x] Caso exigente `ADMIN`: todos los grupos abiertos, `navScrollable=true`, scroll interno activo, logout permanece visible abajo.
+- [x] Logout funcional y redireccion posterior de ruta protegida `/dashboard` hacia `/login`.
+- [x] Build y runtime validados (`npm run build`, `docker compose up --build -d`, `docker compose ps`).
+
+### Hotfix C2.2 - Sidebar estable en scroll de contenido principal (2026-05-06)
+
+- [x] Causa confirmada: el scroll vertical estaba ocurriendo en `window/body`, provocando recorte visual del sidebar y franja vacia inferior al bajar por la derecha.
+- [x] Ajuste aplicado en layout shell: viewport acotado (`100vh/100dvh`) y overflow global controlado.
+- [x] Scroll principal movido al contenedor de contenido (`.content`) con `overflow: auto` y `min-height: 0`.
+- [x] Sidebar mantiene altura completa de viewport durante scroll del contenido (`sidebar top=0`, `bottom=viewport`).
+- [x] Sin franja vacia debajo del sidebar durante scroll del contenido en dashboard y rutas largas.
+- [x] Logout se mantiene fijo/visible abajo y fuera de `.sidebar-menu`.
+- [x] Scroll interno de menu lateral se mantiene operativo y aislado.
+- [x] Validacion por rol en `/dashboard` (`ADMIN`, `CAJERO`, `ALMACENERO`, `SUPERVISOR`) en expandido y compacto.
+- [x] Validacion adicional ADMIN en rutas largas: `/reportes`, `/ventas`, `/inventario/stock`, `/facturacion/comprobantes`.
+- [x] Sin `pageerror`, sin `500` inesperados, sin CORS, sin llamadas directas a `localhost:8080`.
+
+### Hotfix C3 - Scrollbar InkToy + Theme toggle + Sidebar width (2026-05-06)
+
+- [x] Sidebar expandido con ancho moderadamente mayor para mejorar legibilidad de etiquetas largas.
+- [x] Etiquetas largas en ADMIN sin recorte visual en expandido: `Kardex / Movimientos`, `Órdenes de compra`, `Configuración tributaria`, `Series y correlativos`, `Eventos de integración`.
+- [x] Modo compacto se mantiene funcional y persistente; no afecta colapsables ni tooltips.
+- [x] Scrollbar interno de `.sidebar-menu` estilizado con paleta InkToy (track discreto + thumb acento).
+- [x] Scrollbar del menu lateral validado en light/dark sin afectar el scroll principal del contenido.
+- [x] Boton de tema (claro/oscuro) visible en topbar para todos los roles.
+- [x] Boton de tema con `aria-label` dinamico y operable por teclado (`Enter`).
+- [x] Persistencia de tema en localStorage (`erp_pos_theme`) validada tras recarga (dark y light).
+- [x] Fallback seguro de tema: valor invalido en storage => modo claro.
+- [x] Validacion por rol (`ADMIN`, `CAJERO`, `ALMACENERO`, `SUPERVISOR`) en `/dashboard` con scroll de menu y de contenido.
+- [x] Validacion de rutas por rol con tema activo y shell estable:
+  - [x] ADMIN/SUPERVISOR: `/dashboard`, `/pos`, `/inventario/stock`, `/ventas`, `/facturacion/comprobantes`, `/reportes`.
+  - [x] CAJERO: `/dashboard`, `/pos`, `/inventario/stock`, `/ventas`, `/facturacion/comprobantes`.
+  - [x] ALMACENERO: `/dashboard`, `/inventario/stock`, `/reportes`.
+- [x] Sidebar mantiene cobertura completa de viewport durante scroll de contenido (`top=0`, `bottom=viewport`) sin franja vacia inferior.
+- [x] Logout se mantiene fijo y visible fuera de `.sidebar-menu` en expandido y compacto.
+- [x] Sin `pageerror`, sin `500` inesperados, sin CORS, sin llamadas directas a `localhost:8080`.
+
 ### Matriz por rol - Sidebar avanzado
 
 - [x] ADMIN:
