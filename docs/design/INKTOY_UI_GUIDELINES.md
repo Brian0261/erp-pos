@@ -27,6 +27,19 @@ Apply visual consistency across the ERP/POS while preserving MVP behavior.
 4. Present user and role data clearly in sidebar/topbar while preserving existing data sources.
 5. Ensure responsive behavior for sidebar and topbar without hiding allowed menus.
 
+## Shell-Specific Rules (Block C2 - Advanced Sidebar)
+
+1. Keep route targets unchanged; only reorganize visual hierarchy (groups, labels, icons, compact mode).
+2. Keep RBAC visual parity with current route permissions; never show links not allowed by role.
+3. Hide empty groups for each role; do not render group containers without visible items.
+4. Keep sidebar expanded by default and allow compact mode as a UI preference only.
+5. Persist compact/group state in localStorage with safe fallbacks for invalid values.
+6. Keep menu scroll internal to sidebar navigation area; preserve fixed logout at the bottom.
+7. Keep clear active state for current route and group context.
+8. Use local icons only (inline/local resources), no external icon libraries required.
+9. Keep user and role summary visible in expanded mode; compact mode can prioritize icon-only navigation with tooltips.
+10. Preserve existing login/logout contracts, guards, interceptors, and backend authorization behavior.
+
 ## Dashboard-Specific Rules (Block D)
 
 1. Use existing services/endpoints only for KPI data and quick operational summaries.

@@ -52,6 +52,54 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [x] Confirmar visualmente que el cambio aparece realmente en el contenedor Docker (no en shell cacheada).
 - [x] Si hay duda, repetir en incognita y con hard reload.
 
+## Sidebar avanzado InkToy (2026-05-05)
+
+- [x] Build frontend (`npm run build`) exitoso tras cambios del sidebar.
+- [x] `docker compose up --build -d` y `docker compose ps` exitosos.
+- [x] Sidebar agrupado por modulos, sin cambios de rutas ni permisos reales.
+- [x] Etiquetas finales aplicadas con tildes y nombres operativos.
+- [x] Grupos vacios ocultos por rol.
+- [x] Estado activo visible por ruta actual.
+- [x] Menu con scroll interno independiente.
+- [x] Boton `Cerrar sesion` fijo y visible en shell.
+- [x] Modo compacto/expandido funcional y persistente (localStorage).
+- [x] Tooltips activos en modo compacto.
+- [x] Fallback seguro con localStorage invalido para modo/grupos.
+- [x] Logout funcional; ruta protegida redirige a `/login` tras cerrar sesion.
+
+### Matriz por rol - Sidebar avanzado
+
+- [x] ADMIN:
+  - [x] Grupos: Operacion, Catalogo, Inventario, Compras, Facturacion, Integraciones.
+  - [x] Standalone: Inicio, Cotizaciones, Reportes.
+  - [x] Rutas criticas validadas: `/dashboard`, `/pos`, `/caja`, `/ventas`, `/catalogo/productos`, `/inventario/stock`, `/compras/ordenes`, `/cotizaciones`, `/facturacion/comprobantes`, `/reportes`, `/integraciones/eventos`.
+- [x] CAJERO:
+  - [x] Grupos: Operacion, Consulta, Facturacion.
+  - [x] Standalone: Inicio, Cotizaciones.
+  - [x] No visibles: Catalogo, Compras, Integraciones, Configuracion tributaria, Series y correlativos.
+  - [x] Rutas permitidas validadas: `/dashboard`, `/pos`, `/caja`, `/ventas`, `/inventario/stock`, `/cotizaciones`, `/facturacion/comprobantes`.
+  - [x] Rutas bloqueadas redirigen a `/dashboard`: `/catalogo/productos`, `/integraciones/eventos`, `/facturacion/configuracion`.
+- [x] ALMACENERO:
+  - [x] Grupos: Catalogo, Inventario, Compras.
+  - [x] Standalone: Inicio, Reportes.
+  - [x] No visibles: Operacion, Cotizaciones, Facturacion, Integraciones.
+  - [x] Rutas permitidas validadas: `/dashboard`, `/catalogo/productos`, `/inventario/stock`, `/inventario/stock-inicial`, `/inventario/ajustes`, `/inventario/transferencias`, `/compras/proveedores`, `/compras/ordenes`, `/reportes`.
+  - [x] Rutas bloqueadas redirigen a `/dashboard`: `/pos`, `/cotizaciones`, `/facturacion/comprobantes`.
+- [x] SUPERVISOR:
+  - [x] Grupos: Operacion, Catalogo, Inventario, Compras, Facturacion.
+  - [x] Standalone: Inicio, Cotizaciones, Reportes.
+  - [x] No visibles: Integraciones, Configuracion tributaria, Series y correlativos.
+  - [x] Rutas permitidas validadas: `/dashboard`, `/pos`, `/caja`, `/ventas`, `/catalogo/productos`, `/inventario/stock`, `/inventario/kardex`, `/compras/ordenes`, `/cotizaciones`, `/facturacion/comprobantes`, `/reportes`.
+  - [x] Rutas bloqueadas redirigen a `/dashboard`: `/integraciones/eventos`, `/facturacion/configuracion`, `/facturacion/series`.
+
+### Observaciones runtime
+
+- [x] Sin `pageerror` durante la validacion de sidebar.
+- [x] Sin respuestas HTTP `500` inesperadas.
+- [x] Sin errores CORS.
+- [x] Sin llamadas directas a `localhost:8080` desde Angular (`frontend/src`).
+- [x] Se observan respuestas `404` esperadas en `/api/v1/cash-registers/current` cuando no existe caja abierta; no bloquea sidebar ni permisos.
+
 ## Health y auth
 
 - [x] `GET /api/v1/health` => 200.
@@ -1010,4 +1058,3 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
   - [x] `docker compose up --build -d` => OK.
   - [x] `docker compose ps` => OK.
 - [x] Logs backend revisados sin `500` inesperados en ventana de validacion BT-006 F1.
-
