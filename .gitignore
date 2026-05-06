@@ -23,3 +23,5 @@ Thumbs.db
 .agents/
 skills-lock.json
 
+# Archivos temporales de análisis del repositorio
+estructura_repo.txt
