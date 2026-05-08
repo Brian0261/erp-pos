@@ -2,7 +2,7 @@
 
 Papelería, artículos escolares y pasamanería
 
-*Documento de contexto para integrar al proyecto ERP/POS avanzado*
+_Documento de contexto para integrar al proyecto ERP/POS avanzado_
 
 <table>
 <colgroup>
@@ -34,15 +34,17 @@ con más de 5000 productos, el POS no debe obligar al cajero a navegar
 por todo el catálogo. Debe comportarse como una caja registradora
 moderna y touch-friendly.
 
-Método principal:  
-- Una barra grande para escanear o escribir el producto.  
-  
-Métodos de respaldo:  
-- Escáner de código de barras.  
-- Botones rápidos para productos frecuentes.  
-- Categorías visuales.  
-- SKU interno.  
-- Etiquetas internas en estantes.  
+Método principal:
+
+- Una barra grande para escanear o escribir el producto.
+
+Métodos de respaldo:
+
+- Escáner de código de barras.
+- Botones rápidos para productos frecuentes.
+- Categorías visuales.
+- SKU interno.
+- Etiquetas internas en estantes.
 - IA para búsquedas difíciles o ambiguas.
 
 La barra principal debe aceptar código de barras, SKU interno, nombre
@@ -124,7 +126,7 @@ Pantalla POS touch-friendly propuesta:
 </thead>
 <tbody>
 <tr class="odd">
-<td colspan="2">¿Qué desea vender? [ Escanear o escribir producto...
+<td colspan="2">¿Qué desea vender? [ Escanea o escribe el código exacto...
 ]<br />
 Ejemplo: cartulina roja, satinada 1cm, copia color</td>
 </tr>
@@ -181,7 +183,7 @@ o servicios. La solución es usar SKU interno, unidades de venta, alias y
 etiquetas internas.
 
 | **Tipo de producto** | **Unidad sugerida** | **Método rápido**                  | **Ejemplo**              |
-|----------------------|---------------------|------------------------------------|--------------------------|
+| -------------------- | ------------------- | ---------------------------------- | ------------------------ |
 | Papelógrafos         | Unidad              | Botón rápido / etiqueta de estante | Papelógrafo blanco       |
 | Cartulinas           | Unidad              | Buscar por color / botón rápido    | Cartulina escolar roja   |
 | Goma eva             | Unidad              | Buscar por color/tipo              | Goma eva azul escarchada |
@@ -203,8 +205,8 @@ SKU: PAP-PAPELOG-BLA
 Producto: Papelógrafo blanco  
 Unidad: Unidad  
 Precio: S/ 0.80  
-Código de barras: opcional  
-  
+Código de barras: opcional
+
 Etiqueta interna en estante:  
 \[PAP-PAPELOG-BLA\] Papelógrafo blanco - S/ 0.80
 
@@ -232,15 +234,17 @@ lenta si se usa siempre en caja.
 
 ## Opción B: búsqueda directa por teclado con ayuda de IA
 
-El cajero escribe:  
-- satinada roja 1cm  
-- cinta roja brillante  
-- listón rojo delgado  
-- satin rojaa  
-  
-El sistema sugiere:  
-- Cinta satinada roja 1 cm  
-- Cinta satinada roja 0.5 cm  
+El cajero escribe:
+
+- satinada roja 1cm
+- cinta roja brillante
+- listón rojo delgado
+- satin rojaa
+
+El sistema sugiere:
+
+- Cinta satinada roja 1 cm
+- Cinta satinada roja 0.5 cm
 - Cinta organza roja 1 cm
 
 Para una persona con poca facilidad usando PC, la mejor combinación es:
@@ -256,18 +260,19 @@ usuario quiso decir y devolver criterios de búsqueda para que el backend
 consulte productos reales.
 
 Entrada del cajero:  
-"listón rojo delgado"  
-  
+"listón rojo delgado"
+
 Interpretación esperada:  
 Tipo probable: cinta  
 Material probable: satinada  
 Color: rojo  
 Ancho probable: 0.5 cm o 1 cm  
-Unidad: metro  
-  
-Resultado mostrado:  
-1. Cinta satinada roja 0.5 cm  
-2. Cinta satinada roja 1 cm  
+Unidad: metro
+
+Resultado mostrado:
+
+1. Cinta satinada roja 0.5 cm
+2. Cinta satinada roja 1 cm
 3. Cinta organza roja 1 cm
 
 <table>
@@ -296,8 +301,8 @@ Con Angular, Spring Boot y PostgreSQL, la integración con OpenAI debe
 hacerse desde el backend. El frontend nunca debe llamar directamente a
 OpenAI.
 
-Flujo recomendado:  
-  
+Flujo recomendado:
+
 Angular POS  
 -\>  
 Spring Boot Backend  
@@ -333,16 +338,18 @@ Resultados en POS
 
 ## Control de errores, latencia, costos e internet
 
-Si OpenAI falla:  
-- Mostrar búsqueda normal.  
-- Usar SKU, código de barras, nombre, alias y botones rápidos.  
-- No bloquear la venta.  
-  
-Para reducir latencia y costos:  
-- No llamar a IA en cada tecla.  
-- Buscar primero en PostgreSQL.  
-- Usar IA solo si hay ambigüedad.  
-- Cachear búsquedas frecuentes.  
+Si OpenAI falla:
+
+- Mostrar búsqueda normal.
+- Usar SKU, código de barras, nombre, alias y botones rápidos.
+- No bloquear la venta.
+
+Para reducir latencia y costos:
+
+- No llamar a IA en cada tecla.
+- Buscar primero en PostgreSQL.
+- Usar IA solo si hay ambigüedad.
+- Cachear búsquedas frecuentes.
 - Registrar consumo diario/mensual.
 
 # 7. Estrategia correcta para usar IA
@@ -350,15 +357,16 @@ Para reducir latencia y costos:
 La IA debe ser la última capa de búsqueda, no la primera. Primero el
 sistema debe usar su propia base de datos.
 
-Estrategia de búsqueda en capas:  
-1. Código de barras exacto.  
-2. SKU interno exacto.  
-3. Nombre exacto.  
-4. Alias.  
-5. Coincidencia parcial.  
-6. Búsqueda aproximada.  
-7. Sinónimos locales.  
-8. IA solo si hay ambigüedad.  
+Estrategia de búsqueda en capas:
+
+1. Código de barras exacto.
+2. SKU interno exacto.
+3. Nombre exacto.
+4. Alias.
+5. Coincidencia parcial.
+6. Búsqueda aproximada.
+7. Sinónimos locales.
+8. IA solo si hay ambigüedad.
 9. Confirmación del cajero.
 
 Usar IA cuando el texto sea ambiguo o coloquial: "cinta roja brillante",
@@ -370,70 +378,76 @@ si hay código de barras, SKU exacto, coincidencia exacta o botón rápido.
 Para manejar más de 5000 productos, se recomienda separar producto base,
 variantes, códigos, alias, categorías y unidades de venta.
 
-Entidades sugeridas:  
-  
-CATEGORIA  
-- id_categoria  
-- nombre  
-- categoria_padre_id  
-  
-PRODUCTO  
-- id_producto  
-- nombre  
-- descripcion  
-- id_categoria  
-- tipo_producto  
-- activo  
-  
-VARIANTE_PRODUCTO  
-- id_variante  
-- id_producto  
-- sku  
-- nombre_comercial  
-- color  
-- ancho  
-- tamaño  
-- material  
-- marca  
-- unidad_venta_id  
-- precio_venta  
-- controla_stock  
-- stock_actual  
-- activo  
-  
-CODIGO_BARRAS  
-- id_codigo  
-- id_variante  
-- codigo  
-- tipo_codigo  
-- activo  
-  
-ALIAS_PRODUCTO  
-- id_alias  
-- id_producto  
-- id_variante opcional  
-- alias  
-  
-UNIDAD_VENTA  
-- id_unidad  
-- nombre  
-- abreviatura  
+Entidades sugeridas:
+
+CATEGORIA
+
+- id_categoria
+- nombre
+- categoria_padre_id
+
+PRODUCTO
+
+- id_producto
+- nombre
+- descripcion
+- id_categoria
+- tipo_producto
+- activo
+
+VARIANTE_PRODUCTO
+
+- id_variante
+- id_producto
+- sku
+- nombre_comercial
+- color
+- ancho
+- tamaño
+- material
+- marca
+- unidad_venta_id
+- precio_venta
+- controla_stock
+- stock_actual
+- activo
+
+CODIGO_BARRAS
+
+- id_codigo
+- id_variante
+- codigo
+- tipo_codigo
+- activo
+
+ALIAS_PRODUCTO
+
+- id_alias
+- id_producto
+- id_variante opcional
+- alias
+
+UNIDAD_VENTA
+
+- id_unidad
+- nombre
+- abreviatura
 - permite_decimal
 
-Ejemplos:  
-  
+Ejemplos:
+
 Cartulina escolar roja  
 SKU: PAP-CART-ROJ  
 Unidad: Unidad  
 Precio: S/ 1.00  
-Alias: cart roja, cartulina roja  
-  
+Alias: cart roja, cartulina roja
+
 Papelógrafo blanco  
 SKU: PAP-PAPELOG-BLA  
 Unidad: Unidad  
 Precio: S/ 0.80  
-Alias: papelografo, papelote blanco  
-  
+Alias: papelografo, papelote blanco
+
 Cinta satinada roja 1 cm  
 SKU: PAS-CIN-SAT-ROJ-1CM  
 Unidad: Metro  
@@ -505,31 +519,35 @@ ni descuentos.</p>
 
 ## Prioridad de implementación
 
-MVP Fase 1: POS rápido sin IA  
-- Pantalla touch-friendly.  
-- Buscador por nombre, SKU y código de barras.  
-- Carrito, total y cobrar.  
-- Productos con y sin código.  
-- Unidades: unidad, metro, paquete, ciento, docena y servicio.  
-- Botones rápidos.  
-  
-MVP Fase 2: Catálogo preparado  
-- Producto base y variantes.  
-- SKU interno.  
-- Alias.  
-- Categorías.  
-- Etiquetas internas de estante.  
-- Búsqueda aproximada local.  
-  
-MVP Fase 3: IA en buscador  
-- Interpretación de errores ortográficos.  
-- Sinónimos y lenguaje natural.  
-- Sugerencia de productos.  
-- Confirmación antes de agregar.  
-  
-Fases posteriores  
-- IA para listas escolares.  
-- IA para clasificación de productos nuevos.  
+MVP Fase 1: POS rápido sin IA
+
+- Pantalla touch-friendly.
+- Buscador por nombre, SKU y código de barras.
+- Carrito, total y cobrar.
+- Productos con y sin código.
+- Unidades: unidad, metro, paquete, ciento, docena y servicio.
+- Botones rápidos.
+
+MVP Fase 2: Catálogo preparado
+
+- Producto base y variantes.
+- SKU interno.
+- Alias.
+- Categorías.
+- Etiquetas internas de estante.
+- Búsqueda aproximada local.
+
+MVP Fase 3: IA en buscador
+
+- Interpretación de errores ortográficos.
+- Sinónimos y lenguaje natural.
+- Sugerencia de productos.
+- Confirmación antes de agregar.
+
+Fases posteriores
+
+- IA para listas escolares.
+- IA para clasificación de productos nuevos.
 - IA para sugerir alias y detectar duplicados.
 
 Conclusión: la búsqueda por teclado debe ser el método principal, pero

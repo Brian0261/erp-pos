@@ -39,263 +39,304 @@ interface PaymentLine {
   imports: [CommonModule, ReactiveFormsModule, RouterLink],
   template: `
     <section class="ui-card pos-page">
-      <header class="ui-page-head">
-        <div>
+      <header class="pos-hero">
+        <div class="pos-hero__copy">
           <p class="ui-page-kicker">Operacion Comercial InkToy</p>
-          <h1 class="ui-page-title">POS - Venta rapida</h1>
+          <h1 class="ui-page-title">Punto de venta</h1>
           <p class="ui-page-description">
-            Escanea SKU/barcode o busca por nombre para registrar ventas con
-            control de caja en tiempo real.
+            Venta guiada para caja fisica: escanea, selecciona, cobra y conserva
+            el control de caja en tiempo real.
           </p>
         </div>
 
-        <div class="head-actions">
+        <div class="pos-hero__actions">
           <span
-            class="ui-badge"
+            class="ui-badge pos-cash-badge"
             [class.ui-badge--success]="currentCashSession"
             [class.ui-badge--danger]="!currentCashSession"
           >
             {{ currentCashSession ? "Caja abierta" : "Caja cerrada" }}
           </span>
-          <a class="ui-button ui-button--secondary" [routerLink]="['/caja']"
+          <a
+            class="ui-button ui-button--secondary pos-button"
+            [routerLink]="['/caja']"
             >Ir a Caja</a
           >
         </div>
       </header>
 
-      <p class="ui-alert ui-alert--info" *ngIf="!currentCashSession">
+      <p
+        class="ui-alert ui-alert--info pos-cash-strip"
+        *ngIf="!currentCashSession"
+      >
         No hay caja abierta para el usuario actual. Abre caja en
         <a class="inline-link" [routerLink]="['/caja']">/caja</a> antes de
         vender.
       </p>
-      <p class="ui-alert ui-alert--success" *ngIf="currentCashSession">
+      <p
+        class="ui-alert ui-alert--success pos-cash-strip"
+        *ngIf="currentCashSession"
+      >
         Caja abierta #{{ currentCashSession.id }} desde
         {{ currentCashSession.openedAt | date: "yyyy-MM-dd HH:mm" }}.
       </p>
 
-      <form [formGroup]="saleForm" class="lookup-panel">
-        <label class="field">
-          <span>Almacen de salida *</span>
-          <select formControlName="warehouseId">
-            <option [ngValue]="null">Selecciona almacen</option>
-            <option
-              *ngFor="let warehouse of warehouses"
-              [ngValue]="warehouse.id"
-            >
-              {{ warehouse.code }} - {{ warehouse.name }}
-            </option>
-          </select>
-        </label>
+      <div class="pos-shell">
+        <main class="pos-workspace">
+          <form
+            [formGroup]="saleForm"
+            class="pos-command"
+            (ngSubmit)="lookupByCode()"
+          >
+            <label class="field field--warehouse">
+              <span>Almacen de salida *</span>
+              <select formControlName="warehouseId">
+                <option [ngValue]="null">Selecciona almacen</option>
+                <option
+                  *ngFor="let warehouse of warehouses"
+                  [ngValue]="warehouse.id"
+                >
+                  {{ warehouse.code }} - {{ warehouse.name }}
+                </option>
+              </select>
+            </label>
 
-        <label class="field">
-          <span>SKU / Barcode</span>
-          <div class="inline-group">
-            <input
-              type="text"
-              formControlName="code"
-              placeholder="Escanear o escribir codigo"
-            />
-            <button
-              type="button"
-              class="ui-button ui-button--primary"
-              (click)="lookupByCode()"
-              [disabled]="loadingLookup"
-            >
-              Buscar codigo
-            </button>
+            <section class="scan-card" aria-label="Busqueda principal POS">
+              <label class="scan-field">
+                <span class="scan-label"
+                  >Agregar por SKU o código de barras</span
+                >
+                <input
+                  class="scan-input"
+                  type="text"
+                  formControlName="code"
+                  placeholder="Escanea o escribe el código exacto..."
+                  autocomplete="off"
+                />
+              </label>
+
+              <div class="scan-actions">
+                <button
+                  type="submit"
+                  class="ui-button ui-button--primary pos-button pos-button--scan"
+                  [disabled]="loadingLookup"
+                >
+                  {{ loadingLookup ? "Buscando..." : "Agregar por codigo" }}
+                </button>
+                <button
+                  type="button"
+                  class="ui-button ui-button--secondary pos-button pos-button--quiet"
+                  (click)="refreshCashSession()"
+                >
+                  Refrescar caja
+                </button>
+              </div>
+
+              <p class="scan-help">
+                Para buscar por nombre o descripción, usa Búsqueda por nombre.
+              </p>
+            </section>
+
+            <label class="field manual-search">
+              <span>Busqueda por nombre</span>
+              <div class="manual-search__row">
+                <input
+                  type="text"
+                  formControlName="query"
+                  placeholder="Ej: lapiz, cartulina roja, cinta satinada"
+                  autocomplete="off"
+                />
+                <button
+                  type="button"
+                  class="ui-button ui-button--secondary pos-button"
+                  (click)="searchByName()"
+                  [disabled]="loadingSearch"
+                >
+                  {{ loadingSearch ? "Buscando..." : "Buscar productos" }}
+                </button>
+              </div>
+            </label>
+          </form>
+
+          <div class="message-stack" *ngIf="errorMessage || successMessage">
+            <p class="ui-alert ui-alert--error" *ngIf="errorMessage">
+              {{ errorMessage }}
+            </p>
+            <p class="ui-alert ui-alert--success" *ngIf="successMessage">
+              {{ successMessage }}
+            </p>
           </div>
-        </label>
 
-        <label class="field">
-          <span>Buscar por nombre</span>
-          <div class="inline-group">
-            <input
-              type="text"
-              formControlName="query"
-              placeholder="Ej: lapiz, cuaderno"
-            />
-            <button
-              type="button"
-              class="ui-button ui-button--secondary"
-              (click)="searchByName()"
-              [disabled]="loadingSearch"
-            >
-              Buscar nombre
-            </button>
-          </div>
-        </label>
-      </form>
+          <section class="results-panel">
+            <header class="panel-head">
+              <div>
+                <p class="panel-kicker">Seleccion explicita</p>
+                <h2>Resultados de busqueda</h2>
+              </div>
+              <span class="ui-badge"
+                >{{ searchResults.length }} resultados</span
+              >
+            </header>
 
-      <p class="ui-alert ui-alert--error" *ngIf="errorMessage">
-        {{ errorMessage }}
-      </p>
-      <p class="ui-alert ui-alert--success" *ngIf="successMessage">
-        {{ successMessage }}
-      </p>
+            <p class="result-hint" *ngIf="searchResults.length > 1">
+              Hay varias coincidencias. Revisa nombre, codigo, precio y stock
+              antes de tocar Agregar.
+            </p>
 
-      <section *ngIf="searchResults.length > 0" class="pos-block">
-        <header class="block-head">
-          <h2>Resultados de busqueda</h2>
-          <span class="ui-badge">{{ searchResults.length }} resultados</span>
-        </header>
+            <div class="empty-results" *ngIf="searchResults.length === 0">
+              <strong>Sin resultados activos</strong>
+              <span
+                >Busca por nombre para elegir el producto antes de
+                agregar.</span
+              >
+            </div>
 
-        <div class="ui-table-wrapper">
-          <table class="ui-table results-table">
-            <thead>
-              <tr>
-                <th>SKU</th>
-                <th>Barcode</th>
-                <th>Producto</th>
-                <th class="cell-number">Precio</th>
-                <th class="cell-number">Stock disponible</th>
-                <th>Accion</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let result of searchResults">
-                <td class="cell-code">{{ result.sku }}</td>
-                <td class="cell-code">{{ result.barcode || "-" }}</td>
-                <td>{{ result.name }}</td>
-                <td class="cell-number">
-                  {{ result.salePrice | number: "1.2-2" }}
-                </td>
-                <td class="cell-number">
-                  {{ result.stockAvailable | number: "1.0-3" }}
-                </td>
-                <td>
+            <div class="results-grid" *ngIf="searchResults.length > 0">
+              <article class="result-card" *ngFor="let result of searchResults">
+                <div class="result-card__body">
+                  <p class="result-card__sku">{{ result.sku }}</p>
+                  <h3>{{ result.name }}</h3>
+                  <dl class="result-meta">
+                    <div>
+                      <dt>Barcode</dt>
+                      <dd>{{ result.barcode || "-" }}</dd>
+                    </div>
+                    <div>
+                      <dt>Stock</dt>
+                      <dd>{{ result.stockAvailable | number: "1.0-3" }}</dd>
+                    </div>
+                  </dl>
+                </div>
+                <div class="result-card__action">
+                  <p class="result-price">
+                    S/ {{ result.salePrice | number: "1.2-2" }}
+                  </p>
                   <button
                     type="button"
-                    class="ui-button ui-button--primary"
+                    class="ui-button ui-button--primary pos-button pos-button--add"
                     (click)="addToCart(result)"
                   >
                     Agregar
                   </button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
+                </div>
+              </article>
+            </div>
+          </section>
+        </main>
 
-      <section class="pos-block">
-        <header class="block-head">
-          <h2>Carrito</h2>
-          <button
-            type="button"
-            class="ui-button ui-button--danger"
-            (click)="clearCart()"
-            [disabled]="cart.length === 0"
-          >
-            Limpiar carrito
-          </button>
-        </header>
+        <aside class="checkout-panel" aria-label="Carrito y cobro">
+          <section class="cart-panel">
+            <header class="panel-head panel-head--compact">
+              <div>
+                <p class="panel-kicker">Venta actual</p>
+                <h2>Carrito</h2>
+              </div>
+              <button
+                type="button"
+                class="ui-button ui-button--secondary pos-button pos-button--quiet"
+                (click)="clearCart()"
+                [disabled]="cart.length === 0"
+              >
+                Cancelar venta
+              </button>
+            </header>
 
-        <div class="ui-table-wrapper">
-          <table class="ui-table cart-table">
-            <thead>
-              <tr>
-                <th>SKU</th>
-                <th>Producto</th>
-                <th class="cell-number">Stock</th>
-                <th class="cell-number">Cantidad *</th>
-                <th class="cell-number">Precio unitario</th>
-                <th class="cell-number">Descuento</th>
-                <th class="cell-number">Subtotal</th>
-                <th class="cell-number">Total linea</th>
-                <th>Accion</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let item of cart; let index = index">
-                <td class="cell-code">{{ item.sku }}</td>
-                <td>{{ item.name }}</td>
-                <td class="cell-number">
-                  {{ item.stockAvailable | number: "1.0-3" }}
-                </td>
-                <td>
-                  <input
-                    type="number"
-                    min="0.001"
-                    step="0.001"
-                    [value]="item.quantity"
-                    (input)="setQuantity(index, $any($event.target).value)"
-                  />
-                </td>
-                <td class="cell-number">
-                  {{ item.salePrice | number: "1.2-2" }}
-                </td>
-                <td>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    [value]="item.discountAmount"
-                    (input)="setDiscount(index, $any($event.target).value)"
-                  />
-                </td>
-                <td class="cell-number">
-                  {{ lineSubtotal(item) | number: "1.2-2" }}
-                </td>
-                <td class="cell-number">
-                  {{ lineTotal(item) | number: "1.2-2" }}
-                </td>
-                <td>
+            <div class="cart-list" *ngIf="cart.length > 0; else emptyCart">
+              <article
+                class="cart-item"
+                *ngFor="let item of cart; let index = index"
+              >
+                <div class="cart-item__main">
+                  <p class="cart-item__sku">{{ item.sku }}</p>
+                  <h3>{{ item.name }}</h3>
+                  <p class="cart-item__stock">
+                    Stock {{ item.stockAvailable | number: "1.0-3" }} | P.U. S/
+                    {{ item.salePrice | number: "1.2-2" }}
+                  </p>
+                </div>
+
+                <div class="cart-item__controls">
+                  <label class="mini-field">
+                    <span>Cantidad *</span>
+                    <input
+                      type="number"
+                      min="0.001"
+                      step="0.001"
+                      [value]="item.quantity"
+                      (input)="setQuantity(index, $any($event.target).value)"
+                    />
+                  </label>
+                  <label class="mini-field">
+                    <span>Descuento</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      [value]="item.discountAmount"
+                      (input)="setDiscount(index, $any($event.target).value)"
+                    />
+                  </label>
+                </div>
+
+                <div class="cart-item__footer">
+                  <div>
+                    <span>Linea</span>
+                    <strong>S/ {{ lineTotal(item) | number: "1.2-2" }}</strong>
+                  </div>
                   <button
                     type="button"
-                    class="ui-button ui-button--danger"
+                    class="ui-button ui-button--danger pos-button pos-button--small"
                     (click)="removeFromCart(index)"
                   >
                     Quitar
                   </button>
-                </td>
-              </tr>
-              <tr *ngIf="cart.length === 0">
-                <td colspan="9" class="ui-table__empty">
-                  <div class="ui-empty-state">Carrito vacio.</div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
+                </div>
+              </article>
+            </div>
 
-      <section class="pos-block">
-        <header class="block-head">
-          <h2>Pagos</h2>
-          <button
-            type="button"
-            class="ui-button ui-button--secondary"
-            (click)="addPaymentLine()"
-          >
-            Agregar pago
-          </button>
-        </header>
+            <ng-template #emptyCart>
+              <div class="empty-cart">
+                <strong>Carrito vacio</strong>
+                <span>Escanea o busca un producto para empezar.</span>
+              </div>
+            </ng-template>
+          </section>
 
-        <div class="ui-table-wrapper">
-          <table class="ui-table payments-table">
-            <thead>
-              <tr>
-                <th>Metodo *</th>
-                <th class="cell-number">Monto *</th>
-                <th>Referencia</th>
-                <th>Accion</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let payment of payments; let index = index">
-                <td>
+          <section class="payment-panel">
+            <header class="panel-head panel-head--compact">
+              <div>
+                <p class="panel-kicker">Cobro</p>
+                <h2>Pagos</h2>
+              </div>
+              <button
+                type="button"
+                class="ui-button ui-button--secondary pos-button pos-button--quiet"
+                (click)="addPaymentLine()"
+              >
+                + Pago
+              </button>
+            </header>
+
+            <div class="payment-list">
+              <article
+                class="payment-line"
+                *ngFor="let payment of payments; let index = index"
+              >
+                <label class="mini-field">
+                  <span>Metodo *</span>
                   <select
                     [value]="payment.paymentMethod"
                     (change)="
                       setPaymentMethod(index, $any($event.target).value)
                     "
                   >
-                    <option value="CASH">CASH</option>
-                    <option value="CARD">CARD</option>
-                    <option value="TRANSFER">TRANSFER</option>
+                    <option value="CASH">Efectivo</option>
+                    <option value="CARD">Tarjeta</option>
+                    <option value="TRANSFER">Transferencia</option>
                   </select>
-                </td>
-                <td>
+                </label>
+                <label class="mini-field">
+                  <span>Monto *</span>
                   <input
                     type="number"
                     min="0"
@@ -303,8 +344,9 @@ interface PaymentLine {
                     [value]="payment.amount"
                     (input)="setPaymentAmount(index, $any($event.target).value)"
                   />
-                </td>
-                <td>
+                </label>
+                <label class="mini-field mini-field--wide">
+                  <span>Referencia</span>
                   <input
                     type="text"
                     [value]="payment.reference"
@@ -312,90 +354,91 @@ interface PaymentLine {
                       setPaymentReference(index, $any($event.target).value)
                     "
                     maxlength="120"
+                    placeholder="Opcional"
                   />
-                </td>
-                <td>
-                  <button
-                    type="button"
-                    class="ui-button ui-button--danger"
-                    (click)="removePaymentLine(index)"
-                    [disabled]="payments.length === 1"
-                  >
-                    Quitar
-                  </button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
+                </label>
+                <button
+                  type="button"
+                  class="ui-button ui-button--danger pos-button pos-button--small"
+                  (click)="removePaymentLine(index)"
+                  [disabled]="payments.length === 1"
+                >
+                  Quitar
+                </button>
+              </article>
+            </div>
+          </section>
 
-      <section class="totals-panel">
-        <article class="total-item">
-          <p class="label">Subtotal</p>
-          <p class="value">{{ subtotal | number: "1.2-2" }}</p>
-        </article>
-        <article class="total-item">
-          <p class="label">Descuento</p>
-          <p class="value">{{ discountTotal | number: "1.2-2" }}</p>
-        </article>
-        <article class="total-item total-item--strong">
-          <p class="label">Total</p>
-          <p class="value">{{ total | number: "1.2-2" }}</p>
-        </article>
-        <article class="total-item">
-          <p class="label">Pagado</p>
-          <p class="value">{{ paidTotal | number: "1.2-2" }}</p>
-        </article>
-        <article class="total-item total-item--accent">
-          <p class="label">Vuelto</p>
-          <p class="value">{{ change | number: "1.2-2" }}</p>
-        </article>
-      </section>
+          <section class="total-board" aria-label="Totales de venta">
+            <article class="total-main">
+              <span>Total a cobrar</span>
+              <strong>S/ {{ total | number: "1.2-2" }}</strong>
+            </article>
 
-      <footer class="actions">
-        <button
-          type="button"
-          class="ui-button ui-button--secondary"
-          (click)="refreshCashSession()"
-        >
-          Refrescar caja
-        </button>
-        <button
-          type="button"
-          class="ui-button ui-button--primary"
-          (click)="finalizeSale()"
-          [disabled]="submitting"
-        >
-          Finalizar venta
-        </button>
-        <a
-          *ngIf="lastSaleId"
-          class="ui-button ui-button--secondary"
-          [routerLink]="['/ventas', lastSaleId]"
-        >
-          Ver venta #{{ lastSaleId }}
-        </a>
-      </footer>
+            <div class="total-grid">
+              <article>
+                <span>Subtotal</span>
+                <strong>S/ {{ subtotal | number: "1.2-2" }}</strong>
+              </article>
+              <article>
+                <span>Descuento</span>
+                <strong>S/ {{ discountTotal | number: "1.2-2" }}</strong>
+              </article>
+              <article>
+                <span>Pagado</span>
+                <strong>S/ {{ paidTotal | number: "1.2-2" }}</strong>
+              </article>
+              <article class="total-change">
+                <span>Vuelto</span>
+                <strong>S/ {{ change | number: "1.2-2" }}</strong>
+              </article>
+            </div>
+          </section>
+
+          <footer class="checkout-actions">
+            <button
+              type="button"
+              class="ui-button ui-button--primary checkout-button"
+              (click)="finalizeSale()"
+              [disabled]="submitting"
+            >
+              {{ submitting ? "Cobrando..." : "COBRAR" }}
+            </button>
+            <a
+              *ngIf="lastSaleId"
+              class="ui-button ui-button--secondary pos-button sale-link"
+              [routerLink]="['/ventas', lastSaleId]"
+            >
+              Ver venta #{{ lastSaleId }}
+            </a>
+          </footer>
+        </aside>
+      </div>
     </section>
   `,
   styles: [
     `
-      .pos-page {
-        padding: var(--space-5);
-        display: grid;
-        gap: var(--space-4);
+      :host {
+        display: block;
+        height: 100%;
+        min-height: 0;
       }
 
-      .head-actions {
-        display: flex;
-        align-items: center;
-        gap: var(--space-2);
-        flex-wrap: wrap;
+      .pos-page {
+        --pos-gap: 0.625rem;
+        height: calc(100dvh - 7.5rem);
+        max-height: calc(100dvh - 7.5rem);
+        min-height: 0;
+        padding: var(--space-3);
+        display: grid;
+        grid-template-rows: auto auto minmax(0, 1fr);
+        gap: var(--pos-gap);
+        overflow: hidden;
       }
 
       h1,
-      h2 {
+      h2,
+      h3 {
         margin: 0;
       }
 
@@ -404,40 +447,246 @@ interface PaymentLine {
         font-weight: 700;
       }
 
-      .lookup-panel {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(220px, 1fr));
+      .pos-hero {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
         gap: var(--space-3);
-        border: 1px solid var(--color-border-default);
-        border-radius: var(--radius-md);
-        background: var(--color-bg-soft);
-        padding: var(--space-3);
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: var(--radius-lg);
+        background:
+          linear-gradient(
+            135deg,
+            rgba(18, 23, 184, 0.94),
+            rgba(16, 17, 20, 0.94)
+          ),
+          var(--color-brand-primary);
+        color: var(--color-text-on-dark);
+        padding: var(--space-3) var(--space-4);
+        box-shadow: var(--shadow-md);
       }
 
-      .field {
+      .pos-hero .ui-page-title {
+        font-size: clamp(1.2rem, 1.6vw, 1.45rem);
+        line-height: 1.1;
+      }
+
+      .pos-hero .ui-page-kicker,
+      .pos-hero .ui-page-description {
+        color: rgba(255, 255, 255, 0.82);
+      }
+
+      .pos-hero .ui-page-description {
+        margin-top: var(--space-1);
+        max-width: 58ch;
+        font-size: var(--font-size-sm);
+        line-height: 1.3;
+      }
+
+      .pos-hero__copy {
+        max-width: 760px;
+      }
+
+      .pos-hero__actions {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: var(--space-2);
+        flex-wrap: wrap;
+      }
+
+      .pos-cash-badge {
+        min-height: 2.35rem;
+        padding-inline: var(--space-3);
+      }
+
+      .pos-cash-strip {
+        padding: 0.42rem 0.7rem;
+        font-size: var(--font-size-sm);
+        line-height: 1.25;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .pos-shell {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(350px, 0.58fr);
+        gap: var(--pos-gap);
+        align-items: stretch;
+        min-height: 0;
+        overflow: hidden;
+      }
+
+      .pos-workspace,
+      .checkout-panel {
+        display: grid;
+        gap: var(--pos-gap);
+        min-height: 0;
+        overflow: hidden;
+      }
+
+      .pos-workspace {
+        grid-template-rows: auto auto minmax(0, 1fr);
+      }
+
+      .checkout-panel {
+        position: static;
+        height: 100%;
+        grid-template-rows:
+          minmax(12.75rem, 1fr) minmax(5rem, auto) minmax(5rem, auto)
+          auto;
+      }
+
+      .pos-command,
+      .results-panel,
+      .cart-panel,
+      .payment-panel,
+      .total-board {
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-lg);
+        background: var(--color-bg-surface);
+        box-shadow: var(--shadow-sm);
+      }
+
+      .pos-command {
+        display: grid;
+        grid-template-columns: minmax(220px, 0.34fr) minmax(0, 1fr);
+        gap: var(--space-2);
+        padding: var(--space-3);
+        align-items: end;
+      }
+
+      .field,
+      .mini-field,
+      .scan-field {
         display: grid;
         gap: var(--space-1);
       }
 
-      .field > span {
+      .field > span,
+      .mini-field > span,
+      .scan-label {
         font-size: var(--font-size-sm);
-        font-weight: 700;
+        font-weight: 800;
         color: var(--color-text-secondary);
       }
 
-      .inline-group {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
-        gap: var(--space-2);
+      .field--warehouse {
+        grid-column: 1;
+        grid-row: 2;
+        max-width: none;
       }
 
       input,
       select,
       textarea {
-        padding: 0.6rem 0.7rem;
-        border-radius: var(--radius-sm);
+        width: 100%;
+        min-height: 2.55rem;
+        padding: 0.58rem 0.72rem;
+        border-radius: var(--radius-md);
         border: 1px solid var(--color-border-strong);
         background: var(--color-bg-surface);
+        color: var(--color-text-primary);
+      }
+
+      .scan-card {
+        grid-column: 1 / -1;
+        grid-row: 1;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: end;
+        gap: var(--space-2);
+        border-radius: calc(var(--radius-lg) + 0.2rem);
+        border: 2px solid rgba(18, 23, 184, 0.22);
+        background:
+          linear-gradient(
+            135deg,
+            rgba(244, 194, 13, 0.14),
+            rgba(242, 74, 11, 0.08)
+          ),
+          var(--color-bg-soft);
+        padding: var(--space-3);
+      }
+
+      .scan-label {
+        color: var(--color-text-primary);
+        font-size: var(--font-size-md);
+      }
+
+      .scan-input {
+        min-height: 3.15rem;
+        border-width: 2px;
+        border-color: rgba(18, 23, 184, 0.38);
+        border-radius: var(--radius-lg);
+        font-size: clamp(1.05rem, 1.55vw, 1.35rem);
+        font-weight: 800;
+        letter-spacing: 0.01em;
+      }
+
+      .scan-actions {
+        display: grid;
+        grid-template-columns: repeat(2, max-content);
+        gap: var(--space-2);
+        justify-content: start;
+      }
+
+      .manual-search__row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: var(--space-2);
+      }
+
+      .scan-help,
+      .result-hint,
+      .cart-item__stock,
+      .empty-cart span {
+        margin: 0;
+        color: var(--color-text-secondary);
+      }
+
+      .scan-help,
+      .result-hint {
+        font-weight: 700;
+        font-size: var(--font-size-xs);
+      }
+
+      .manual-search {
+        grid-column: 2;
+        grid-row: 2;
+        border-top: 0;
+        padding-top: 0;
+      }
+
+      .pos-button,
+      .checkout-button {
+        min-height: 2.55rem;
+        border-radius: var(--radius-md);
+        padding: 0.58rem var(--space-4);
+        font-size: var(--font-size-md);
+      }
+
+      .pos-button--scan {
+        min-height: 3.15rem;
+        background: var(--color-brand-accent);
+        font-size: var(--font-size-md);
+        letter-spacing: 0.01em;
+      }
+
+      .pos-button--add {
+        width: 100%;
+        min-height: 2.8rem;
+        background: var(--color-brand-accent);
+        font-size: var(--font-size-md);
+      }
+
+      .pos-button--quiet {
+        background: #4b5563;
+      }
+
+      .pos-button--small {
+        min-height: 2.35rem;
+        padding-inline: var(--space-3);
       }
 
       .ui-button[disabled] {
@@ -445,118 +694,566 @@ interface PaymentLine {
         cursor: not-allowed;
       }
 
-      .pos-block {
-        border: 1px solid var(--color-border-default);
-        border-radius: var(--radius-md);
-        background: var(--color-bg-surface);
-        padding: var(--space-3);
+      .message-stack {
         display: grid;
-        gap: var(--space-3);
+        gap: var(--space-2);
       }
 
-      .block-head {
+      .results-panel,
+      .cart-panel,
+      .payment-panel,
+      .total-board {
+        padding: var(--space-3);
+        display: grid;
+        gap: var(--space-2);
+        min-height: 0;
+        overflow: hidden;
+      }
+
+      .results-panel {
+        grid-template-rows: auto auto minmax(0, 1fr);
+      }
+
+      .cart-panel {
+        grid-template-rows: auto minmax(0, 1fr);
+      }
+
+      .payment-panel {
+        grid-template-columns: max-content minmax(0, 1fr);
+        align-items: stretch;
+        min-height: 5rem;
+        padding: 0.4rem;
+      }
+
+      .panel-head {
         display: flex;
         justify-content: space-between;
-        align-items: center;
+        align-items: flex-start;
         gap: var(--space-2);
         flex-wrap: wrap;
       }
 
-      .results-table {
-        min-width: 860px;
+      .panel-head--compact {
+        align-items: center;
       }
 
-      .cart-table {
-        min-width: 1280px;
+      .payment-panel .panel-head--compact {
+        align-items: flex-start;
+        align-self: center;
+        flex-direction: column;
+        justify-content: center;
+        gap: 0.2rem;
       }
 
-      .payments-table {
-        min-width: 760px;
+      .panel-head h2 {
+        font-size: 1.15rem;
+        line-height: 1.1;
       }
 
-      .cell-code,
-      .cell-number {
-        white-space: nowrap;
+      .payment-panel .panel-head h2 {
+        font-size: 0.9rem;
       }
 
-      .cell-number {
-        text-align: right;
+      .payment-panel .panel-kicker {
+        display: none;
       }
 
-      .totals-panel {
+      .payment-panel .pos-button {
+        min-height: 2rem;
+        padding: 0.3rem var(--space-2);
+        font-size: var(--font-size-sm);
+      }
+
+      .cart-panel .pos-button--quiet {
+        min-height: 2rem;
+        padding: 0.36rem var(--space-2);
+        font-size: var(--font-size-sm);
+      }
+
+      .panel-kicker {
+        margin: 0 0 var(--space-1);
+        font-size: var(--font-size-xs);
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--color-text-secondary);
+      }
+
+      .results-grid {
+        grid-row: 3;
         display: grid;
-        grid-template-columns: repeat(5, minmax(130px, 1fr));
+        grid-template-columns: 1fr;
+        align-content: start;
         gap: var(--space-2);
+        min-height: 0;
+        overflow: auto;
+        padding-right: var(--space-1);
       }
 
-      .total-item {
-        border: 1px solid var(--color-border-default);
-        border-radius: var(--radius-sm);
+      .empty-results {
+        grid-row: 3;
+        display: grid;
+        place-items: center;
+        gap: var(--space-1);
+        min-height: 0;
+        border: 2px dashed var(--color-border-default);
+        border-radius: var(--radius-lg);
         background: var(--color-bg-soft);
-        padding: var(--space-2) var(--space-3);
+        color: var(--color-text-secondary);
+        text-align: center;
+        padding: var(--space-4);
+      }
+
+      .result-card {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(130px, auto);
+        gap: var(--space-2);
+        align-items: stretch;
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-lg);
+        background:
+          linear-gradient(
+            180deg,
+            rgba(18, 23, 184, 0.04),
+            rgba(18, 23, 184, 0)
+          ),
+          var(--color-bg-surface);
+        padding: var(--space-2);
+      }
+
+      .result-card__body,
+      .result-card__action,
+      .cart-item__main {
         display: grid;
         gap: var(--space-1);
       }
 
-      .total-item .label {
+      .result-card__action {
+        align-content: space-between;
+      }
+
+      .result-card__sku,
+      .cart-item__sku {
         margin: 0;
-        font-size: var(--font-size-xs);
+        width: fit-content;
+        border-radius: var(--radius-pill);
+        background: var(--color-bg-soft);
         color: var(--color-text-secondary);
-        font-weight: 700;
+        padding: 0.15rem var(--space-2);
+        font-size: var(--font-size-xs);
+        font-weight: 800;
+        letter-spacing: 0.04em;
+      }
+
+      .result-meta {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: var(--space-1);
+        margin: 0;
+      }
+
+      .result-meta div,
+      .total-grid article {
+        border-radius: var(--radius-md);
+        background: var(--color-bg-soft);
+        padding: 0.45rem var(--space-2);
+      }
+
+      .result-meta dt,
+      .total-grid span,
+      .cart-item__footer span,
+      .total-main span {
+        color: var(--color-text-secondary);
+        font-size: var(--font-size-xs);
+        font-weight: 800;
+        letter-spacing: 0.06em;
         text-transform: uppercase;
       }
 
-      .total-item .value {
-        margin: 0;
+      .result-meta dd {
+        margin: var(--space-1) 0 0;
         font-weight: 800;
-        font-size: var(--font-size-lg);
       }
 
-      .total-item--strong {
-        border-color: #c7d2fe;
-        background: #eef2ff;
-      }
-
-      .total-item--strong .value {
+      .result-price {
+        margin: 0;
         color: var(--color-brand-primary);
+        font-size: clamp(1.25rem, 1.8vw, 1.55rem);
+        font-weight: 900;
+        text-align: right;
       }
 
-      .total-item--accent {
-        border-color: #bbf7d0;
-        background: #f0fdf4;
+      .cart-list,
+      .payment-list {
+        display: grid;
+        align-content: start;
+        gap: var(--space-2);
+        min-height: 0;
+        overflow: auto;
+        padding-right: var(--space-1);
       }
 
-      .total-item--accent .value {
+      .cart-list {
+        overflow: auto;
+      }
+
+      .payment-list {
+        align-content: center;
+        max-height: 5.4rem;
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding-right: 0;
+      }
+
+      .cart-item,
+      .payment-line {
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-lg);
+        background: var(--color-bg-surface);
+        padding: 0.55rem;
+      }
+
+      .cart-item {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(82px, auto);
+        gap: 0.38rem var(--space-2);
+        align-items: start;
+      }
+
+      .cart-item__main {
+        grid-column: 1 / -1;
+        grid-template-columns: auto minmax(0, 1fr);
+        align-items: center;
+        gap: 0.22rem 0.45rem;
+        align-content: start;
+        min-width: 0;
+      }
+
+      .cart-item__main h3 {
+        font-size: 0.92rem;
+        line-height: 1.12;
+      }
+
+      .cart-item__stock {
+        grid-column: 1 / -1;
+        font-size: var(--font-size-xs);
+      }
+
+      .cart-item__controls {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: var(--space-1);
+        align-content: end;
+      }
+
+      .cart-item__footer {
+        display: grid;
+        align-content: space-between;
+        align-items: stretch;
+        gap: var(--space-1);
+        border-left: 1px solid var(--color-border-default);
+        border-top: 0;
+        padding-left: var(--space-2);
+        padding-top: 0;
+      }
+
+      .cart-item__footer div {
+        display: grid;
+        gap: 0;
+      }
+
+      .cart-item__footer strong {
+        font-size: var(--font-size-sm);
+      }
+
+      .cart-item .mini-field > span {
+        font-size: 0.68rem;
+      }
+
+      .mini-field input,
+      .mini-field select {
+        min-height: 2.35rem;
+        font-weight: 800;
+      }
+
+      .cart-item .mini-field input {
+        min-height: 1.75rem;
+        padding: 0.24rem 0.42rem;
+      }
+
+      .payment-line {
+        display: grid;
+        grid-template-columns:
+          minmax(132px, 0.92fr) minmax(74px, 0.46fr) minmax(108px, 0.95fr)
+          minmax(66px, auto);
+        gap: 0.28rem;
+        align-items: end;
+        min-width: 0;
+      }
+
+      .payment-line .mini-field > span {
+        font-size: 0.68rem;
+      }
+
+      .payment-line input,
+      .payment-line select {
+        min-height: 2rem;
+        padding: 0.28rem 0.42rem;
+      }
+
+      .payment-line select {
+        font-weight: 700;
+      }
+
+      .payment-line .pos-button--small {
+        min-height: 2.05rem;
+        padding-inline: var(--space-2);
+      }
+
+      .empty-cart {
+        display: grid;
+        gap: var(--space-1);
+        place-items: center;
+        min-height: 4.6rem;
+        border: 2px dashed var(--color-border-default);
+        border-radius: var(--radius-lg);
+        background: var(--color-bg-soft);
+        text-align: center;
+        padding: var(--space-3);
+      }
+
+      .total-board {
+        border-color: rgba(18, 23, 184, 0.28);
+        grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+        align-items: stretch;
+        min-height: 4.35rem;
+        padding: 0.35rem;
+      }
+
+      .total-main {
+        display: grid;
+        gap: var(--space-1);
+        border-radius: var(--radius-lg);
+        background:
+          linear-gradient(135deg, var(--color-brand-primary), #0f172a),
+          var(--color-brand-primary);
+        color: var(--color-text-on-dark);
+        padding: 0.4rem var(--space-2);
+      }
+
+      .total-main span {
+        color: rgba(255, 255, 255, 0.78);
+      }
+
+      .total-main strong {
+        font-size: clamp(1.35rem, 2vw, 1.75rem);
+        line-height: 1;
+      }
+
+      .total-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: var(--space-1);
+      }
+
+      .total-grid article {
+        display: grid;
+        gap: 0;
+        padding: 0.22rem var(--space-1);
+      }
+
+      .total-grid strong {
+        font-size: var(--font-size-sm);
+      }
+
+      .total-change strong {
         color: var(--color-success);
       }
 
-      .actions {
-        display: flex;
-        gap: var(--space-2);
-        flex-wrap: wrap;
+      .checkout-actions {
+        display: grid;
+        gap: var(--space-1);
       }
 
-      @media (max-width: 900px) {
+      .checkout-button {
+        min-height: 2.65rem;
+        border-radius: var(--radius-lg);
+        background: var(--color-brand-accent);
+        font-size: clamp(1.05rem, 1.7vw, 1.35rem);
+        font-weight: 900;
+        letter-spacing: 0.06em;
+      }
+
+      .sale-link {
+        width: 100%;
+      }
+
+      :host-context(body[data-theme="dark"]) .scan-card {
+        border-color: rgba(244, 194, 13, 0.36);
+        background:
+          linear-gradient(
+            135deg,
+            rgba(244, 194, 13, 0.16),
+            rgba(242, 74, 11, 0.1)
+          ),
+          var(--color-bg-soft);
+      }
+
+      :host-context(body[data-theme="dark"]) .result-card {
+        background:
+          linear-gradient(
+            180deg,
+            rgba(244, 194, 13, 0.08),
+            rgba(244, 194, 13, 0)
+          ),
+          var(--color-bg-surface);
+      }
+
+      .results-grid::-webkit-scrollbar,
+      .cart-list::-webkit-scrollbar,
+      .payment-list::-webkit-scrollbar {
+        width: 8px;
+      }
+
+      .results-grid::-webkit-scrollbar-track,
+      .cart-list::-webkit-scrollbar-track,
+      .payment-list::-webkit-scrollbar-track {
+        background: var(--color-bg-soft);
+        border-radius: var(--radius-pill);
+      }
+
+      .results-grid::-webkit-scrollbar-thumb,
+      .cart-list::-webkit-scrollbar-thumb,
+      .payment-list::-webkit-scrollbar-thumb {
+        background: linear-gradient(
+          180deg,
+          var(--color-brand-highlight),
+          var(--color-brand-accent)
+        );
+        border-radius: var(--radius-pill);
+      }
+
+      @media (max-height: 820px) and (min-width: 981px) {
         .pos-page {
-          padding: var(--space-4);
+          height: calc(100dvh - 7rem);
+          max-height: calc(100dvh - 7rem);
+          padding: var(--space-2);
         }
 
-        .lookup-panel {
-          grid-template-columns: 1fr;
+        .pos-hero {
+          padding: var(--space-2) var(--space-3);
         }
 
-        .inline-group {
-          grid-template-columns: 1fr;
+        .pos-cash-badge {
+          min-height: 2rem;
         }
 
-        .totals-panel {
-          grid-template-columns: 1fr 1fr;
+        .pos-cash-strip {
+          padding: 0.32rem 0.6rem;
+        }
+
+        .pos-hero .ui-page-description {
+          display: none;
+        }
+
+        .scan-help,
+        .result-hint {
+          display: none;
+        }
+
+        .scan-input {
+          min-height: 2.85rem;
+        }
+
+        .payment-list {
+          max-height: 5.4rem;
         }
       }
 
-      @media (max-width: 640px) {
-        .totals-panel {
+      @media (max-width: 980px) {
+        :host {
+          height: auto;
+        }
+
+        .pos-page {
+          height: auto;
+          max-height: none;
+          min-height: 0;
+          overflow: visible;
+        }
+
+        .pos-shell {
           grid-template-columns: 1fr;
+          overflow: visible;
+        }
+
+        .pos-workspace,
+        .checkout-panel {
+          overflow: visible;
+          height: auto;
+        }
+
+        .checkout-panel {
+          grid-template-rows: auto;
+        }
+
+        .results-grid,
+        .cart-list,
+        .payment-list {
+          max-height: 18rem;
+        }
+      }
+
+      @media (max-width: 760px) {
+        .pos-page {
+          padding: var(--space-3);
+        }
+
+        .pos-hero,
+        .panel-head,
+        .panel-head--compact,
+        .cart-item__footer {
+          align-items: stretch;
+          flex-direction: column;
+        }
+
+        .pos-hero__actions,
+        .pos-command,
+        .scan-card,
+        .scan-actions,
+        .manual-search__row,
+        .cart-item__controls,
+        .payment-line,
+        .result-card,
+        .total-board,
+        .total-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .payment-panel,
+        .cart-item {
+          grid-template-columns: 1fr;
+        }
+
+        .pos-hero__actions,
+        .panel-head {
+          width: 100%;
+        }
+
+        .scan-card,
+        .field--warehouse,
+        .manual-search {
+          grid-column: 1;
+          grid-row: auto;
+        }
+
+        .pos-button,
+        .checkout-button {
+          width: 100%;
+        }
+
+        .result-price {
+          text-align: left;
         }
       }
     `,

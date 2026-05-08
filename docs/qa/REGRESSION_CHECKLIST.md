@@ -52,6 +52,98 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [x] Confirmar visualmente que el cambio aparece realmente en el contenedor Docker (no en shell cacheada).
 - [x] Si hay duda, repetir en incognita y con hard reload.
 
+### POS touch-friendly Fase 1 (2026-05-06)
+
+- [x] Alcance acotado a `frontend/src/app/features/sales/pos-page.component.ts` y evidencia QA en este checklist.
+- [x] `npm run build` frontend exitoso tras rediseño POS Fase 1.
+- [x] `docker compose up --build -d` y `docker compose ps` exitosos tras rebuild del runtime.
+- [x] Docker runtime disponible: frontend `http://localhost:4200`, backend `UP`, postgres healthy.
+- [x] POS mantiene contratos y servicios existentes: lookup, busqueda, carrito, pagos y `finalizeSale()` sin cambios de payload/endpoints.
+- [x] Validacion headless Chrome con `admin@erp.local` (ADMIN): login `200`, `/pos` carga, buscador principal con placeholder `Escanea o escribe el código exacto...`, carrito, pagos, total grande y `COBRAR` visibles.
+- [x] ADMIN: busqueda por producto en POS devuelve resultados, requiere seleccion explicita, agrega item al carrito, permite setear cantidad y mantiene total visible.
+- [x] ADMIN: `/ventas` sigue cargando y logout redirige a login.
+- [x] Validacion headless Chrome con `cajero@erp.local` (CAJERO): login `200`, `/pos` carga, buscador principal, carrito, pagos, total grande y `COBRAR` visibles.
+- [x] CAJERO: busqueda por producto en POS devuelve resultados, requiere seleccion explicita, agrega item al carrito, permite setear cantidad y mantiene total visible.
+- [x] CAJERO: `/ventas` sigue cargando y logout redirige a login.
+- [x] Sin `pageerror` observado en la validacion headless.
+- [x] Sin respuestas `500` inesperadas observadas en la validacion headless.
+- [x] Sin llamadas directas a `localhost:8080`; se mantiene proxy relativo `/api`.
+- [x] No se ejecuto venta real de prueba en Fase 1 para evitar mutacion transaccional innecesaria; la validacion cubrio hasta carrito/pagos/CTA.
+- [x] Sin cambios en backend, Flyway, DB, rutas, guards, AuthService, JWT/interceptor, endpoints, facturacion, compras, outbox, OpenAI, Dockerfile ni nginx.conf.
+
+### POS touch-friendly Fase 1.1 - Grid fijo sin scroll de pagina (2026-05-06)
+
+- [x] Ajuste aplicado solo en `frontend/src/app/features/sales/pos-page.component.ts` y evidencia QA en este checklist.
+- [x] Causa corregida: `/pos` crecia por altura natural de hero, estado de caja, resultados y columna de cobro, generando scroll vertical en `.content`.
+- [x] `npm run build` frontend exitoso tras layout POS de una sola vista.
+- [x] `docker compose up --build -d` y `docker compose ps` exitosos tras rebuild del runtime.
+- [x] Validacion desktop headless Chrome `1366x768`: `documentOverflowY=0`, `bodyOverflowY=0`, `contentOverflowY=0`, `posOverflowY=0`.
+- [x] ADMIN (`admin@erp.local`): login `200`, `/pos` carga sin scroll vertical de pagina, busqueda, resultados, carrito, pagos, total y `COBRAR` visibles sin bajar la pagina.
+- [x] ADMIN: busqueda por producto QA, seleccion explicita, agregado al carrito, cantidad `1`, pago `S/ 25.00`, total actualizado `S/ 25.00`, `COBRAR` visible.
+- [x] ADMIN: venta QA generada desde POS `S-1778129942429` (`/ventas/7`), CTA `Ver venta #7` visible, detalle `/ventas/7` carga y `/ventas` carga.
+- [x] ADMIN: stock/kardex confirmados para `SKU-BT003-A-1777947134` en `STORE-01`: stock `60 -> 59`, movimiento `SALE_OUT`, `referenceId=7`.
+- [x] CAJERO (`cajero@erp.local`): login `200`, `/pos` carga sin scroll vertical de pagina, busqueda, resultados, carrito, pagos, total y `COBRAR` visibles sin bajar la pagina.
+- [x] CAJERO: busqueda por producto QA, seleccion explicita, agregado al carrito, cantidad `1`, pago seteado, total actualizado `S/ 25.00`, `COBRAR` visible; no se finalizo una segunda venta.
+- [x] Scroll interno controlado validado tras agregar item: resultados y carrito tienen overflow interno cuando el contenido excede su zona; no crece la pagina.
+- [x] `/ventas` sigue cargando y logout redirige a login para ADMIN y CAJERO.
+- [x] Sin `pageerror`, sin errores de consola inesperados, sin `500`, sin CORS y sin llamadas directas a `localhost:8080`.
+- [x] Sin cambios en backend, Flyway, DB, rutas, guards, AuthService, JWT/interceptor, endpoints, servicios Angular, facturacion, compras, outbox, OpenAI, Dockerfile ni nginx.conf.
+
+### POS touch-friendly Fase 1.2 - Carrito completo con 1 producto (2026-05-07)
+
+- [x] Ajuste aplicado solo en `frontend/src/app/features/sales/pos-page.component.ts` y evidencia QA en este checklist.
+- [x] Causa corregida: el alto efectivo de `.cart-list` quedaba por debajo del alto de un `.cart-item`, generando scroll interno con un solo producto.
+- [x] Carrito compactado sin cambiar logica de venta: item en estructura mas densa, controles de cantidad/descuento mas compactos, pagos/totales/CTA y breakpoint desktop `<= 820px` ajustados para `1366x768`.
+- [x] `npm run build` frontend exitoso tras correccion del carrito.
+- [x] `docker compose up --build -d` y `docker compose ps` exitosos tras rebuild del runtime.
+- [x] ADMIN (`admin@erp.local`) headless Chrome `1366x768`: `/pos?ngsw-bypass=true`, `documentOverflowY=0`, `bodyOverflowY=0`, `contentOverflowY=0`, `posOverflowY=0`.
+- [x] ADMIN: con 1 producto QA en carrito, `cartInternalOverflowY=0`, `cartListClientHeight=183`, `cartListScrollHeight=183`, `cartItemHeight=179`.
+- [x] ADMIN: SKU, nombre, stock/precio, cantidad, descuento, linea/subtotal, `Quitar`, pagos, total y `COBRAR` visibles en una sola vista.
+- [x] ADMIN: con 2 productos, la pagina sigue sin scroll vertical (`document/body/content/pos overflowY=0`) y el scroll queda dentro del carrito (`cartInternalOverflowY=157`) con pagos, total y `COBRAR` visibles.
+- [x] CAJERO (`cajero@erp.local`) headless Chrome `1366x768`: mismas metricas visuales del carrito con 1 producto (`cartInternalOverflowY=0`) y 2 productos con scroll interno del carrito.
+- [x] Sin `pageerror`, sin respuestas `500`, sin CORS y sin llamadas directas a `localhost:8080` durante validacion ADMIN/CAJERO.
+- [x] No se finalizo venta real en esta fase por ser ajuste visual; no hubo mutacion transaccional de stock/kardex.
+- [x] Sin cambios en backend, Flyway, DB, rutas, guards, AuthService, JWT/interceptor, endpoints, servicios Angular, facturacion, compras, outbox, OpenAI, Dockerfile ni nginx.conf.
+
+### POS touch-friendly Fase 1.3 - Pagos sin scroll con 1 linea (2026-05-07)
+
+- [x] Ajuste aplicado solo en `frontend/src/app/features/sales/pos-page.component.ts` y evidencia QA en este checklist.
+- [x] Causa corregida: `.payment-list` tenia `max-height` agresivo y `overflow: auto`, generando scroll interno incluso con la linea de pago inicial.
+- [x] Pagos reestructurado como banda horizontal desktop: `Agregar pago`, metodo, monto, referencia y `Quitar` visibles completos con una sola linea.
+- [x] `.checkout-panel` reequilibrado para asignar altura minima real al bloque de pagos sin cambiar logica TypeScript de venta ni payloads.
+- [x] `npm run build` frontend exitoso tras ajuste visual de Pagos.
+- [x] `docker compose up --build -d` y `docker compose ps` exitosos tras rebuild del runtime.
+- [x] ADMIN (`admin@erp.local`) headless Chrome `1366x768`: `/pos?ngsw-bypass=true`, `documentOverflowY=0`, `bodyOverflowY=0`, `contentOverflowY=0`, `posOverflowY=0`.
+- [x] ADMIN: con 1 linea de pago, `paymentInternalOverflowY=0`, `paymentPanelHeight=91`, `paymentListClientHeight=74`, `paymentListScrollHeight=74`, `paymentLineHeight=74`.
+- [x] ADMIN: con 2 lineas de pago, el scroll aparece solo dentro de Pagos (`paymentInternalOverflowY=35`) y la pagina permanece sin scroll vertical.
+- [x] ADMIN: busqueda por producto QA, agregado al carrito y total actualizado a `S/ 25.00`; busqueda, resultados, carrito, total y `COBRAR` visibles.
+- [x] ADMIN: modo oscuro validado visualmente por visibilidad de controles criticos; `/ventas` carga y logout redirige a `/login`.
+- [x] CAJERO (`cajero@erp.local`) headless Chrome `1366x768`: mismas metricas visuales de Pagos con 1 linea (`paymentInternalOverflowY=0`) y 2 lineas con scroll interno solo en Pagos.
+- [x] CAJERO: busqueda por producto QA, agregado al carrito y total actualizado a `S/ 25.00`; `/ventas` carga y logout redirige a `/login`.
+- [x] Sin `pageerror`, sin respuestas `500`, sin CORS y sin llamadas directas a `localhost:8080` durante validacion ADMIN/CAJERO.
+- [x] No se finalizo venta real en esta fase por ser ajuste visual; no hubo mutacion transaccional de stock/kardex.
+- [x] Sin cambios en backend, Flyway, DB, rutas, guards, AuthService, JWT/interceptor, endpoints, servicios Angular, modelos, facturacion, compras, outbox, OpenAI, Dockerfile ni nginx.conf.
+
+### POS UX copy - Metodos de pago en espanol (2026-05-07)
+
+- [x] Ajuste aplicado solo en `frontend/src/app/features/sales/pos-page.component.ts` y evidencia QA en este checklist.
+- [x] Cambio limitado a texto visible del selector en POS: `CASH -> Efectivo`, `CARD -> Tarjeta`, `TRANSFER -> Transferencia`.
+- [x] Se mantienen intactos los values internos del `option`: `value="CASH"`, `value="CARD"`, `value="TRANSFER"` (sin cambios de payload ni enum enviado al backend).
+- [x] `npm run build` frontend exitoso tras el ajuste de etiquetas.
+- [x] `docker compose up --build -d` y `docker compose ps` exitosos tras rebuild del runtime.
+- [x] Sin cambios en backend, Flyway, DB, endpoints, servicios Angular, rutas, guards, AuthService, JWT/interceptor, facturacion, compras, outbox, OpenAI, Dockerfile ni nginx.conf.
+
+### POS Touch-Friendly Fase 1.x - Cierre consolidado (2026-05-07)
+
+- [x] Cierre consolidado de mejoras visuales acumuladas en `/pos`: rediseño touch-friendly, vista unica sin scroll vertical de pagina, buscador principal grande, resultados en tarjetas, carrito visible, pagos visibles, total destacado y `COBRAR` siempre visible.
+- [x] Carrito validado para mostrar completo 1 producto sin scroll interno; con varios productos, el scroll queda controlado dentro del carrito y no crece la pagina.
+- [x] Pagos validado para 1 linea sin scroll interno; con varias lineas, el scroll queda controlado dentro de Pagos y no crece la pagina.
+- [x] Metodos de pago visibles en espanol para cajero: `CASH -> Efectivo`, `CARD -> Tarjeta`, `TRANSFER -> Transferencia`.
+- [x] Values internos conservados para backend/payload: `CASH`, `CARD`, `TRANSFER`.
+- [x] Validacion tecnica consolidada: `npm run build` OK, `docker compose up --build -d` OK y `docker compose ps` OK.
+- [x] Validacion funcional consolidada por rol: ADMIN y CAJERO acceden a `/pos`, visualizan busqueda, resultados, carrito, pagos, total y `COBRAR` sin scroll vertical de pagina.
+- [x] Alcance mantenido como frontend visual POS: sin cambios en backend, endpoints, rutas, guards, AuthService, JWT/interceptor, DB, Flyway ni servicios Angular.
+
 ## Sidebar avanzado InkToy (2026-05-05)
 
 - [x] Build frontend (`npm run build`) exitoso tras cambios del sidebar.
