@@ -103,14 +103,12 @@ interface PaymentLine {
 
             <section class="scan-card" aria-label="Busqueda principal POS">
               <label class="scan-field">
-                <span class="scan-label"
-                  >Agregar por SKU o código de barras</span
-                >
+                <span class="scan-label">Agregar por SKU o barcode</span>
                 <input
                   class="scan-input"
                   type="text"
                   formControlName="code"
-                  placeholder="Escanea o escribe el código exacto..."
+                  placeholder="Escanea o escribe SKU/barcode exacto..."
                   autocomplete="off"
                 />
               </label>
@@ -133,17 +131,18 @@ interface PaymentLine {
               </div>
 
               <p class="scan-help">
-                Para buscar por nombre o descripción, usa Búsqueda por nombre.
+                Productos sin barcode: busca por nombre o usa los botones
+                rapidos.
               </p>
             </section>
 
             <label class="field manual-search">
-              <span>Busqueda por nombre</span>
+              <span>Busqueda por nombre, SKU o producto sin barcode</span>
               <div class="manual-search__row">
                 <input
                   type="text"
                   formControlName="query"
-                  placeholder="Ej: lapiz, cartulina roja, cinta satinada"
+                  placeholder="Ej: lapiz, cartulina roja, papelografo, cinta"
                   autocomplete="off"
                 />
                 <button
@@ -156,6 +155,24 @@ interface PaymentLine {
                 </button>
               </div>
             </label>
+
+            <section
+              class="quick-search"
+              aria-label="Busquedas rapidas para productos sin barcode"
+            >
+              <span>BÚSQUEDAS RÁPIDAS</span>
+              <div class="quick-search__buttons">
+                <button
+                  type="button"
+                  class="ui-button quick-search__button"
+                  *ngFor="let term of quickSearchTerms"
+                  (click)="applyQuickSearch(term)"
+                  [disabled]="loadingSearch"
+                >
+                  {{ term }}
+                </button>
+              </div>
+            </section>
           </form>
 
           <div class="message-stack" *ngIf="errorMessage || successMessage">
@@ -199,7 +216,14 @@ interface PaymentLine {
                   <dl class="result-meta">
                     <div>
                       <dt>Barcode</dt>
-                      <dd>{{ result.barcode || "-" }}</dd>
+                      <dd>
+                        <span
+                          class="barcode-badge"
+                          [class.barcode-badge--missing]="!result.barcode"
+                        >
+                          {{ result.barcode || "Sin barcode" }}
+                        </span>
+                      </dd>
                     </div>
                     <div>
                       <dt>Stock</dt>
@@ -252,19 +276,64 @@ interface PaymentLine {
                   <p class="cart-item__stock">
                     Stock {{ item.stockAvailable | number: "1.0-3" }} | P.U. S/
                     {{ item.salePrice | number: "1.2-2" }}
+                    <span
+                      class="barcode-badge barcode-badge--missing cart-barcode-badge"
+                      *ngIf="!item.barcode"
+                    >
+                      Sin barcode
+                    </span>
                   </p>
                 </div>
 
                 <div class="cart-item__controls">
                   <label class="mini-field">
                     <span>Cantidad *</span>
-                    <input
-                      type="number"
-                      min="0.001"
-                      step="0.001"
-                      [value]="item.quantity"
-                      (input)="setQuantity(index, $any($event.target).value)"
-                    />
+                    <div class="quantity-tools">
+                      <button
+                        type="button"
+                        class="ui-button quantity-stepper"
+                        (click)="decreaseQuantity(index)"
+                        [disabled]="item.quantity <= 1"
+                      >
+                        -
+                      </button>
+                      <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        inputmode="numeric"
+                        pattern="[0-9]*"
+                        [value]="item.quantity"
+                        (input)="
+                          setQuantity(
+                            index,
+                            $any($event.target).value,
+                            $any($event.target)
+                          )
+                        "
+                      />
+                      <button
+                        type="button"
+                        class="ui-button quantity-stepper"
+                        (click)="increaseQuantity(index)"
+                      >
+                        +
+                      </button>
+                    </div>
+                    <div
+                      class="quantity-presets"
+                      aria-label="Cantidades rapidas"
+                    >
+                      <button
+                        type="button"
+                        class="ui-button quantity-preset"
+                        *ngFor="let quantity of quickQuantities"
+                        (click)="setQuickQuantity(index, quantity)"
+                        [disabled]="quantity > availableIntegerStock(item)"
+                      >
+                        {{ quantity }}
+                      </button>
+                    </div>
                   </label>
                   <label class="mini-field">
                     <span>Descuento</span>
@@ -637,6 +706,40 @@ interface PaymentLine {
         gap: var(--space-2);
       }
 
+      .quick-search {
+        grid-column: 1 / -1;
+        display: grid;
+        grid-template-columns: max-content minmax(0, 1fr);
+        gap: var(--space-2);
+        align-items: center;
+      }
+
+      .quick-search > span {
+        color: var(--color-text-secondary);
+        font-size: var(--font-size-xs);
+        font-weight: 900;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .quick-search__buttons {
+        display: flex;
+        gap: var(--space-1);
+        overflow-x: auto;
+        padding-bottom: 0.05rem;
+      }
+
+      .quick-search__button {
+        min-height: 2rem;
+        flex: 0 0 auto;
+        border: 1px solid var(--color-border-strong);
+        background: var(--color-bg-soft);
+        color: var(--color-text-primary);
+        padding: 0.32rem 0.62rem;
+        font-size: var(--font-size-sm);
+        white-space: nowrap;
+      }
+
       .scan-help,
       .result-hint,
       .cart-item__stock,
@@ -875,6 +978,23 @@ interface PaymentLine {
         font-weight: 800;
       }
 
+      .barcode-badge {
+        display: inline-flex;
+        width: fit-content;
+        border-radius: var(--radius-pill);
+        background: var(--color-bg-soft);
+        color: var(--color-text-secondary);
+        padding: 0.12rem var(--space-2);
+        font-size: var(--font-size-xs);
+        font-weight: 900;
+      }
+
+      .barcode-badge--missing {
+        border: 1px solid rgba(244, 194, 13, 0.42);
+        background: rgba(244, 194, 13, 0.14);
+        color: var(--color-warning);
+      }
+
       .result-price {
         margin: 0;
         color: var(--color-brand-primary);
@@ -979,6 +1099,44 @@ interface PaymentLine {
       .cart-item .mini-field input {
         min-height: 1.75rem;
         padding: 0.24rem 0.42rem;
+      }
+
+      .quantity-tools {
+        display: grid;
+        grid-template-columns: 1.8rem minmax(3.2rem, 1fr) 1.8rem;
+        gap: 0.22rem;
+        align-items: center;
+      }
+
+      .quantity-tools input {
+        text-align: center;
+      }
+
+      .quantity-stepper {
+        min-height: 1.75rem;
+        padding: 0;
+        border-radius: var(--radius-sm);
+        background: var(--color-bg-soft);
+        border: 1px solid var(--color-border-strong);
+        color: var(--color-text-primary);
+        font-weight: 900;
+      }
+
+      .quantity-presets {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 0.18rem;
+        margin-top: 0.22rem;
+      }
+
+      .quantity-preset {
+        min-height: 1.5rem;
+        padding: 0.08rem 0.15rem;
+        border: 1px solid var(--color-border-default);
+        background: var(--color-bg-soft);
+        color: var(--color-text-primary);
+        font-size: 0.68rem;
+        font-weight: 900;
       }
 
       .payment-line {
@@ -1157,8 +1315,19 @@ interface PaymentLine {
         }
 
         .scan-help,
-        .result-hint {
+        .result-hint,
+        .quick-search > span {
           display: none;
+        }
+
+        .quick-search {
+          grid-template-columns: 1fr;
+        }
+
+        .quick-search__button {
+          min-height: 1.75rem;
+          padding: 0.2rem 0.5rem;
+          font-size: var(--font-size-xs);
         }
 
         .scan-input {
@@ -1222,6 +1391,7 @@ interface PaymentLine {
         .scan-card,
         .scan-actions,
         .manual-search__row,
+        .quick-search,
         .cart-item__controls,
         .payment-line,
         .result-card,
@@ -1242,7 +1412,8 @@ interface PaymentLine {
 
         .scan-card,
         .field--warehouse,
-        .manual-search {
+        .manual-search,
+        .quick-search {
           grid-column: 1;
           grid-row: auto;
         }
@@ -1260,6 +1431,18 @@ interface PaymentLine {
   ],
 })
 export class PosPageComponent implements OnInit {
+  readonly quickSearchTerms = [
+    "Cartulina",
+    "Papelógrafo",
+    "Copia",
+    "Impresión",
+    "Goma eva",
+    "Cinta",
+    "Elástico",
+    "Cordón",
+  ];
+  readonly quickQuantities = [1, 2, 5, 10];
+
   readonly saleForm = this.formBuilder.group({
     warehouseId: [null as number | null, Validators.required],
     code: [""],
@@ -1399,6 +1582,11 @@ export class PosPageComponent implements OnInit {
     });
   }
 
+  applyQuickSearch(term: string): void {
+    this.saleForm.patchValue({ query: term, code: "" });
+    this.searchByName();
+  }
+
   addToCart(product: PosProductResponse): void {
     this.errorMessage = "";
     this.successMessage = "";
@@ -1413,7 +1601,7 @@ export class PosPageComponent implements OnInit {
 
     if (existing) {
       const nextQty = existing.quantity + 1;
-      if (nextQty > product.stockAvailable) {
+      if (nextQty > this.availableIntegerStock(existing)) {
         this.errorMessage = `Stock insuficiente para ${product.sku}. Disponible: ${product.stockAvailable}.`;
         return;
       }
@@ -1421,7 +1609,11 @@ export class PosPageComponent implements OnInit {
       return;
     }
 
-    if (product.stockAvailable <= 0) {
+    const availableStock = Math.floor(
+      this.normalizeNumber(product.stockAvailable),
+    );
+
+    if (availableStock <= 0) {
       this.errorMessage = `El producto ${product.sku} no tiene stock disponible.`;
       return;
     }
@@ -1450,25 +1642,54 @@ export class PosPageComponent implements OnInit {
     }
   }
 
-  setQuantity(index: number, rawValue: string): void {
+  setQuantity(index: number, rawValue: string, input?: HTMLInputElement): void {
     const item = this.cart[index];
     if (!item) {
       return;
     }
 
-    const parsed = this.normalizeNumber(rawValue);
-    if (parsed <= 0) {
-      item.quantity = 0;
-      return;
-    }
+    const parsed = this.normalizeQuantity(rawValue);
+    const maxStock = this.availableIntegerStock(item);
 
-    if (parsed > item.stockAvailable) {
+    if (parsed > maxStock) {
       this.errorMessage = `Cantidad excede stock disponible (${item.stockAvailable}) para ${item.sku}.`;
-      item.quantity = item.stockAvailable;
+      item.quantity = Math.max(maxStock, 1);
+      if (input) {
+        input.value = String(item.quantity);
+      }
       return;
     }
 
     item.quantity = parsed;
+    if (input) {
+      input.value = String(item.quantity);
+    }
+  }
+
+  increaseQuantity(index: number): void {
+    const item = this.cart[index];
+    if (!item) {
+      return;
+    }
+
+    this.setQuantity(index, String(item.quantity + 1));
+  }
+
+  decreaseQuantity(index: number): void {
+    const item = this.cart[index];
+    if (!item) {
+      return;
+    }
+
+    this.setQuantity(index, String(item.quantity - 1));
+  }
+
+  setQuickQuantity(index: number, quantity: number): void {
+    this.setQuantity(index, String(quantity));
+  }
+
+  availableIntegerStock(item: Pick<PosCartItem, "stockAvailable">): number {
+    return Math.floor(this.normalizeNumber(item.stockAvailable));
   }
 
   setDiscount(index: number, rawValue: string): void {
@@ -1574,7 +1795,7 @@ export class PosPageComponent implements OnInit {
       warehouseId,
       items: this.cart.map((item) => ({
         productId: item.productId,
-        quantity: this.normalizeNumber(item.quantity),
+        quantity: this.normalizeQuantity(item.quantity),
         discountAmount: this.normalizeNumber(item.discountAmount),
       })),
       payments: this.payments
@@ -1635,7 +1856,7 @@ export class PosPageComponent implements OnInit {
     }
 
     for (const item of this.cart) {
-      if (this.normalizeNumber(item.quantity) <= 0) {
+      if (this.normalizeQuantity(item.quantity) <= 0) {
         return `La cantidad de ${item.sku} debe ser mayor que 0.`;
       }
 
@@ -1644,8 +1865,7 @@ export class PosPageComponent implements OnInit {
       }
 
       if (
-        this.normalizeNumber(item.quantity) >
-        this.normalizeNumber(item.stockAvailable)
+        this.normalizeQuantity(item.quantity) > this.availableIntegerStock(item)
       ) {
         return `Stock insuficiente para ${item.sku}.`;
       }
@@ -1672,5 +1892,10 @@ export class PosPageComponent implements OnInit {
       return 0;
     }
     return parsed;
+  }
+
+  private normalizeQuantity(value: unknown): number {
+    const parsed = Math.floor(this.normalizeNumber(value));
+    return parsed > 0 ? parsed : 1;
   }
 }

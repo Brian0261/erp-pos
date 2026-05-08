@@ -160,6 +160,27 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [x] Sin cambios en backend, Flyway, DB, endpoints, servicios Angular, modelos, rutas, guards, AuthService, JWT/interceptor, POS logic, venta, facturacion logica, compras logica, Dockerfile ni nginx.conf.
 - [x] Fase 2 local queda reservada para excepciones visuales especificas con colores hardcodeados dentro de componentes si aparecen en revision manual posterior.
 
+### POS Fase 2A - Productos sin barcode y cantidades enteras (2026-05-07)
+
+- [x] Alcance aplicado solo a `frontend/src/app/features/sales/pos-page.component.ts` y evidencia QA en este checklist.
+- [x] Enfoque frontend-only mantenido: sin cambios en backend, Flyway, DB, endpoints, servicios Angular, modelos, rutas, guards, AuthService, JWT/interceptor, facturacion, compras, outbox, OpenAI, Dockerfile ni nginx.conf.
+- [x] Copy POS actualizado para productos sin barcode: busqueda principal por SKU/barcode exacto y busqueda manual por nombre, SKU o producto sin barcode.
+- [x] Botones rapidos agregados para productos sin barcode: `Cartulina`, `Papelógrafo`, `Copia`, `Impresión`, `Goma eva`, `Cinta`, `Elástico`, `Cordón`; en runtime se validaron 8 botones y codigos Unicode correctos para labels con tilde.
+- [x] Boton rapido `Cartulina` validado en ADMIN y CAJERO: rellena busqueda manual, limpia codigo, dispara `GET /api/v1/pos/products/search` y no agrega producto directo al carrito (`cartCountAfterQuickSearch=0`).
+- [x] Resultados ambiguos mantienen seleccion explicita: producto QA se agrega solo tras tocar `Agregar` desde resultados.
+- [x] Badge `Sin barcode` validado en carrito con producto QA sin barcode.
+- [x] Cantidad POS validada como entero positivo: input `min="1"`, `step="1"`, `inputmode="numeric"`, `pattern="[0-9]*"`.
+- [x] Controles de cantidad validados en ADMIN y CAJERO: `+` cambia `1 -> 2`, `-` cambia `2 -> 1`, preset `2` cambia a `2` y entrada decimal `2.7` se normaliza visualmente a `2`.
+- [x] Total recalcula tras cambios de cantidad (`S/ 50.00` con cantidad `2` del producto QA de `S/ 25.00`).
+- [x] `npm run build` frontend exitoso tras implementacion y ajuste de normalizacion visual.
+- [x] `docker compose up --build -d` y `docker compose ps` exitosos; frontend `http://localhost:4200`, backend `UP`, postgres healthy.
+- [x] ADMIN (`admin@erp.local`) headless Chrome `1366x768`: `/pos?ngsw-bypass=true` carga, sin scroll vertical de pagina, sin overflow horizontal, pagos en espanol y `COBRAR` visibles.
+- [x] CAJERO (`cajero@erp.local`) headless Chrome `1366x768`: `/pos?ngsw-bypass=true` carga, sin scroll vertical de pagina, sin overflow horizontal, pagos en espanol y `COBRAR` visibles.
+- [x] Validacion mobile headless `390x844` para ADMIN y CAJERO: POS carga, 8 botones rapidos presentes, sin overflow horizontal y `COBRAR` existe.
+- [x] `/ventas?ngsw-bypass=true` carga para ADMIN y CAJERO tras validar POS.
+- [x] Sin `pageerror`, sin respuestas `500`, sin CORS observado y sin llamadas directas a `localhost:8080` durante validacion ADMIN/CAJERO.
+- [x] No se finalizo venta real en esta fase; no hubo mutacion transaccional de stock/kardex.
+
 ## Sidebar avanzado InkToy (2026-05-05)
 
 - [x] Build frontend (`npm run build`) exitoso tras cambios del sidebar.
