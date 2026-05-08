@@ -144,6 +144,22 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [x] Validacion funcional consolidada por rol: ADMIN y CAJERO acceden a `/pos`, visualizan busqueda, resultados, carrito, pagos, total y `COBRAR` sin scroll vertical de pagina.
 - [x] Alcance mantenido como frontend visual POS: sin cambios en backend, endpoints, rutas, guards, AuthService, JWT/interceptor, DB, Flyway ni servicios Angular.
 
+### Dark Mode Hardening Fase 1 - tokens y componentes compartidos (2026-05-07)
+
+- [x] Alcance aplicado solo a tokens/estilos globales: `frontend/src/styles/design-tokens.css`, `frontend/src/styles/base.css`, `frontend/src/styles/components.css` y evidencia QA en este checklist.
+- [x] Causa corregida: modo oscuro incompleto a nivel de tokens semanticos y componentes compartidos; badges, chips, alerts, inputs, botones disabled y links podian heredar colores de modo claro o bajo contraste.
+- [x] Tokens semanticos agregados/ajustados para superficies, texto primario/secundario/muted, bordes, links, focus ring, estados success/warning/danger/info y disabled.
+- [x] Componentes compartidos endurecidos: `.ui-card`, `.ui-button`, `.ui-button--secondary`, botones disabled, `.ui-badge`, `.ui-chip`, `.ui-alert`, `.ui-field`, inputs/selects/textarea, placeholders, tablas y links criticos en dark mode.
+- [x] `npm run build` frontend exitoso tras la implementacion final.
+- [x] `docker compose up --build -d` y `docker compose ps` exitosos tras rebuild final; frontend `http://localhost:4200`, backend `UP`, postgres healthy.
+- [x] Validacion headless Chrome final con `?ngsw-bypass=true`: 84 checks por tema/rol/ruta sobre modo oscuro y claro.
+- [x] Roles validados: `ADMIN`, `CAJERO`, `ALMACENERO`, `SUPERVISOR`; login/token correcto para cada rol.
+- [x] Rutas validadas segun permisos: `/login`, `/dashboard`, `/pos`, `/caja`, `/ventas`, `/catalogo/productos`, `/catalogo/categorias`, `/catalogo/unidades`, `/inventario/stock`, `/inventario/kardex`, `/compras/ordenes`, `/cotizaciones`, `/facturacion/comprobantes`, `/reportes`, `/integraciones/eventos` para ADMIN.
+- [x] Muestreo de contraste en contenido principal/formularios final: `badMainContent=[]` en modo oscuro y modo claro.
+- [x] Sin `pageerror`, sin `500` inesperados, sin CORS y sin llamadas directas a `localhost:8080` durante la validacion headless final.
+- [x] Sin cambios en backend, Flyway, DB, endpoints, servicios Angular, modelos, rutas, guards, AuthService, JWT/interceptor, POS logic, venta, facturacion logica, compras logica, Dockerfile ni nginx.conf.
+- [x] Fase 2 local queda reservada para excepciones visuales especificas con colores hardcodeados dentro de componentes si aparecen en revision manual posterior.
+
 ## Sidebar avanzado InkToy (2026-05-05)
 
 - [x] Build frontend (`npm run build`) exitoso tras cambios del sidebar.

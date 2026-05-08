@@ -52,7 +52,25 @@ button {
   font: inherit;
 }
 
+input,
+select,
+textarea {
+  background: var(--color-bg-surface);
+  color: var(--color-text-primary);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--color-text-muted);
+  opacity: 1;
+}
+
+::selection {
+  background: var(--color-focus-ring);
+  color: var(--color-text-primary);
+}
+
 :focus-visible {
-  outline: 3px solid rgba(18, 23, 184, 0.35);
+  outline: 3px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
