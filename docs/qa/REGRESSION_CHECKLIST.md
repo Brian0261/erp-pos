@@ -184,6 +184,26 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [x] POS Fase 2A: ajuste visual del footer del item de carrito para alinear LINEA/monto/Quitar y compactar tarjeta.
 - [x] POS Fase 2A: correccion de grid del item de carrito; `LINEA`/monto/`Quitar` pasan a la columna derecha desde la primera fila y se mantiene reset responsive a una columna.
 - [x] POS Fase 2A: `LINEA`/monto/`Quitar` quedan centrados verticalmente en la columna derecha del item de carrito manteniendo boton touch-friendly.
+- [x] POS Fase 2A: el input de cantidad selecciona automaticamente el valor al focus/click para permitir reemplazo rapido con teclado.
+- [x] POS Fase 2A: ajuste visual del bloque principal de busqueda para usar jerarquia azul/neutra y reservar amarillo para badges/advertencias.
+
+### POS Fase 2B - Contador y carrito completo (2026-05-08)
+
+- [x] Alcance aplicado solo a `frontend/src/app/features/sales/pos-page.component.ts` y evidencia QA en este checklist.
+- [x] POS Fase 2B: agregado contador de items y modal/panel de carrito completo para revision de ventas largas, manteniendo `COBRAR` y pagos visibles en la pantalla principal.
+- [x] Carrito principal mantiene estados `Carrito`, `Carrito · 1 item` y `Carrito · N items`; boton `Ver carrito completo` queda deshabilitado con carrito vacio.
+- [x] Modal `Carrito completo` validado con ADMIN y CAJERO: abre con productos, muestra contador, total actual, SKU, nombre, precio unitario, badge `Sin barcode`, cantidad, descuento, linea/subtotal y `Quitar`.
+- [x] Modal no incluye boton `COBRAR`; el CTA de cobro queda exclusivamente en la pantalla principal.
+- [x] Cierre del modal validado por boton `Cerrar` y tecla `Escape`.
+- [x] Edicion dentro del modal reutiliza la logica existente: cantidad decimal `2.7` normaliza a `2`, `+` incrementa, `-` no baja de `1`, `Quitar` actualiza el carrito principal.
+- [x] Con varios productos disponibles para QA, el modal muestra 2 filas y usa scroll interno (`overflow-y: auto`) sin generar scroll vertical de pagina; pagos, total y `COBRAR` permanecen visibles en pantalla principal.
+- [x] `npm run build` frontend exitoso tras implementacion de Fase 2B.
+- [x] `docker compose up --build -d` y `docker compose ps` exitosos; frontend `http://localhost:4200`, backend `UP`, postgres healthy.
+- [x] ADMIN (`admin@erp.local`) headless Chrome `1366x768`: `/pos?ngsw-bypass=true` carga, carrito vacio correcto, modal con 1 producto correcto, edicion/quitar correcto, varios productos correcto, modo claro/oscuro validado.
+- [x] CAJERO (`cajero@erp.local`) headless Chrome `1366x768`: mismas validaciones de contador, modal, edicion/quitar, varios productos y claro/oscuro.
+- [x] Sin `pageerror`, sin respuestas `500`, sin CORS observado y sin llamadas directas a `localhost:8080` durante validacion ADMIN/CAJERO.
+- [x] No se finalizo venta real en esta fase; no hubo mutacion transaccional de stock/kardex.
+- [x] Sin cambios en backend, Flyway, DB, endpoints, servicios Angular, modelos, rutas, guards, AuthService, JWT/interceptor, facturacion, compras, outbox, OpenAI, Dockerfile ni nginx.conf.
 
 ## Sidebar avanzado InkToy (2026-05-05)
 

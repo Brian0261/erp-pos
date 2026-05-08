@@ -1,5 +1,5 @@
 import { CommonModule } from "@angular/common";
-import { Component, OnInit } from "@angular/core";
+import { Component, HostListener, OnInit } from "@angular/core";
 import { FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
 import { RouterLink } from "@angular/router";
 
@@ -253,16 +253,26 @@ interface PaymentLine {
             <header class="panel-head panel-head--compact">
               <div>
                 <p class="panel-kicker">Venta actual</p>
-                <h2>Carrito</h2>
+                <h2>{{ cartTitle }}</h2>
               </div>
-              <button
-                type="button"
-                class="ui-button ui-button--secondary pos-button pos-button--quiet"
-                (click)="clearCart()"
-                [disabled]="cart.length === 0"
-              >
-                Cancelar venta
-              </button>
+              <div class="cart-head-actions">
+                <button
+                  type="button"
+                  class="ui-button ui-button--secondary pos-button pos-button--quiet"
+                  (click)="openFullCart()"
+                  [disabled]="cart.length === 0"
+                >
+                  Ver carrito completo
+                </button>
+                <button
+                  type="button"
+                  class="ui-button ui-button--secondary pos-button pos-button--quiet"
+                  (click)="clearCart()"
+                  [disabled]="cart.length === 0"
+                >
+                  Cancelar venta
+                </button>
+              </div>
             </header>
 
             <div class="cart-list" *ngIf="cart.length > 0; else emptyCart">
@@ -304,6 +314,8 @@ interface PaymentLine {
                         inputmode="numeric"
                         pattern="[0-9]*"
                         [value]="item.quantity"
+                        (focus)="selectQuantityInput($any($event.target))"
+                        (click)="selectQuantityInput($any($event.target))"
                         (input)="
                           setQuantity(
                             index,
@@ -469,6 +481,123 @@ interface PaymentLine {
           </footer>
         </aside>
       </div>
+
+      <section
+        class="full-cart-backdrop"
+        *ngIf="isFullCartOpen"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="full-cart-title"
+      >
+        <article class="full-cart-modal">
+          <header class="full-cart-header">
+            <div>
+              <p class="panel-kicker">Revision de venta</p>
+              <h2 id="full-cart-title">Carrito completo</h2>
+              <span class="full-cart-count">{{ cartCountLabel }}</span>
+            </div>
+            <div class="full-cart-summary">
+              <span>Total actual</span>
+              <strong>S/ {{ total | number: "1.2-2" }}</strong>
+            </div>
+            <button
+              type="button"
+              class="ui-button ui-button--secondary pos-button pos-button--quiet"
+              (click)="closeFullCart()"
+            >
+              Cerrar
+            </button>
+          </header>
+
+          <div class="full-cart-empty" *ngIf="cart.length === 0">
+            <strong>Carrito vacio</strong>
+            <span>Agrega productos desde el POS para revisar la venta.</span>
+          </div>
+
+          <div class="full-cart-list" *ngIf="cart.length > 0">
+            <article
+              class="full-cart-row"
+              *ngFor="let item of cart; let index = index"
+            >
+              <div class="full-cart-product">
+                <p class="cart-item__sku">{{ item.sku }}</p>
+                <h3>{{ item.name }}</h3>
+                <span>
+                  P.U. S/ {{ item.salePrice | number: "1.2-2" }}
+                  <span
+                    class="barcode-badge barcode-badge--missing"
+                    *ngIf="!item.barcode"
+                  >
+                    Sin barcode
+                  </span>
+                </span>
+              </div>
+
+              <label class="mini-field full-cart-quantity">
+                <span>Cantidad</span>
+                <div class="quantity-tools">
+                  <button
+                    type="button"
+                    class="ui-button quantity-stepper"
+                    (click)="decreaseQuantity(index)"
+                    [disabled]="item.quantity <= 1"
+                  >
+                    -
+                  </button>
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    inputmode="numeric"
+                    pattern="[0-9]*"
+                    [value]="item.quantity"
+                    (focus)="selectQuantityInput($any($event.target))"
+                    (click)="selectQuantityInput($any($event.target))"
+                    (input)="
+                      setQuantity(
+                        index,
+                        $any($event.target).value,
+                        $any($event.target)
+                      )
+                    "
+                  />
+                  <button
+                    type="button"
+                    class="ui-button quantity-stepper"
+                    (click)="increaseQuantity(index)"
+                  >
+                    +
+                  </button>
+                </div>
+              </label>
+
+              <label class="mini-field full-cart-discount">
+                <span>Descuento</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  [value]="item.discountAmount"
+                  (input)="setDiscount(index, $any($event.target).value)"
+                />
+              </label>
+
+              <div class="full-cart-line">
+                <span>Linea</span>
+                <strong>S/ {{ lineTotal(item) | number: "1.2-2" }}</strong>
+              </div>
+
+              <button
+                type="button"
+                class="ui-button ui-button--danger pos-button pos-button--small"
+                (click)="removeFromCart(index)"
+              >
+                Quitar
+              </button>
+            </article>
+          </div>
+        </article>
+      </section>
     </section>
   `,
   styles: [
@@ -653,12 +782,12 @@ interface PaymentLine {
         align-items: end;
         gap: var(--space-2);
         border-radius: calc(var(--radius-lg) + 0.2rem);
-        border: 2px solid rgba(18, 23, 184, 0.22);
+        border: 2px solid rgba(18, 23, 184, 0.3);
         background:
           linear-gradient(
             135deg,
-            rgba(244, 194, 13, 0.14),
-            rgba(242, 74, 11, 0.08)
+            rgba(18, 23, 184, 0.14),
+            rgba(34, 197, 246, 0.08)
           ),
           var(--color-bg-soft);
         padding: var(--space-3);
@@ -857,6 +986,13 @@ interface PaymentLine {
         min-height: 2rem;
         padding: 0.36rem var(--space-2);
         font-size: var(--font-size-sm);
+      }
+
+      .cart-head-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: var(--space-1);
+        flex-wrap: wrap;
       }
 
       .panel-kicker {
@@ -1221,17 +1357,150 @@ interface PaymentLine {
         letter-spacing: 0.06em;
       }
 
+      .full-cart-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 60;
+        display: grid;
+        place-items: center;
+        padding: var(--space-4);
+        background: rgba(16, 17, 20, 0.62);
+        backdrop-filter: blur(3px);
+      }
+
+      .full-cart-modal {
+        width: min(980px, calc(100vw - 2rem));
+        max-height: min(720px, calc(100dvh - 2rem));
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr);
+        gap: var(--space-3);
+        border: 1px solid var(--color-border-default);
+        border-radius: calc(var(--radius-lg) + 0.35rem);
+        background: var(--color-bg-surface);
+        box-shadow: 0 24px 80px rgba(16, 17, 20, 0.36);
+        padding: var(--space-4);
+        overflow: hidden;
+      }
+
+      .full-cart-header {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto auto;
+        gap: var(--space-3);
+        align-items: center;
+      }
+
+      .full-cart-header h2 {
+        font-size: clamp(1.25rem, 2vw, 1.6rem);
+      }
+
+      .full-cart-count {
+        color: var(--color-text-secondary);
+        font-size: var(--font-size-sm);
+        font-weight: 800;
+      }
+
+      .full-cart-summary {
+        display: grid;
+        gap: 0.05rem;
+        min-width: 9rem;
+        border-radius: var(--radius-lg);
+        background: var(--color-bg-soft);
+        padding: 0.48rem var(--space-3);
+        text-align: right;
+      }
+
+      .full-cart-summary span,
+      .full-cart-line span {
+        color: var(--color-text-secondary);
+        font-size: var(--font-size-xs);
+        font-weight: 900;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .full-cart-summary strong {
+        color: var(--color-brand-primary);
+        font-size: 1.2rem;
+        line-height: 1.05;
+      }
+
+      .full-cart-empty {
+        display: grid;
+        place-items: center;
+        gap: var(--space-1);
+        min-height: 16rem;
+        border: 2px dashed var(--color-border-default);
+        border-radius: var(--radius-lg);
+        background: var(--color-bg-soft);
+        color: var(--color-text-secondary);
+        text-align: center;
+      }
+
+      .full-cart-list {
+        display: grid;
+        align-content: start;
+        gap: var(--space-2);
+        min-height: 0;
+        overflow: auto;
+        padding-right: var(--space-1);
+      }
+
+      .full-cart-row {
+        display: grid;
+        grid-template-columns:
+          minmax(190px, 1.4fr) minmax(150px, 0.72fr)
+          minmax(104px, 0.45fr) minmax(82px, 0.34fr) auto;
+        gap: var(--space-2);
+        align-items: end;
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-lg);
+        background: var(--color-bg-surface);
+        padding: var(--space-2);
+      }
+
+      .full-cart-product {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: 0.18rem 0.45rem;
+        align-items: center;
+        min-width: 0;
+      }
+
+      .full-cart-product h3 {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: var(--font-size-sm);
+      }
+
+      .full-cart-product > span {
+        grid-column: 1 / -1;
+        color: var(--color-text-secondary);
+        font-size: var(--font-size-xs);
+        font-weight: 800;
+      }
+
+      .full-cart-line {
+        display: grid;
+        gap: 0.06rem;
+        align-self: center;
+      }
+
+      .full-cart-line strong {
+        font-size: var(--font-size-sm);
+      }
+
       .sale-link {
         width: 100%;
       }
 
       :host-context(body[data-theme="dark"]) .scan-card {
-        border-color: rgba(244, 194, 13, 0.36);
+        border-color: rgba(96, 165, 250, 0.46);
         background:
           linear-gradient(
             135deg,
-            rgba(244, 194, 13, 0.16),
-            rgba(242, 74, 11, 0.1)
+            rgba(18, 23, 184, 0.34),
+            rgba(56, 189, 248, 0.16)
           ),
           var(--color-bg-soft);
       }
@@ -1384,6 +1653,15 @@ interface PaymentLine {
           grid-template-columns: 1fr;
         }
 
+        .full-cart-header,
+        .full-cart-row {
+          grid-template-columns: 1fr;
+        }
+
+        .full-cart-summary {
+          text-align: left;
+        }
+
         .cart-item__main,
         .cart-item__controls,
         .cart-item__footer {
@@ -1452,6 +1730,7 @@ export class PosPageComponent implements OnInit {
   loadingLookup = false;
   loadingSearch = false;
   submitting = false;
+  isFullCartOpen = false;
 
   errorMessage = "";
   successMessage = "";
@@ -1494,6 +1773,23 @@ export class PosPageComponent implements OnInit {
 
   get change(): number {
     return this.paidTotal > this.total ? this.paidTotal - this.total : 0;
+  }
+
+  get cartTitle(): string {
+    if (this.cart.length === 0) {
+      return "Carrito";
+    }
+
+    return `Carrito · ${this.cartCountLabel}`;
+  }
+
+  get cartCountLabel(): string {
+    return this.cart.length === 1 ? "1 ítem" : `${this.cart.length} ítems`;
+  }
+
+  @HostListener("document:keydown.escape")
+  closeFullCartOnEscape(): void {
+    this.closeFullCart();
   }
 
   private buildFinalizeConfirmationMessage(): string {
@@ -1579,6 +1875,18 @@ export class PosPageComponent implements OnInit {
     this.searchByName();
   }
 
+  openFullCart(): void {
+    if (this.cart.length === 0) {
+      return;
+    }
+
+    this.isFullCartOpen = true;
+  }
+
+  closeFullCart(): void {
+    this.isFullCartOpen = false;
+  }
+
   addToCart(product: PosProductResponse): void {
     this.errorMessage = "";
     this.successMessage = "";
@@ -1632,6 +1940,10 @@ export class PosPageComponent implements OnInit {
     if (clearLastSaleReference) {
       this.lastSaleId = null;
     }
+  }
+
+  selectQuantityInput(input: HTMLInputElement): void {
+    input.select();
   }
 
   setQuantity(index: number, rawValue: string, input?: HTMLInputElement): void {
