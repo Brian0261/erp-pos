@@ -320,20 +320,6 @@ interface PaymentLine {
                         +
                       </button>
                     </div>
-                    <div
-                      class="quantity-presets"
-                      aria-label="Cantidades rapidas"
-                    >
-                      <button
-                        type="button"
-                        class="ui-button quantity-preset"
-                        *ngFor="let quantity of quickQuantities"
-                        (click)="setQuickQuantity(index, quantity)"
-                        [disabled]="quantity > availableIntegerStock(item)"
-                      >
-                        {{ quantity }}
-                      </button>
-                    </div>
                   </label>
                   <label class="mini-field">
                     <span>Descuento</span>
@@ -1041,7 +1027,7 @@ interface PaymentLine {
       }
 
       .cart-item__main {
-        grid-column: 1 / -1;
+        grid-column: 1;
         grid-template-columns: auto minmax(0, 1fr);
         align-items: center;
         gap: 0.22rem 0.45rem;
@@ -1060,6 +1046,7 @@ interface PaymentLine {
       }
 
       .cart-item__controls {
+        grid-column: 1;
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: var(--space-1);
@@ -1067,23 +1054,32 @@ interface PaymentLine {
       }
 
       .cart-item__footer {
+        grid-column: 2;
+        grid-row: 1 / span 2;
         display: grid;
-        align-content: space-between;
+        align-self: center;
+        align-content: center;
         align-items: stretch;
-        gap: var(--space-1);
+        gap: 0.28rem;
         border-left: 1px solid var(--color-border-default);
         border-top: 0;
-        padding-left: var(--space-2);
+        padding-left: 0.38rem;
         padding-top: 0;
       }
 
       .cart-item__footer div {
         display: grid;
-        gap: 0;
+        align-content: start;
+        gap: 0.06rem;
+      }
+
+      .cart-item__footer span {
+        line-height: 1.05;
       }
 
       .cart-item__footer strong {
         font-size: var(--font-size-sm);
+        line-height: 1.1;
       }
 
       .cart-item .mini-field > span {
@@ -1119,23 +1115,6 @@ interface PaymentLine {
         background: var(--color-bg-soft);
         border: 1px solid var(--color-border-strong);
         color: var(--color-text-primary);
-        font-weight: 900;
-      }
-
-      .quantity-presets {
-        display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 0.18rem;
-        margin-top: 0.22rem;
-      }
-
-      .quantity-preset {
-        min-height: 1.5rem;
-        padding: 0.08rem 0.15rem;
-        border: 1px solid var(--color-border-default);
-        background: var(--color-bg-soft);
-        color: var(--color-text-primary);
-        font-size: 0.68rem;
         font-weight: 900;
       }
 
@@ -1405,6 +1384,20 @@ interface PaymentLine {
           grid-template-columns: 1fr;
         }
 
+        .cart-item__main,
+        .cart-item__controls,
+        .cart-item__footer {
+          grid-column: 1;
+          grid-row: auto;
+        }
+
+        .cart-item__footer {
+          border-left: 0;
+          border-top: 1px solid var(--color-border-default);
+          padding-left: 0;
+          padding-top: var(--space-2);
+        }
+
         .pos-hero__actions,
         .panel-head {
           width: 100%;
@@ -1441,7 +1434,6 @@ export class PosPageComponent implements OnInit {
     "Elástico",
     "Cordón",
   ];
-  readonly quickQuantities = [1, 2, 5, 10];
 
   readonly saleForm = this.formBuilder.group({
     warehouseId: [null as number | null, Validators.required],
@@ -1682,10 +1674,6 @@ export class PosPageComponent implements OnInit {
     }
 
     this.setQuantity(index, String(item.quantity - 1));
-  }
-
-  setQuickQuantity(index: number, quantity: number): void {
-    this.setQuantity(index, String(quantity));
   }
 
   availableIntegerStock(item: Pick<PosCartItem, "stockAvailable">): number {

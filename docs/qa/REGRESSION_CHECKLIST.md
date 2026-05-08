@@ -170,7 +170,8 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [x] Resultados ambiguos mantienen seleccion explicita: producto QA se agrega solo tras tocar `Agregar` desde resultados.
 - [x] Badge `Sin barcode` validado en carrito con producto QA sin barcode.
 - [x] Cantidad POS validada como entero positivo: input `min="1"`, `step="1"`, `inputmode="numeric"`, `pattern="[0-9]*"`.
-- [x] Controles de cantidad validados en ADMIN y CAJERO: `+` cambia `1 -> 2`, `-` cambia `2 -> 1`, preset `2` cambia a `2` y entrada decimal `2.7` se normaliza visualmente a `2`.
+- [x] POS Fase 2A: se simplifican controles de cantidad retirando presets `1`/`2`/`5`/`10` y manteniendo `+` / `-` / input entero.
+- [x] Controles de cantidad validados en ADMIN y CAJERO: `+` cambia `1 -> 2`, `-` cambia `2 -> 1` y entrada decimal `2.7` se normaliza visualmente a `2`.
 - [x] Total recalcula tras cambios de cantidad (`S/ 50.00` con cantidad `2` del producto QA de `S/ 25.00`).
 - [x] `npm run build` frontend exitoso tras implementacion y ajuste de normalizacion visual.
 - [x] `docker compose up --build -d` y `docker compose ps` exitosos; frontend `http://localhost:4200`, backend `UP`, postgres healthy.
@@ -180,6 +181,9 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [x] `/ventas?ngsw-bypass=true` carga para ADMIN y CAJERO tras validar POS.
 - [x] Sin `pageerror`, sin respuestas `500`, sin CORS observado y sin llamadas directas a `localhost:8080` durante validacion ADMIN/CAJERO.
 - [x] No se finalizo venta real en esta fase; no hubo mutacion transaccional de stock/kardex.
+- [x] POS Fase 2A: ajuste visual del footer del item de carrito para alinear LINEA/monto/Quitar y compactar tarjeta.
+- [x] POS Fase 2A: correccion de grid del item de carrito; `LINEA`/monto/`Quitar` pasan a la columna derecha desde la primera fila y se mantiene reset responsive a una columna.
+- [x] POS Fase 2A: `LINEA`/monto/`Quitar` quedan centrados verticalmente en la columna derecha del item de carrito manteniendo boton touch-friendly.
 
 ## Sidebar avanzado InkToy (2026-05-05)
 
