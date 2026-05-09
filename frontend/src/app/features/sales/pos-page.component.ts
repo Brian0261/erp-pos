@@ -41,7 +41,7 @@ interface PaymentLine {
     <section class="ui-card pos-page">
       <header class="pos-hero">
         <div class="pos-hero__copy">
-          <p class="ui-page-kicker">Operacion Comercial InkToy</p>
+          <p class="ui-page-kicker">InkToy POS</p>
           <h1 class="ui-page-title">Punto de venta</h1>
           <p class="ui-page-description">
             Venta guiada para caja fisica: escanea, selecciona, cobra y conserva
@@ -50,13 +50,19 @@ interface PaymentLine {
         </div>
 
         <div class="pos-hero__actions">
-          <span
-            class="ui-badge pos-cash-badge"
-            [class.ui-badge--success]="currentCashSession"
-            [class.ui-badge--danger]="!currentCashSession"
+          <div
+            class="pos-cash-status"
+            [class.pos-cash-status--open]="currentCashSession"
+            [class.pos-cash-status--closed]="!currentCashSession"
           >
-            {{ currentCashSession ? "Caja abierta" : "Caja cerrada" }}
-          </span>
+            <span class="pos-cash-dot" aria-hidden="true"></span>
+            <strong>{{ currentCashSession ? "Caja abierta" : "Caja cerrada" }}</strong>
+            <span *ngIf="currentCashSession">
+              #{{ currentCashSession.id }} · desde
+              {{ currentCashSession.openedAt | date: "HH:mm" }}
+            </span>
+            <span *ngIf="!currentCashSession">Abre caja antes de vender</span>
+          </div>
           <a
             class="ui-button ui-button--secondary pos-button"
             [routerLink]="['/caja']"
@@ -65,96 +71,58 @@ interface PaymentLine {
         </div>
       </header>
 
-      <p
-        class="ui-alert ui-alert--info pos-cash-strip"
-        *ngIf="!currentCashSession"
-      >
-        No hay caja abierta para el usuario actual. Abre caja en
-        <a class="inline-link" [routerLink]="['/caja']">/caja</a> antes de
-        vender.
-      </p>
-      <p
-        class="ui-alert ui-alert--success pos-cash-strip"
-        *ngIf="currentCashSession"
-      >
-        Caja abierta #{{ currentCashSession.id }} desde
-        {{ currentCashSession.openedAt | date: "yyyy-MM-dd HH:mm" }}.
-      </p>
-
       <div class="pos-shell">
         <main class="pos-workspace">
           <form
             [formGroup]="saleForm"
             class="pos-command"
-            (ngSubmit)="lookupByCode()"
+            (ngSubmit)="submitUnifiedSearch()"
           >
             <label class="field field--warehouse">
               <span>Almacen de salida *</span>
-              <select formControlName="warehouseId">
+              <select formControlName="warehouseId" [title]="selectedWarehouseLabel">
                 <option [ngValue]="null">Selecciona almacen</option>
                 <option
                   *ngFor="let warehouse of warehouses"
                   [ngValue]="warehouse.id"
+                  [title]="warehouse.code + ' - ' + warehouse.name"
                 >
                   {{ warehouse.code }} - {{ warehouse.name }}
                 </option>
               </select>
             </label>
 
-            <section class="scan-card" aria-label="Busqueda principal POS">
+            <section class="scan-card" aria-label="Busqueda unificada POS">
               <label class="scan-field">
-                <span class="scan-label">Agregar por SKU o barcode</span>
+                <span class="scan-label">Buscar o escanear producto</span>
                 <input
                   class="scan-input"
                   type="text"
                   formControlName="code"
-                  placeholder="Escanea o escribe SKU/barcode exacto..."
+                  placeholder="Escanea barcode/SKU o busca producto..."
                   autocomplete="off"
                 />
               </label>
 
               <div class="scan-actions">
                 <button
-                  type="submit"
+                  type="button"
                   class="ui-button ui-button--primary pos-button pos-button--scan"
+                  (click)="addExactFromUnifiedSearch()"
                   [disabled]="loadingLookup"
                 >
-                  {{ loadingLookup ? "Buscando..." : "Agregar por codigo" }}
+                  {{ loadingLookup ? "Agregando..." : "Agregar codigo" }}
                 </button>
                 <button
                   type="button"
                   class="ui-button ui-button--secondary pos-button pos-button--quiet"
-                  (click)="refreshCashSession()"
-                >
-                  Refrescar caja
-                </button>
-              </div>
-
-              <p class="scan-help">
-                Productos sin barcode: busca por nombre o usa los botones
-                rapidos.
-              </p>
-            </section>
-
-            <label class="field manual-search">
-              <span>Busqueda por nombre, SKU o producto sin barcode</span>
-              <div class="manual-search__row">
-                <input
-                  type="text"
-                  formControlName="query"
-                  placeholder="Ej: lapiz, cartulina roja, papelografo, cinta"
-                  autocomplete="off"
-                />
-                <button
-                  type="button"
-                  class="ui-button ui-button--secondary pos-button"
-                  (click)="searchByName()"
+                  (click)="searchUnifiedText()"
                   [disabled]="loadingSearch"
                 >
-                  {{ loadingSearch ? "Buscando..." : "Buscar productos" }}
+                  {{ loadingSearch ? "Buscando..." : "Buscar" }}
                 </button>
               </div>
-            </label>
+            </section>
 
             <section
               class="quick-search"
@@ -187,7 +155,6 @@ interface PaymentLine {
           <section class="results-panel">
             <header class="panel-head">
               <div>
-                <p class="panel-kicker">Seleccion explicita</p>
                 <h2>Resultados de busqueda</h2>
               </div>
               <span class="ui-badge"
@@ -211,25 +178,23 @@ interface PaymentLine {
             <div class="results-grid" *ngIf="searchResults.length > 0">
               <article class="result-card" *ngFor="let result of searchResults">
                 <div class="result-card__body">
-                  <p class="result-card__sku">{{ result.sku }}</p>
+                  <div class="result-card__meta-row">
+                    <p class="result-card__sku">{{ result.sku }}</p>
+                    <span class="result-card__meta-separator" aria-hidden="true">·</span>
+                    <div class="result-meta">
+                      <span *ngIf="result.barcode" class="result-meta__code">
+                        {{ result.barcode }}
+                      </span>
+                      <span *ngIf="!result.barcode" class="barcode-badge barcode-badge--missing">
+                        Sin código
+                      </span>
+                      <span class="result-meta__stock">
+                        <span class="result-meta__label">Stock</span>
+                        <span class="result-meta__value">{{ result.stockAvailable | number: "1.0-3" }}</span>
+                      </span>
+                    </div>
+                  </div>
                   <h3>{{ result.name }}</h3>
-                  <dl class="result-meta">
-                    <div>
-                      <dt>Barcode</dt>
-                      <dd>
-                        <span
-                          class="barcode-badge"
-                          [class.barcode-badge--missing]="!result.barcode"
-                        >
-                          {{ result.barcode || "Sin barcode" }}
-                        </span>
-                      </dd>
-                    </div>
-                    <div>
-                      <dt>Stock</dt>
-                      <dd>{{ result.stockAvailable | number: "1.0-3" }}</dd>
-                    </div>
-                  </dl>
                 </div>
                 <div class="result-card__action">
                   <p class="result-price">
@@ -252,7 +217,6 @@ interface PaymentLine {
           <section class="cart-panel">
             <header class="panel-head panel-head--compact">
               <div>
-                <p class="panel-kicker">Venta actual</p>
                 <h2>{{ cartTitle }}</h2>
               </div>
               <div class="cart-head-actions">
@@ -281,18 +245,14 @@ interface PaymentLine {
                 *ngFor="let item of cart; let index = index"
               >
                 <div class="cart-item__main">
-                  <p class="cart-item__sku">{{ item.sku }}</p>
+                  <div class="cart-item__meta-row">
+                    <p class="cart-item__sku">{{ item.sku }}</p>
+                    <span class="cart-item__meta-separator" aria-hidden="true">·</span>
+                    <p class="cart-item__stock">
+                      P.U. S/ {{ item.salePrice | number: "1.2-2" }}
+                    </p>
+                  </div>
                   <h3>{{ item.name }}</h3>
-                  <p class="cart-item__stock">
-                    Stock {{ item.stockAvailable | number: "1.0-3" }} | P.U. S/
-                    {{ item.salePrice | number: "1.2-2" }}
-                    <span
-                      class="barcode-badge barcode-badge--missing cart-barcode-badge"
-                      *ngIf="!item.barcode"
-                    >
-                      Sin barcode
-                    </span>
-                  </p>
                 </div>
 
                 <div class="cart-item__controls">
@@ -347,12 +307,12 @@ interface PaymentLine {
 
                 <div class="cart-item__footer">
                   <div>
-                    <span>Linea</span>
+                    <span>Subtotal</span>
                     <strong>S/ {{ lineTotal(item) | number: "1.2-2" }}</strong>
                   </div>
                   <button
                     type="button"
-                    class="ui-button ui-button--danger pos-button pos-button--small"
+                    class="ui-button ui-button--danger pos-button pos-button--small cart-item__remove"
                     (click)="removeFromCart(index)"
                   >
                     Quitar
@@ -492,7 +452,6 @@ interface PaymentLine {
         <article class="full-cart-modal">
           <header class="full-cart-header">
             <div>
-              <p class="panel-kicker">Revision de venta</p>
               <h2 id="full-cart-title">Carrito completo</h2>
               <span class="full-cart-count">{{ cartCountLabel }}</span>
             </div>
@@ -520,17 +479,20 @@ interface PaymentLine {
               *ngFor="let item of cart; let index = index"
             >
               <div class="full-cart-product">
-                <p class="cart-item__sku">{{ item.sku }}</p>
-                <h3>{{ item.name }}</h3>
-                <span>
-                  P.U. S/ {{ item.salePrice | number: "1.2-2" }}
-                  <span
-                    class="barcode-badge barcode-badge--missing"
-                    *ngIf="!item.barcode"
-                  >
-                    Sin barcode
+                <div class="full-cart-product-meta-row">
+                  <p class="cart-item__sku">{{ item.sku }}</p>
+                  <span class="full-cart-meta-separator" aria-hidden="true">·</span>
+                  <span class="full-cart-product-price">
+                    P.U. S/ {{ item.salePrice | number: "1.2-2" }}
                   </span>
-                </span>
+                  <span *ngIf="item.barcode" class="full-cart-barcode-note">
+                    {{ item.barcode }}
+                  </span>
+                  <span *ngIf="!item.barcode" class="full-cart-barcode-note">
+                    Sin código
+                  </span>
+                </div>
+                <h3>{{ item.name }}</h3>
               </div>
 
               <label class="mini-field full-cart-quantity">
@@ -583,13 +545,13 @@ interface PaymentLine {
               </label>
 
               <div class="full-cart-line">
-                <span>Linea</span>
+                <span>Subtotal</span>
                 <strong>S/ {{ lineTotal(item) | number: "1.2-2" }}</strong>
               </div>
 
               <button
                 type="button"
-                class="ui-button ui-button--danger pos-button pos-button--small"
+                class="ui-button ui-button--secondary pos-button pos-button--small full-cart-remove"
                 (click)="removeFromCart(index)"
               >
                 Quitar
@@ -615,7 +577,7 @@ interface PaymentLine {
         min-height: 0;
         padding: var(--space-3);
         display: grid;
-        grid-template-rows: auto auto minmax(0, 1fr);
+        grid-template-rows: auto minmax(0, 1fr);
         gap: var(--pos-gap);
         overflow: hidden;
       }
@@ -635,36 +597,38 @@ interface PaymentLine {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        gap: var(--space-3);
+        gap: var(--space-2);
         border: 1px solid rgba(255, 255, 255, 0.18);
         border-radius: var(--radius-lg);
         background:
           linear-gradient(
             135deg,
-            rgba(18, 23, 184, 0.94),
-            rgba(16, 17, 20, 0.94)
+            rgba(18, 23, 184, 0.86),
+            rgba(16, 17, 20, 0.9)
           ),
           var(--color-brand-primary);
         color: var(--color-text-on-dark);
-        padding: var(--space-3) var(--space-4);
-        box-shadow: var(--shadow-md);
+        padding: 0.58rem 0.75rem;
+        box-shadow: var(--shadow-sm);
       }
 
       .pos-hero .ui-page-title {
-        font-size: clamp(1.2rem, 1.6vw, 1.45rem);
+        font-size: clamp(1.08rem, 1.45vw, 1.28rem);
         line-height: 1.1;
       }
 
-      .pos-hero .ui-page-kicker,
-      .pos-hero .ui-page-description {
+      .pos-hero .ui-page-kicker {
         color: rgba(255, 255, 255, 0.82);
       }
 
+      .pos-hero .ui-page-kicker {
+        margin-bottom: 0.08rem;
+        font-size: 0.65rem;
+        letter-spacing: 0.08em;
+      }
+
       .pos-hero .ui-page-description {
-        margin-top: var(--space-1);
-        max-width: 58ch;
-        font-size: var(--font-size-sm);
-        line-height: 1.3;
+        display: none;
       }
 
       .pos-hero__copy {
@@ -679,18 +643,57 @@ interface PaymentLine {
         flex-wrap: wrap;
       }
 
-      .pos-cash-badge {
-        min-height: 2.35rem;
-        padding-inline: var(--space-3);
+      .pos-hero__actions .pos-button {
+        min-height: 2.12rem;
+        padding: 0.38rem 0.75rem;
+        font-size: var(--font-size-sm);
       }
 
-      .pos-cash-strip {
-        padding: 0.42rem 0.7rem;
+      .pos-cash-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        min-height: 2.12rem;
+        max-width: min(42vw, 22rem);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: var(--radius-pill);
+        background: rgba(255, 255, 255, 0.1);
+        color: rgba(255, 255, 255, 0.9);
+        padding: 0.34rem 0.65rem;
         font-size: var(--font-size-sm);
-        line-height: 1.25;
+        line-height: 1.1;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+      }
+
+      .pos-cash-status strong,
+      .pos-cash-status span:not(.pos-cash-dot) {
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .pos-cash-status strong {
+        flex: 0 0 auto;
+        font-weight: 900;
+      }
+
+      .pos-cash-status span:not(.pos-cash-dot) {
+        color: rgba(255, 255, 255, 0.78);
+      }
+
+      .pos-cash-dot {
+        width: 0.58rem;
+        height: 0.58rem;
+        flex: 0 0 auto;
+        border-radius: 999px;
+        background: var(--color-success);
+        box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.18);
+      }
+
+      .pos-cash-status--closed .pos-cash-dot {
+        background: var(--color-danger);
+        box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.18);
       }
 
       .pos-shell {
@@ -735,9 +738,9 @@ interface PaymentLine {
 
       .pos-command {
         display: grid;
-        grid-template-columns: minmax(220px, 0.34fr) minmax(0, 1fr);
+        grid-template-columns: minmax(240px, 0.34fr) minmax(0, 1fr);
         gap: var(--space-2);
-        padding: var(--space-3);
+        padding: var(--space-2);
         align-items: end;
       }
 
@@ -760,6 +763,10 @@ interface PaymentLine {
         grid-column: 1;
         grid-row: 2;
         max-width: none;
+      }
+
+      .field--warehouse select {
+        min-width: 0;
       }
 
       input,
@@ -790,20 +797,20 @@ interface PaymentLine {
             rgba(34, 197, 246, 0.08)
           ),
           var(--color-bg-soft);
-        padding: var(--space-3);
+        padding: 0.65rem;
       }
 
       .scan-label {
         color: var(--color-text-primary);
-        font-size: var(--font-size-md);
+        font-size: var(--font-size-sm);
       }
 
       .scan-input {
-        min-height: 3.15rem;
+        min-height: 2.8rem;
         border-width: 2px;
         border-color: rgba(18, 23, 184, 0.38);
         border-radius: var(--radius-lg);
-        font-size: clamp(1.05rem, 1.55vw, 1.35rem);
+        font-size: clamp(1rem, 1.35vw, 1.2rem);
         font-weight: 800;
         letter-spacing: 0.01em;
       }
@@ -822,14 +829,17 @@ interface PaymentLine {
       }
 
       .quick-search {
-        grid-column: 1 / -1;
+        grid-column: 2;
+        grid-row: 2;
         display: grid;
-        grid-template-columns: max-content minmax(0, 1fr);
-        gap: var(--space-2);
+        grid-template-columns: minmax(0, 1fr);
+        gap: var(--space-1);
         align-items: center;
+        min-width: 0;
       }
 
       .quick-search > span {
+        display: none;
         color: var(--color-text-secondary);
         font-size: var(--font-size-xs);
         font-weight: 900;
@@ -845,12 +855,12 @@ interface PaymentLine {
       }
 
       .quick-search__button {
-        min-height: 2rem;
+        min-height: 1.9rem;
         flex: 0 0 auto;
         border: 1px solid var(--color-border-strong);
         background: var(--color-bg-soft);
         color: var(--color-text-primary);
-        padding: 0.32rem 0.62rem;
+        padding: 0.26rem 0.58rem;
         font-size: var(--font-size-sm);
         white-space: nowrap;
       }
@@ -869,6 +879,10 @@ interface PaymentLine {
         font-size: var(--font-size-xs);
       }
 
+      .scan-help {
+        display: none;
+      }
+
       .manual-search {
         grid-column: 2;
         grid-row: 2;
@@ -885,7 +899,7 @@ interface PaymentLine {
       }
 
       .pos-button--scan {
-        min-height: 3.15rem;
+        min-height: 2.8rem;
         background: var(--color-brand-accent);
         font-size: var(--font-size-md);
         letter-spacing: 0.01em;
@@ -893,7 +907,7 @@ interface PaymentLine {
 
       .pos-button--add {
         width: 100%;
-        min-height: 2.8rem;
+        min-height: 2.35rem;
         background: var(--color-brand-accent);
         font-size: var(--font-size-md);
       }
@@ -921,7 +935,7 @@ interface PaymentLine {
       .cart-panel,
       .payment-panel,
       .total-board {
-        padding: var(--space-3);
+        padding: var(--space-2);
         display: grid;
         gap: var(--space-2);
         min-height: 0;
@@ -929,7 +943,8 @@ interface PaymentLine {
       }
 
       .results-panel {
-        grid-template-rows: auto auto minmax(0, 1fr);
+        grid-row: 3;
+        grid-template-rows: auto minmax(0, 1fr);
       }
 
       .cart-panel {
@@ -964,7 +979,7 @@ interface PaymentLine {
       }
 
       .panel-head h2 {
-        font-size: 1.15rem;
+        font-size: 1.05rem;
         line-height: 1.1;
       }
 
@@ -997,26 +1012,30 @@ interface PaymentLine {
 
       .panel-kicker {
         margin: 0 0 var(--space-1);
-        font-size: var(--font-size-xs);
+        font-size: 0.68rem;
         font-weight: 800;
         letter-spacing: 0.08em;
         text-transform: uppercase;
         color: var(--color-text-secondary);
       }
 
+      .results-panel .result-hint {
+        display: none;
+      }
+
       .results-grid {
-        grid-row: 3;
+        grid-row: 2;
         display: grid;
         grid-template-columns: 1fr;
         align-content: start;
-        gap: var(--space-2);
+        gap: 0.25rem;
         min-height: 0;
         overflow: auto;
         padding-right: var(--space-1);
       }
 
       .empty-results {
-        grid-row: 3;
+        grid-row: 2;
         display: grid;
         place-items: center;
         gap: var(--space-1);
@@ -1031,9 +1050,9 @@ interface PaymentLine {
 
       .result-card {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(130px, auto);
-        gap: var(--space-2);
-        align-items: stretch;
+        grid-template-columns: minmax(0, 1fr) minmax(198px, auto);
+        gap: 0.45rem;
+        align-items: center;
         border: 1px solid var(--color-border-default);
         border-radius: var(--radius-lg);
         background:
@@ -1043,18 +1062,46 @@ interface PaymentLine {
             rgba(18, 23, 184, 0)
           ),
           var(--color-bg-surface);
-        padding: var(--space-2);
+        padding: 0.35rem;
       }
 
       .result-card__body,
       .result-card__action,
       .cart-item__main {
         display: grid;
-        gap: var(--space-1);
+        gap: 0.14rem;
+      }
+
+      .result-card__body {
+        min-width: 0;
+      }
+
+      .result-card__meta-row {
+        display: flex;
+        justify-content: flex-start;
+        align-items: center;
+        gap: 0.34rem;
+        min-width: 0;
+        flex-wrap: wrap;
+        opacity: 0.82;
+      }
+
+      .result-card h3 {
+        overflow: hidden;
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+        font-size: 1.06rem;
+        font-weight: 900;
+        line-height: 1.18;
+        color: var(--color-text-primary);
       }
 
       .result-card__action {
-        align-content: space-between;
+        grid-template-columns: minmax(72px, auto) minmax(96px, 1fr);
+        align-items: center;
+        align-content: center;
+        gap: 0.50rem;
       }
 
       .result-card__sku,
@@ -1064,40 +1111,62 @@ interface PaymentLine {
         border-radius: var(--radius-pill);
         background: var(--color-bg-soft);
         color: var(--color-text-secondary);
-        padding: 0.15rem var(--space-2);
-        font-size: var(--font-size-xs);
-        font-weight: 800;
-        letter-spacing: 0.04em;
+        padding: 0.03rem 0.3rem;
+        font-size: 0.58rem;
+        font-weight: 700;
+        letter-spacing: 0.03em;
       }
 
       .result-meta {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: var(--space-1);
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-start;
+        gap: 0.22rem;
+        min-width: 0;
         margin: 0;
       }
 
-      .result-meta div,
+      .result-card__meta-separator {
+        color: var(--color-text-secondary);
+        font-weight: 700;
+        font-size: 0.56rem;
+        line-height: 1;
+      }
+
+      .result-meta__code,
+      .result-meta__stock,
       .total-grid article {
         border-radius: var(--radius-md);
         background: var(--color-bg-soft);
-        padding: 0.45rem var(--space-2);
+        padding: 0.3rem 0.45rem;
       }
 
-      .result-meta dt,
+      .result-meta__code,
+      .result-meta__stock {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.22rem;
+        padding: 0.03rem 0.3rem;
+        white-space: nowrap;
+        color: var(--color-text-secondary);
+        font-size: 0.58rem;
+        font-weight: 700;
+      }
+
+      .result-meta__label,
       .total-grid span,
       .cart-item__footer span,
       .total-main span {
         color: var(--color-text-secondary);
-        font-size: var(--font-size-xs);
-        font-weight: 800;
-        letter-spacing: 0.06em;
+        font-size: 0.56rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
         text-transform: uppercase;
       }
 
-      .result-meta dd {
-        margin: var(--space-1) 0 0;
-        font-weight: 800;
+      .result-meta__value {
+        margin: 0;
+        font-weight: 700;
       }
 
       .barcode-badge {
@@ -1106,23 +1175,24 @@ interface PaymentLine {
         border-radius: var(--radius-pill);
         background: var(--color-bg-soft);
         color: var(--color-text-secondary);
-        padding: 0.12rem var(--space-2);
-        font-size: var(--font-size-xs);
-        font-weight: 900;
+        padding: 0.03rem 0.3rem;
+        font-size: 0.58rem;
+        font-weight: 700;
       }
 
       .barcode-badge--missing {
-        border: 1px solid rgba(244, 194, 13, 0.42);
-        background: rgba(244, 194, 13, 0.14);
-        color: var(--color-warning);
+        border: 1px solid var(--color-border-default);
+        background: var(--color-bg-soft);
+        color: var(--color-text-secondary);
       }
 
       .result-price {
         margin: 0;
         color: var(--color-brand-primary);
-        font-size: clamp(1.25rem, 1.8vw, 1.55rem);
+        font-size: clamp(0.98rem, 1.35vw, 1.18rem);
         font-weight: 900;
         text-align: right;
+        line-height: 1;
       }
 
       .cart-list,
@@ -1164,21 +1234,40 @@ interface PaymentLine {
 
       .cart-item__main {
         grid-column: 1;
-        grid-template-columns: auto minmax(0, 1fr);
-        align-items: center;
-        gap: 0.22rem 0.45rem;
+        grid-template-columns: minmax(0, 1fr);
+        align-items: start;
+        gap: 0.18rem;
         align-content: start;
         min-width: 0;
       }
 
+      .cart-item__meta-row {
+        display: flex;
+        align-items: center;
+        gap: 0.28rem;
+        min-width: 0;
+        flex-wrap: wrap;
+      }
+
+      .cart-item__meta-separator {
+        color: var(--color-text-secondary);
+        font-size: 0.58rem;
+        font-weight: 700;
+        line-height: 1;
+      }
+
       .cart-item__main h3 {
-        font-size: 0.92rem;
-        line-height: 1.12;
+        font-size: 0.98rem;
+        line-height: 1.15;
+        font-weight: 900;
       }
 
       .cart-item__stock {
-        grid-column: 1 / -1;
-        font-size: var(--font-size-xs);
+        margin: 0;
+        font-size: 0.62rem;
+        color: var(--color-text-secondary);
+        font-weight: 700;
+        letter-spacing: 0.03em;
       }
 
       .cart-item__controls {
@@ -1216,6 +1305,12 @@ interface PaymentLine {
       .cart-item__footer strong {
         font-size: var(--font-size-sm);
         line-height: 1.1;
+      }
+
+      .cart-item__remove {
+        min-height: 2.05rem;
+        box-shadow: none;
+        opacity: 0.92;
       }
 
       .cart-item .mini-field > span {
@@ -1401,12 +1496,17 @@ interface PaymentLine {
 
       .full-cart-summary {
         display: grid;
+        place-items: center;
         gap: 0.05rem;
-        min-width: 9rem;
+        min-width: 10.75rem;
+        border: 1px solid var(--color-border-strong);
         border-radius: var(--radius-lg);
-        background: var(--color-bg-soft);
-        padding: 0.48rem var(--space-3);
-        text-align: right;
+        background:
+          linear-gradient(180deg, var(--color-bg-surface), var(--color-bg-soft)),
+          var(--color-bg-soft);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+        padding: 0.62rem var(--space-3);
+        text-align: center;
       }
 
       .full-cart-summary span,
@@ -1419,8 +1519,11 @@ interface PaymentLine {
       }
 
       .full-cart-summary strong {
-        color: var(--color-brand-primary);
-        font-size: 1.2rem;
+        color: var(--color-text-primary);
+        font-size: clamp(1.38rem, 2vw, 1.65rem);
+        font-variant-numeric: tabular-nums;
+        font-weight: 900;
+        letter-spacing: -0.03em;
         line-height: 1.05;
       }
 
@@ -1448,46 +1551,105 @@ interface PaymentLine {
       .full-cart-row {
         display: grid;
         grid-template-columns:
-          minmax(190px, 1.4fr) minmax(150px, 0.72fr)
-          minmax(104px, 0.45fr) minmax(82px, 0.34fr) auto;
-        gap: var(--space-2);
-        align-items: end;
+          minmax(240px, 1.6fr) minmax(142px, 0.58fr)
+          minmax(96px, 0.36fr) minmax(108px, 0.42fr) minmax(76px, auto);
+        gap: 0.55rem;
+        align-items: center;
         border: 1px solid var(--color-border-default);
         border-radius: var(--radius-lg);
         background: var(--color-bg-surface);
-        padding: var(--space-2);
+        padding: 0.62rem 0.7rem;
       }
 
       .full-cart-product {
         display: grid;
-        grid-template-columns: auto minmax(0, 1fr);
-        gap: 0.18rem 0.45rem;
-        align-items: center;
+        gap: 0.16rem;
+        align-content: center;
+        align-items: start;
         min-width: 0;
+      }
+
+      .full-cart-product-meta-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.22rem 0.32rem;
+        min-width: 0;
+        color: var(--color-text-secondary);
+        font-size: 0.58rem;
+        opacity: 0.8;
+      }
+
+      .full-cart-product .cart-item__sku {
+        margin: 0;
+        color: var(--color-text-secondary);
+        font-size: 0.58rem;
+        font-weight: 700;
+        letter-spacing: 0.03em;
+        line-height: 1.15;
       }
 
       .full-cart-product h3 {
         overflow: hidden;
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
         text-overflow: ellipsis;
-        white-space: nowrap;
-        font-size: var(--font-size-sm);
+        white-space: normal;
+        font-size: 1rem;
+        font-weight: 900;
+        line-height: 1.16;
       }
 
-      .full-cart-product > span {
-        grid-column: 1 / -1;
+      .full-cart-product-price {
+        font-weight: 700;
         color: var(--color-text-secondary);
-        font-size: var(--font-size-xs);
-        font-weight: 800;
+        white-space: nowrap;
+      }
+
+      .full-cart-barcode-note {
+        display: inline-flex;
+        width: fit-content;
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-pill);
+        background: var(--color-bg-soft);
+        color: var(--color-text-secondary);
+        padding: 0.03rem 0.34rem;
+        font-size: 0.58rem;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+      }
+
+      .full-cart-meta-separator {
+        color: var(--color-text-secondary);
+        font-size: 0.58rem;
+        font-weight: 700;
+        line-height: 1;
       }
 
       .full-cart-line {
         display: grid;
-        gap: 0.06rem;
+        gap: 0.08rem;
         align-self: center;
+        min-width: 0;
+        justify-items: end;
       }
 
       .full-cart-line strong {
-        font-size: var(--font-size-sm);
+        color: var(--color-text-primary);
+        font-size: 1rem;
+        font-variant-numeric: tabular-nums;
+        font-weight: 900;
+        line-height: 1.08;
+      }
+
+      .full-cart-remove {
+        min-height: 2.2rem;
+        border-color: var(--color-border-default);
+        color: var(--color-danger);
+        background: color-mix(in srgb, var(--color-danger) 8%, var(--color-bg-surface));
+        box-shadow: none;
+        opacity: 0.96;
       }
 
       .sale-link {
@@ -1515,22 +1677,41 @@ interface PaymentLine {
           var(--color-bg-surface);
       }
 
+      :host-context(body[data-theme="dark"]) .full-cart-summary {
+        border-color: rgba(96, 165, 250, 0.32);
+        background:
+          linear-gradient(180deg, rgba(30, 41, 59, 0.94), rgba(15, 23, 42, 0.88)),
+          var(--color-bg-soft);
+      }
+
+      :host-context(body[data-theme="dark"]) .full-cart-barcode-note {
+        border-color: rgba(148, 163, 184, 0.24);
+        background: rgba(148, 163, 184, 0.1);
+      }
+
+      :host-context(body[data-theme="dark"]) .full-cart-remove {
+        background: rgba(220, 38, 38, 0.08);
+      }
+
       .results-grid::-webkit-scrollbar,
       .cart-list::-webkit-scrollbar,
-      .payment-list::-webkit-scrollbar {
+      .payment-list::-webkit-scrollbar,
+      .full-cart-list::-webkit-scrollbar {
         width: 8px;
       }
 
       .results-grid::-webkit-scrollbar-track,
       .cart-list::-webkit-scrollbar-track,
-      .payment-list::-webkit-scrollbar-track {
+      .payment-list::-webkit-scrollbar-track,
+      .full-cart-list::-webkit-scrollbar-track {
         background: var(--color-bg-soft);
         border-radius: var(--radius-pill);
       }
 
       .results-grid::-webkit-scrollbar-thumb,
       .cart-list::-webkit-scrollbar-thumb,
-      .payment-list::-webkit-scrollbar-thumb {
+      .payment-list::-webkit-scrollbar-thumb,
+      .full-cart-list::-webkit-scrollbar-thumb {
         background: linear-gradient(
           180deg,
           var(--color-brand-highlight),
@@ -1681,6 +1862,11 @@ interface PaymentLine {
           width: 100%;
         }
 
+        .pos-cash-status {
+          width: 100%;
+          max-width: none;
+        }
+
         .scan-card,
         .field--warehouse,
         .manual-search,
@@ -1775,6 +1961,12 @@ export class PosPageComponent implements OnInit {
     return this.paidTotal > this.total ? this.paidTotal - this.total : 0;
   }
 
+  get selectedWarehouseLabel(): string {
+    const warehouseId = this.saleForm.value.warehouseId;
+    const warehouse = this.warehouses.find((item) => item.id === warehouseId);
+    return warehouse ? `${warehouse.code} - ${warehouse.name}` : "Selecciona almacen";
+  }
+
   get cartTitle(): string {
     if (this.cart.length === 0) {
       return "Carrito";
@@ -1838,6 +2030,46 @@ export class PosPageComponent implements OnInit {
     });
   }
 
+  submitUnifiedSearch(): void {
+    this.lookupUnifiedSearch(true);
+  }
+
+  addExactFromUnifiedSearch(): void {
+    this.lookupUnifiedSearch(false);
+  }
+
+  searchUnifiedText(rawQuery = this.saleForm.value.code ?? ""): void {
+    const query = rawQuery.trim();
+    if (query.length < 2) {
+      this.errorMessage =
+        "Ingresa al menos 2 caracteres para buscar por nombre o SKU.";
+      return;
+    }
+
+    const warehouseId = this.saleForm.value.warehouseId ?? undefined;
+
+    this.loadingSearch = true;
+    this.errorMessage = "";
+    this.successMessage = "";
+
+    this.posService.search(query, warehouseId).subscribe({
+      next: (results) => {
+        this.loadingSearch = false;
+        this.searchResults = results;
+        if (results.length === 0) {
+          this.errorMessage = "No se encontraron productos para la busqueda.";
+        }
+      },
+      error: (error: unknown) => {
+        this.loadingSearch = false;
+        this.errorMessage = toHttpErrorMessage(
+          error,
+          "No se pudo realizar la busqueda por nombre.",
+        );
+      },
+    });
+  }
+
   searchByName(): void {
     const query = (this.saleForm.value.query ?? "").trim();
     if (query.length < 2) {
@@ -1871,8 +2103,61 @@ export class PosPageComponent implements OnInit {
   }
 
   applyQuickSearch(term: string): void {
-    this.saleForm.patchValue({ query: term, code: "" });
-    this.searchByName();
+    this.saleForm.patchValue({ code: term, query: term });
+    this.searchUnifiedText(term);
+  }
+
+  private lookupUnifiedSearch(fallbackToSearch: boolean): void {
+    const code = (this.saleForm.value.code ?? "").trim();
+    if (!code) {
+      this.errorMessage = "Ingresa un barcode, SKU o nombre de producto.";
+      return;
+    }
+
+    const warehouseId = this.saleForm.value.warehouseId ?? undefined;
+    if (!warehouseId) {
+      this.errorMessage = "Selecciona un almacen antes de buscar.";
+      return;
+    }
+
+    this.loadingLookup = true;
+    this.errorMessage = "";
+    this.successMessage = "";
+
+    this.posService.lookup(code, warehouseId).subscribe({
+      next: (product) => {
+        this.loadingLookup = false;
+        this.addToCart(product);
+        this.saleForm.patchValue({ code: "", query: "" });
+      },
+      error: (error: unknown) => {
+        this.loadingLookup = false;
+        if (this.isNotFoundError(error)) {
+          if (fallbackToSearch && code.length >= 2) {
+            this.searchUnifiedText(code);
+            return;
+          }
+
+          this.errorMessage =
+            "No hay coincidencia exacta. Usa Buscar para ver productos relacionados.";
+          return;
+        }
+
+        this.errorMessage = toHttpErrorMessage(
+          error,
+          "No se encontro un producto exacto para agregar.",
+        );
+      },
+    });
+  }
+
+  private isNotFoundError(error: unknown): boolean {
+    return (
+      typeof error === "object" &&
+      error !== null &&
+      "status" in error &&
+      (error as { status?: number }).status === 404
+    );
   }
 
   openFullCart(): void {

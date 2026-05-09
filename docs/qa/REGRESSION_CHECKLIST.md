@@ -205,6 +205,38 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [x] No se finalizo venta real en esta fase; no hubo mutacion transaccional de stock/kardex.
 - [x] Sin cambios en backend, Flyway, DB, endpoints, servicios Angular, modelos, rutas, guards, AuthService, JWT/interceptor, facturacion, compras, outbox, OpenAI, Dockerfile ni nginx.conf.
 
+### POS Fase 2C - Busqueda unificada y limpieza visual (2026-05-08)
+
+- [x] Alcance aplicado solo a `frontend/src/app/features/sales/pos-page.component.ts` y evidencia QA en este checklist.
+- [x] POS consolida busqueda en un unico input para escaneo, SKU/barcode exacto y busqueda por texto, manteniendo acciones separadas `Agregar codigo` y `Buscar`.
+- [x] Error 404 esperado de coincidencia exacta muestra copy operativo: `No hay coincidencia exacta. Usa Buscar para ver productos relacionados.`; no se expone `Product not found` al cajero.
+- [x] Limpieza visual validada: sin kickers `Seleccion explicita`/`Venta actual`, resultados sin label `Barcode`, productos sin codigo con badge `Sin codigo`, carrito principal compacto con `P.U.` y sin stock/barcode.
+- [x] Selector de almacen muestra label completo via `title` para evitar perdida de contexto visual cuando el select se recorta.
+- [x] `npm run build` frontend exitoso tras los ajustes (`main-ND44DGER.js`, build 8.970 s).
+- [x] `docker compose config`, `docker compose up --build -d` y `docker compose ps` exitosos; frontend `http://localhost:4200`, backend `UP`, postgres healthy.
+- [x] ADMIN (`admin@erp.local`) headless Chrome `1366x768`: `/pos?ngsw-bypass=true` carga sin scroll vertical de pagina, un solo input de busqueda, `Agregar codigo`, `Buscar`, carrito, pagos, total y `COBRAR` visibles.
+- [x] CAJERO (`cajero@erp.local`) headless Chrome `1366x768`: mismas validaciones de carga, busqueda unificada, carrito, pagos, total y `COBRAR`.
+- [x] ADMIN/CAJERO: `lapic` + `Agregar codigo` no agrega al carrito y muestra el copy de coincidencia exacta; `lapic` + `Buscar` devuelve 6 resultados.
+- [x] ADMIN/CAJERO: barcode `7678765456323` con Enter agrega `Cuaderno A4` al carrito; carrito principal muestra `P.U. S/ 5.00`, sin stock ni badge de codigo ausente.
+- [x] Boton rapido `Cartulina` validado con UI asentada: input `Cartulina`, 1 resultado `Cartulina Blanca`, `Sin codigo`, carrito sigue en 0 items y no hay errores de servidor.
+- [x] Modal `Carrito completo` sigue abriendo desde `Ver carrito completo`, no incluye `COBRAR`, y el CTA `COBRAR` permanece visible/dominante en pantalla principal.
+- [x] Modo oscuro validado para input, botones `Agregar codigo`/`COBRAR` y superficies criticas del POS.
+- [x] Sin `pageerror`, sin unhandled rejections, sin respuestas `500`, sin CORS observado y sin llamadas directas a `localhost:8080` durante validacion ADMIN/CAJERO.
+- [x] No se finalizo venta real en esta fase; no hubo mutacion transaccional de stock/kardex.
+- [x] Sin cambios en backend, Flyway, DB, endpoints, servicios Angular, modelos, rutas, guards, AuthService, JWT/interceptor, facturacion, compras, outbox, OpenAI, Dockerfile ni nginx.conf.
+
+### POS Fase 2D - Jerarquía visual de resultados y carrito (2026-05-09)
+
+- [x] Alcance aplicado solo a `frontend/src/app/features/sales/pos-page.component.ts` y evidencia QA en este checklist.
+- [x] Resultados de búsqueda ajustados visualmente: primera línea compacta con SKU, código/sin código y stock; segunda línea con nombre del producto como elemento principal.
+- [x] Carrito derecho ajustado visualmente: primera línea compacta con SKU y P.U.; nombre del producto con mayor protagonismo; rótulo `LINEA` reemplazado por `SUBTOTAL`.
+- [x] Botón `Quitar` mantiene semántica destructiva y paleta roja del sistema, sin convertirse en acción principal.
+- [x] Precio, botón `Agregar`, cantidad, descuento, subtotal y `COBRAR` permanecen visibles y operativos.
+- [x] `npm run build` frontend exitoso tras los ajustes visuales.
+- [x] Validación visual realizada en `/pos?ngsw-bypass=true` con resultados y carrito con varios ítems.
+- [x] Sin cambios en backend, Flyway, DB, endpoints, servicios Angular, modelos, rutas, guards, AuthService, JWT/interceptor, payload de venta, pagos, cantidades ni descuentos.
+- [x] No se finalizó venta real en esta fase; no hubo mutación transaccional de stock/kardex.
+
 ## Sidebar avanzado InkToy (2026-05-05)
 
 - [x] Build frontend (`npm run build`) exitoso tras cambios del sidebar.
