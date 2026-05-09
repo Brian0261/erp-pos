@@ -236,6 +236,11 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [x] Validación visual realizada en `/pos?ngsw-bypass=true` con resultados y carrito con varios ítems.
 - [x] Sin cambios en backend, Flyway, DB, endpoints, servicios Angular, modelos, rutas, guards, AuthService, JWT/interceptor, payload de venta, pagos, cantidades ni descuentos.
 - [x] No se finalizó venta real en esta fase; no hubo mutación transaccional de stock/kardex.
+- [x] Modal `Carrito completo` alineado visualmente con el carrito principal: se eliminó el kicker `REVISIÓN DE VENTA`.
+- [x] Modal `Carrito completo`: cada producto muestra primera línea compacta con SKU, P.U. y estado de código; nombre del producto con mayor protagonismo en segunda línea.
+- [x] Modal `Carrito completo`: rótulo `LINEA` reemplazado por `Subtotal` para mayor claridad operativa.
+- [x] Modal `Carrito completo`: botón `Quitar` mantiene semántica destructiva, pero con menor dominancia visual.
+- [x] Modal `Carrito completo`: bloque `TOTAL ACTUAL` se mantiene como resumen y no compite con el CTA `COBRAR`.
 
 ## Sidebar avanzado InkToy (2026-05-05)
 
