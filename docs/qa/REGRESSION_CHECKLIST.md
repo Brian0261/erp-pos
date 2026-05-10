@@ -258,6 +258,12 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
   - [x] `Desde` incluye desde `00:00:00.000`.
   - [x] `Hasta` incluye hasta `23:59:59.999`.
   - [x] Rango inválido muestra mensaje: `La fecha Desde no puede ser mayor que la fecha Hasta.`
+- [x] Filtro `Estado` en Ventas se aplica automaticamente al cambiar la opcion:
+  - [x] `Completada` filtra sin requerir click en `Filtrar`.
+  - [x] `Anulada` filtra sin requerir click en `Filtrar`.
+  - [x] `Todos` limpia el filtro de estado y recarga el listado.
+  - [x] `Filtrar` sigue disponible para los demas filtros y como accion manual general.
+- [x] Filtro `Caja` en Ventas acepta solo enteros positivos en frontend y mantiene el mensaje `Ingresa un número de caja válido.` para valores invalidos.
 - [x] Validación funcional del filtro de fechas:
   - [x] Sin filtros: carga ventas disponibles.
   - [x] Solo `Hasta = 09/05/2026`: incluye ventas del 09/05/2026.

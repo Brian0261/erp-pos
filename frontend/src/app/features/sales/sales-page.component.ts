@@ -1,7 +1,8 @@
 import { CommonModule } from "@angular/common";
-import { Component, OnInit } from "@angular/core";
+import { Component, DestroyRef, OnInit, inject } from "@angular/core";
 import { FormBuilder, ReactiveFormsModule } from "@angular/forms";
 import { RouterLink } from "@angular/router";
+import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 
 import { toHttpErrorMessage } from "./data/http-error-message";
 import { SalesService } from "./data/sales.service";
@@ -54,12 +55,12 @@ import { SaleResponse, SaleStatus } from "./data/sales.models";
         <label class="field">
           <span>Caja</span>
           <input
-            type="number"
-            min="1"
-            step="1"
+            type="text"
             inputmode="numeric"
             pattern="[0-9]*"
             formControlName="cashRegisterSessionId"
+            (keydown)="onCashRegisterKeydown($event)"
+            (input)="sanitizeCashRegisterInput($event)"
           />
         </label>
 
@@ -238,6 +239,8 @@ import { SaleResponse, SaleStatus } from "./data/sales.models";
   ],
 })
 export class SalesPageComponent implements OnInit {
+  private readonly destroyRef = inject(DestroyRef);
+
   readonly filterForm = this.formBuilder.group({
     from: [""],
     to: [""],
@@ -258,6 +261,12 @@ export class SalesPageComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
+    this.filterForm.controls.status.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => {
+        this.applyFilters();
+      });
+
     this.loadSales();
   }
 
@@ -303,8 +312,42 @@ export class SalesPageComponent implements OnInit {
       status: "",
       cashRegisterSessionId: null,
       createdBy: "",
-    });
+    }, { emitEvent: false });
     this.loadSales();
+  }
+
+  onCashRegisterKeydown(event: KeyboardEvent): void {
+    if (
+      event.ctrlKey ||
+      event.metaKey ||
+      event.altKey ||
+      ["Backspace", "Delete", "Tab", "Enter", "Escape", "ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)
+    ) {
+      return;
+    }
+
+    if (/^[0-9]$/.test(event.key)) {
+      return;
+    }
+
+    event.preventDefault();
+  }
+
+  sanitizeCashRegisterInput(event: Event): void {
+    const input = event.target as HTMLInputElement | null;
+    if (!input) {
+      return;
+    }
+
+    const sanitized = input.value.match(/^\d*/)?.[0] ?? "";
+    if (input.value !== sanitized) {
+      input.value = sanitized;
+    }
+
+    this.filterForm.controls.cashRegisterSessionId.setValue(
+      sanitized ? Number(sanitized) : null,
+      { emitEvent: false },
+    );
   }
 
   private loadSales(): void {
