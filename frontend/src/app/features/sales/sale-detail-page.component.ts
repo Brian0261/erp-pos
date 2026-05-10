@@ -96,7 +96,21 @@ import { SaleResponse } from "./data/sales.models";
               </thead>
               <tbody>
                 <tr *ngFor="let item of sale.items">
-                  <td>Producto #{{ item.productId }}</td>
+                  <td>
+                    <div class="item-product">
+                      <strong class="item-product__name">
+                        {{ item.productName || "Producto #" + item.productId }}
+                      </strong>
+                      <div
+                        class="item-product__meta"
+                        *ngIf="item.sku || item.barcode || !item.productName"
+                      >
+                        <span *ngIf="item.sku">SKU {{ item.sku }}</span>
+                        <span *ngIf="item.barcode">Barcode {{ item.barcode }}</span>
+                        <span *ngIf="!item.productName">ID #{{ item.productId }}</span>
+                      </div>
+                    </div>
+                  </td>
                   <td class="cell-number">
                     {{ item.quantity | number: "1.0-3" }}
                   </td>
@@ -248,6 +262,27 @@ import { SaleResponse } from "./data/sales.models";
       .cell-number {
         text-align: right;
         white-space: nowrap;
+      }
+
+      .item-product {
+        display: grid;
+        gap: 0.18rem;
+        min-width: 0;
+      }
+
+      .item-product__name {
+        display: block;
+        color: var(--color-text-primary);
+        font-size: var(--font-size-sm);
+        line-height: 1.2;
+      }
+
+      .item-product__meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.32rem 0.5rem;
+        color: var(--color-text-secondary);
+        font-size: var(--font-size-xs);
       }
 
       .totals-panel {

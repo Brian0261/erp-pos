@@ -39,6 +39,9 @@ export type PaymentMethod = "CASH" | "CARD" | "TRANSFER";
 export interface SaleItemResponse {
   id: number;
   productId: number;
+  productName: string | null;
+  sku: string | null;
+  barcode: string | null;
   quantity: number;
   unitPrice: number;
   discountAmount: number;

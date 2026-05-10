@@ -265,10 +265,10 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
   - [x] `Desde = 09/05/2026` y `Hasta = 09/05/2026`: muestra ventas de ese día.
   - [x] `Desde = 08/05/2026` y `Hasta = 10/05/2026`: incluye ventas de 08, 09 y 10.
 - [x] Detalle de venta: resumen visual mejorado; `TOTAL` queda como dato principal y `Subtotal`, `Descuento`, `Pagado`, `Vuelto` mantienen contraste correcto en modo oscuro.
+- [x] Detalle de venta Fase 1 enriquecido: `GET /api/v1/sales/{id}` devuelve `productName`, `sku` y `barcode`; la UI muestra nombre y SKU y usa `Producto #id` solo como fallback.
 - [x] `npm run build` frontend exitoso.
 - [x] `docker compose up --build -d` y `docker compose ps` exitosos.
 - [x] Backend, DB, Flyway, endpoints, servicios Angular, modelos, rutas, guards, AuthService, JWT/interceptor y payload sin cambios.
-- [x] Pendiente backend/DTO: detalle de venta todavía muestra producto por ID técnico si el endpoint no expone nombre/SKU/barcode.
 
 ## Sidebar avanzado InkToy (2026-05-05)
 

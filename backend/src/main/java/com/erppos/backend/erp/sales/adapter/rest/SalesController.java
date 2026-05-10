@@ -12,10 +12,12 @@ import com.erppos.backend.erp.sales.application.usecase.CreateSaleItemCommand;
 import com.erppos.backend.erp.sales.application.usecase.CreateSalePaymentCommand;
 import com.erppos.backend.erp.sales.application.usecase.SalesUseCase;
 import com.erppos.backend.erp.sales.application.usecase.VoidSaleCommand;
+import com.erppos.backend.erp.sales.domain.model.PosProductSnapshot;
 import com.erppos.backend.erp.sales.domain.model.Sale;
 import com.erppos.backend.erp.sales.domain.model.SaleItem;
 import com.erppos.backend.erp.sales.domain.model.SalePayment;
 import com.erppos.backend.erp.sales.domain.model.SaleStatus;
+import com.erppos.backend.erp.sales.domain.port.CatalogReadPort;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -37,9 +39,11 @@ import java.util.List;
 public class SalesController {
 
     private final SalesUseCase salesUseCase;
+    private final CatalogReadPort catalogReadPort;
 
-    public SalesController(SalesUseCase salesUseCase) {
+    public SalesController(SalesUseCase salesUseCase, CatalogReadPort catalogReadPort) {
         this.salesUseCase = salesUseCase;
+        this.catalogReadPort = catalogReadPort;
     }
 
     @PostMapping
@@ -62,19 +66,19 @@ public class SalesController {
             @RequestParam(required = false) SaleStatus status,
             @RequestParam(required = false) String createdBy
     ) {
-        return ResponseEntity.ok(salesUseCase.list(from, to, cashRegisterSessionId, status, createdBy).stream().map(this::toResponse).toList());
+        return ResponseEntity.ok(salesUseCase.list(from, to, cashRegisterSessionId, status, createdBy).stream().map(sale -> toResponse(sale, false)).toList());
     }
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('CAJERO','ADMIN','SUPERVISOR')")
     public ResponseEntity<SaleResponse> getById(@PathVariable Long id) {
-        return ResponseEntity.ok(toResponse(salesUseCase.getById(id)));
+        return ResponseEntity.ok(toResponse(salesUseCase.getById(id), true));
     }
 
     @PostMapping("/{id}/void")
     @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR')")
     public ResponseEntity<SaleResponse> voidSale(@PathVariable Long id, @Valid @RequestBody VoidSaleRequest request) {
-        return ResponseEntity.ok(toResponse(salesUseCase.voidSale(id, new VoidSaleCommand(request.reason()))));
+        return ResponseEntity.ok(toResponse(salesUseCase.voidSale(id, new VoidSaleCommand(request.reason())), false));
     }
 
     private CreateSaleItemCommand toItemCommand(CreateSaleItemRequest request) {
@@ -86,6 +90,10 @@ public class SalesController {
     }
 
     private SaleResponse toResponse(Sale sale) {
+        return toResponse(sale, false);
+    }
+
+    private SaleResponse toResponse(Sale sale, boolean enrichItems) {
         return new SaleResponse(
                 sale.id(),
                 sale.cashRegisterSessionId(),
@@ -102,15 +110,22 @@ public class SalesController {
                 sale.voidedByUserId(),
                 sale.voidReason(),
                 sale.createdBy(),
-                sale.items().stream().map(this::toItemResponse).toList(),
+                sale.items().stream().map(item -> toItemResponse(item, enrichItems)).toList(),
                 sale.payments().stream().map(this::toPaymentResponse).toList()
         );
     }
 
-    private SaleItemResponse toItemResponse(SaleItem item) {
+    private SaleItemResponse toItemResponse(SaleItem item, boolean enrichProductData) {
+        PosProductSnapshot product = enrichProductData
+                ? catalogReadPort.findById(item.productId()).orElse(null)
+                : null;
+
         return new SaleItemResponse(
                 item.id(),
                 item.productId(),
+                product != null ? product.name() : null,
+                product != null ? product.sku() : null,
+                product != null ? product.barcode() : null,
                 item.quantity(),
                 item.unitPrice(),
                 item.discountAmount(),
