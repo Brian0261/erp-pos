@@ -2,11 +2,14 @@ import { CommonModule } from "@angular/common";
 import { Component, OnInit } from "@angular/core";
 import { FormBuilder, ReactiveFormsModule } from "@angular/forms";
 import { RouterLink } from "@angular/router";
+import { catchError, forkJoin, of } from "rxjs";
 
 import { AuthService } from "../../core/auth/auth.service";
-import { Product } from "./data/catalog.models";
+import { Category, Product, Unit } from "./data/catalog.models";
+import { CategoryService } from "./data/category.service";
 import { ProductService } from "./data/product.service";
 import { toHttpErrorMessage } from "./data/http-error-message";
+import { UnitService } from "./data/unit.service";
 
 @Component({
   selector: "app-products-page",
@@ -71,12 +74,11 @@ import { toHttpErrorMessage } from "./data/http-error-message";
         <table class="ui-table catalog-table">
           <thead>
             <tr>
-              <th>ID</th>
               <th>SKU</th>
               <th>Codigo de barras</th>
               <th>Nombre</th>
-              <th>Categoria ID</th>
-              <th>Unidad ID</th>
+              <th>Categoria</th>
+              <th>Unidad</th>
               <th class="cell-right">Precio venta</th>
               <th>Estado</th>
               <th>Acciones</th>
@@ -84,12 +86,11 @@ import { toHttpErrorMessage } from "./data/http-error-message";
           </thead>
           <tbody>
             <tr *ngFor="let product of products">
-              <td class="cell-id">{{ product.id }}</td>
               <td class="cell-code">{{ product.sku }}</td>
-              <td class="cell-code">{{ product.barcode || "-" }}</td>
+              <td class="cell-code">{{ barcodeLabel(product.barcode) }}</td>
               <td>{{ product.name }}</td>
-              <td>{{ product.categoryId }}</td>
-              <td>{{ product.unitId }}</td>
+              <td>{{ categoryLabel(product.categoryId) }}</td>
+              <td>{{ unitLabel(product.unitId) }}</td>
               <td class="cell-right">
                 S/ {{ product.salePrice | number: "1.2-2" }}
               </td>
@@ -119,7 +120,7 @@ import { toHttpErrorMessage } from "./data/http-error-message";
               </td>
             </tr>
             <tr *ngIf="products.length === 0">
-              <td colspan="9" class="ui-table__empty">
+              <td colspan="8" class="ui-table__empty">
                 <div class="ui-empty-state">No hay productos para mostrar.</div>
               </td>
             </tr>
@@ -280,16 +281,20 @@ export class ProductsPageComponent implements OnInit {
 
   private searchResults: Product[] = [];
   private searchMode = false;
+  private readonly categoriesById = new Map<number, Category>();
+  private readonly unitsById = new Map<number, Unit>();
 
   constructor(
     private readonly formBuilder: FormBuilder,
+    private readonly categoryService: CategoryService,
     private readonly productService: ProductService,
     private readonly authService: AuthService,
+    private readonly unitService: UnitService,
   ) {}
 
   ngOnInit(): void {
     this.resolveCurrentRole();
-    this.loadProducts();
+    this.loadReferenceData();
   }
 
   onSearch(): void {
@@ -352,6 +357,28 @@ export class ProductsPageComponent implements OnInit {
     });
   }
 
+  barcodeLabel(barcode: string | null): string {
+    const normalized = barcode?.trim();
+    if (!normalized || normalized === "-") {
+      return "Sin código";
+    }
+
+    return normalized;
+  }
+
+  categoryLabel(categoryId: number): string {
+    return this.categoriesById.get(categoryId)?.name || `Categoría #${categoryId}`;
+  }
+
+  unitLabel(unitId: number): string {
+    const unit = this.unitsById.get(unitId);
+    if (!unit) {
+      return `Unidad #${unitId}`;
+    }
+
+    return unit.code?.trim() || unit.name || `Unidad #${unitId}`;
+  }
+
   private resolveCurrentRole(): void {
     this.authService.me().subscribe({
       next: (user) => {
@@ -359,6 +386,33 @@ export class ProductsPageComponent implements OnInit {
       },
       error: () => {
         this.isAdmin = false;
+      },
+    });
+  }
+
+  private loadReferenceData(): void {
+    this.loading = true;
+    this.errorMessage = "";
+
+    forkJoin({
+      categories: this.categoryService.list().pipe(catchError(() => of([] as Category[]))),
+      units: this.unitService.list().pipe(catchError(() => of([] as Unit[]))),
+    }).subscribe({
+      next: ({ categories, units }) => {
+        this.categoriesById.clear();
+        categories.forEach((category) => {
+          this.categoriesById.set(category.id, category);
+        });
+
+        this.unitsById.clear();
+        units.forEach((unit) => {
+          this.unitsById.set(unit.id, unit);
+        });
+
+        this.loadProducts();
+      },
+      error: () => {
+        this.loadProducts();
       },
     });
   }
