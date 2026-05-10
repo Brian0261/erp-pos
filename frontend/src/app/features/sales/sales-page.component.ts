@@ -108,7 +108,12 @@ import { SaleResponse, SaleStatus } from "./data/sales.models";
           <tbody>
             <tr *ngFor="let sale of sales">
               <td class="cell-id">#{{ sale.id }}</td>
-              <td class="cell-code">{{ sale.saleNumber }}</td>
+              <td class="cell-code">
+                <strong>Venta #{{ sale.id }}</strong>
+                <span class="cell-code__secondary">
+                  Código interno: {{ sale.saleNumber }}
+                </span>
+              </td>
               <td>{{ sale.soldAt | date: "dd/MM/yyyy HH:mm" }}</td>
               <td>
                 <span
@@ -200,6 +205,17 @@ import { SaleResponse, SaleStatus } from "./data/sales.models";
       .cell-code,
       .cell-number {
         white-space: nowrap;
+      }
+
+      .cell-code {
+        display: grid;
+        gap: 0.12rem;
+      }
+
+      .cell-code__secondary {
+        color: var(--color-text-secondary);
+        font-size: var(--font-size-xs);
+        line-height: 1.2;
       }
 
       .cell-number {

@@ -15,12 +15,12 @@ import { SaleResponse } from "./data/sales.models";
   template: `
     <section class="ui-card sale-detail-page" *ngIf="sale || errorMessage">
       <header class="ui-page-head">
-        <div>
-          <h1 class="ui-page-title">
-            {{ sale ? "Venta " + sale.saleNumber : "Detalle de venta" }}
-          </h1>
-          <p class="ui-page-description">Consulta de items, pagos y estado.</p>
-        </div>
+          <div>
+            <h1 class="ui-page-title">
+              {{ sale ? "Venta #" + sale.id : "Detalle de venta" }}
+            </h1>
+            <p class="ui-page-description">Consulta de items, pagos y estado.</p>
+          </div>
 
         <a class="ui-button ui-button--secondary" [routerLink]="['/ventas']"
           >Volver al listado</a
@@ -49,7 +49,7 @@ import { SaleResponse } from "./data/sales.models";
 
           <div class="summary-grid">
             <p><strong>ID:</strong> #{{ sale.id }}</p>
-            <p><strong>Nro venta:</strong> {{ sale.saleNumber }}</p>
+            <p><strong>Código interno:</strong> {{ sale.saleNumber }}</p>
             <p>
               <strong>Fecha:</strong>
               {{ sale.soldAt | date: "dd/MM/yyyy HH:mm" }}
@@ -234,6 +234,10 @@ import { SaleResponse } from "./data/sales.models";
 
       .summary-grid p {
         margin: 0;
+      }
+
+      .summary-grid strong {
+        display: inline-block;
       }
 
       .full-width {

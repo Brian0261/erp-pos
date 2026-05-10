@@ -258,6 +258,7 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
   - [x] Las fechas se filtran localmente por día completo.
   - [x] `Desde` incluye desde `00:00:00.000`.
   - [x] `Hasta` incluye hasta `23:59:59.999`.
+- [x] Identificador visual de venta actualizado: listado muestra `Venta #id` con `Código interno: S-...` y el detalle usa `Venta #id` como título con `Código interno` en el resumen.
   - [x] Rango inválido muestra mensaje: `La fecha Desde no puede ser mayor que la fecha Hasta.`
 - [x] Filtro `Estado` en Ventas se aplica automaticamente al cambiar la opcion:
   - [x] `Completada` filtra sin requerir click en `Filtrar`.
