@@ -56,7 +56,9 @@ interface PaymentLine {
             [class.pos-cash-status--closed]="!currentCashSession"
           >
             <span class="pos-cash-dot" aria-hidden="true"></span>
-            <strong>{{ currentCashSession ? "Caja abierta" : "Caja cerrada" }}</strong>
+            <strong>{{
+              currentCashSession ? "Caja abierta" : "Caja cerrada"
+            }}</strong>
             <span *ngIf="currentCashSession">
               #{{ currentCashSession.id }} · desde
               {{ currentCashSession.openedAt | date: "HH:mm" }}
@@ -80,7 +82,10 @@ interface PaymentLine {
           >
             <label class="field field--warehouse">
               <span>Almacen de salida *</span>
-              <select formControlName="warehouseId" [title]="selectedWarehouseLabel">
+              <select
+                formControlName="warehouseId"
+                [title]="selectedWarehouseLabel"
+              >
                 <option [ngValue]="null">Selecciona almacen</option>
                 <option
                   *ngFor="let warehouse of warehouses"
@@ -180,17 +185,24 @@ interface PaymentLine {
                 <div class="result-card__body">
                   <div class="result-card__meta-row">
                     <p class="result-card__sku">{{ result.sku }}</p>
-                    <span class="result-card__meta-separator" aria-hidden="true">·</span>
+                    <span class="result-card__meta-separator" aria-hidden="true"
+                      >·</span
+                    >
                     <div class="result-meta">
                       <span *ngIf="result.barcode" class="result-meta__code">
                         {{ result.barcode }}
                       </span>
-                      <span *ngIf="!result.barcode" class="barcode-badge barcode-badge--missing">
+                      <span
+                        *ngIf="!result.barcode"
+                        class="barcode-badge barcode-badge--missing"
+                      >
                         Sin código
                       </span>
                       <span class="result-meta__stock">
                         <span class="result-meta__label">Stock</span>
-                        <span class="result-meta__value">{{ result.stockAvailable | number: "1.0-3" }}</span>
+                        <span class="result-meta__value">{{
+                          result.stockAvailable | number: "1.0-3"
+                        }}</span>
                       </span>
                     </div>
                   </div>
@@ -247,7 +259,9 @@ interface PaymentLine {
                 <div class="cart-item__main">
                   <div class="cart-item__meta-row">
                     <p class="cart-item__sku">{{ item.sku }}</p>
-                    <span class="cart-item__meta-separator" aria-hidden="true">·</span>
+                    <span class="cart-item__meta-separator" aria-hidden="true"
+                      >·</span
+                    >
                     <p class="cart-item__stock">
                       P.U. S/ {{ item.salePrice | number: "1.2-2" }}
                     </p>
@@ -481,7 +495,9 @@ interface PaymentLine {
               <div class="full-cart-product">
                 <div class="full-cart-product-meta-row">
                   <p class="cart-item__sku">{{ item.sku }}</p>
-                  <span class="full-cart-meta-separator" aria-hidden="true">·</span>
+                  <span class="full-cart-meta-separator" aria-hidden="true"
+                    >·</span
+                  >
                   <span class="full-cart-product-price">
                     P.U. S/ {{ item.salePrice | number: "1.2-2" }}
                   </span>
@@ -1101,7 +1117,7 @@ interface PaymentLine {
         grid-template-columns: minmax(72px, auto) minmax(96px, 1fr);
         align-items: center;
         align-content: center;
-        gap: 0.50rem;
+        gap: 0.5rem;
       }
 
       .result-card__sku,
@@ -1502,7 +1518,11 @@ interface PaymentLine {
         border: 1px solid var(--color-border-strong);
         border-radius: var(--radius-lg);
         background:
-          linear-gradient(180deg, var(--color-bg-surface), var(--color-bg-soft)),
+          linear-gradient(
+            180deg,
+            var(--color-bg-surface),
+            var(--color-bg-soft)
+          ),
           var(--color-bg-soft);
         box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
         padding: 0.62rem var(--space-3);
@@ -1647,7 +1667,11 @@ interface PaymentLine {
         min-height: 2.2rem;
         border-color: var(--color-border-default);
         color: var(--color-danger);
-        background: color-mix(in srgb, var(--color-danger) 8%, var(--color-bg-surface));
+        background: color-mix(
+          in srgb,
+          var(--color-danger) 8%,
+          var(--color-bg-surface)
+        );
         box-shadow: none;
         opacity: 0.96;
       }
@@ -1680,7 +1704,11 @@ interface PaymentLine {
       :host-context(body[data-theme="dark"]) .full-cart-summary {
         border-color: rgba(96, 165, 250, 0.32);
         background:
-          linear-gradient(180deg, rgba(30, 41, 59, 0.94), rgba(15, 23, 42, 0.88)),
+          linear-gradient(
+            180deg,
+            rgba(30, 41, 59, 0.94),
+            rgba(15, 23, 42, 0.88)
+          ),
           var(--color-bg-soft);
       }
 
@@ -1964,7 +1992,9 @@ export class PosPageComponent implements OnInit {
   get selectedWarehouseLabel(): string {
     const warehouseId = this.saleForm.value.warehouseId;
     const warehouse = this.warehouses.find((item) => item.id === warehouseId);
-    return warehouse ? `${warehouse.code} - ${warehouse.name}` : "Selecciona almacen";
+    return warehouse
+      ? `${warehouse.code} - ${warehouse.name}`
+      : "Selecciona almacen";
   }
 
   get cartTitle(): string {
@@ -2433,7 +2463,7 @@ export class PosPageComponent implements OnInit {
 
     const warehouseId = this.saleForm.value.warehouseId;
     if (!warehouseId) {
-      return "warehouseId es requerido.";
+      return "Selecciona un almacén de salida antes de cobrar.";
     }
 
     if (this.cart.length === 0) {

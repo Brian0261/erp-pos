@@ -242,6 +242,34 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [x] Modal `Carrito completo`: botón `Quitar` mantiene semántica destructiva, pero con menor dominancia visual.
 - [x] Modal `Carrito completo`: bloque `TOTAL ACTUAL` se mantiene como resumen y no compite con el CTA `COBRAR`.
 
+### Ventas UX/QA - Traducciones, filtros y detalle (2026-05-10)
+
+- [x] Alcance aplicado a:
+  - `frontend/src/app/features/sales/sales-page.component.ts`
+  - `frontend/src/app/features/sales/sale-detail-page.component.ts`
+- [x] Listado de ventas: estados visibles traducidos a español (`COMPLETED -> Completada`, `VOIDED -> Anulada`) manteniendo valores internos sin cambios.
+- [x] Detalle de venta: métodos de pago visibles traducidos a español (`CASH -> Efectivo`, `CARD -> Tarjeta`, `TRANSFER -> Transferencia`) manteniendo valores internos sin cambios.
+- [x] Fechas visibles en listado y detalle formateadas a `dd/MM/yyyy HH:mm`.
+- [x] Detalle de venta: campos `Anulada en` y `Motivo anulación` se ocultan cuando la venta no está anulada.
+- [x] Filtro `Caja` valida enteros positivos; valores `0`, negativos, decimales o texto muestran mensaje controlado y no ejecutan filtrado.
+- [x] Filtro de fechas en Ventas corregido frontend-only:
+  - [x] Ya no se envían `from/to` al backend para evitar `500` del endpoint con fechas.
+  - [x] Las fechas se filtran localmente por día completo.
+  - [x] `Desde` incluye desde `00:00:00.000`.
+  - [x] `Hasta` incluye hasta `23:59:59.999`.
+  - [x] Rango inválido muestra mensaje: `La fecha Desde no puede ser mayor que la fecha Hasta.`
+- [x] Validación funcional del filtro de fechas:
+  - [x] Sin filtros: carga ventas disponibles.
+  - [x] Solo `Hasta = 09/05/2026`: incluye ventas del 09/05/2026.
+  - [x] Solo `Desde = 09/05/2026`: incluye ventas del 09/05/2026 y posteriores.
+  - [x] `Desde = 09/05/2026` y `Hasta = 09/05/2026`: muestra ventas de ese día.
+  - [x] `Desde = 08/05/2026` y `Hasta = 10/05/2026`: incluye ventas de 08, 09 y 10.
+- [x] Detalle de venta: resumen visual mejorado; `TOTAL` queda como dato principal y `Subtotal`, `Descuento`, `Pagado`, `Vuelto` mantienen contraste correcto en modo oscuro.
+- [x] `npm run build` frontend exitoso.
+- [x] `docker compose up --build -d` y `docker compose ps` exitosos.
+- [x] Backend, DB, Flyway, endpoints, servicios Angular, modelos, rutas, guards, AuthService, JWT/interceptor y payload sin cambios.
+- [x] Pendiente backend/DTO: detalle de venta todavía muestra producto por ID técnico si el endpoint no expone nombre/SKU/barcode.
+
 ## Sidebar avanzado InkToy (2026-05-05)
 
 - [x] Build frontend (`npm run build`) exitoso tras cambios del sidebar.

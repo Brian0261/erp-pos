@@ -41,21 +41,24 @@ import { SaleResponse, SaleStatus } from "./data/sales.models";
           <input type="date" formControlName="to" />
         </label>
 
-        <label class="field">
-          <span>Estado</span>
-          <select formControlName="status">
-            <option value="">Todos</option>
-            <option *ngFor="let status of statuses" [value]="status">
-              {{ status }}
-            </option>
-          </select>
-        </label>
+          <label class="field">
+            <span>Estado</span>
+            <select formControlName="status">
+              <option value="">Todos</option>
+              <option *ngFor="let status of statuses" [value]="status">
+                {{ saleStatusLabel(status) }}
+              </option>
+            </select>
+          </label>
 
         <label class="field">
           <span>Caja</span>
           <input
             type="number"
             min="1"
+            step="1"
+            inputmode="numeric"
+            pattern="[0-9]*"
             formControlName="cashRegisterSessionId"
           />
         </label>
@@ -106,14 +109,14 @@ import { SaleResponse, SaleStatus } from "./data/sales.models";
             <tr *ngFor="let sale of sales">
               <td class="cell-id">#{{ sale.id }}</td>
               <td class="cell-code">{{ sale.saleNumber }}</td>
-              <td>{{ sale.soldAt | date: "yyyy-MM-dd HH:mm" }}</td>
+              <td>{{ sale.soldAt | date: "dd/MM/yyyy HH:mm" }}</td>
               <td>
                 <span
                   class="ui-badge"
                   [class.ui-badge--danger]="sale.status === 'VOIDED'"
                   [class.ui-badge--success]="sale.status !== 'VOIDED'"
                 >
-                  {{ sale.status }}
+                  {{ saleStatusLabel(sale.status) }}
                 </span>
               </td>
               <td class="cell-number">
@@ -258,12 +261,35 @@ export class SalesPageComponent implements OnInit {
     this.loadSales();
   }
 
+  saleStatusLabel(status: SaleStatus | string): string {
+    switch (status) {
+      case "COMPLETED":
+        return "Completada";
+      case "VOIDED":
+        return "Anulada";
+      case "PENDING":
+        return "Pendiente";
+      case "CANCELLED":
+        return "Cancelada";
+      default:
+        return status;
+    }
+  }
+
   applyFilters(): void {
-    const { from, to } = this.filterForm.getRawValue();
+    const { from, to, cashRegisterSessionId } = this.filterForm.getRawValue();
 
     if (from && to && from > to) {
       this.errorMessage =
-        "El rango de fechas es invalido: desde no puede ser mayor que hasta.";
+        "La fecha Desde no puede ser mayor que la fecha Hasta.";
+      return;
+    }
+
+    if (
+      cashRegisterSessionId !== null &&
+      this.normalizeCashRegisterSessionId(cashRegisterSessionId) === undefined
+    ) {
+      this.errorMessage = "Ingresa un número de caja válido.";
       return;
     }
 
@@ -283,22 +309,23 @@ export class SalesPageComponent implements OnInit {
 
   private loadSales(): void {
     const value = this.filterForm.getRawValue();
+    const cashRegisterSessionId = this.normalizeCashRegisterSessionId(value.cashRegisterSessionId);
+    const from = value.from || undefined;
+    const to = value.to || undefined;
 
     this.loading = true;
     this.errorMessage = "";
 
     this.salesService
       .list({
-        from: value.from || undefined,
-        to: value.to || undefined,
         status: (value.status as SaleStatus | "") || undefined,
-        cashRegisterSessionId: value.cashRegisterSessionId ?? undefined,
+        cashRegisterSessionId,
         createdBy: value.createdBy?.trim() ? value.createdBy.trim() : undefined,
       })
       .subscribe({
         next: (sales) => {
           this.loading = false;
-          this.sales = sales;
+          this.sales = this.applyDateRangeFilter(sales, from, to);
         },
         error: (error: unknown) => {
           this.loading = false;
@@ -308,5 +335,46 @@ export class SalesPageComponent implements OnInit {
           );
         },
       });
+  }
+
+  private normalizeCashRegisterSessionId(value: unknown): number | undefined {
+    if (value === null || value === undefined || value === "") {
+      return undefined;
+    }
+
+    const normalized = typeof value === "number" ? value : Number(value);
+    if (!Number.isInteger(normalized) || normalized <= 0) {
+      return undefined;
+    }
+
+    return normalized;
+  }
+
+  private applyDateRangeFilter(
+    sales: SaleResponse[],
+    from?: string,
+    to?: string,
+  ): SaleResponse[] {
+    if (!from && !to) {
+      return sales;
+    }
+
+    const fromBoundary = from ? new Date(`${from}T00:00:00.000`) : null;
+    const toBoundary = to ? new Date(`${to}T23:59:59.999`) : null;
+
+    return sales.filter((sale) => {
+      const soldDate = new Date(sale.soldAt);
+      if (Number.isNaN(soldDate.getTime())) {
+        return false;
+      }
+
+      if (fromBoundary && soldDate < fromBoundary) {
+        return false;
+      }
+      if (toBoundary && soldDate > toBoundary) {
+        return false;
+      }
+      return true;
+    });
   }
 }
