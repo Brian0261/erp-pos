@@ -13,14 +13,12 @@ import { SaleResponse } from "./data/sales.models";
   standalone: true,
   imports: [CommonModule, RouterLink],
   template: `
-    <section class="ui-card sale-detail-page">
+    <section class="ui-card sale-detail-page" *ngIf="sale || errorMessage">
       <header class="ui-page-head">
         <div>
-          <p class="ui-page-kicker">Operacion Comercial InkToy</p>
-          <h1 class="ui-page-title" *ngIf="sale">
-            Venta {{ sale.saleNumber }}
+          <h1 class="ui-page-title">
+            {{ sale ? "Venta " + sale.saleNumber : "Detalle de venta" }}
           </h1>
-          <h1 class="ui-page-title" *ngIf="!sale">Detalle de venta</h1>
           <p class="ui-page-description">Consulta de items, pagos y estado.</p>
         </div>
 
@@ -32,14 +30,11 @@ import { SaleResponse } from "./data/sales.models";
       <p class="ui-alert ui-alert--error" *ngIf="errorMessage">
         {{ errorMessage }}
       </p>
-      <p class="ui-alert ui-alert--success" *ngIf="successMessage">
+      <p class="ui-alert ui-alert--success" *ngIf="successMessage && sale">
         {{ successMessage }}
       </p>
-      <p class="ui-alert ui-alert--info" *ngIf="loading">
-        Cargando detalle de venta...
-      </p>
 
-      <ng-container *ngIf="sale && !loading">
+      <ng-container *ngIf="sale">
         <article class="summary-panel">
           <div class="summary-head">
             <h2>Resumen</h2>
@@ -175,9 +170,17 @@ import { SaleResponse } from "./data/sales.models";
             <p class="label">Pagado</p>
             <p class="value">{{ sale.paidAmount | number: "1.2-2" }}</p>
           </div>
-          <div class="total-item total-item--accent">
-            <p class="label">Vuelto</p>
-            <p class="value">{{ sale.changeAmount | number: "1.2-2" }}</p>
+          <div
+            class="total-item"
+            [class.total-item--accent]="settlementDisplayAmount(sale) !== null"
+          >
+            <p class="label">{{ settlementLabel(sale) }}</p>
+            <p class="value" *ngIf="settlementDisplayAmount(sale) !== null; else settlementNotApplicable">
+              {{ settlementDisplayAmount(sale) | number: "1.2-2" }}
+            </p>
+            <ng-template #settlementNotApplicable>
+              <p class="value value--muted">No aplica</p>
+            </ng-template>
           </div>
         </article>
 
@@ -315,6 +318,11 @@ import { SaleResponse } from "./data/sales.models";
         font-size: clamp(1.02rem, 1.4vw, 1.22rem);
         line-height: 1.08;
         font-variant-numeric: tabular-nums;
+      }
+
+      .total-item .value--muted {
+        color: var(--color-text-secondary);
+        font-size: 0.95rem;
       }
 
       .total-item--strong {
@@ -475,6 +483,39 @@ export class SaleDetailPageComponent implements OnInit {
       default:
         return method;
     }
+  }
+
+  settlementLabel(sale: SaleResponse): string {
+    if (this.hasCashPayment(sale)) {
+      return "Vuelto";
+    }
+
+    const difference = sale.paidAmount - sale.totalAmount;
+    if (difference > 0) {
+      return "Diferencia";
+    }
+    if (difference < 0) {
+      return "Saldo";
+    }
+
+    return "Vuelto";
+  }
+
+  settlementDisplayAmount(sale: SaleResponse): number | null {
+    if (this.hasCashPayment(sale)) {
+      return sale.changeAmount;
+    }
+
+    const difference = sale.paidAmount - sale.totalAmount;
+    if (difference === 0) {
+      return null;
+    }
+
+    return Math.abs(difference);
+  }
+
+  private hasCashPayment(sale: SaleResponse): boolean {
+    return sale.payments.some((payment) => payment.paymentMethod === "CASH");
   }
 
   private loadSale(): void {

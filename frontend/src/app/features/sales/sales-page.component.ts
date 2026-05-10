@@ -16,7 +16,6 @@ import { SaleResponse, SaleStatus } from "./data/sales.models";
     <section class="ui-card sales-page">
       <header class="ui-page-head">
         <div>
-          <p class="ui-page-kicker">Operacion Comercial InkToy</p>
           <h1 class="ui-page-title">Ventas</h1>
           <p class="ui-page-description">
             Consulta ventas por rango de fechas, estado, caja o usuario y accede

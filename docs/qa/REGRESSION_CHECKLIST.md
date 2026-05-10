@@ -250,6 +250,7 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [x] Listado de ventas: estados visibles traducidos a español (`COMPLETED -> Completada`, `VOIDED -> Anulada`) manteniendo valores internos sin cambios.
 - [x] Detalle de venta: métodos de pago visibles traducidos a español (`CASH -> Efectivo`, `CARD -> Tarjeta`, `TRANSFER -> Transferencia`) manteniendo valores internos sin cambios.
 - [x] Fechas visibles en listado y detalle formateadas a `dd/MM/yyyy HH:mm`.
+- [x] Detalle de venta: `Vuelto` se muestra solo cuando existe pago en efectivo; pagos solo con tarjeta/transferencia muestran `Diferencia`, `Saldo` o `No aplica` segun corresponda, sin sugerir dinero fisico a devolver.
 - [x] Detalle de venta: campos `Anulada en` y `Motivo anulación` se ocultan cuando la venta no está anulada.
 - [x] Filtro `Caja` valida enteros positivos; valores `0`, negativos, decimales o texto muestran mensaje controlado y no ejecutan filtrado.
 - [x] Filtro de fechas en Ventas corregido frontend-only:
