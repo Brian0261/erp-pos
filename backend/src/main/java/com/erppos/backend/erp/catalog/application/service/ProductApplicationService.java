@@ -1,5 +1,6 @@
 package com.erppos.backend.erp.catalog.application.service;
 import com.erppos.backend.erp.catalog.application.usecase.CreateProductCommand;
+import com.erppos.backend.erp.catalog.application.usecase.ProductBarcodeStatus;
 import com.erppos.backend.erp.catalog.application.usecase.ProductUseCase;
 import com.erppos.backend.erp.catalog.application.usecase.UpdateProductCommand;
 import com.erppos.backend.erp.catalog.domain.exception.CatalogBusinessRuleException;
@@ -14,6 +15,7 @@ import com.erppos.backend.erp.catalog.domain.port.UnitRepositoryPort;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import java.util.Locale;
 import java.util.List;
 @Service
 public class ProductApplicationService implements ProductUseCase {
@@ -55,8 +57,17 @@ public class ProductApplicationService implements ProductUseCase {
         return productRepositoryPort.save(product);
     }
     @Override
-    public Page<Product> list(Pageable pageable) {
-        return productRepositoryPort.findAll(pageable);
+    public Page<Product> list(String query, Long categoryId, Boolean active, ProductBarcodeStatus barcodeStatus, Pageable pageable) {
+        String normalizedQuery = normalizeQuery(query);
+        ProductBarcodeStatus normalizedBarcodeStatus = barcodeStatus == ProductBarcodeStatus.ALL ? null : barcodeStatus;
+        return productRepositoryPort.findByFilters(
+                normalizedQuery == null ? "" : normalizedQuery,
+                normalizedQuery != null,
+                categoryId,
+                active,
+                normalizedBarcodeStatus,
+                pageable
+        );
     }
     @Override
     public Product getById(Long id) {
@@ -154,5 +165,9 @@ public class ProductApplicationService implements ProductUseCase {
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+    private String normalizeQuery(String value) {
+        String trimmed = trimToNull(value);
+        return trimmed == null ? null : trimmed.toLowerCase(Locale.ROOT);
     }
 }

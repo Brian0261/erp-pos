@@ -1,4 +1,5 @@
 package com.erppos.backend.erp.catalog.infrastructure.persistence;
+import com.erppos.backend.erp.catalog.application.usecase.ProductBarcodeStatus;
 import com.erppos.backend.erp.catalog.domain.exception.CatalogNotFoundException;
 import com.erppos.backend.erp.catalog.domain.model.Product;
 import com.erppos.backend.erp.catalog.domain.port.ProductRepositoryPort;
@@ -45,6 +46,17 @@ public class ProductPersistenceAdapter implements ProductRepositoryPort {
     @Override
     public Page<Product> findAll(Pageable pageable) {
         return productJpaRepository.findAll(pageable).map(ProductMapper::toDomain);
+    }
+    @Override
+    public Page<Product> findByFilters(String query, boolean applyQuery, Long categoryId, Boolean active, ProductBarcodeStatus barcodeStatus, Pageable pageable) {
+        return productJpaRepository.findByFilters(
+                query,
+                applyQuery,
+                categoryId,
+                active,
+                barcodeStatus == null ? null : barcodeStatus.name(),
+                pageable
+        ).map(ProductMapper::toDomain);
     }
     @Override
     public List<Product> search(String query, int limit) {

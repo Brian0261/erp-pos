@@ -4,6 +4,7 @@ import com.erppos.backend.erp.catalog.application.service.CategoryApplicationSer
 import com.erppos.backend.erp.catalog.application.service.ProductApplicationService;
 import com.erppos.backend.erp.catalog.application.service.UnitApplicationService;
 import com.erppos.backend.erp.catalog.application.usecase.CreateCategoryCommand;
+import com.erppos.backend.erp.catalog.application.usecase.ProductBarcodeStatus;
 import com.erppos.backend.erp.catalog.application.usecase.CreateProductCommand;
 import com.erppos.backend.erp.catalog.application.usecase.CreateUnitCommand;
 import com.erppos.backend.erp.catalog.domain.exception.CatalogBusinessRuleException;
@@ -18,6 +19,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -127,6 +129,48 @@ class CatalogApplicationServiceTest {
         productService.create(new CreateProductCommand("SKU-009", "EAN-100", "Crayones", null, ids[0], ids[1], BigDecimal.ONE));
         List<Product> results = productService.search("EAN-100");
         assertEquals(1, results.size());
+    }
+    @Test
+    void shouldListProductsWithoutFiltersKeepingPagination() {
+        Long[] ids = seedActiveCategoryAndUnit();
+        productService.create(new CreateProductCommand("SKU-013", "BC-013", "Lapiz", null, ids[0], ids[1], BigDecimal.ONE));
+        productService.create(new CreateProductCommand("SKU-014", null, "Borrador", null, ids[0], ids[1], BigDecimal.ONE));
+        productService.create(new CreateProductCommand("SKU-015", "BC-015", "Regla", null, ids[0], ids[1], BigDecimal.ONE));
+
+        Page<Product> page = productService.list(null, null, null, null, PageRequest.of(0, 2));
+
+        assertEquals(3, page.getTotalElements());
+        assertEquals(2, page.getContent().size());
+    }
+    @Test
+    void shouldFilterProductsByQueryCategoryAndActive() {
+        Category categoryA = categoryRepository.save(new Category(null, "Utiles A", null, true, null, null, "system", "system"));
+        Category categoryB = categoryRepository.save(new Category(null, "Utiles B", null, true, null, null, "system", "system"));
+        Unit unit = unitRepository.save(new Unit(null, "UND", "Unidad", true, null, null, "system", "system"));
+
+        productService.create(new CreateProductCommand("SKU-016", "BC-016", "Mochila Azul", null, categoryA.id(), unit.id(), BigDecimal.ONE));
+        productService.create(new CreateProductCommand("SKU-017", "BC-017", "Mochila Roja", null, categoryB.id(), unit.id(), BigDecimal.ONE));
+        Product inactive = productService.create(new CreateProductCommand("SKU-018", "BC-018", "Mochila Verde", null, categoryA.id(), unit.id(), BigDecimal.ONE));
+        productService.deactivate(inactive.id());
+
+        Page<Product> page = productService.list("mochila", categoryA.id(), true, null, PageRequest.of(0, 10));
+
+        assertEquals(1, page.getTotalElements());
+        assertEquals("SKU-016", page.getContent().get(0).sku());
+    }
+    @Test
+    void shouldFilterProductsByBarcodeStatus() {
+        Long[] ids = seedActiveCategoryAndUnit();
+        productService.create(new CreateProductCommand("SKU-019", "BC-019", "Con barcode", null, ids[0], ids[1], BigDecimal.ONE));
+        productService.create(new CreateProductCommand("SKU-020", null, "Sin barcode", null, ids[0], ids[1], BigDecimal.ONE));
+
+        Page<Product> withBarcode = productService.list(null, null, null, ProductBarcodeStatus.WITH_BARCODE, PageRequest.of(0, 10));
+        Page<Product> withoutBarcode = productService.list(null, null, null, ProductBarcodeStatus.WITHOUT_BARCODE, PageRequest.of(0, 10));
+
+        assertEquals(1, withBarcode.getTotalElements());
+        assertEquals("SKU-019", withBarcode.getContent().get(0).sku());
+        assertEquals(1, withoutBarcode.getTotalElements());
+        assertEquals("SKU-020", withoutBarcode.getContent().get(0).sku());
     }
     @Test
     void shouldDeactivateProduct() {
@@ -265,6 +309,34 @@ class CatalogApplicationServiceTest {
         @Override
         public Page<Product> findAll(Pageable pageable) {
             return new PageImpl<>(storage.values().stream().toList(), pageable, storage.size());
+        }
+        @Override
+        public Page<Product> findByFilters(String query, boolean applyQuery, Long categoryId, Boolean active, ProductBarcodeStatus barcodeStatus, Pageable pageable) {
+            List<Product> filtered = storage.values().stream()
+                    .filter(product -> !applyQuery
+                            || product.name().toLowerCase(Locale.ROOT).contains(query)
+                            || product.sku().toLowerCase(Locale.ROOT).contains(query)
+                            || (product.barcode() != null && product.barcode().toLowerCase(Locale.ROOT).contains(query)))
+                    .filter(product -> categoryId == null || product.categoryId().equals(categoryId))
+                    .filter(product -> active == null || product.active() == active)
+                    .filter(product -> {
+                        if (barcodeStatus == null) {
+                            return true;
+                        }
+                        boolean hasBarcode = product.barcode() != null && !product.barcode().trim().isEmpty();
+                        return switch (barcodeStatus) {
+                            case ALL -> true;
+                            case WITH_BARCODE -> hasBarcode;
+                            case WITHOUT_BARCODE -> !hasBarcode;
+                        };
+                    })
+                    .sorted(Comparator.comparing(Product::id))
+                    .toList();
+
+            int start = (int) pageable.getOffset();
+            int end = Math.min(start + pageable.getPageSize(), filtered.size());
+            List<Product> content = start >= filtered.size() ? List.of() : filtered.subList(start, end);
+            return new PageImpl<>(content, pageable, filtered.size());
         }
         @Override
         public List<Product> search(String query, int limit) {

@@ -7,7 +7,7 @@ import { catchError, forkJoin, of } from "rxjs";
 import { AuthService } from "../../core/auth/auth.service";
 import { Category, Product, Unit } from "./data/catalog.models";
 import { CategoryService } from "./data/category.service";
-import { ProductService } from "./data/product.service";
+import { ProductListFilters, ProductService } from "./data/product.service";
 import { toHttpErrorMessage } from "./data/http-error-message";
 import { UnitService } from "./data/unit.service";
 
@@ -44,6 +44,34 @@ import { UnitService } from "./data/unit.service";
             formControlName="q"
             placeholder="Nombre, SKU o codigo de barras"
           />
+        </label>
+
+        <label class="search-field">
+          <span>Categoria</span>
+          <select formControlName="categoryId">
+            <option value="">Todas</option>
+            <option *ngFor="let category of categories" [value]="category.id">
+              {{ category.name }}
+            </option>
+          </select>
+        </label>
+
+        <label class="search-field">
+          <span>Estado</span>
+          <select formControlName="active">
+            <option value="">Todos</option>
+            <option value="true">Activo</option>
+            <option value="false">Inactivo</option>
+          </select>
+        </label>
+
+        <label class="search-field">
+          <span>Codigo de barras</span>
+          <select formControlName="barcodeStatus">
+            <option value="">Todos</option>
+            <option value="WITH_BARCODE">Con codigo</option>
+            <option value="WITHOUT_BARCODE">Sin codigo</option>
+          </select>
         </label>
 
         <div class="search-actions">
@@ -107,11 +135,11 @@ import { UnitService } from "./data/unit.service";
                 <a
                   class="ui-button ui-button--secondary"
                   [routerLink]="['/catalogo/productos', product.id, 'editar']"
-                  >Editar</a
-                >
+                >Editar</a
+                 >
                 <button
                   type="button"
-                  class="ui-button ui-button--danger"
+                  class="ui-button ui-button--secondary action-deactivate"
                   [disabled]="!product.active || !isAdmin"
                   (click)="deactivate(product)"
                 >
@@ -131,7 +159,7 @@ import { UnitService } from "./data/unit.service";
       <footer class="pagination" *ngIf="!loading">
         <p class="ui-muted pagination-copy">
           Pagina {{ page + 1 }} de {{ totalPages }} -
-          {{ totalElements }} registros
+          {{ totalElements }} resultados
         </p>
 
         <div class="pagination-actions">
@@ -165,7 +193,7 @@ import { UnitService } from "./data/unit.service";
 
       .search-panel {
         display: grid;
-        grid-template-columns: minmax(260px, 1fr) auto;
+        grid-template-columns: minmax(260px, 2fr) repeat(3, minmax(160px, 1fr)) auto;
         gap: var(--space-3);
         align-items: end;
         border: 1px solid var(--color-border-default);
@@ -193,6 +221,14 @@ import { UnitService } from "./data/unit.service";
         background: var(--color-bg-surface);
       }
 
+      .search-field select {
+        min-width: 0;
+        padding: 0.6rem 0.7rem;
+        border: 1px solid var(--color-border-strong);
+        border-radius: var(--radius-sm);
+        background: var(--color-bg-surface);
+      }
+
       .search-actions {
         display: flex;
         gap: var(--space-2);
@@ -210,6 +246,10 @@ import { UnitService } from "./data/unit.service";
         gap: var(--space-2);
         align-items: center;
         flex-wrap: wrap;
+      }
+
+      .action-deactivate {
+        opacity: 0.88;
       }
 
       .cell-id,
@@ -267,8 +307,12 @@ import { UnitService } from "./data/unit.service";
 export class ProductsPageComponent implements OnInit {
   readonly searchForm = this.formBuilder.nonNullable.group({
     q: "",
+    categoryId: "",
+    active: "",
+    barcodeStatus: "",
   });
 
+  categories: Category[] = [];
   products: Product[] = [];
   page = 0;
   readonly pageSize = 10;
@@ -279,8 +323,6 @@ export class ProductsPageComponent implements OnInit {
   successMessage = "";
   isAdmin = false;
 
-  private searchResults: Product[] = [];
-  private searchMode = false;
   private readonly categoriesById = new Map<number, Category>();
   private readonly unitsById = new Map<number, Unit>();
 
@@ -303,7 +345,12 @@ export class ProductsPageComponent implements OnInit {
   }
 
   clearSearch(): void {
-    this.searchForm.controls.q.setValue("");
+    this.searchForm.reset({
+      q: "",
+      categoryId: "",
+      active: "",
+      barcodeStatus: "",
+    });
     this.page = 0;
     this.loadProducts();
   }
@@ -314,7 +361,7 @@ export class ProductsPageComponent implements OnInit {
     }
 
     this.page -= 1;
-    this.refreshByMode();
+    this.loadProducts();
   }
 
   nextPage(): void {
@@ -323,7 +370,7 @@ export class ProductsPageComponent implements OnInit {
     }
 
     this.page += 1;
-    this.refreshByMode();
+    this.loadProducts();
   }
 
   deactivate(product: Product): void {
@@ -399,6 +446,7 @@ export class ProductsPageComponent implements OnInit {
       units: this.unitService.list().pipe(catchError(() => of([] as Unit[]))),
     }).subscribe({
       next: ({ categories, units }) => {
+        this.categories = categories;
         this.categoriesById.clear();
         categories.forEach((category) => {
           this.categoriesById.set(category.id, category);
@@ -418,39 +466,17 @@ export class ProductsPageComponent implements OnInit {
   }
 
   private loadProducts(): void {
-    const query = this.searchForm.controls.q.value.trim();
-
     this.loading = true;
     this.errorMessage = "";
     this.successMessage = "";
 
-    if (query.length > 0) {
-      this.productService.search(query).subscribe({
-        next: (results) => {
-          this.loading = false;
-          this.searchMode = true;
-          this.searchResults = results;
-          this.applySearchPagination();
-        },
-        error: (error: unknown) => {
-          this.loading = false;
-          this.errorMessage = toHttpErrorMessage(
-            error,
-            "No se pudo buscar productos.",
-          );
-          this.products = [];
-          this.totalElements = 0;
-          this.totalPages = 1;
-        },
-      });
-      return;
-    }
-
-    this.productService.list(this.page, this.pageSize).subscribe({
+    this.productService.list(
+      this.page,
+      this.pageSize,
+      this.currentFilters(),
+    ).subscribe({
       next: (response) => {
         this.loading = false;
-        this.searchMode = false;
-        this.searchResults = [];
         this.products = response.content;
         this.page = response.number;
         this.totalElements = response.totalElements;
@@ -466,27 +492,20 @@ export class ProductsPageComponent implements OnInit {
     });
   }
 
-  private refreshByMode(): void {
-    if (this.searchMode) {
-      this.applySearchPagination();
-      return;
-    }
-    this.loadProducts();
+  private currentFilters(): ProductListFilters {
+    const value = this.searchForm.getRawValue();
+    const categoryId = value.categoryId ? Number(value.categoryId) : undefined;
+
+    return {
+      q: value.q,
+      categoryId: Number.isFinite(categoryId) ? categoryId : undefined,
+      active: value.active === "" ? undefined : value.active === "true",
+      barcodeStatus:
+        value.barcodeStatus === "WITH_BARCODE" ||
+        value.barcodeStatus === "WITHOUT_BARCODE"
+          ? value.barcodeStatus
+          : undefined,
+    };
   }
 
-  private applySearchPagination(): void {
-    this.totalElements = this.searchResults.length;
-    this.totalPages = Math.max(
-      Math.ceil(this.totalElements / this.pageSize),
-      1,
-    );
-
-    if (this.page >= this.totalPages) {
-      this.page = this.totalPages - 1;
-    }
-
-    const start = this.page * this.pageSize;
-    const end = start + this.pageSize;
-    this.products = this.searchResults.slice(start, end);
-  }
 }

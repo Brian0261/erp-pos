@@ -253,6 +253,8 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [x] Detalle de venta: `Vuelto` se muestra solo cuando existe pago en efectivo; pagos solo con tarjeta/transferencia muestran `Diferencia`, `Saldo` o `No aplica` segun corresponda, sin sugerir dinero fisico a devolver.
 - [x] Detalle de venta: campos `Anulada en` y `Motivo anulación` se ocultan cuando la venta no está anulada.
 - [x] Filtro `Caja` valida enteros positivos; valores `0`, negativos, decimales o texto muestran mensaje controlado y no ejecutan filtrado.
+- [x] Productos: listado usa filtros backend-driven paginados por `q`, `categoryId`, `active` y `barcodeStatus`; `/search` ya no se usa en esta pantalla.
+- [x] Productos: contador visible mantiene coherencia con la paginacion backend.
 - [x] Filtro de fechas en Ventas corregido frontend-only:
   - [x] Ya no se envían `from/to` al backend para evitar `500` del endpoint con fechas.
   - [x] Las fechas se filtran localmente por día completo.

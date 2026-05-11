@@ -5,7 +5,7 @@ import org.springframework.data.domain.Pageable;
 import java.util.List;
 public interface ProductUseCase {
     Product create(CreateProductCommand command);
-    Page<Product> list(Pageable pageable);
+    Page<Product> list(String query, Long categoryId, Boolean active, ProductBarcodeStatus barcodeStatus, Pageable pageable);
     Product getById(Long id);
     Product update(Long id, UpdateProductCommand command);
     void deactivate(Long id);

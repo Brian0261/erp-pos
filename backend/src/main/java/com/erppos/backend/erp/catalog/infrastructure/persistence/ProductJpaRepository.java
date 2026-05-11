@@ -10,6 +10,41 @@ public interface ProductJpaRepository extends JpaRepository<ProductEntity, Long>
     @Override
     @EntityGraph(attributePaths = {"category", "unit"})
     Page<ProductEntity> findAll(Pageable pageable);
+    @EntityGraph(attributePaths = {"category", "unit"})
+    @Query(
+            value = """
+                    SELECT p FROM ProductEntity p
+                    WHERE (:applyQuery = false
+                           OR LOWER(p.name) LIKE CONCAT('%', :query, '%')
+                           OR LOWER(p.sku) LIKE CONCAT('%', :query, '%')
+                           OR (p.barcode IS NOT NULL AND LOWER(p.barcode) LIKE CONCAT('%', :query, '%')))
+                      AND (:categoryId IS NULL OR p.category.id = :categoryId)
+                      AND (:active IS NULL OR p.active = :active)
+                      AND (:barcodeStatus IS NULL
+                           OR (:barcodeStatus = 'WITH_BARCODE' AND p.barcode IS NOT NULL AND TRIM(p.barcode) <> '')
+                           OR (:barcodeStatus = 'WITHOUT_BARCODE' AND (p.barcode IS NULL OR TRIM(p.barcode) = '')))
+                    """,
+            countQuery = """
+                    SELECT COUNT(p) FROM ProductEntity p
+                    WHERE (:applyQuery = false
+                           OR LOWER(p.name) LIKE CONCAT('%', :query, '%')
+                           OR LOWER(p.sku) LIKE CONCAT('%', :query, '%')
+                           OR (p.barcode IS NOT NULL AND LOWER(p.barcode) LIKE CONCAT('%', :query, '%')))
+                      AND (:categoryId IS NULL OR p.category.id = :categoryId)
+                      AND (:active IS NULL OR p.active = :active)
+                      AND (:barcodeStatus IS NULL
+                           OR (:barcodeStatus = 'WITH_BARCODE' AND p.barcode IS NOT NULL AND TRIM(p.barcode) <> '')
+                           OR (:barcodeStatus = 'WITHOUT_BARCODE' AND (p.barcode IS NULL OR TRIM(p.barcode) = '')))
+                    """
+    )
+    Page<ProductEntity> findByFilters(
+            @Param("query") String query,
+            @Param("applyQuery") boolean applyQuery,
+            @Param("categoryId") Long categoryId,
+            @Param("active") Boolean active,
+            @Param("barcodeStatus") String barcodeStatus,
+            Pageable pageable
+    );
     @Override
     @EntityGraph(attributePaths = {"category", "unit"})
     java.util.Optional<ProductEntity> findById(Long id);

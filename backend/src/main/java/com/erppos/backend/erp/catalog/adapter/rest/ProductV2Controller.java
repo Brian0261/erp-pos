@@ -26,7 +26,7 @@ public class ProductV2Controller {
     @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR','ALMACENERO','CAJERO')")
     public ResponseEntity<PageResponse<ProductResponse>> list(Pageable pageable) {
         PageResponse<ProductResponse> response = PageResponseMapper.from(
-                productUseCase.list(pageable).map(this::toResponse)
+                productUseCase.list(null, null, null, null, pageable).map(this::toResponse)
         );
         return ResponseEntity.ok(response);
     }
