@@ -705,7 +705,15 @@ const ROLES_CONSULTA_CAJERO: AppRole[] = ["CAJERO"];
         padding: var(--space-5);
         min-width: 0;
         min-height: 0;
-        overflow: auto;
+        overflow-x: auto;
+        overflow-y: auto;
+        scrollbar-gutter: stable;
+      }
+
+      @supports not (scrollbar-gutter: stable) {
+        .content {
+          overflow-y: scroll;
+        }
       }
 
       .visually-hidden {

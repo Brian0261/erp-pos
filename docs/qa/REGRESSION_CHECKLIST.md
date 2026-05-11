@@ -254,6 +254,7 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [x] Detalle de venta: campos `Anulada en` y `Motivo anulación` se ocultan cuando la venta no está anulada.
 - [x] Filtro `Caja` valida enteros positivos; valores `0`, negativos, decimales o texto muestran mensaje controlado y no ejecutan filtrado.
 - [x] Productos: listado usa filtros backend-driven paginados por `q`, `categoryId`, `active` y `barcodeStatus`; `/search` ya no se usa en esta pantalla.
+- [x] Productos: los selects de `Categoria`, `Estado` y `Código de barras` aplican el filtro al cambiar y reinician a la página 0.
 - [x] Productos: contador visible mantiene coherencia con la paginacion backend.
 - [x] Filtro de fechas en Ventas corregido frontend-only:
   - [x] Ya no se envían `from/to` al backend para evitar `500` del endpoint con fechas.

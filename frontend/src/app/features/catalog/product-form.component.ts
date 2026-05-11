@@ -52,95 +52,127 @@ import { toHttpErrorMessage } from "./data/http-error-message";
         class="form-layout"
         *ngIf="!loading"
       >
-        <label class="field">
-          <span>SKU *</span>
-          <input type="text" formControlName="sku" placeholder="Ej. LAP-001" />
-          <small class="ui-muted" *ngIf="!isInvalid('sku')"
-            >Identificador interno unico para ventas e inventario.</small
-          >
-          <small class="field-error" *ngIf="isInvalid('sku')"
-            >SKU es obligatorio.</small
-          >
-        </label>
+        <div class="form-row">
+          <label class="field">
+            <span>SKU *</span>
+            <input
+              type="text"
+              formControlName="sku"
+              placeholder="Ej. LAP-001"
+            />
+            <div class="field-feedback">
+              <small class="ui-muted" *ngIf="!isInvalid('sku')"
+                >Identificador interno unico para ventas e inventario.</small
+              >
+              <small class="field-error" *ngIf="isInvalid('sku')"
+                >SKU es obligatorio.</small
+              >
+            </div>
+          </label>
 
-        <label class="field">
-          <span>Codigo de barras</span>
-          <input
-            type="text"
-            formControlName="barcode"
-            placeholder="Opcional para escaneo"
-          />
-          <small class="ui-muted"
-            >Se mantiene separado del SKU para no mezclar ambos
-            identificadores.</small
-          >
-        </label>
+          <label class="field">
+            <span>Codigo de barras</span>
+            <input
+              type="text"
+              formControlName="barcode"
+              placeholder="Opcional para escaneo"
+            />
+            <div class="field-feedback">
+              <small class="ui-muted"
+                >Se mantiene separado del SKU para no mezclar ambos
+                identificadores.</small
+              >
+            </div>
+          </label>
+        </div>
 
-        <label class="field full">
-          <span>Nombre *</span>
-          <input
-            type="text"
-            formControlName="name"
-            placeholder="Nombre comercial del producto"
-          />
-          <small class="field-error" *ngIf="isInvalid('name')"
-            >Nombre es obligatorio.</small
-          >
-        </label>
+        <div class="form-row form-row--single">
+          <label class="field full">
+            <span>Nombre *</span>
+            <input
+              type="text"
+              formControlName="name"
+              placeholder="Nombre comercial del producto"
+            />
+            <div class="field-feedback">
+              <small class="field-error" *ngIf="isInvalid('name')"
+                >Nombre es obligatorio.</small
+              >
+            </div>
+          </label>
+        </div>
 
-        <label class="field full">
-          <span>Descripcion</span>
-          <textarea
-            rows="3"
-            formControlName="description"
-            placeholder="Caracteristicas principales, uso o notas comerciales"
-          ></textarea>
-        </label>
+        <div class="form-row form-row--single">
+          <label class="field full">
+            <span>Descripcion</span>
+            <textarea
+              rows="3"
+              formControlName="description"
+              placeholder="Caracteristicas principales, uso o notas comerciales"
+            ></textarea>
+            <div class="field-feedback"></div>
+          </label>
+        </div>
 
-        <label class="field">
-          <span>Categoria *</span>
-          <select formControlName="categoryId">
-            <option [ngValue]="null">Selecciona una categoria</option>
-            <option *ngFor="let category of categories" [ngValue]="category.id">
-              {{ category.name }}
-            </option>
-          </select>
-          <small class="field-error" *ngIf="isInvalid('categoryId')"
-            >Categoria es obligatoria.</small
-          >
-        </label>
+        <div class="form-row form-row--stable">
+          <label class="field field--select field--floating-error">
+            <span>Categoria *</span>
+            <select formControlName="categoryId">
+              <option [ngValue]="null">Selecciona una categoria</option>
+              <option
+                *ngFor="let category of categories"
+                [ngValue]="category.id"
+              >
+                {{ category.name }}
+              </option>
+            </select>
+            <div class="field-feedback field-feedback--floating">
+              <small class="field-error" *ngIf="isInvalid('categoryId')"
+                >Categoria es obligatoria.</small
+              >
+            </div>
+          </label>
 
-        <label class="field">
-          <span>Unidad *</span>
-          <select formControlName="unitId">
-            <option [ngValue]="null">Selecciona una unidad</option>
-            <option *ngFor="let unit of units" [ngValue]="unit.id">
-              {{ unit.name }} ({{ unit.code }})
-            </option>
-          </select>
-          <small class="field-error" *ngIf="isInvalid('unitId')"
-            >Unidad es obligatoria.</small
-          >
-        </label>
+          <label class="field field--select">
+            <span>Unidad *</span>
+            <select formControlName="unitId">
+              <option [ngValue]="null">Selecciona una unidad</option>
+              <option *ngFor="let unit of units" [ngValue]="unit.id">
+                {{ unit.name }} ({{ unit.code }})
+              </option>
+            </select>
+            <div class="field-feedback">
+              <small class="field-error" *ngIf="isInvalid('unitId')"
+                >Unidad es obligatoria.</small
+              >
+            </div>
+          </label>
+        </div>
 
-        <label class="field">
-          <span>Precio de venta *</span>
-          <input
-            type="number"
-            min="0"
-            step="0.01"
-            formControlName="salePrice"
-            placeholder="0.00"
-          />
-          <small class="field-error" *ngIf="isInvalid('salePrice')">
-            Precio de venta es obligatorio y debe ser mayor o igual a 0.
-          </small>
-        </label>
+        <div class="form-row">
+          <label class="field">
+            <span>Precio de venta *</span>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              formControlName="salePrice"
+              placeholder="0.00"
+            />
+            <div class="field-feedback">
+              <small class="field-error" *ngIf="isInvalid('salePrice')">
+                Precio de venta es obligatorio y debe ser mayor o igual a 0.
+              </small>
+            </div>
+          </label>
 
-        <label class="checkbox" *ngIf="isEditMode">
-          <input type="checkbox" formControlName="active" />
-          <span>Producto activo</span>
-        </label>
+          <div class="checkbox-slot" *ngIf="isEditMode">
+            <label class="checkbox">
+              <input type="checkbox" formControlName="active" />
+              <span>Producto activo</span>
+            </label>
+          </div>
+        </div>
 
         <div class="actions full">
           <a
@@ -175,13 +207,50 @@ import { toHttpErrorMessage } from "./data/http-error-message";
 
       .form-layout {
         display: grid;
+        gap: var(--space-3);
+      }
+
+      .form-row {
+        display: grid;
         grid-template-columns: repeat(2, minmax(240px, 1fr));
         gap: var(--space-3);
+        align-items: start;
+      }
+
+      .form-row--single {
+        grid-template-columns: 1fr;
+      }
+
+      .form-row--stable {
+        min-height: 4.8rem;
+        padding-bottom: 0.35rem;
       }
 
       .field {
         display: grid;
         gap: var(--space-1);
+      }
+
+      .field-feedback {
+        min-height: 1rem;
+      }
+
+      .field-feedback--floating {
+        position: absolute;
+        top: calc(100% - 0.55rem);
+        left: 0;
+        right: 0;
+        min-height: 0;
+        pointer-events: none;
+      }
+
+      .field--select {
+        align-content: start;
+      }
+
+      .field--floating-error {
+        position: relative;
+        padding-bottom: 0.65rem;
       }
 
       .field > span {
@@ -203,6 +272,15 @@ import { toHttpErrorMessage } from "./data/http-error-message";
         background: var(--color-bg-surface);
       }
 
+      input:focus-visible,
+      textarea:focus-visible,
+      select:focus-visible {
+        outline: none;
+        border-color: var(--color-focus-ring);
+        box-shadow: 0 0 0 2px
+          color-mix(in srgb, var(--color-focus-ring) 28%, transparent);
+      }
+
       textarea {
         resize: vertical;
         min-height: 96px;
@@ -211,6 +289,7 @@ import { toHttpErrorMessage } from "./data/http-error-message";
       .field-error {
         color: var(--color-danger);
         font-size: var(--font-size-xs);
+        line-height: 1rem;
       }
 
       .checkbox {
@@ -219,8 +298,16 @@ import { toHttpErrorMessage } from "./data/http-error-message";
         gap: var(--space-2);
         border: 1px solid var(--color-border-default);
         border-radius: var(--radius-sm);
-        padding: var(--space-2) var(--space-3);
+        padding: 0.55rem 0.65rem;
         background: var(--color-bg-soft);
+        min-height: 44px;
+        align-self: start;
+      }
+
+      .checkbox-slot {
+        align-self: start;
+        padding-top: calc(var(--font-size-sm) * 1.45 + var(--space-1));
+        min-height: 44px;
       }
 
       .checkbox input {

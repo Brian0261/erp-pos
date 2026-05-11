@@ -48,7 +48,7 @@ import { UnitService } from "./data/unit.service";
 
         <label class="search-field">
           <span>Categoria</span>
-          <select formControlName="categoryId">
+          <select formControlName="categoryId" (change)="applySelectFilters()">
             <option value="">Todas</option>
             <option *ngFor="let category of categories" [value]="category.id">
               {{ category.name }}
@@ -58,7 +58,7 @@ import { UnitService } from "./data/unit.service";
 
         <label class="search-field">
           <span>Estado</span>
-          <select formControlName="active">
+          <select formControlName="active" (change)="applySelectFilters()">
             <option value="">Todos</option>
             <option value="true">Activo</option>
             <option value="false">Inactivo</option>
@@ -67,7 +67,7 @@ import { UnitService } from "./data/unit.service";
 
         <label class="search-field">
           <span>Codigo de barras</span>
-          <select formControlName="barcodeStatus">
+          <select formControlName="barcodeStatus" (change)="applySelectFilters()">
             <option value="">Todos</option>
             <option value="WITH_BARCODE">Con codigo</option>
             <option value="WITHOUT_BARCODE">Sin codigo</option>
@@ -100,6 +100,16 @@ import { UnitService } from "./data/unit.service";
 
       <div class="ui-table-wrapper" *ngIf="!loading">
         <table class="ui-table catalog-table">
+          <colgroup>
+            <col class="col-sku" />
+            <col class="col-barcode" />
+            <col class="col-name" />
+            <col class="col-category" />
+            <col class="col-unit" />
+            <col class="col-price" />
+            <col class="col-state" />
+            <col class="col-actions" />
+          </colgroup>
           <thead>
             <tr>
               <th>SKU</th>
@@ -116,7 +126,7 @@ import { UnitService } from "./data/unit.service";
             <tr *ngFor="let product of products">
               <td class="cell-code">{{ product.sku }}</td>
               <td class="cell-code">{{ barcodeLabel(product.barcode) }}</td>
-              <td>{{ product.name }}</td>
+              <td class="cell-name">{{ product.name }}</td>
               <td>{{ categoryLabel(product.categoryId) }}</td>
               <td>{{ unitLabel(product.unitId) }}</td>
               <td class="cell-right">
@@ -245,7 +255,8 @@ import { UnitService } from "./data/unit.service";
         display: flex;
         gap: var(--space-2);
         align-items: center;
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
+        justify-content: flex-start;
       }
 
       .action-deactivate {
@@ -257,12 +268,59 @@ import { UnitService } from "./data/unit.service";
         white-space: nowrap;
       }
 
+      .cell-name {
+        white-space: nowrap;
+        min-width: 0;
+      }
+
       .cell-right {
         text-align: right;
+        white-space: nowrap;
       }
 
       .catalog-table {
-        min-width: 960px;
+        width: 100%;
+        min-width: 1080px;
+        table-layout: fixed;
+      }
+
+      .catalog-table th,
+      .catalog-table td {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        vertical-align: middle;
+      }
+
+      .col-sku {
+        width: 8%;
+      }
+
+      .col-barcode {
+        width: 12%;
+      }
+
+      .col-name {
+        width: 28%;
+      }
+
+      .col-category {
+        width: 12%;
+      }
+
+      .col-unit {
+        width: 8%;
+      }
+
+      .col-price {
+        width: 8%;
+      }
+
+      .col-state {
+        width: 8%;
+      }
+
+      .col-actions {
+        width: 16%;
       }
 
       .pagination {
@@ -340,6 +398,11 @@ export class ProductsPageComponent implements OnInit {
   }
 
   onSearch(): void {
+    this.page = 0;
+    this.loadProducts();
+  }
+
+  applySelectFilters(): void {
     this.page = 0;
     this.loadProducts();
   }
