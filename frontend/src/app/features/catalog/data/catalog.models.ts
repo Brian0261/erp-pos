@@ -61,3 +61,55 @@ export interface PageResponse<T> {
   size: number;
   number: number;
 }
+
+export interface ProductImportPreviewRow {
+  rowNumber: number;
+  sku: string | null;
+  barcode: string | null;
+  name: string | null;
+  description: string | null;
+  category: string | null;
+  unit: string | null;
+  salePrice: string | null;
+  active: string | null;
+  valid: boolean;
+  errors: string[];
+}
+
+export interface ProductImportPreviewResponse {
+  totalRows: number;
+  validRows: number;
+  invalidRows: number;
+  rows: ProductImportPreviewRow[];
+}
+
+export interface ProductImportConfirmRowRequest {
+  rowNumber: number;
+  sku: string | null;
+  barcode: string | null;
+  name: string | null;
+  description: string | null;
+  category: string | null;
+  unit: string | null;
+  salePrice: string | null;
+  active: string | null;
+}
+
+export interface ProductImportConfirmRequest {
+  rows: ProductImportConfirmRowRequest[];
+}
+
+export interface ProductImportConfirmRowResponse {
+  rowNumber: number;
+  sku: string | null;
+  created: boolean;
+  productId: number | null;
+  errors: string[];
+}
+
+export interface ProductImportConfirmResponse {
+  totalRows: number;
+  createdRows: number;
+  rejectedRows: number;
+  rows: ProductImportConfirmRowResponse[];
+}

@@ -4,6 +4,7 @@ import { authGuard } from "./core/guards/auth.guard";
 import { roleGuard } from "./core/guards/role.guard";
 import { CategoriesPageComponent } from "./features/catalog/categories-page.component";
 import { ProductFormComponent } from "./features/catalog/product-form.component";
+import { ProductImportPageComponent } from "./features/catalog/product-import-page.component";
 import { ProductsPageComponent } from "./features/catalog/products-page.component";
 import { UnitsPageComponent } from "./features/catalog/units-page.component";
 import { BillingConfigPageComponent } from "./features/billing/billing-config-page.component";
@@ -104,6 +105,11 @@ export const routes: Routes = [
         path: "catalogo/productos",
         component: ProductsPageComponent,
         data: { allowedRoles: ROLES_CATALOG },
+      },
+      {
+        path: "catalogo/productos/importar",
+        component: ProductImportPageComponent,
+        data: { allowedRoles: ROLES_ADMIN },
       },
       {
         path: "catalogo/productos/nuevo",

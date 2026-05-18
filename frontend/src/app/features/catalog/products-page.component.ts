@@ -25,11 +25,19 @@ import { UnitService } from "./data/unit.service";
             Gestiona productos y buscalos por nombre, SKU o codigo de barras.
           </p>
         </div>
-        <a
-          routerLink="/catalogo/productos/nuevo"
-          class="ui-button ui-button--primary"
-          >Crear producto</a
-        >
+        <div class="header-actions">
+          <a
+            *ngIf="isAdmin"
+            routerLink="/catalogo/productos/importar"
+            class="ui-button ui-button--secondary"
+            >Importar productos</a
+          >
+          <a
+            routerLink="/catalogo/productos/nuevo"
+            class="ui-button ui-button--primary"
+            >Crear producto</a
+          >
+        </div>
       </header>
 
       <form
@@ -229,6 +237,13 @@ import { UnitService } from "./data/unit.service";
         border: 1px solid var(--color-border-strong);
         border-radius: var(--radius-sm);
         background: var(--color-bg-surface);
+      }
+
+      .header-actions {
+        display: flex;
+        gap: var(--space-2);
+        flex-wrap: wrap;
+        justify-content: flex-end;
       }
 
       .search-field select {

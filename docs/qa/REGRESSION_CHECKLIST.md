@@ -256,6 +256,14 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [x] Productos: listado usa filtros backend-driven paginados por `q`, `categoryId`, `active` y `barcodeStatus`; `/search` ya no se usa en esta pantalla.
 - [x] Productos: los selects de `Categoria`, `Estado` y `Código de barras` aplican el filtro al cambiar y reinician a la página 0.
 - [x] Productos: contador visible mantiene coherencia con la paginacion backend.
+- [x] Importación masiva de productos Fase 2 frontend:
+  - [x] Acceso desde Productos a `Importar productos`.
+  - [x] Descarga de plantilla `.xlsx`.
+  - [x] Selección de archivo, validación preview y confirmación final.
+  - [x] Errores del preview mostrados en español.
+  - [x] Banner de validación ajustado a éxito/advertencia/error según filas válidas e inválidas.
+  - [x] `Confirmar importación` deshabilitado cuando no hay filas válidas.
+  - [x] `Volver a productos` funcional.
 - [x] Filtro de fechas en Ventas corregido frontend-only:
   - [x] Ya no se envían `from/to` al backend para evitar `500` del endpoint con fechas.
   - [x] Las fechas se filtran localmente por día completo.
