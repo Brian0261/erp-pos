@@ -256,6 +256,12 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [x] Productos: listado usa filtros backend-driven paginados por `q`, `categoryId`, `active` y `barcodeStatus`; `/search` ya no se usa en esta pantalla.
 - [x] Productos: los selects de `Categoria`, `Estado` y `Código de barras` aplican el filtro al cambiar y reinician a la página 0.
 - [x] Productos: contador visible mantiene coherencia con la paginacion backend.
+- [x] Productos UI/QA visual final:
+  - [x] Texto `CATALOGO INKTOY` eliminado.
+  - [x] Pantalla compactada y visible completa en desktop estándar sin scroll vertical.
+  - [x] Header, filtros, tabla, paginación y acciones siguen alineados y legibles.
+  - [x] Se mantiene 10 productos por página y el espaciado inferior es legible.
+  - [x] Filtros, `Importar productos`, `Crear producto`, `Editar` y `Desactivar` siguen funcionando.
 - [x] Importación masiva de productos Fase 2 frontend:
   - [x] Acceso desde Productos a `Importar productos`.
   - [x] Descarga de plantilla `.xlsx`.

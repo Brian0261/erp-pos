@@ -18,8 +18,7 @@ import { UnitService } from "./data/unit.service";
   template: `
     <section class="ui-card catalog-page">
       <header class="ui-page-head">
-        <div>
-          <p class="ui-page-kicker">Catalogo InkToy</p>
+        <div class="page-copy">
           <h1 class="ui-page-title">Productos</h1>
           <p class="ui-page-description">
             Gestiona productos y buscalos por nombre, SKU o codigo de barras.
@@ -204,36 +203,71 @@ import { UnitService } from "./data/unit.service";
   styles: [
     `
       .catalog-page {
-        padding: var(--space-5);
+        padding: 0.7rem;
         display: grid;
-        gap: var(--space-4);
+        gap: 0.25rem;
+      }
+
+      .ui-page-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 0.55rem;
+        flex-wrap: wrap;
+      }
+
+      .page-copy {
+        display: grid;
+        gap: 0.15rem;
+      }
+
+      .ui-page-title,
+      .ui-page-description {
+        margin: 0;
+      }
+
+      .ui-page-title {
+        line-height: 1.05;
+      }
+
+      .ui-page-description {
+        max-width: 72ch;
+        font-size: var(--font-size-sm);
+      }
+
+      .ui-page-head {
+        gap: 0.25rem;
+      }
+
+      .page-copy {
+        margin-bottom: 0.15rem;
       }
 
       .search-panel {
         display: grid;
-        grid-template-columns: minmax(260px, 2fr) repeat(3, minmax(160px, 1fr)) auto;
-        gap: var(--space-3);
+        grid-template-columns: minmax(220px, 2fr) repeat(3, minmax(140px, 1fr)) auto;
+        gap: 0.5rem 0.75rem;
         align-items: end;
         border: 1px solid var(--color-border-default);
         border-radius: var(--radius-md);
         background: var(--color-bg-soft);
-        padding: var(--space-3);
+        padding: 0.75rem 0.9rem;
       }
 
       .search-field {
         display: grid;
-        gap: var(--space-1);
+        gap: 0.25rem;
       }
 
       .search-field span {
-        font-size: var(--font-size-sm);
+        font-size: 0.8rem;
         color: var(--color-text-secondary);
         font-weight: 700;
       }
 
       .search-field input {
         min-width: 0;
-        padding: 0.6rem 0.7rem;
+        padding: 0.45rem 0.65rem;
         border: 1px solid var(--color-border-strong);
         border-radius: var(--radius-sm);
         background: var(--color-bg-surface);
@@ -248,7 +282,7 @@ import { UnitService } from "./data/unit.service";
 
       .search-field select {
         min-width: 0;
-        padding: 0.6rem 0.7rem;
+        padding: 0.45rem 0.65rem;
         border: 1px solid var(--color-border-strong);
         border-radius: var(--radius-sm);
         background: var(--color-bg-surface);
@@ -256,7 +290,7 @@ import { UnitService } from "./data/unit.service";
 
       .search-actions {
         display: flex;
-        gap: var(--space-2);
+        gap: 0.4rem;
         flex-wrap: wrap;
         justify-content: flex-end;
       }
@@ -268,10 +302,29 @@ import { UnitService } from "./data/unit.service";
 
       .actions {
         display: flex;
-        gap: var(--space-2);
+        gap: 0.35rem;
         align-items: center;
         flex-wrap: nowrap;
         justify-content: flex-start;
+      }
+
+      .header-actions .ui-button,
+      .search-actions .ui-button,
+      .actions .ui-button {
+        min-height: 2rem;
+        padding-block: 0.42rem;
+        padding-inline: 0.7rem;
+      }
+
+      .catalog-table th,
+      .catalog-table td {
+        padding-top: 0.4rem;
+        padding-bottom: 0.4rem;
+        line-height: 1.15;
+      }
+
+      .catalog-table thead th {
+        font-size: 0.9rem;
       }
 
       .action-deactivate {
@@ -297,6 +350,7 @@ import { UnitService } from "./data/unit.service";
         width: 100%;
         min-width: 1080px;
         table-layout: fixed;
+        margin-top: 0.15rem;
       }
 
       .catalog-table th,
@@ -342,8 +396,9 @@ import { UnitService } from "./data/unit.service";
         display: flex;
         justify-content: space-between;
         align-items: center;
-        gap: var(--space-3);
+        gap: var(--space-2);
         flex-wrap: wrap;
+        margin-top: 0.15rem;
       }
 
       .pagination-copy {
