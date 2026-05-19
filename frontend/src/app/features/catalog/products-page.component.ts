@@ -180,6 +180,30 @@ import { UnitService } from "./data/unit.service";
         </p>
 
         <div class="pagination-actions">
+          <div class="page-jump" *ngIf="totalPages > 1">
+            <label class="page-jump__label" for="pageJumpInput">Ir a pág.</label>
+            <input
+              id="pageJumpInput"
+              class="page-jump__input"
+              type="text"
+              inputmode="numeric"
+              pattern="[0-9]*"
+              [value]="pageJumpValue"
+              (input)="onPageJumpInput($event)"
+              (keydown)="onPageJumpKeydown($event)"
+              [attr.aria-invalid]="!isPageJumpValid()"
+              [disabled]="loading"
+            />
+            <button
+              type="button"
+              class="ui-button ui-button--secondary page-jump__button"
+              (click)="goToPageJump()"
+              [disabled]="!isPageJumpValid() || loading"
+            >
+              Ir
+            </button>
+          </div>
+
           <button
             type="button"
             class="ui-button ui-button--secondary"
@@ -203,22 +227,26 @@ import { UnitService } from "./data/unit.service";
   styles: [
     `
       .catalog-page {
-        padding: 0.7rem;
+        padding: var(--space-5) var(--space-5) 0.55rem;
         display: grid;
-        gap: 0.25rem;
+        gap: 0;
+        min-height: 100%;
       }
 
       .ui-page-head {
         display: flex;
         align-items: flex-start;
         justify-content: space-between;
-        gap: 0.55rem;
+        gap: var(--space-4);
         flex-wrap: wrap;
+        padding-top: var(--space-2);
+        padding-bottom: var(--space-2);
       }
 
       .page-copy {
         display: grid;
-        gap: 0.15rem;
+        gap: 0.5rem;
+        margin-bottom: 0;
       }
 
       .ui-page-title,
@@ -227,47 +255,41 @@ import { UnitService } from "./data/unit.service";
       }
 
       .ui-page-title {
-        line-height: 1.05;
+        line-height: 1.1;
       }
 
       .ui-page-description {
         max-width: 72ch;
         font-size: var(--font-size-sm);
-      }
-
-      .ui-page-head {
-        gap: 0.25rem;
-      }
-
-      .page-copy {
-        margin-bottom: 0.15rem;
+        line-height: 1.35;
       }
 
       .search-panel {
         display: grid;
         grid-template-columns: minmax(220px, 2fr) repeat(3, minmax(140px, 1fr)) auto;
-        gap: 0.5rem 0.75rem;
+        gap: var(--space-3);
         align-items: end;
         border: 1px solid var(--color-border-default);
         border-radius: var(--radius-md);
         background: var(--color-bg-soft);
-        padding: 0.75rem 0.9rem;
+        padding: var(--space-3);
+        margin-top: var(--space-3);
       }
 
       .search-field {
         display: grid;
-        gap: 0.25rem;
+        gap: var(--space-1);
       }
 
       .search-field span {
-        font-size: 0.8rem;
+        font-size: var(--font-size-sm);
         color: var(--color-text-secondary);
         font-weight: 700;
       }
 
       .search-field input {
         min-width: 0;
-        padding: 0.45rem 0.65rem;
+        padding: 0.6rem 0.7rem;
         border: 1px solid var(--color-border-strong);
         border-radius: var(--radius-sm);
         background: var(--color-bg-surface);
@@ -278,11 +300,13 @@ import { UnitService } from "./data/unit.service";
         gap: var(--space-2);
         flex-wrap: wrap;
         justify-content: flex-end;
+        align-items: center;
+        padding-top: 0;
       }
 
       .search-field select {
         min-width: 0;
-        padding: 0.45rem 0.65rem;
+        padding: 0.6rem 0.7rem;
         border: 1px solid var(--color-border-strong);
         border-radius: var(--radius-sm);
         background: var(--color-bg-surface);
@@ -290,7 +314,7 @@ import { UnitService } from "./data/unit.service";
 
       .search-actions {
         display: flex;
-        gap: 0.4rem;
+        gap: var(--space-2);
         flex-wrap: wrap;
         justify-content: flex-end;
       }
@@ -311,16 +335,16 @@ import { UnitService } from "./data/unit.service";
       .header-actions .ui-button,
       .search-actions .ui-button,
       .actions .ui-button {
-        min-height: 2rem;
-        padding-block: 0.42rem;
+        min-height: 1.8rem;
+        padding-block: 0.33rem;
         padding-inline: 0.7rem;
       }
 
       .catalog-table th,
       .catalog-table td {
-        padding-top: 0.4rem;
-        padding-bottom: 0.4rem;
-        line-height: 1.15;
+        padding-top: 0.24rem;
+        padding-bottom: 0.24rem;
+        line-height: 1.04;
       }
 
       .catalog-table thead th {
@@ -350,7 +374,7 @@ import { UnitService } from "./data/unit.service";
         width: 100%;
         min-width: 1080px;
         table-layout: fixed;
-        margin-top: 0.15rem;
+        margin-top: 1rem;
       }
 
       .catalog-table th,
@@ -365,31 +389,31 @@ import { UnitService } from "./data/unit.service";
       }
 
       .col-barcode {
-        width: 12%;
+        width: 11%;
       }
 
       .col-name {
-        width: 28%;
+        width: 44%;
       }
 
       .col-category {
-        width: 12%;
+        width: 7%;
       }
 
       .col-unit {
-        width: 8%;
+        width: 5%;
       }
 
       .col-price {
-        width: 8%;
+        width: 6%;
       }
 
       .col-state {
-        width: 8%;
+        width: 5%;
       }
 
       .col-actions {
-        width: 16%;
+        width: 14%;
       }
 
       .pagination {
@@ -398,7 +422,7 @@ import { UnitService } from "./data/unit.service";
         align-items: center;
         gap: var(--space-2);
         flex-wrap: wrap;
-        margin-top: 0.15rem;
+        margin-top: 0.35rem;
       }
 
       .pagination-copy {
@@ -409,6 +433,40 @@ import { UnitService } from "./data/unit.service";
         display: flex;
         gap: var(--space-2);
         flex-wrap: wrap;
+        align-items: center;
+      }
+
+      .page-jump {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.22rem 0.45rem;
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-md);
+        background: var(--color-bg-soft);
+      }
+
+      .page-jump__label {
+        font-size: var(--font-size-sm);
+        color: var(--color-text-secondary);
+        font-weight: 700;
+        white-space: nowrap;
+      }
+
+      .page-jump__input {
+        width: 4.5rem;
+        min-width: 4.5rem;
+        padding: 0.35rem 0.45rem;
+        border: 1px solid var(--color-border-strong);
+        border-radius: var(--radius-sm);
+        background: var(--color-bg-surface);
+        color: var(--color-text-primary);
+      }
+
+      .page-jump__button {
+        min-height: 1.8rem;
+        padding-block: 0.33rem;
+        padding-inline: 0.7rem;
       }
 
       @media (max-width: 980px) {
@@ -427,6 +485,17 @@ import { UnitService } from "./data/unit.service";
         .pagination {
           flex-direction: column;
           align-items: flex-start;
+        }
+
+        .page-jump {
+          width: 100%;
+          justify-content: space-between;
+          flex-wrap: wrap;
+        }
+
+        .page-jump__input {
+          width: 5rem;
+          min-width: 5rem;
         }
       }
     `,
@@ -450,6 +519,7 @@ export class ProductsPageComponent implements OnInit {
   errorMessage = "";
   successMessage = "";
   isAdmin = false;
+  pageJumpValue = "";
 
   private readonly categoriesById = new Map<number, Category>();
   private readonly unitsById = new Map<number, Unit>();
@@ -485,6 +555,7 @@ export class ProductsPageComponent implements OnInit {
       barcodeStatus: "",
     });
     this.page = 0;
+    this.pageJumpValue = "";
     this.loadProducts();
   }
 
@@ -494,6 +565,7 @@ export class ProductsPageComponent implements OnInit {
     }
 
     this.page -= 1;
+    this.pageJumpValue = String(this.page + 1);
     this.loadProducts();
   }
 
@@ -503,6 +575,67 @@ export class ProductsPageComponent implements OnInit {
     }
 
     this.page += 1;
+    this.pageJumpValue = String(this.page + 1);
+    this.loadProducts();
+  }
+
+  onPageJumpInput(event: Event): void {
+    const input = event.target as HTMLInputElement | null;
+    if (!input) {
+      return;
+    }
+
+    const sanitized = input.value.replace(/\D+/g, "");
+    if (input.value !== sanitized) {
+      input.value = sanitized;
+    }
+
+    this.pageJumpValue = sanitized;
+  }
+
+  onPageJumpKeydown(event: KeyboardEvent): void {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      this.goToPageJump();
+      return;
+    }
+
+    if (
+      event.ctrlKey ||
+      event.metaKey ||
+      event.altKey ||
+      ["Backspace", "Delete", "Tab", "Escape", "ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)
+    ) {
+      return;
+    }
+
+    if (/^[0-9]$/.test(event.key)) {
+      return;
+    }
+
+    event.preventDefault();
+  }
+
+  isPageJumpValid(): boolean {
+    if (this.totalPages <= 1) {
+      return false;
+    }
+
+    const value = Number(this.pageJumpValue);
+    return Number.isInteger(value) && value >= 1 && value <= this.totalPages;
+  }
+
+  goToPageJump(): void {
+    if (!this.isPageJumpValid()) {
+      return;
+    }
+
+    const targetPage = Number(this.pageJumpValue) - 1;
+    if (targetPage === this.page) {
+      return;
+    }
+
+    this.page = targetPage;
     this.loadProducts();
   }
 
@@ -614,6 +747,7 @@ export class ProductsPageComponent implements OnInit {
         this.page = response.number;
         this.totalElements = response.totalElements;
         this.totalPages = Math.max(response.totalPages, 1);
+        this.pageJumpValue = String(this.page + 1);
       },
       error: (error: unknown) => {
         this.loading = false;

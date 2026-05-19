@@ -262,6 +262,13 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
   - [x] Header, filtros, tabla, paginación y acciones siguen alineados y legibles.
   - [x] Se mantiene 10 productos por página y el espaciado inferior es legible.
   - [x] Filtros, `Importar productos`, `Crear producto`, `Editar` y `Desactivar` siguen funcionando.
+- [x] Productos navegación directa a página:
+  - [x] Control `Ir a pág. [ ] [Ir]` agregado en la zona de paginación.
+  - [x] Entrada visual 1-based y navegación interna 0-based validada.
+  - [x] Enter ejecuta igual que `Ir`.
+  - [x] Valores válidos probados: 1, 2, intermedia y última página.
+  - [x] Valores inválidos probados: 0, negativos, letras, decimales, vacío y mayores a `totalPages`.
+  - [x] `Anterior` / `Siguiente` siguen funcionando y los filtros resetean a página visual 1.
 - [x] Importación masiva de productos Fase 2 frontend:
   - [x] Acceso desde Productos a `Importar productos`.
   - [x] Descarga de plantilla `.xlsx`.
