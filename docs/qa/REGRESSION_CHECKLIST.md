@@ -258,6 +258,13 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [x] Productos: contador visible mantiene coherencia con la paginacion backend.
 - [x] Productos UI/QA visual final:
   - [x] Texto `CATALOGO INKTOY` eliminado.
+
+### ConfirmDialog shared - Desactivar producto (2026-05-19)
+
+- [x] Alcance QA acotado a `frontend/src/app/shared/dialogs/confirm-dialog.component.ts`, `frontend/src/app/shared/dialogs/confirm-dialog.service.ts`, `frontend/src/app/shared/layout/layout.component.ts` y `frontend/src/app/features/catalog/products-page.component.ts`.
+- [x] `npm run build` frontend exitoso tras la implementacion del modal compartido.
+- [x] Validacion manual: clic en `Desactivar` abre modal visual del sistema; `Cancelar` y `Escape` cierran sin desactivar; `Confirmar` ejecuta la desactivacion.
+- [x] Validacion manual: no aparece `window.confirm` nativo; tabla de Productos, filtros, paginacion directa e Importar productos siguen funcionando.
   - [x] Pantalla compactada y visible completa en desktop estándar sin scroll vertical.
   - [x] Header, filtros, tabla, paginación y acciones siguen alineados y legibles.
   - [x] Se mantiene 10 productos por página y el espaciado inferior es legible.

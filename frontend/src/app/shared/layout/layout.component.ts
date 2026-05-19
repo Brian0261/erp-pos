@@ -11,6 +11,7 @@ import { filter, Subscription } from "rxjs";
 
 import { AuthService } from "../../core/auth/auth.service";
 import { UserProfile } from "../../core/auth/auth.models";
+import { ConfirmDialogComponent } from "../dialogs/confirm-dialog.component";
 
 type AppRole = "ADMIN" | "CAJERO" | "ALMACENERO" | "SUPERVISOR";
 type UiTheme = "light" | "dark";
@@ -51,7 +52,7 @@ const ROLES_CONSULTA_CAJERO: AppRole[] = ["CAJERO"];
 @Component({
   selector: "app-layout",
   standalone: true,
-  imports: [CommonModule, RouterOutlet, RouterLink, RouterLinkActive],
+  imports: [CommonModule, RouterOutlet, RouterLink, RouterLinkActive, ConfirmDialogComponent],
   template: `
     <div class="layout-shell" [class.is-sidebar-compact]="isSidebarCompact">
       <aside class="sidebar" [class.is-compact]="isSidebarCompact">
@@ -224,6 +225,8 @@ const ROLES_CONSULTA_CAJERO: AppRole[] = ["CAJERO"];
           <router-outlet></router-outlet>
         </main>
       </section>
+
+      <app-confirm-dialog></app-confirm-dialog>
     </div>
   `,
   styles: [

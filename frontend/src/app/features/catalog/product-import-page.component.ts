@@ -118,24 +118,40 @@ import { ProductImportService } from "./data/product-import.service";
           <div>
             <h2 class="result-title">Resumen de errores</h2>
             <p class="ui-muted error-summary__hint">
-              Puedes importar las filas válidas y corregir aparte las filas con error.
+              {{ errorSummaryHint }}
             </p>
           </div>
 
-          <button
-            type="button"
-            class="ui-button ui-button--secondary"
-            (click)="downloadErrorRowsCsv()"
-            [disabled]="downloadingErrorCsv"
-          >
-            {{ downloadingErrorCsv ? "Preparando CSV..." : "Descargar filas con error" }}
-          </button>
+          <div class="error-summary__actions">
+            <button
+              type="button"
+              class="ui-button ui-button--secondary"
+              (click)="downloadErrorRowsCsv()"
+              [disabled]="downloadingErrorCsv"
+            >
+              {{ downloadingErrorCsv ? "Preparando CSV..." : "Descargar filas con error" }}
+            </button>
+
+            <button
+              type="button"
+              class="ui-button ui-button--secondary"
+              (click)="setPreviewFilter('error')"
+            >
+              Ver filas con error
+            </button>
+          </div>
         </div>
 
         <div class="error-summary__grid">
-          <article class="error-summary__card" *ngFor="let item of errorSummaryItems">
-            <strong>{{ item.count }}</strong>
-            <span>{{ item.label }}</span>
+          <article
+            class="error-summary__card"
+            *ngFor="let item of errorSummaryCards"
+            [class.error-summary__card--danger]="item.tone === 'danger'"
+            [class.error-summary__card--warning]="item.tone === 'warning'"
+          >
+            <strong class="error-summary__card-title">{{ item.title }}</strong>
+            <span class="error-summary__card-count">{{ item.countLabel }}</span>
+            <p class="error-summary__card-detail">{{ item.detail }}</p>
           </article>
         </div>
 
@@ -213,14 +229,6 @@ import { ProductImportService } from "./data/product-import.service";
           </button>
         </div>
 
-        <button
-          *ngIf="preview.invalidRows > 0"
-          type="button"
-          class="ui-button ui-button--secondary"
-          (click)="setPreviewFilter('error')"
-        >
-          Ver errores
-        </button>
       </section>
 
       <section class="ui-table-wrapper" *ngIf="preview && visiblePreviewRows.length > 0; else emptyPreviewState">
@@ -414,6 +422,13 @@ import { ProductImportService } from "./data/product-import.service";
         flex-wrap: wrap;
       }
 
+      .error-summary__actions {
+        display: flex;
+        gap: var(--space-2);
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+
       .error-summary__hint {
         margin: 0;
       }
@@ -429,12 +444,33 @@ import { ProductImportService } from "./data/product-import.service";
         border-radius: var(--radius-md);
         padding: var(--space-2) var(--space-3);
         display: grid;
-        gap: 0.15rem;
+        gap: 0.2rem;
         background: var(--color-bg-soft);
       }
 
-      .error-summary__card strong {
+      .error-summary__card--danger {
+        border-color: color-mix(in srgb, var(--color-danger-text) 30%, transparent);
+      }
+
+      .error-summary__card--warning {
+        border-color: color-mix(in srgb, var(--color-warning-text) 28%, transparent);
+      }
+
+      .error-summary__card-title {
         font-size: 1rem;
+      }
+
+      .error-summary__card-count {
+        color: var(--color-text-secondary);
+        font-size: var(--font-size-sm);
+        font-weight: 700;
+      }
+
+      .error-summary__card-detail {
+        margin: 0;
+        color: var(--color-text-secondary);
+        font-size: var(--font-size-sm);
+        line-height: 1.25;
       }
 
       .error-summary__subtitle {
@@ -614,7 +650,7 @@ export class ProductImportPageComponent {
     }
   }
 
-  get errorSummaryItems(): Array<{ label: string; count: number }> {
+  get errorSummaryCards(): Array<{ title: string; countLabel: string; detail: string; tone: "danger" | "warning" | "neutral" }> {
     if (!this.preview) {
       return [];
     }
@@ -627,7 +663,29 @@ export class ProductImportPageComponent {
       }
     }
 
-    return Array.from(counts.entries()).map(([label, count]) => ({ label, count }));
+    return Array.from(counts.entries())
+      .map(([error, count]) => this.describeImportError(error, count))
+      .sort((left, right) => right.count - left.count || left.title.localeCompare(right.title));
+  }
+
+  get errorSummaryHint(): string {
+    if (!this.preview) {
+      return "";
+    }
+
+    if (this.preview.validRows === 0 && this.preview.invalidRows === this.preview.totalRows) {
+      if (this.hasExistingProductErrors()) {
+        return `${this.existingProductErrorMessage()} Revisa el resumen o descarga las filas con error.`;
+      }
+
+      return "No hay filas nuevas para importar. Revisa los errores del archivo o descarga las filas con error.";
+    }
+
+    if (this.hasExistingProductErrors()) {
+      return `${this.existingProductErrorMessage()} Revisa el resumen antes de importar.`;
+    }
+
+    return "Puedes importar las filas válidas y corregir aparte las filas con error.";
   }
 
   get duplicateBarcodeGroups(): Array<{ barcode: string; rowCount: number; rowNumbers: number[] }> {
@@ -690,14 +748,92 @@ export class ProductImportPageComponent {
     }
 
     if (this.preview.validRows > 0 && this.preview.invalidRows > 0) {
-      return "Validación completada con observaciones. Puedes importar las filas válidas o corregir el archivo.";
+      return "Validación completada con observaciones. Revisa el resumen y las filas con error.";
     }
 
     if (this.preview.validRows === 0 && this.preview.invalidRows > 0) {
-      return "No hay filas válidas para importar. Revisa los errores del archivo.";
+      if (this.hasExistingProductErrors()) {
+        return `Este archivo no tiene filas nuevas para importar. ${this.existingProductErrorMessage()}`;
+      }
+
+      return "No hay filas válidas para importar. Revisa el resumen y descarga las filas con error.";
     }
 
     return "";
+  }
+
+  private describeImportError(error: string, count: number): { title: string; countLabel: string; detail: string; tone: "danger" | "warning" | "neutral"; count: number } {
+    const countLabel = count === 1 ? "1 fila afectada" : `${count} filas afectadas`;
+
+    switch (error) {
+      case "SKU already exists":
+        return {
+          title: "SKU ya existente",
+          countLabel,
+          detail: "Estos productos ya están registrados en el catálogo.",
+          tone: "danger",
+          count,
+        };
+      case "Barcode already exists":
+        return {
+          title: "Código de barras ya existente",
+          countLabel,
+          detail: "Revisa si se trata de productos duplicados o códigos compartidos.",
+          tone: "danger",
+          count,
+        };
+      case "SKU is duplicated in file":
+        return {
+          title: "SKU duplicado en el archivo",
+          countLabel,
+          detail: "Hay filas repetidas dentro del Excel.",
+          tone: "warning",
+          count,
+        };
+      case "Barcode is duplicated in file":
+        return {
+          title: "Código de barras duplicado en el archivo",
+          countLabel,
+          detail: "Hay códigos repetidos dentro del Excel.",
+          tone: "warning",
+          count,
+        };
+      default:
+        return {
+          title: this.translateError(error),
+          countLabel,
+          detail: "Revisa las filas con error o descarga el CSV para corregirlas.",
+          tone: "neutral",
+          count,
+        };
+    }
+  }
+
+  private hasExistingProductErrors(): boolean {
+    return this.existingProductErrorRowCount() > 0;
+  }
+
+  private existingProductErrorMessage(): string {
+    const count = this.existingProductErrorRowCount();
+
+    if (count === 1) {
+      return "1 fila ya existe en el catálogo.";
+    }
+
+    return `${count} filas ya existen en el catálogo.`;
+  }
+
+  private existingProductErrorRowCount(): number {
+    if (!this.preview) {
+      return 0;
+    }
+
+    return this.preview.rows.filter((row) =>
+      row.errors.some((error) => {
+        const current = error.trim();
+        return current === "SKU already exists" || current === "Barcode already exists";
+      }),
+    ).length;
   }
 
   constructor(private readonly productImportService: ProductImportService) {}

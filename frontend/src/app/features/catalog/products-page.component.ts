@@ -5,6 +5,7 @@ import { RouterLink } from "@angular/router";
 import { catchError, forkJoin, of } from "rxjs";
 
 import { AuthService } from "../../core/auth/auth.service";
+import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.service";
 import { Category, Product, Unit } from "./data/catalog.models";
 import { CategoryService } from "./data/category.service";
 import { ProductListFilters, ProductService } from "./data/product.service";
@@ -20,9 +21,6 @@ import { UnitService } from "./data/unit.service";
       <header class="ui-page-head">
         <div class="page-copy">
           <h1 class="ui-page-title">Productos</h1>
-          <p class="ui-page-description">
-            Gestiona productos y buscalos por nombre, SKU o codigo de barras.
-          </p>
         </div>
         <div class="header-actions">
           <a
@@ -155,11 +153,11 @@ import { UnitService } from "./data/unit.service";
                 >Editar</a
                  >
                 <button
-                  type="button"
-                  class="ui-button ui-button--secondary action-deactivate"
-                  [disabled]="!product.active || !isAdmin"
-                  (click)="deactivate(product)"
-                >
+                   type="button"
+                   class="ui-button ui-button--secondary action-deactivate"
+                   [disabled]="loading || !product.active || !isAdmin"
+                   (click)="deactivate(product)"
+                 >
                   Desactivar
                 </button>
               </td>
@@ -240,7 +238,7 @@ import { UnitService } from "./data/unit.service";
         gap: var(--space-4);
         flex-wrap: wrap;
         padding-top: var(--space-2);
-        padding-bottom: var(--space-2);
+        padding-bottom: 0.1rem;
       }
 
       .page-copy {
@@ -258,12 +256,6 @@ import { UnitService } from "./data/unit.service";
         line-height: 1.1;
       }
 
-      .ui-page-description {
-        max-width: 72ch;
-        font-size: var(--font-size-sm);
-        line-height: 1.35;
-      }
-
       .search-panel {
         display: grid;
         grid-template-columns: minmax(220px, 2fr) repeat(3, minmax(140px, 1fr)) auto;
@@ -273,7 +265,7 @@ import { UnitService } from "./data/unit.service";
         border-radius: var(--radius-md);
         background: var(--color-bg-soft);
         padding: var(--space-3);
-        margin-top: var(--space-3);
+        margin-top: 0.35rem;
       }
 
       .search-field {
@@ -340,15 +332,14 @@ import { UnitService } from "./data/unit.service";
         padding-inline: 0.7rem;
       }
 
-      .catalog-table th,
-      .catalog-table td {
-        padding-top: 0.24rem;
-        padding-bottom: 0.24rem;
-        line-height: 1.04;
+      .catalog-table tbody td {
+        padding: var(--space-2) var(--space-2);
       }
 
       .catalog-table thead th {
         font-size: 0.9rem;
+        padding-top: 0.65rem;
+        padding-bottom: 0.65rem;
       }
 
       .action-deactivate {
@@ -529,6 +520,7 @@ export class ProductsPageComponent implements OnInit {
     private readonly categoryService: CategoryService,
     private readonly productService: ProductService,
     private readonly authService: AuthService,
+    private readonly confirmDialog: ConfirmDialogService,
     private readonly unitService: UnitService,
   ) {}
 
@@ -639,13 +631,25 @@ export class ProductsPageComponent implements OnInit {
     this.loadProducts();
   }
 
-  deactivate(product: Product): void {
+  async deactivate(product: Product): Promise<void> {
     if (!this.isAdmin) {
       this.errorMessage = "Solo ADMIN puede desactivar productos.";
       return;
     }
 
-    const accepted = window.confirm(`Desactivar producto ${product.name}?`);
+    if (this.loading) {
+      return;
+    }
+
+    const accepted = await this.confirmDialog.confirm({
+      title: "Desactivar producto",
+      description: "El producto se marcará como inactivo. Podrás conservar su historial, pero dejará de estar disponible para nuevas operaciones donde aplique.",
+      highlightText: product.name,
+      confirmText: "Desactivar producto",
+      cancelText: "Cancelar",
+      variant: "warning",
+    });
+
     if (!accepted) {
       return;
     }
