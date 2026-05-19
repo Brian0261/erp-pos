@@ -264,6 +264,7 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
   - [x] Banner de validación ajustado a éxito/advertencia/error según filas válidas e inválidas.
   - [x] `Confirmar importación` deshabilitado cuando no hay filas válidas.
   - [x] `Volver a productos` funcional.
+  - [x] QA manual final con Excel grande (5820/5823 filas): preview paginado 50 filas, filtros funcionales, `Ver errores`, resumen de errores, CSV de filas con error, confirm-file sin 413 y sin HTML crudo.
 - [x] Filtro de fechas en Ventas corregido frontend-only:
   - [x] Ya no se envían `from/to` al backend para evitar `500` del endpoint con fechas.
   - [x] Las fechas se filtran localmente por día completo.

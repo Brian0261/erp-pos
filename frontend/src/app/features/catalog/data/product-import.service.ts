@@ -4,7 +4,6 @@ import { Observable } from "rxjs";
 
 import { environment } from "../../../../environments/environment";
 import {
-  ProductImportConfirmRequest,
   ProductImportConfirmResponse,
   ProductImportPreviewResponse,
 } from "./catalog.models";
@@ -30,12 +29,12 @@ export class ProductImportService {
     );
   }
 
-  confirm(
-    payload: ProductImportConfirmRequest,
-  ): Observable<ProductImportConfirmResponse> {
+  confirmFile(file: File): Observable<ProductImportConfirmResponse> {
+    const formData = new FormData();
+    formData.append("file", file);
     return this.http.post<ProductImportConfirmResponse>(
-      `${this.endpoint}/confirm`,
-      payload,
+      `${this.endpoint}/confirm-file`,
+      formData,
     );
   }
 }

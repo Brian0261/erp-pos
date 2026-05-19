@@ -132,6 +132,37 @@ class ProductImportIntegrationTest extends AbstractHttpIntegrationTest {
     }
 
     @Test
+    void shouldConfirmFileAndCreateProducts() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = Long.toString(System.nanoTime());
+        createCategory(adminToken, suffix);
+        createUnit(adminToken, suffix);
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "products.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                workbookBytes(new String[][]{{
+                        "SKU-CONF-FILE-" + suffix,
+                        "BC-CONF-FILE-" + suffix,
+                        "Producto Confirmado File " + suffix,
+                        "Sin stock",
+                        "CAT-IT-" + suffix,
+                        "UIT" + suffix,
+                        "18.50",
+                        "true"
+                }})
+        );
+
+        mockMvc.perform(multipart("/api/v1/products/import/confirm-file")
+                        .file(file)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.createdRows").value(1))
+                .andExpect(jsonPath("$.rows[0].created").value(true));
+    }
+
+    @Test
     void shouldRejectExistingSkuDuringConfirmRevalidation() throws Exception {
         String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
         String suffix = Long.toString(System.nanoTime());

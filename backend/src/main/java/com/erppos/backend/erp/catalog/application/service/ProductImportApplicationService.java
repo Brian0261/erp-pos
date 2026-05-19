@@ -89,6 +89,20 @@ public class ProductImportApplicationService implements ProductImportUseCase {
                 ))
                 .toList();
 
+        return confirmRows(rows);
+    }
+
+    @Override
+    public ConfirmResult confirmFile(String originalFilename, byte[] content) {
+        validateFile(originalFilename, content);
+        return confirmRows(workbookPort.parse(content));
+    }
+
+    private ConfirmResult confirmRows(List<ParsedRow> rows) {
+        if (rows.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "file does not contain rows");
+        }
+
         ValidationBatch validation = validateRows(rows);
         List<ConfirmRowResult> results = new ArrayList<>();
         int createdRows = 0;

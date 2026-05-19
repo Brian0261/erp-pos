@@ -29,6 +29,8 @@ export function toHttpErrorMessage(
       return detail
         ? `Conflicto: ${detail}`
         : "Conflicto de datos. Revisa valores duplicados.";
+    case 413:
+      return "El archivo o la importación es demasiado grande para el límite actual. Intenta dividir el archivo o contacta al administrador.";
     case 422:
       return detail
         ? `Validacion fallida: ${detail}`
@@ -46,12 +48,17 @@ function extractDetail(error: HttpErrorResponse): string {
   }
 
   if (typeof payload === "string") {
-    return payload;
+    return looksLikeHtml(payload) ? "" : payload;
   }
 
   if (typeof payload.message === "string") {
-    return payload.message;
+    return looksLikeHtml(payload.message) ? "" : payload.message;
   }
 
   return "";
+}
+
+function looksLikeHtml(value: string): boolean {
+  const normalized = value.trim().toLowerCase();
+  return normalized.startsWith("<!doctype") || normalized.startsWith("<html");
 }

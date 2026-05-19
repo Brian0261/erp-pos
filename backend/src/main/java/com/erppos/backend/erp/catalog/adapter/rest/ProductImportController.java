@@ -77,7 +77,18 @@ public class ProductImportController {
                         row.active()
                 )).toList()
         ));
-        return ResponseEntity.ok(new ProductImportConfirmResponse(
+        return ResponseEntity.ok(toConfirmResponse(result));
+    }
+
+    @PostMapping(value = "/confirm-file", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ProductImportConfirmResponse> confirmFile(@RequestParam("file") MultipartFile file) throws Exception {
+        ProductImportUseCase.ConfirmResult result = productImportUseCase.confirmFile(file.getOriginalFilename(), file.getBytes());
+        return ResponseEntity.ok(toConfirmResponse(result));
+    }
+
+    private ProductImportConfirmResponse toConfirmResponse(ProductImportUseCase.ConfirmResult result) {
+        return new ProductImportConfirmResponse(
                 result.totalRows(),
                 result.createdRows(),
                 result.rejectedRows(),
@@ -88,6 +99,6 @@ public class ProductImportController {
                         row.productId(),
                         row.errors()
                 )).toList()
-        ));
+        );
     }
 }

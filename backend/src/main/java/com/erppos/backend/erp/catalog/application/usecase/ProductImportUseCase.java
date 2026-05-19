@@ -9,6 +9,8 @@ public interface ProductImportUseCase {
 
     ConfirmResult confirm(ConfirmCommand command);
 
+    ConfirmResult confirmFile(String originalFilename, byte[] content);
+
     record ParsedRow(
             int rowNumber,
             String sku,

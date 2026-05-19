@@ -79,6 +79,16 @@ class ProductImportApplicationServiceTest {
     }
 
     @Test
+    void shouldCreateValidRowsOnConfirmFile() {
+        seedActiveCategoryAndUnit();
+
+        ProductImportUseCase.ConfirmResult confirm = importService.confirmFile("products.xlsx", new byte[]{1});
+
+        assertEquals(1, confirm.createdRows());
+        assertTrue(confirm.rows().get(0).created());
+    }
+
+    @Test
     void shouldRejectExistingSkuOnConfirmRevalidation() {
         Category category = categoryRepository.save(new Category(null, "Utiles", null, true, null, null, "system", "system"));
         Unit unit = unitRepository.save(new Unit(null, "UND", "Unidad", true, null, null, "system", "system"));
@@ -95,6 +105,11 @@ class ProductImportApplicationServiceTest {
     @Test
     void shouldRejectNonXlsxPreview() {
         assertThrows(ResponseStatusException.class, () -> importService.preview("products.csv", new byte[]{1}));
+    }
+
+    @Test
+    void shouldRejectNonXlsxConfirmFile() {
+        assertThrows(ResponseStatusException.class, () -> importService.confirmFile("products.csv", new byte[]{1}));
     }
 
     private void seedActiveCategoryAndUnit() {
