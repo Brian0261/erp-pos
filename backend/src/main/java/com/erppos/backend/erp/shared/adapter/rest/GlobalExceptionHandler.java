@@ -1,5 +1,6 @@
 package com.erppos.backend.erp.shared.adapter.rest;
 
+import com.erppos.backend.erp.admin.cleanup.domain.exception.CleanupBusinessRuleException;
 import com.erppos.backend.erp.catalog.domain.exception.CatalogBusinessRuleException;
 import com.erppos.backend.erp.catalog.domain.exception.CatalogConflictException;
 import com.erppos.backend.erp.catalog.domain.exception.CatalogNotFoundException;
@@ -98,7 +99,7 @@ public class GlobalExceptionHandler {
                 .body(errorResponseFactory.build(request, HttpStatus.CONFLICT, message));
     }
 
-    @ExceptionHandler({CatalogBusinessRuleException.class, InventoryBusinessRuleException.class, PurchaseBusinessRuleException.class, SalesBusinessRuleException.class, QuoteBusinessRuleException.class, BillingBusinessRuleException.class, ReportBusinessRuleException.class, IntegrationBusinessRuleException.class})
+    @ExceptionHandler({CleanupBusinessRuleException.class, CatalogBusinessRuleException.class, InventoryBusinessRuleException.class, PurchaseBusinessRuleException.class, SalesBusinessRuleException.class, QuoteBusinessRuleException.class, BillingBusinessRuleException.class, ReportBusinessRuleException.class, IntegrationBusinessRuleException.class})
     public ResponseEntity<ApiError> handleBusinessRule(RuntimeException ex, HttpServletRequest request) {
         return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
                 .body(errorResponseFactory.build(request, HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage()));
