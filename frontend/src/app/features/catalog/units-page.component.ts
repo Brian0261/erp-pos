@@ -25,18 +25,12 @@ import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.servic
       </header>
 
       <form [formGroup]="form" (ngSubmit)="submit()" class="form-grid">
-        <label class="field">
-          <span>Código *</span>
-          <input type="text" formControlName="code" placeholder="Ej. UND" />
-          <small class="field-error" [class.field-error--hidden]="!isInvalid('code')">Código es obligatorio.</small>
-        </label>
+        <span class="field-label">Código *</span>
+        <span class="field-label">Nombre *</span>
+        <span class="field-label field-label--placeholder" aria-hidden="true">&nbsp;</span>
 
-        <label class="field">
-          <span>Nombre *</span>
-          <input type="text" formControlName="name" placeholder="Ej. Unidad" />
-          <small class="field-error" [class.field-error--hidden]="!isInvalid('name')">Nombre es obligatorio.</small>
-        </label>
-
+        <input type="text" formControlName="code" placeholder="Ej. UND" />
+        <input type="text" formControlName="name" placeholder="Ej. Unidad" />
         <div class="form-action">
           <button
             type="submit"
@@ -54,6 +48,16 @@ import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.servic
           >
             Cancelar
           </button>
+        </div>
+
+        <div class="field-feedback" aria-live="polite">
+          <small class="field-error" [class.field-error--hidden]="!isInvalid('code')">Código es obligatorio.</small>
+        </div>
+        <div class="field-feedback" aria-live="polite">
+          <small class="field-error" [class.field-error--hidden]="!isInvalid('name')">Nombre es obligatorio.</small>
+        </div>
+        <div class="field-feedback field-feedback--placeholder" aria-hidden="true">
+          <small class="field-placeholder">&nbsp;</small>
         </div>
       </form>
 
@@ -139,6 +143,7 @@ import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.servic
       .form-grid {
         display: grid;
         grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr) auto;
+        grid-template-rows: auto auto auto;
         gap: var(--space-3);
         align-items: start;
         border: 1px solid var(--color-border-default);
@@ -151,21 +156,23 @@ import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.servic
         min-width: 0;
       }
 
-      .field {
-        display: grid;
-        gap: var(--space-1);
-      }
-
-      .field > span {
+      .field-label {
         font-size: var(--font-size-sm);
         color: var(--color-text-secondary);
         font-weight: 700;
+      }
+
+      .field-label--placeholder {
+        visibility: hidden;
       }
 
       input {
         padding: 0.6rem 0.7rem;
         border: 1px solid var(--color-border-strong);
         border-radius: var(--radius-sm);
+        box-sizing: border-box;
+        width: 100%;
+        height: 2.75rem;
       }
 
       .field-error {
@@ -176,6 +183,18 @@ import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.servic
       }
 
       .field-error--hidden {
+        visibility: hidden;
+      }
+
+      .field-feedback {
+        min-height: 1rem;
+      }
+
+      .field-feedback--placeholder {
+        justify-self: end;
+      }
+
+      .field-placeholder {
         visibility: hidden;
       }
 
@@ -190,6 +209,7 @@ import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.servic
 
       .form-action .ui-button {
         height: 100%;
+        box-sizing: border-box;
       }
 
       .actions {
@@ -215,6 +235,7 @@ import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.servic
 
         .form-grid {
           grid-template-columns: 1fr;
+          grid-template-rows: auto;
         }
 
         .form-action {

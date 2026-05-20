@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -85,6 +86,26 @@ class AuthRbacCorsIntegrationTest extends AbstractHttpIntegrationTest {
         assertTrue(blockedPreflight.getResponse().getStatus() == 403 || blockedPreflight.getResponse().getStatus() == 200);
         String blockedOriginHeader = blockedPreflight.getResponse().getHeader("Access-Control-Allow-Origin");
         assertFalse("http://evil.local:4200".equals(blockedOriginHeader));
+    }
+
+    @Test
+    void shouldAllowPatchPreflightForCatalogStatusEndpoints() throws Exception {
+        MvcResult categoryPreflight = mockMvc.perform(options("/api/v1/categories/1/status")
+                        .header(HttpHeaders.ORIGIN, "http://localhost:4200")
+                        .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "PATCH")
+                        .header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, "Authorization,Content-Type"))
+                .andReturn();
+
+        MvcResult unitPreflight = mockMvc.perform(options("/api/v1/units/1/status")
+                        .header(HttpHeaders.ORIGIN, "http://localhost:4200")
+                        .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "PATCH")
+                        .header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, "Authorization,Content-Type"))
+                .andReturn();
+
+        assertEquals(200, categoryPreflight.getResponse().getStatus());
+        assertEquals(200, unitPreflight.getResponse().getStatus());
+        assertTrue(categoryPreflight.getResponse().getHeader("Access-Control-Allow-Methods").contains("PATCH"));
+        assertTrue(unitPreflight.getResponse().getHeader("Access-Control-Allow-Methods").contains("PATCH"));
     }
 }
 
