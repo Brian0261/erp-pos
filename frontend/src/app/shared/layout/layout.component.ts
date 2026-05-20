@@ -834,6 +834,7 @@ export class LayoutComponent implements OnInit, OnDestroy {
     facturacion: "Facturación",
     reportes: "Reportes",
     integraciones: "Integraciones",
+    admin: "Administración",
   };
 
   private readonly sidebarNodes: SidebarNode[] = [
@@ -1079,6 +1080,24 @@ export class LayoutComponent implements OnInit, OnDestroy {
           label: "Eventos de integración",
           route: "/integraciones/eventos",
           icon: "EI",
+          allowedRoles: ROLES_ADMIN,
+        },
+      ],
+    },
+    {
+      kind: "group",
+      id: "administracion",
+      label: "Administración",
+      icon: "AD",
+      allowedRoles: ROLES_ADMIN,
+      collapsible: true,
+      items: [
+        {
+          kind: "link",
+          id: "limpieza-pruebas",
+          label: "Limpieza de pruebas",
+          route: "/admin/test-data-cleanup/products",
+          icon: "LP",
           allowedRoles: ROLES_ADMIN,
         },
       ],
