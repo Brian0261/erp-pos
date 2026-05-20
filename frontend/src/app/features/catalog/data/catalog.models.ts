@@ -63,6 +63,15 @@ export interface UnitCreateRequest {
   name: string;
 }
 
+export interface UnitUpdateRequest {
+  code: string;
+  name: string;
+}
+
+export interface UnitStatusRequest {
+  active: boolean;
+}
+
 export interface PageResponse<T> {
   content: T[];
   totalElements: number;

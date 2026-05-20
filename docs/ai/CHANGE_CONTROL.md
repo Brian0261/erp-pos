@@ -54,6 +54,9 @@ Actualizar docs/qa cuando ocurra al menos uno de estos casos:
 4. Cambio de comportamiento observable en Docker/runtime.
 5. Nuevo protocolo operativo de validacion (ejemplo: anti-cache).
 
+Nota operativa: cambios de catalogo que agregan endpoints nuevos o reglas de reserva deben reflejarse tambien en matrices y decisiones antes de cerrar la tarea.
+Nota operativa: cuando Unidades cierre acciones de frontend, reflejarlo en matrices y checklist sin abrir nuevos documentos.
+
 ## Criterios para crear tag estable
 
 Solo crear tag cuando se cumpla todo:

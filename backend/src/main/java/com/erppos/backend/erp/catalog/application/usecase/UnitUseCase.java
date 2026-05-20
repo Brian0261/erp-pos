@@ -4,4 +4,6 @@ import java.util.List;
 public interface UnitUseCase {
     Unit create(CreateUnitCommand command);
     List<Unit> list();
+    Unit update(Long id, UpdateUnitCommand command);
+    Unit changeStatus(Long id, ChangeUnitStatusCommand command);
 }

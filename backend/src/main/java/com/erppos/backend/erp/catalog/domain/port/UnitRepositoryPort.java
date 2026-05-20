@@ -5,6 +5,7 @@ import java.util.Optional;
 public interface UnitRepositoryPort {
     Unit save(Unit unit);
     boolean existsByCodeIgnoreCase(String code);
+    boolean existsByCodeIgnoreCaseAndIdNot(String code, Long id);
     List<Unit> findAll();
     Optional<Unit> findById(Long id);
 }

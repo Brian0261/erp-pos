@@ -24,6 +24,8 @@ Cada decision debe incluir:
 | D-008 | Evaluar app movil reducida solo post-piloto y si se justifica por operacion real.      | Tomar decision con datos reales de uso y retorno operativo.                        | Posible fase incremental posterior, no comprometida aun.               | Condicionada                       | Lineamiento de alcance actual |
 | D-009 | Mantener integracion e-commerce real fuera del alcance actual.                         | Reducir dependencias externas durante estabilizacion MVP.                          | Integracion queda planificada para fase posterior.                     | Fuera de alcance actual            | README + ADR-0003             |
 | D-010 | Mantener SUNAT/OSE/PSE productivo fuera del alcance actual; usar mock/sandbox en MVP.  | Reducir riesgo de compliance/operacion temprana.                                   | Flujo funcional validado sin bloqueo de proveedor externo real.        | Aceptada para MVP actual           | README + ADR-0002             |
+| D-011 | Proteger `Por clasificar` por nombre normalizado y diferir `is_system`.                | Evitar cambio estructural de schema/Flyway para una regla puntual de negocio.      | Bloqueo operativo inmediato sin migracion adicional.                   | Aceptada y activa                  | QA + Catalogo                  |
+| D-012 | Mantener `active` como estado operativo de categorias y unidades sin proteger bases.   | Evitar sobredimensionar reglas reservadas antes de necesitarlo en produccion.       | `UND/PQT/CJA/PLG` siguen editables/inactivables en esta fase.          | Aceptada y activa                  | QA + Catalogo                  |
 
 ## Reglas de actualizacion del log
 

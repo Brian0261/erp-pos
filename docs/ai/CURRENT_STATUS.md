@@ -36,6 +36,8 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
 - Seguridad JWT/RBAC operativa.
 - Endpoints principales de modulos MVP operativos.
 - Contrato legado v1 convive con contrato estable v2 para paginacion.
+- Catalogo reforzado: Categorias con update/status y proteccion de `Por clasificar`; Unidades con update/status y validacion de estado.
+- Catalogo frontend operativo: Categorias y Unidades ya tienen mantenimiento basico completo en UI (crear/editar/estado) con tablas sin ID.
 
 ## Estado QA
 

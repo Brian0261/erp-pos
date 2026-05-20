@@ -71,6 +71,15 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [x] No se ejecuto venta real de prueba en Fase 1 para evitar mutacion transaccional innecesaria; la validacion cubrio hasta carrito/pagos/CTA.
 - [x] Sin cambios en backend, Flyway, DB, rutas, guards, AuthService, JWT/interceptor, endpoints, facturacion, compras, outbox, OpenAI, Dockerfile ni nginx.conf.
 
+### Catalogo - Categorias y Unidades (2026-05-20)
+
+- [ ] Categorias: editar categoria normal desde UI y validar persistencia en `PUT /api/v1/categories/{id}`.
+- [ ] Categorias: desactivar/reactivar categoria normal desde UI y validar `PATCH /api/v1/categories/{id}/status`.
+- [ ] Categorias: verificar bloqueo de `Por clasificar` en edicion y cambio de estado por nombre normalizado.
+- [ ] Unidades: validar `PUT /api/v1/units/{id}` con cambio de `code`/`name` y rechazo por `code` duplicado case-insensitive.
+- [ ] Unidades: validar `PATCH /api/v1/units/{id}/status` en backend.
+- [ ] Unidades: verificar impacto en productos/importacion cuando la unidad queda inactiva.
+
 ### POS touch-friendly Fase 1.1 - Grid fijo sin scroll de pagina (2026-05-06)
 
 - [x] Ajuste aplicado solo en `frontend/src/app/features/sales/pos-page.component.ts` y evidencia QA en este checklist.
@@ -291,6 +300,17 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [x] Importación masiva de productos Fase 2 frontend:
   - [x] Acceso desde Productos a `Importar productos`.
   - [x] Descarga de plantilla `.xlsx`.
+
+### Catalogo - Unidades frontend operativo (2026-05-20)
+
+- [ ] Crear unidad desde el formulario superior.
+- [ ] Editar unidad reutilizando el formulario superior en modo edición.
+- [ ] Cancelar edición limpia el modo edición y resetea el formulario.
+- [ ] Editar con `code` duplicado muestra error controlado.
+- [ ] Desactivar unidad activa con confirmación.
+- [ ] Reactivar unidad inactiva con confirmación.
+- [ ] La tabla sigue sin mostrar ID y conserva columnas `Código`, `Nombre`, `Estado`, `Acciones`.
+- [ ] Verificar impacto en productos/importación si una unidad queda inactiva.
   - [x] Selección de archivo, validación preview y confirmación final.
   - [x] Errores del preview mostrados en español.
   - [x] Banner de validación ajustado a éxito/advertencia/error según filas válidas e inválidas.

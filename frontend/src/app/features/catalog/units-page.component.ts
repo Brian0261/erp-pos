@@ -5,6 +5,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
 import { Unit } from "./data/catalog.models";
 import { toHttpErrorMessage } from "./data/http-error-message";
 import { UnitService } from "./data/unit.service";
+import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.service";
 
 @Component({
   selector: "app-units-page",
@@ -16,8 +17,8 @@ import { UnitService } from "./data/unit.service";
         <div>
           <p class="ui-page-kicker">Catalogo InkToy</p>
           <h1 class="ui-page-title">Unidades</h1>
-          <p class="ui-page-description">
-            Define unidades de medida estandar para ventas, compras e
+            <p class="ui-page-description">
+            Define unidades de medida estándar para ventas, compras e
             inventario.
           </p>
         </div>
@@ -25,19 +26,15 @@ import { UnitService } from "./data/unit.service";
 
       <form [formGroup]="form" (ngSubmit)="submit()" class="form-grid">
         <label class="field">
-          <span>Codigo *</span>
+          <span>Código *</span>
           <input type="text" formControlName="code" placeholder="Ej. UND" />
-          <small class="field-error" *ngIf="isInvalid('code')"
-            >Codigo es obligatorio.</small
-          >
+          <small class="field-error" [class.field-error--hidden]="!isInvalid('code')">Código es obligatorio.</small>
         </label>
 
         <label class="field">
           <span>Nombre *</span>
           <input type="text" formControlName="name" placeholder="Ej. Unidad" />
-          <small class="field-error" *ngIf="isInvalid('name')"
-            >Nombre es obligatorio.</small
-          >
+          <small class="field-error" [class.field-error--hidden]="!isInvalid('name')">Nombre es obligatorio.</small>
         </label>
 
         <div class="form-action">
@@ -46,7 +43,16 @@ import { UnitService } from "./data/unit.service";
             class="ui-button ui-button--primary"
             [disabled]="saving"
           >
-            {{ saving ? "Creando..." : "Crear unidad" }}
+            {{ submitButtonLabel }}
+          </button>
+          <button
+            type="button"
+            class="ui-button ui-button--secondary"
+            *ngIf="isEditing"
+            [disabled]="saving"
+            (click)="cancelEdit()"
+          >
+            Cancelar
           </button>
         </div>
       </form>
@@ -62,15 +68,14 @@ import { UnitService } from "./data/unit.service";
         <table class="ui-table">
           <thead>
             <tr>
-              <th>ID</th>
-              <th>Codigo</th>
+              <th>Código</th>
               <th>Nombre</th>
               <th>Estado</th>
+              <th>Acciones</th>
             </tr>
           </thead>
           <tbody>
             <tr *ngFor="let unit of units">
-              <td class="cell-id">{{ unit.id }}</td>
               <td class="cell-code">{{ unit.code }}</td>
               <td>{{ unit.name }}</td>
               <td>
@@ -81,6 +86,36 @@ import { UnitService } from "./data/unit.service";
                 >
                   {{ unit.active ? "Activa" : "Inactiva" }}
                 </span>
+              </td>
+              <td>
+                <div class="actions">
+                  <button
+                    type="button"
+                    class="ui-button ui-button--secondary"
+                    [disabled]="saving"
+                    (click)="editUnit(unit)"
+                  >
+                    Editar
+                  </button>
+                  <button
+                    *ngIf="unit.active"
+                    type="button"
+                    class="ui-button ui-button--danger"
+                    [disabled]="saving"
+                    (click)="changeStatus(unit, false)"
+                  >
+                    Desactivar
+                  </button>
+                  <button
+                    *ngIf="!unit.active"
+                    type="button"
+                    class="ui-button ui-button--secondary"
+                    [disabled]="saving"
+                    (click)="changeStatus(unit, true)"
+                  >
+                    Reactivar
+                  </button>
+                </div>
               </td>
             </tr>
             <tr *ngIf="units.length === 0">
@@ -105,11 +140,15 @@ import { UnitService } from "./data/unit.service";
         display: grid;
         grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr) auto;
         gap: var(--space-3);
-        align-items: end;
+        align-items: start;
         border: 1px solid var(--color-border-default);
         border-radius: var(--radius-md);
         background: var(--color-bg-soft);
         padding: var(--space-3);
+      }
+
+      .form-grid > * {
+        min-width: 0;
       }
 
       .field {
@@ -130,13 +169,34 @@ import { UnitService } from "./data/unit.service";
       }
 
       .field-error {
+        min-height: 1rem;
+        line-height: 1rem;
         color: var(--color-danger);
         font-size: var(--font-size-xs);
       }
 
+      .field-error--hidden {
+        visibility: hidden;
+      }
+
       .form-action {
         display: flex;
+        gap: var(--space-2);
+        flex-wrap: wrap;
         justify-content: flex-end;
+        align-self: stretch;
+        align-items: stretch;
+      }
+
+      .form-action .ui-button {
+        height: 100%;
+      }
+
+      .actions {
+        display: flex;
+        gap: var(--space-2);
+        flex-wrap: wrap;
+        align-items: center;
       }
 
       .ui-button[disabled] {
@@ -144,7 +204,6 @@ import { UnitService } from "./data/unit.service";
         cursor: not-allowed;
       }
 
-      .cell-id,
       .cell-code {
         white-space: nowrap;
       }
@@ -161,6 +220,10 @@ import { UnitService } from "./data/unit.service";
         .form-action {
           justify-content: flex-start;
         }
+
+        .actions {
+          justify-content: flex-start;
+        }
       }
     `,
   ],
@@ -175,10 +238,12 @@ export class UnitsPageComponent implements OnInit {
   saving = false;
   errorMessage = "";
   successMessage = "";
+  editingUnitId: number | null = null;
 
   constructor(
     private readonly formBuilder: FormBuilder,
     private readonly unitService: UnitService,
+    private readonly confirmDialog: ConfirmDialogService,
   ) {}
 
   ngOnInit(): void {
@@ -196,31 +261,103 @@ export class UnitsPageComponent implements OnInit {
     this.successMessage = "";
 
     const value = this.form.getRawValue();
-    this.unitService
-      .create({
-        code: (value.code ?? "").trim(),
-        name: (value.name ?? "").trim(),
-      })
+    const payload = {
+      code: (value.code ?? "").trim(),
+      name: (value.name ?? "").trim(),
+    };
+    const request$ = this.editingUnitId === null
+      ? this.unitService.create(payload)
+      : this.unitService.update(this.editingUnitId, payload);
+
+    request$
       .subscribe({
         next: () => {
           this.saving = false;
-          this.successMessage = "Unidad creada correctamente.";
-          this.form.reset();
+          this.successMessage = this.editingUnitId === null
+            ? "Unidad creada correctamente."
+            : "Unidad actualizada correctamente.";
+          this.cancelEdit();
           this.loadUnits();
         },
         error: (error: unknown) => {
           this.saving = false;
           this.errorMessage = toHttpErrorMessage(
             error,
-            "No se pudo crear la unidad.",
+            this.editingUnitId === null
+              ? "No se pudo crear la unidad."
+              : "No se pudo actualizar la unidad.",
           );
         },
       });
   }
 
+  editUnit(unit: Unit): void {
+    this.editingUnitId = unit.id;
+    this.errorMessage = "";
+    this.successMessage = "";
+    this.form.setValue({ code: unit.code, name: unit.name });
+  }
+
+  cancelEdit(): void {
+    this.editingUnitId = null;
+    this.form.reset();
+  }
+
+  async changeStatus(unit: Unit, active: boolean): Promise<void> {
+    const confirmed = await this.confirmDialog.confirm({
+      title: active ? "Reactivar unidad" : "Desactivar unidad",
+      description: active
+        ? `Vas a reactivar la unidad ${unit.code}.`
+        : `Vas a desactivar la unidad ${unit.code}.`,
+      highlightText: unit.name,
+      confirmText: active ? "Reactivar" : "Desactivar",
+      cancelText: "Cancelar",
+      variant: active ? "warning" : "danger",
+    });
+
+    if (!confirmed) {
+      return;
+    }
+
+    this.saving = true;
+    this.errorMessage = "";
+    this.successMessage = "";
+
+    this.unitService.changeStatus(unit.id, { active }).subscribe({
+      next: () => {
+        this.saving = false;
+        this.successMessage = active
+          ? "Unidad reactivada correctamente."
+          : "Unidad desactivada correctamente.";
+        this.loadUnits();
+      },
+      error: (error: unknown) => {
+        this.saving = false;
+        this.errorMessage = toHttpErrorMessage(
+          error,
+          active
+            ? "No se pudo reactivar la unidad."
+            : "No se pudo desactivar la unidad.",
+        );
+      },
+    });
+  }
+
   isInvalid(controlName: string): boolean {
     const control = this.form.get(controlName);
     return !!control && control.invalid && (control.touched || control.dirty);
+  }
+
+  get isEditing(): boolean {
+    return this.editingUnitId !== null;
+  }
+
+  get submitButtonLabel(): string {
+    if (this.saving) {
+      return this.isEditing ? "Actualizando..." : "Creando...";
+    }
+
+    return this.isEditing ? "Actualizar unidad" : "Crear unidad";
   }
 
   private loadUnits(): void {

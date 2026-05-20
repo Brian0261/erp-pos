@@ -1,8 +1,12 @@
 package com.erppos.backend.erp.catalog.adapter.rest;
 import com.erppos.backend.erp.catalog.adapter.dto.UnitCreateRequest;
+import com.erppos.backend.erp.catalog.adapter.dto.UnitStatusRequest;
+import com.erppos.backend.erp.catalog.adapter.dto.UnitUpdateRequest;
 import com.erppos.backend.erp.catalog.adapter.dto.UnitResponse;
+import com.erppos.backend.erp.catalog.application.usecase.ChangeUnitStatusCommand;
 import com.erppos.backend.erp.catalog.application.usecase.CreateUnitCommand;
 import com.erppos.backend.erp.catalog.application.usecase.UnitUseCase;
+import com.erppos.backend.erp.catalog.application.usecase.UpdateUnitCommand;
 import com.erppos.backend.erp.catalog.domain.model.Unit;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -28,6 +32,21 @@ public class UnitController {
     public ResponseEntity<List<UnitResponse>> list() {
         return ResponseEntity.ok(unitUseCase.list().stream().map(this::toResponse).toList());
     }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<UnitResponse> update(@PathVariable Long id, @Valid @RequestBody UnitUpdateRequest request) {
+        Unit updated = unitUseCase.update(id, new UpdateUnitCommand(request.code(), request.name()));
+        return ResponseEntity.ok(toResponse(updated));
+    }
+
+    @PatchMapping("/{id}/status")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<UnitResponse> changeStatus(@PathVariable Long id, @Valid @RequestBody UnitStatusRequest request) {
+        Unit updated = unitUseCase.changeStatus(id, new ChangeUnitStatusCommand(Boolean.TRUE.equals(request.active())));
+        return ResponseEntity.ok(toResponse(updated));
+    }
+
     private UnitResponse toResponse(Unit unit) {
         return new UnitResponse(unit.id(), unit.code(), unit.name(), unit.active(), unit.createdAt(), unit.updatedAt());
     }

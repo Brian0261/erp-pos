@@ -4,11 +4,13 @@ import com.erppos.backend.erp.catalog.application.service.CategoryApplicationSer
 import com.erppos.backend.erp.catalog.application.service.ProductApplicationService;
 import com.erppos.backend.erp.catalog.application.service.UnitApplicationService;
 import com.erppos.backend.erp.catalog.application.usecase.ChangeCategoryStatusCommand;
+import com.erppos.backend.erp.catalog.application.usecase.ChangeUnitStatusCommand;
 import com.erppos.backend.erp.catalog.application.usecase.CreateCategoryCommand;
 import com.erppos.backend.erp.catalog.application.usecase.ProductBarcodeStatus;
 import com.erppos.backend.erp.catalog.application.usecase.CreateProductCommand;
 import com.erppos.backend.erp.catalog.application.usecase.CreateUnitCommand;
 import com.erppos.backend.erp.catalog.application.usecase.UpdateCategoryCommand;
+import com.erppos.backend.erp.catalog.application.usecase.UpdateUnitCommand;
 import com.erppos.backend.erp.catalog.domain.exception.CatalogBusinessRuleException;
 import com.erppos.backend.erp.catalog.domain.exception.CatalogConflictException;
 import com.erppos.backend.erp.catalog.domain.model.Category;
@@ -103,6 +105,44 @@ class CatalogApplicationServiceTest {
         Unit unit = unitService.create(new CreateUnitCommand("UND", "Unidad"));
         assertNotNull(unit.id());
         assertEquals("UND", unit.code());
+    }
+
+    @Test
+    void shouldUpdateUnitSuccessfully() {
+        Unit unit = unitService.create(new CreateUnitCommand("UND", "Unidad"));
+
+        Unit updated = unitService.update(unit.id(), new UpdateUnitCommand("UND2", "Unidad secundaria"));
+
+        assertEquals(unit.id(), updated.id());
+        assertEquals("UND2", updated.code());
+        assertEquals("Unidad secundaria", updated.name());
+        assertTrue(updated.active());
+    }
+
+    @Test
+    void shouldRejectDuplicatedUnitCodeOnUpdate() {
+        Unit first = unitService.create(new CreateUnitCommand("UND", "Unidad"));
+        Unit second = unitService.create(new CreateUnitCommand("PQT", "Paquete"));
+
+        assertThrows(CatalogConflictException.class,
+                () -> unitService.update(second.id(), new UpdateUnitCommand(first.code().toLowerCase(), "Paquete")));
+    }
+
+    @Test
+    void shouldChangeUnitStatusSuccessfully() {
+        Unit unit = unitService.create(new CreateUnitCommand("UND", "Unidad"));
+
+        Unit updated = unitService.changeStatus(unit.id(), new ChangeUnitStatusCommand(false));
+
+        assertFalse(updated.active());
+    }
+
+    @Test
+    void shouldRejectBlankUnitCodeOrName() {
+        assertThrows(CatalogBusinessRuleException.class,
+                () -> unitService.create(new CreateUnitCommand("   ", "Unidad")));
+        assertThrows(CatalogBusinessRuleException.class,
+                () -> unitService.create(new CreateUnitCommand("UND", "   ")));
     }
     @Test
     void shouldRejectDuplicatedUnitCode() {
@@ -314,6 +354,11 @@ class CatalogApplicationServiceTest {
         @Override
         public boolean existsByCodeIgnoreCase(String code) {
             return storage.values().stream().anyMatch(u -> u.code().equalsIgnoreCase(code));
+        }
+
+        @Override
+        public boolean existsByCodeIgnoreCaseAndIdNot(String code, Long id) {
+            return storage.values().stream().anyMatch(u -> u.code().equalsIgnoreCase(code) && !u.id().equals(id));
         }
         @Override
         public List<Unit> findAll() {

@@ -3,7 +3,12 @@ import { Injectable } from "@angular/core";
 import { map, Observable } from "rxjs";
 
 import { environment } from "../../../../environments/environment";
-import { Unit, UnitCreateRequest } from "./catalog.models";
+import {
+  Unit,
+  UnitCreateRequest,
+  UnitStatusRequest,
+  UnitUpdateRequest,
+} from "./catalog.models";
 
 @Injectable({ providedIn: "root" })
 export class UnitService {
@@ -23,5 +28,13 @@ export class UnitService {
 
   create(payload: UnitCreateRequest): Observable<Unit> {
     return this.http.post<Unit>(this.endpoint, payload);
+  }
+
+  update(id: number, payload: UnitUpdateRequest): Observable<Unit> {
+    return this.http.put<Unit>(`${this.endpoint}/${id}`, payload);
+  }
+
+  changeStatus(id: number, payload: UnitStatusRequest): Observable<Unit> {
+    return this.http.patch<Unit>(`${this.endpoint}/${id}/status`, payload);
   }
 }

@@ -26,6 +26,12 @@ public class UnitPersistenceAdapter implements UnitRepositoryPort {
     public boolean existsByCodeIgnoreCase(String code) {
         return unitJpaRepository.existsByCodeIgnoreCase(code);
     }
+
+    @Override
+    public boolean existsByCodeIgnoreCaseAndIdNot(String code, Long id) {
+        return unitJpaRepository.existsByCodeIgnoreCaseAndIdNot(code, id);
+    }
+
     @Override
     public List<Unit> findAll() {
         return unitJpaRepository.findAllByOrderByCodeAsc().stream().map(UnitMapper::toDomain).toList();
