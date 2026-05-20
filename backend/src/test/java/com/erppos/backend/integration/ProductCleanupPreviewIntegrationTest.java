@@ -12,6 +12,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import java.math.BigDecimal;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -52,6 +53,17 @@ class ProductCleanupPreviewIntegrationTest extends AbstractHttpIntegrationTest {
                 .andExpect(jsonPath("$.summary.relatedSales").value(0))
                 .andExpect(jsonPath("$.foundProducts[0].active").value(false))
                 .andExpect(jsonPath("$.foundProducts[0].purgeCandidate").value(true));
+    }
+
+    @Test
+    void shouldForbidNonAdminExecute() throws Exception {
+        String cajeroToken = login(CAJERO_EMAIL, CAJERO_PASSWORD);
+
+        mockMvc.perform(post("/api/v1/admin/test-data-cleanup/products/execute")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(cajeroToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(executePayload(999999L, "ELIMINAR PRUEBAS").toString()))
+                .andExpect(status().isForbidden());
     }
 
     @Test
@@ -110,10 +122,219 @@ class ProductCleanupPreviewIntegrationTest extends AbstractHttpIntegrationTest {
                 .andExpect(jsonPath("$.blockers[0]").exists());
     }
 
+    @Test
+    void shouldExecuteInactiveProductWithoutReferences() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = Long.toString(System.nanoTime());
+        long categoryId = createCategory(adminToken, suffix);
+        long unitId = createUnit(adminToken, suffix);
+        long productId = createProduct(adminToken, categoryId, unitId, suffix, BigDecimal.valueOf(9.99));
+        deactivateProduct(adminToken, productId);
+
+        mockMvc.perform(post("/api/v1/admin/test-data-cleanup/products/execute")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(executePayload(productId, "ELIMINAR PRUEBAS").toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.deletedProductIds[0]").value(productId))
+                .andExpect(jsonPath("$.deletedProducts").value(1))
+                .andExpect(jsonPath("$.deletedSales").value(0))
+                .andExpect(jsonPath("$.deletedSaleItems").value(0))
+                .andExpect(jsonPath("$.deletedSalePayments").value(0));
+
+        Long remaining = jdbcTemplate.queryForObject("select count(*) from products where id = ?", Long.class, productId);
+        assertEquals(0L, remaining == null ? 0L : remaining);
+    }
+
+    @Test
+    void shouldRejectExecuteForActiveProduct() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = Long.toString(System.nanoTime());
+        long categoryId = createCategory(adminToken, suffix);
+        long unitId = createUnit(adminToken, suffix);
+        long productId = createProduct(adminToken, categoryId, unitId, suffix, BigDecimal.valueOf(9.99));
+
+        mockMvc.perform(post("/api/v1/admin/test-data-cleanup/products/execute")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(executePayload(productId, "ELIMINAR PRUEBAS").toString()))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.message").exists());
+
+        Long remaining = jdbcTemplate.queryForObject("select count(*) from products where id = ?", Long.class, productId);
+        assertTrue(remaining != null && remaining == 1L);
+    }
+
+    @Test
+    void shouldRejectExecuteWhenConfirmationTextIsInvalidAndKeepDataUnchanged() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = Long.toString(System.nanoTime());
+        long categoryId = createCategory(adminToken, suffix);
+        long unitId = createUnit(adminToken, suffix);
+        long productId = createProduct(adminToken, categoryId, unitId, suffix, BigDecimal.valueOf(9.99));
+        deactivateProduct(adminToken, productId);
+
+        Counts before = snapshotCounts();
+
+        mockMvc.perform(post("/api/v1/admin/test-data-cleanup/products/execute")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(executePayload(productId, "BORRAR").toString()))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.message").value("confirmationText must be exactly ELIMINAR PRUEBAS"));
+
+        assertEquals(before, snapshotCounts());
+        assertEquals(1L, countById("products", productId));
+    }
+
+    @Test
+    void shouldRejectExecuteWhenConfirmationTextIsMissing() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+
+        mockMvc.perform(post("/api/v1/admin/test-data-cleanup/products/execute")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(previewPayload(999999L).toString()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").exists());
+    }
+
+    @Test
+    void shouldRejectExecuteForEmptyRequest() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        ObjectNode payload = objectMapper.createObjectNode();
+        payload.put("confirmationText", "ELIMINAR PRUEBAS");
+
+        mockMvc.perform(post("/api/v1/admin/test-data-cleanup/products/execute")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload.toString()))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.message").value("At least one productId or sku is required"));
+    }
+
+    @Test
+    void shouldRejectExecuteForMissingProductAndKeepDataUnchanged() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        Counts before = snapshotCounts();
+
+        mockMvc.perform(post("/api/v1/admin/test-data-cleanup/products/execute")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(executePayload(999999L, "ELIMINAR PRUEBAS").toString()))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.message").value("Some requested products were not found in the catalog. No matching products were found for the requested identifiers."));
+
+        assertEquals(before, snapshotCounts());
+    }
+
+    @Test
+    void shouldBlockExecuteForMixedSaleAndKeepDataUnchanged() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = Long.toString(System.nanoTime());
+        long categoryId = createCategory(adminToken, suffix);
+        long unitId = createUnit(adminToken, suffix);
+        long warehouseId = createWarehouse(adminToken, suffix);
+        long targetProductId = createProduct(adminToken, categoryId, unitId, "A-" + suffix, BigDecimal.TEN);
+        long otherProductId = createProduct(adminToken, categoryId, unitId, "B-" + suffix, BigDecimal.valueOf(5));
+        registerInitialStock(adminToken, targetProductId, warehouseId, BigDecimal.TEN, "IT target");
+        registerInitialStock(adminToken, otherProductId, warehouseId, BigDecimal.TEN, "IT other");
+        openCash(adminToken, BigDecimal.valueOf(100), suffix);
+        createSale(adminToken, warehouseId, new long[]{targetProductId, otherProductId}, new BigDecimal[]{BigDecimal.ONE, BigDecimal.ONE}, BigDecimal.valueOf(15));
+        deactivateProduct(adminToken, targetProductId);
+
+        Counts before = snapshotCounts();
+
+        mockMvc.perform(post("/api/v1/admin/test-data-cleanup/products/execute")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(executePayload(targetProductId, "ELIMINAR PRUEBAS").toString()))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("mixed sale")));
+
+        assertEquals(before, snapshotCounts());
+        assertEquals(1L, countById("products", targetProductId));
+        assertEquals(1L, countById("products", otherProductId));
+    }
+
+    @Test
+    void shouldBlockExecuteWhenElectronicDocumentExistsAndKeepDataUnchanged() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = Long.toString(System.nanoTime());
+        long categoryId = createCategory(adminToken, suffix);
+        long unitId = createUnit(adminToken, suffix);
+        long warehouseId = createWarehouse(adminToken, suffix);
+        long productId = createProduct(adminToken, categoryId, unitId, suffix, BigDecimal.TEN);
+        registerInitialStock(adminToken, productId, warehouseId, BigDecimal.TEN, "IT doc");
+        openCash(adminToken, BigDecimal.valueOf(50), suffix);
+        long saleId = createSale(adminToken, warehouseId, new long[]{productId}, new BigDecimal[]{BigDecimal.ONE}, BigDecimal.TEN);
+        deactivateProduct(adminToken, productId);
+        insertElectronicDocument(saleId, productId, suffix);
+
+        Counts before = snapshotCounts();
+
+        mockMvc.perform(post("/api/v1/admin/test-data-cleanup/products/execute")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(executePayload(productId, "ELIMINAR PRUEBAS").toString()))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("electronic document")));
+
+        assertEquals(before, snapshotCounts());
+        assertEquals(1L, countById("products", productId));
+        assertEquals(1L, countById("sales", saleId));
+    }
+
+    @Test
+    void shouldExecutePureSaleAndDeleteRelatedRowsConsistently() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = Long.toString(System.nanoTime());
+        long categoryId = createCategory(adminToken, suffix);
+        long unitId = createUnit(adminToken, suffix);
+        long warehouseId = createWarehouse(adminToken, suffix);
+        long productId = createProduct(adminToken, categoryId, unitId, suffix, BigDecimal.TEN);
+        registerInitialStock(adminToken, productId, warehouseId, BigDecimal.TEN, "IT pure sale");
+        openCash(adminToken, BigDecimal.valueOf(50), suffix);
+        long saleId = createSale(adminToken, warehouseId, new long[]{productId}, new BigDecimal[]{BigDecimal.ONE}, BigDecimal.TEN);
+        deactivateProduct(adminToken, productId);
+
+        long saleItemsBefore = countByColumn("sale_items", "sale_id", saleId);
+        long salePaymentsBefore = countByColumn("sale_payments", "sale_id", saleId);
+        long movementsBefore = countByColumn("inventory_movements", "product_id", productId);
+        long balancesBefore = countByColumn("stock_balances", "product_id", productId);
+
+        mockMvc.perform(post("/api/v1/admin/test-data-cleanup/products/execute")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(executePayload(productId, "ELIMINAR PRUEBAS").toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.deletedProductIds[0]").value(productId))
+                .andExpect(jsonPath("$.deletedSaleIds[0]").value(saleId))
+                .andExpect(jsonPath("$.deletedProducts").value(1))
+                .andExpect(jsonPath("$.deletedSales").value(1))
+                .andExpect(jsonPath("$.deletedSaleItems").value((int) saleItemsBefore))
+                .andExpect(jsonPath("$.deletedSalePayments").value((int) salePaymentsBefore));
+
+        assertEquals(0L, countById("products", productId));
+        assertEquals(0L, countById("sales", saleId));
+        assertEquals(0L, countByColumn("sale_items", "sale_id", saleId));
+        assertEquals(0L, countByColumn("sale_payments", "sale_id", saleId));
+        assertEquals(0L, countByColumn("inventory_movements", "product_id", productId));
+        assertEquals(0L, countByColumn("stock_balances", "product_id", productId));
+        assertTrue(movementsBefore > 0);
+        assertTrue(balancesBefore > 0);
+    }
+
     private ObjectNode previewPayload(long productId) {
         ObjectNode payload = objectMapper.createObjectNode();
         ArrayNode ids = payload.putArray("productIds");
         ids.add(productId);
+        return payload;
+    }
+
+    private ObjectNode executePayload(long productId, String confirmationText) {
+        ObjectNode payload = previewPayload(productId);
+        payload.put("confirmationText", confirmationText);
         return payload;
     }
 
@@ -191,6 +412,7 @@ class ProductCleanupPreviewIntegrationTest extends AbstractHttpIntegrationTest {
                 count("sales"),
                 count("sale_items"),
                 count("sale_payments"),
+                count("stock_balances"),
                 count("inventory_movements"),
                 count("electronic_documents"),
                 count("electronic_document_items")
@@ -202,11 +424,21 @@ class ProductCleanupPreviewIntegrationTest extends AbstractHttpIntegrationTest {
         return value == null ? 0L : value;
     }
 
+    private long countById(String table, long id) {
+        return countByColumn(table, "id", id);
+    }
+
+    private long countByColumn(String table, String column, long value) {
+        Long count = jdbcTemplate.queryForObject("select count(*) from " + table + " where " + column + " = ?", Long.class, value);
+        return count == null ? 0L : count;
+    }
+
     private record Counts(
             long products,
             long sales,
             long saleItems,
             long salePayments,
+            long stockBalances,
             long inventoryMovements,
             long electronicDocuments,
             long electronicDocumentItems

@@ -1,11 +1,16 @@
 package com.erppos.backend.erp.admin.cleanup.application.service;
 
 import com.erppos.backend.erp.admin.cleanup.application.usecase.ProductCleanupPreviewCommand;
+import com.erppos.backend.erp.admin.cleanup.application.usecase.ProductCleanupExecuteCommand;
+import com.erppos.backend.erp.admin.cleanup.application.usecase.ProductCleanupExecuteResult;
+import com.erppos.backend.erp.admin.cleanup.application.usecase.ProductCleanupExecuteUseCase;
 import com.erppos.backend.erp.admin.cleanup.application.usecase.ProductCleanupPreviewResult;
 import com.erppos.backend.erp.admin.cleanup.application.usecase.ProductCleanupPreviewUseCase;
 import com.erppos.backend.erp.admin.cleanup.domain.exception.CleanupBusinessRuleException;
+import com.erppos.backend.erp.admin.cleanup.domain.port.ProductCleanupExecutePort;
 import com.erppos.backend.erp.admin.cleanup.domain.port.ProductCleanupPreviewQueryPort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -19,12 +24,16 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
-public class ProductCleanupPreviewApplicationService implements ProductCleanupPreviewUseCase {
+public class ProductCleanupPreviewApplicationService implements ProductCleanupPreviewUseCase, ProductCleanupExecuteUseCase {
+
+    private static final String REQUIRED_CONFIRMATION_TEXT = "ELIMINAR PRUEBAS";
 
     private final ProductCleanupPreviewQueryPort queryPort;
+    private final ProductCleanupExecutePort executePort;
 
-    public ProductCleanupPreviewApplicationService(ProductCleanupPreviewQueryPort queryPort) {
+    public ProductCleanupPreviewApplicationService(ProductCleanupPreviewQueryPort queryPort, ProductCleanupExecutePort executePort) {
         this.queryPort = queryPort;
+        this.executePort = executePort;
     }
 
     @Override
@@ -295,6 +304,62 @@ public class ProductCleanupPreviewApplicationService implements ProductCleanupPr
                 List.copyOf(blockers),
                 summary
         );
+    }
+
+    @Override
+    @Transactional
+    public ProductCleanupExecuteResult execute(ProductCleanupExecuteCommand command) {
+        validateConfirmationText(command.confirmationText());
+
+        ProductCleanupPreviewResult preview = preview(new ProductCleanupPreviewCommand(
+                command.productIds(),
+                command.skus()
+        ));
+        if (!preview.purgeable()) {
+            List<String> messages = preview.blockers().isEmpty() ? preview.warnings() : preview.blockers();
+            String message = String.join(" ", messages);
+            throw new CleanupBusinessRuleException(message.isBlank() ? "Cleanup cannot be executed" : message);
+        }
+
+        Set<Long> productIds = preview.foundProducts().stream()
+                .map(ProductCleanupPreviewResult.ProductImpact::productId)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        Set<Long> pureSaleIds = preview.relatedSales().stream()
+                .filter(ProductCleanupPreviewResult.SaleImpact::pureSale)
+                .map(ProductCleanupPreviewResult.SaleImpact::saleId)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+
+        int deletedSaleItems = executePort.deleteSaleItemsBySaleIds(pureSaleIds);
+        int deletedSalePayments = executePort.deleteSalePaymentsBySaleIds(pureSaleIds);
+        int deletedQuoteItems = executePort.deleteQuoteItemsByProductIds(productIds);
+        int deletedPurchaseReceiptItems = executePort.deletePurchaseReceiptItemsByProductIds(productIds);
+        int deletedPurchaseOrderItems = executePort.deletePurchaseOrderItemsByProductIds(productIds);
+        int deletedStockTransferItems = executePort.deleteStockTransferItemsByProductIds(productIds);
+        int deletedStockBalances = executePort.deleteStockBalancesByProductIds(productIds);
+        int deletedInventoryMovements = executePort.deleteInventoryMovementsByProductIds(productIds);
+        int deletedSales = executePort.deleteSalesByIds(pureSaleIds);
+        int deletedProducts = executePort.deleteProductsByIds(productIds);
+
+        return new ProductCleanupExecuteResult(
+                List.copyOf(productIds),
+                List.copyOf(pureSaleIds),
+                deletedProducts,
+                deletedSales,
+                deletedSaleItems,
+                deletedSalePayments,
+                deletedQuoteItems,
+                deletedPurchaseOrderItems,
+                deletedPurchaseReceiptItems,
+                deletedStockTransferItems,
+                deletedStockBalances,
+                deletedInventoryMovements
+        );
+    }
+
+    private void validateConfirmationText(String confirmationText) {
+        if (!REQUIRED_CONFIRMATION_TEXT.equals(confirmationText)) {
+            throw new CleanupBusinessRuleException("confirmationText must be exactly ELIMINAR PRUEBAS");
+        }
     }
 
     private ProductCleanupPreviewResult.SaleImpact toSaleImpact(

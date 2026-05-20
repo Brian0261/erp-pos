@@ -1,6 +1,9 @@
 package com.erppos.backend.erp.admin.cleanup.adapter.rest;
 
 import com.erppos.backend.erp.admin.cleanup.application.usecase.ProductCleanupPreviewCommand;
+import com.erppos.backend.erp.admin.cleanup.application.usecase.ProductCleanupExecuteCommand;
+import com.erppos.backend.erp.admin.cleanup.application.usecase.ProductCleanupExecuteResult;
+import com.erppos.backend.erp.admin.cleanup.application.usecase.ProductCleanupExecuteUseCase;
 import com.erppos.backend.erp.admin.cleanup.application.usecase.ProductCleanupPreviewResult;
 import com.erppos.backend.erp.admin.cleanup.application.usecase.ProductCleanupPreviewUseCase;
 import jakarta.validation.Valid;
@@ -16,9 +19,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class ProductCleanupPreviewController {
 
     private final ProductCleanupPreviewUseCase previewUseCase;
+    private final ProductCleanupExecuteUseCase executeUseCase;
 
-    public ProductCleanupPreviewController(ProductCleanupPreviewUseCase previewUseCase) {
+    public ProductCleanupPreviewController(ProductCleanupPreviewUseCase previewUseCase, ProductCleanupExecuteUseCase executeUseCase) {
         this.previewUseCase = previewUseCase;
+        this.executeUseCase = executeUseCase;
     }
 
     @PostMapping("/preview")
@@ -29,6 +34,30 @@ public class ProductCleanupPreviewController {
                 request.skus()
         ));
         return ResponseEntity.ok(toResponse(result));
+    }
+
+    @PostMapping("/execute")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ProductCleanupExecuteResponse> execute(@Valid @RequestBody ProductCleanupExecuteRequest request) {
+        ProductCleanupExecuteResult result = executeUseCase.execute(new ProductCleanupExecuteCommand(
+                request.productIds(),
+                request.skus(),
+                request.confirmationText()
+        ));
+        return ResponseEntity.ok(new ProductCleanupExecuteResponse(
+                result.deletedProductIds(),
+                result.deletedSaleIds(),
+                result.deletedProducts(),
+                result.deletedSales(),
+                result.deletedSaleItems(),
+                result.deletedSalePayments(),
+                result.deletedQuoteItems(),
+                result.deletedPurchaseOrderItems(),
+                result.deletedPurchaseReceiptItems(),
+                result.deletedStockTransferItems(),
+                result.deletedStockBalances(),
+                result.deletedInventoryMovements()
+        ));
     }
 
     private ProductCleanupPreviewResponse toResponse(ProductCleanupPreviewResult result) {

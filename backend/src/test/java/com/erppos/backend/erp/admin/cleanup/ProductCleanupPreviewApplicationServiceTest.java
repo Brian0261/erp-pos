@@ -1,9 +1,12 @@
 package com.erppos.backend.erp.admin.cleanup;
 
 import com.erppos.backend.erp.admin.cleanup.application.service.ProductCleanupPreviewApplicationService;
+import com.erppos.backend.erp.admin.cleanup.application.usecase.ProductCleanupExecuteCommand;
+import com.erppos.backend.erp.admin.cleanup.application.usecase.ProductCleanupExecuteResult;
 import com.erppos.backend.erp.admin.cleanup.application.usecase.ProductCleanupPreviewCommand;
 import com.erppos.backend.erp.admin.cleanup.application.usecase.ProductCleanupPreviewResult;
 import com.erppos.backend.erp.admin.cleanup.domain.exception.CleanupBusinessRuleException;
+import com.erppos.backend.erp.admin.cleanup.domain.port.ProductCleanupExecutePort;
 import com.erppos.backend.erp.admin.cleanup.domain.port.ProductCleanupPreviewQueryPort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,12 +23,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ProductCleanupPreviewApplicationServiceTest {
 
     private StubProductCleanupPreviewQueryPort queryPort;
+    private StubProductCleanupExecutePort executePort;
     private ProductCleanupPreviewApplicationService service;
 
     @BeforeEach
     void setUp() {
         queryPort = new StubProductCleanupPreviewQueryPort();
-        service = new ProductCleanupPreviewApplicationService(queryPort);
+        executePort = new StubProductCleanupExecutePort();
+        service = new ProductCleanupPreviewApplicationService(queryPort, executePort);
     }
 
     @Test
@@ -126,6 +131,33 @@ class ProductCleanupPreviewApplicationServiceTest {
         assertTrue(result.blockers().stream().anyMatch(message -> message.contains("electronic document")));
     }
 
+    @Test
+    void shouldExecuteInactiveProductsWithNoReferences() {
+        queryPort.products = List.of(new ProductCleanupPreviewQueryPort.ProductRow(16L, "SKU-DEL", null, "Delete", false));
+
+        ProductCleanupExecuteResult result = service.execute(new ProductCleanupExecuteCommand(List.of(16L), List.of(), "ELIMINAR PRUEBAS"));
+
+        assertEquals(List.of(16L), result.deletedProductIds());
+        assertEquals(1, result.deletedProducts());
+        assertEquals(Set.of(16L), executePort.deletedProductIds);
+    }
+
+    @Test
+    void shouldRejectExecuteWhenBlocked() {
+        queryPort.products = List.of(new ProductCleanupPreviewQueryPort.ProductRow(17L, "SKU-ACT", null, "Active", true));
+
+        assertThrows(CleanupBusinessRuleException.class, () -> service.execute(new ProductCleanupExecuteCommand(List.of(17L), List.of(), "ELIMINAR PRUEBAS")));
+        assertTrue(executePort.deletedProductIds.isEmpty());
+    }
+
+    @Test
+    void shouldRejectExecuteWhenConfirmationTextIsInvalid() {
+        queryPort.products = List.of(new ProductCleanupPreviewQueryPort.ProductRow(18L, "SKU-CONF", null, "Confirm", false));
+
+        assertThrows(CleanupBusinessRuleException.class, () -> service.execute(new ProductCleanupExecuteCommand(List.of(18L), List.of(), "BORRAR")));
+        assertTrue(executePort.deletedProductIds.isEmpty());
+    }
+
     private static final class StubProductCleanupPreviewQueryPort implements ProductCleanupPreviewQueryPort {
         private List<ProductRow> products = List.of();
         private List<SaleRow> sales = List.of();
@@ -195,6 +227,61 @@ class ProductCleanupPreviewApplicationServiceTest {
         @Override
         public List<ElectronicDocumentItemRow> findElectronicDocumentItemsByProductIds(Set<Long> productIds) {
             return documentItems;
+        }
+    }
+
+    private static final class StubProductCleanupExecutePort implements ProductCleanupExecutePort {
+        private Set<Long> deletedProductIds = Set.of();
+
+        @Override
+        public int deleteSaleItemsBySaleIds(Set<Long> saleIds) {
+            return 0;
+        }
+
+        @Override
+        public int deleteSalePaymentsBySaleIds(Set<Long> saleIds) {
+            return 0;
+        }
+
+        @Override
+        public int deleteQuoteItemsByProductIds(Set<Long> productIds) {
+            return 0;
+        }
+
+        @Override
+        public int deletePurchaseOrderItemsByProductIds(Set<Long> productIds) {
+            return 0;
+        }
+
+        @Override
+        public int deletePurchaseReceiptItemsByProductIds(Set<Long> productIds) {
+            return 0;
+        }
+
+        @Override
+        public int deleteStockTransferItemsByProductIds(Set<Long> productIds) {
+            return 0;
+        }
+
+        @Override
+        public int deleteStockBalancesByProductIds(Set<Long> productIds) {
+            return 0;
+        }
+
+        @Override
+        public int deleteInventoryMovementsByProductIds(Set<Long> productIds) {
+            return 0;
+        }
+
+        @Override
+        public int deleteSalesByIds(Set<Long> saleIds) {
+            return 0;
+        }
+
+        @Override
+        public int deleteProductsByIds(Set<Long> productIds) {
+            deletedProductIds = Set.copyOf(productIds);
+            return productIds.size();
         }
     }
 }
