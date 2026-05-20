@@ -8,11 +8,23 @@ import { toHttpErrorMessage } from "./data/http-error-message";
 import {
   ProductCleanupExecuteResponse,
   ProductCleanupInventoryMovementPreview,
+  ProductCleanupPurchaseOrderPreview,
+  ProductCleanupPurchaseReceiptPreview,
+  ProductCleanupProductPreview,
   ProductCleanupPreviewRequest,
   ProductCleanupPreviewResponse,
   ProductCleanupSalePreview,
+  ProductCleanupStockBalancePreview,
+  ProductCleanupStockTransferItemPreview,
 } from "./data/product-cleanup.models";
 import { ProductCleanupService } from "./data/product-cleanup.service";
+
+type DetailTabId =
+  | "products"
+  | "sales"
+  | "purchaseOrders"
+  | "purchaseReceipts"
+  | "inventory";
 
 @Component({
   selector: "app-product-cleanup-preview-page",
@@ -24,10 +36,7 @@ import { ProductCleanupService } from "./data/product-cleanup.service";
         <div>
           <p class="ui-page-kicker">Administracion InkToy</p>
           <h1 class="ui-page-title">Limpieza de datos de prueba</h1>
-          <p class="ui-page-description">
-            Analiza productos de prueba antes de ejecutar cualquier eliminacion.
-            Esta pantalla no borra datos hasta que confirmes una purga de forma explicita.
-          </p>
+          <p class="ui-page-description">Analiza productos de prueba antes de purgar.</p>
         </div>
 
         <a routerLink="/dashboard" class="ui-button ui-button--secondary"
@@ -40,7 +49,7 @@ import { ProductCleanupService } from "./data/product-cleanup.service";
           <label class="criteria-field">
             <span>Productos a analizar</span>
             <textarea
-              rows="4"
+              rows="2"
               formControlName="productQuery"
               placeholder="Ejemplo: SKU-001, SKU-002, 15, 28"
               (input)="onCriteriaChange()"
@@ -56,23 +65,13 @@ import { ProductCleanupService } from "./data/product-cleanup.service";
           >
             {{ loading ? "Analizando..." : "Analizar impacto" }}
           </button>
-
-          <button
-            type="button"
-            class="ui-button ui-button--danger"
-            (click)="openExecuteDialog()"
-            [disabled]="!canExecute()"
-          >
-            {{ executing ? "Ejecutando..." : "Ejecutar purga" }}
-          </button>
         </div>
 
         <p class="ui-muted criteria-help">
           Ingresa SKUs o IDs separados por coma, espacio o salto de linea.
-          Recomendado: usa SKUs; el ID interno es opcional.
         </p>
         <p class="ui-alert ui-alert--warning criteria-warning" *ngIf="preview?.purgeable">
-          Esta accion elimina datos de prueba de forma permanente y requiere confirmacion explicita.
+          La purga elimina datos permanentemente y requiere escribir ELIMINAR PRUEBAS.
         </p>
         <p class="ui-alert ui-alert--warning criteria-warning" *ngIf="previewStale">
           Los criterios cambiaron despues del ultimo analisis. Vuelve a analizar antes de ejecutar.
@@ -147,19 +146,42 @@ import { ProductCleanupService } from "./data/product-cleanup.service";
               {{ reason }}
             </span>
           </div>
+
+          <div class="decision-card__actions">
+            <button
+              *ngIf="result.purgeable"
+              type="button"
+              class="ui-button ui-button--danger"
+              (click)="openExecuteDialog()"
+              [disabled]="!canExecute()"
+            >
+              {{ executing ? "Ejecutando..." : "Ejecutar purga" }}
+            </button>
+            <p class="ui-muted decision-card__hint" *ngIf="result.purgeable && !canExecute()">
+              {{ executeAvailabilityMessage() }}
+            </p>
+            <p class="ui-muted decision-card__hint" *ngIf="!result.purgeable">
+              La purga queda bloqueada hasta resolver los bloqueos detectados.
+            </p>
+          </div>
         </section>
 
-        <section class="summary-grid">
-          <article
-            class="summary-card"
-            *ngFor="let item of summaryCards(result)"
-            [class.summary-card--success]="item.tone === 'success'"
-            [class.summary-card--warning]="item.tone === 'warning'"
-            [class.summary-card--danger]="item.tone === 'danger'"
-          >
-            <span class="summary-label">{{ item.label }}</span>
-            <strong>{{ item.value }}</strong>
-            <span class="summary-note" *ngIf="item.note">{{ item.note }}</span>
+        <p class="ui-alert ui-alert--info cleanup-education">
+          Solo se eliminaran ventas, ordenes o recepciones que incluyan unicamente los productos seleccionados.
+          Si tambien incluyen otros productos, bloquearan la purga.
+        </p>
+
+        <section class="summary-groups">
+          <article class="summary-group-card" *ngFor="let group of summaryGroups(result)">
+            <div class="summary-group-head">
+              <h2>{{ group.title }}</h2>
+            </div>
+            <div class="summary-group-metrics">
+              <div class="summary-metric" *ngFor="let item of group.items">
+                <span>{{ item.label }}</span>
+                <strong>{{ item.value }}</strong>
+              </div>
+            </div>
           </article>
         </section>
 
@@ -185,8 +207,22 @@ import { ProductCleanupService } from "./data/product-cleanup.service";
           </article>
         </section>
 
-        <section class="detail-grid">
-          <article class="detail-card">
+        <section class="detail-tabs-card">
+          <div class="detail-tabs" role="tablist" aria-label="Detalle del preview">
+            <button
+              type="button"
+              class="detail-tab"
+              *ngFor="let tab of detailTabs(result)"
+              [class.is-active]="activeDetailTab === tab.id"
+              [class.is-alert]="tab.alert"
+              (click)="setActiveDetailTab(tab.id)"
+            >
+              <span>{{ tab.label }}</span>
+              <span class="ui-badge">{{ tab.count }}</span>
+            </button>
+          </div>
+
+          <article class="detail-card detail-card--active" *ngIf="activeDetailTab === 'products'">
             <div class="detail-head">
               <div>
                 <h2>Productos encontrados</h2>
@@ -243,17 +279,17 @@ import { ProductCleanupService } from "./data/product-cleanup.service";
             </div>
           </article>
 
-          <article class="detail-card">
+          <article class="detail-card detail-card--active" *ngIf="activeDetailTab === 'sales'">
             <div class="detail-head">
               <div>
                 <h2>Ventas relacionadas</h2>
                 <p class="ui-muted">
-                  El preview diferencia ventas puras y mixtas para evitar borrados riesgosos.
+                  El preview diferencia ventas completas y mezcladas para evitar borrados riesgosos.
                 </p>
               </div>
               <div class="split-pills">
-                <span class="ui-badge ui-badge--success">Puras: {{ pureSales(result).length }}</span>
-                <span class="ui-badge ui-badge--warning">Mixtas: {{ mixedSales(result).length }}</span>
+                <span class="ui-badge ui-badge--success">Completas: {{ pureSales(result).length }}</span>
+                <span class="ui-badge ui-badge--warning">Mezcladas: {{ mixedSales(result).length }}</span>
               </div>
             </div>
 
@@ -290,75 +326,131 @@ import { ProductCleanupService } from "./data/product-cleanup.service";
             <ng-template #noSales><p class="ui-muted">No hay ventas relacionadas.</p></ng-template>
           </article>
 
-          <article class="detail-card" *ngIf="result.electronicDocumentItems.length > 0">
+          <article class="detail-card detail-card--active" *ngIf="activeDetailTab === 'purchaseOrders'">
             <div class="detail-head">
               <div>
-                <h2>Documentos electronicos relacionados</h2>
-                <p class="ui-muted">Si existen, se consideran bloqueo de purga.</p>
+                <h2>Ordenes de compra relacionadas</h2>
+                <p class="ui-muted">
+                  Las ordenes completas se eliminan enteras; las mezcladas bloquean la purga.
+                </p>
               </div>
-              <span class="ui-badge ui-badge--danger">{{ result.electronicDocumentItems.length }} documento(s)</span>
+              <div class="split-pills">
+                <span class="ui-badge ui-badge--success">Completas: {{ purePurchaseOrders(result).length }}</span>
+                <span class="ui-badge ui-badge--warning">Mezcladas: {{ mixedPurchaseOrders(result).length }}</span>
+              </div>
             </div>
 
-            <div class="ui-table-wrapper">
+            <div class="ui-table-wrapper" *ngIf="result.purchaseOrders.length > 0; else noPurchaseOrders">
               <table class="ui-table compact-table">
                 <thead>
                   <tr>
-                    <th>Documento</th>
-                    <th>Venta</th>
+                    <th>Orden</th>
                     <th>Estado</th>
-                    <th>Descripcion</th>
+                    <th>Items</th>
+                    <th>Tipo</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr *ngFor="let item of result.electronicDocumentItems">
-                    <td>{{ item.fullNumber }}</td>
-                    <td>{{ item.saleId }}</td>
-                    <td>{{ translateSaleStatus(item.status) }}</td>
-                    <td class="cell-name">{{ item.description }}</td>
+                  <tr *ngFor="let order of result.purchaseOrders">
+                    <td>{{ order.purchaseOrderId }}</td>
+                    <td>{{ translatePurchaseStatus(order.status) }}</td>
+                    <td>{{ order.selectedItemCount }}/{{ order.itemCount }}</td>
+                    <td>
+                      <span
+                        class="ui-badge"
+                        [class.ui-badge--success]="order.purePurchaseOrder"
+                        [class.ui-badge--warning]="order.mixedPurchaseOrder"
+                      >
+                        {{ purchaseOrderTypeLabel(order) }}
+                      </span>
+                    </td>
                   </tr>
                 </tbody>
               </table>
             </div>
+            <ng-template #noPurchaseOrders><p class="ui-muted">No hay ordenes de compra relacionadas.</p></ng-template>
           </article>
 
-          <article
-            class="detail-card"
-            *ngIf="result.inventoryMovements.length > 0 || result.stockBalances.length > 0 || result.stockTransferItems.length > 0"
-          >
+          <article class="detail-card detail-card--active" *ngIf="activeDetailTab === 'purchaseReceipts'">
+            <div class="detail-head">
+              <div>
+                <h2>Recepciones de compra relacionadas</h2>
+                <p class="ui-muted">
+                  Las recepciones completas se eliminan enteras; las mezcladas bloquean la purga.
+                </p>
+              </div>
+              <div class="split-pills">
+                <span class="ui-badge ui-badge--success">Completas: {{ purePurchaseReceipts(result).length }}</span>
+                <span class="ui-badge ui-badge--warning">Mezcladas: {{ mixedPurchaseReceipts(result).length }}</span>
+              </div>
+            </div>
+
+            <div class="ui-table-wrapper" *ngIf="result.purchaseReceipts.length > 0; else noPurchaseReceipts">
+              <table class="ui-table compact-table">
+                <thead>
+                  <tr>
+                    <th>Recepcion</th>
+                    <th>Orden</th>
+                    <th>Items</th>
+                    <th>Tipo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let receipt of result.purchaseReceipts">
+                    <td>{{ receipt.purchaseReceiptId }}</td>
+                    <td>{{ receipt.purchaseOrderId }}</td>
+                    <td>{{ receipt.selectedItemCount }}/{{ receipt.itemCount }}</td>
+                    <td>
+                      <span
+                        class="ui-badge"
+                        [class.ui-badge--success]="receipt.purePurchaseReceipt"
+                        [class.ui-badge--warning]="receipt.mixedPurchaseReceipt"
+                      >
+                        {{ purchaseReceiptTypeLabel(receipt) }}
+                      </span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <ng-template #noPurchaseReceipts><p class="ui-muted">No hay recepciones de compra relacionadas.</p></ng-template>
+          </article>
+
+          <article class="detail-card detail-card--active" *ngIf="activeDetailTab === 'inventory'">
             <div class="detail-head">
               <div>
                 <h2>Stock y movimientos relacionados</h2>
-                <p class="ui-muted">Se listan referencias de inventario detectadas para los productos analizados.</p>
+                <p class="ui-muted">Se listan movimientos, saldos, transferencias y documentos detectados.</p>
               </div>
               <div class="impact-tags">
                 <span class="ui-badge">Saldos: {{ result.stockBalances.length }}</span>
                 <span class="ui-badge">Movimientos: {{ result.inventoryMovements.length }}</span>
                 <span class="ui-badge">Transferencias: {{ result.stockTransferItems.length }}</span>
+                <span class="ui-badge ui-badge--danger">Documentos: {{ result.electronicDocumentItems.length }}</span>
               </div>
             </div>
 
-            <div class="ui-table-wrapper" *ngIf="result.inventoryMovements.length > 0">
+            <div class="ui-table-wrapper" *ngIf="inventoryRows(result).length > 0; else noInventoryRows">
               <table class="ui-table compact-table">
                 <thead>
                   <tr>
                     <th>ID</th>
                     <th>Producto</th>
                     <th>Tipo</th>
-                    <th>Cantidad</th>
-                    <th>Motivo</th>
+                    <th>Referencia</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr *ngFor="let movement of visibleInventoryMovements(result.inventoryMovements)">
-                    <td>{{ movement.inventoryMovementId }}</td>
-                    <td>{{ movement.productId }}</td>
-                    <td>{{ translateMovementType(movement.movementType) }}</td>
-                    <td>{{ movement.quantity }}</td>
-                    <td class="cell-name">{{ movement.reason }}</td>
+                  <tr *ngFor="let row of inventoryRows(result)">
+                    <td>{{ row.id }}</td>
+                    <td>{{ row.productId }}</td>
+                    <td>{{ row.type }}</td>
+                    <td class="cell-name">{{ row.reference }}</td>
                   </tr>
                 </tbody>
               </table>
             </div>
+            <ng-template #noInventoryRows><p class="ui-muted">No hay referencias de inventario o documentos relacionadas.</p></ng-template>
           </article>
         </section>
       </section>
@@ -436,7 +528,6 @@ import { ProductCleanupService } from "./data/product-cleanup.service";
       }
 
       .criteria-grid,
-      .detail-grid,
       .message-grid,
       .summary-grid,
       .not-found-grid {
@@ -448,13 +539,15 @@ import { ProductCleanupService } from "./data/product-cleanup.service";
         grid-template-columns: minmax(0, 1fr);
       }
 
-      .detail-grid {
-        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      }
-
       .summary-grid {
         grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
         margin-top: var(--space-3);
+      }
+
+      .summary-groups {
+        display: grid;
+        gap: var(--space-3);
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
       }
 
       .decision-card {
@@ -512,6 +605,18 @@ import { ProductCleanupService } from "./data/product-cleanup.service";
         gap: var(--space-2);
       }
 
+      .decision-card__actions {
+        display: flex;
+        gap: var(--space-3);
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+      }
+
+      .decision-card__hint {
+        margin: 0;
+      }
+
       .decision-pill {
         border-radius: 999px;
         padding: 0.45rem 0.75rem;
@@ -544,7 +649,7 @@ import { ProductCleanupService } from "./data/product-cleanup.service";
 
       textarea {
         resize: vertical;
-        min-height: 108px;
+        min-height: 64px;
       }
 
       .criteria-actions,
@@ -565,11 +670,55 @@ import { ProductCleanupService } from "./data/product-cleanup.service";
         margin-top: var(--space-3);
       }
 
+      .cleanup-education {
+        margin: 0;
+      }
+
       .summary-card,
       .detail-card,
       .message-card,
       .not-found-card {
         padding: var(--space-3);
+      }
+
+      .summary-group-card,
+      .detail-tabs-card {
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-md);
+        background: var(--color-bg-soft);
+        padding: var(--space-3);
+      }
+
+      .summary-group-card {
+        display: grid;
+        gap: var(--space-3);
+      }
+
+      .summary-group-head h2 {
+        margin: 0;
+        font-size: var(--font-size-md);
+        color: var(--color-text-secondary);
+      }
+
+      .summary-group-metrics {
+        display: grid;
+        gap: var(--space-2);
+      }
+
+      .summary-metric {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: var(--space-3);
+      }
+
+      .summary-metric span {
+        color: var(--color-text-secondary);
+        font-size: var(--font-size-sm);
+      }
+
+      .summary-metric strong {
+        font-size: 1rem;
       }
 
       .summary-card {
@@ -622,6 +771,49 @@ import { ProductCleanupService } from "./data/product-cleanup.service";
         padding-left: 1rem;
       }
 
+      .message-card {
+        padding-block: var(--space-2);
+      }
+
+      .detail-tabs-card {
+        display: grid;
+        gap: var(--space-3);
+      }
+
+      .detail-tabs {
+        display: flex;
+        gap: var(--space-2);
+        flex-wrap: wrap;
+      }
+
+      .detail-tab {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--space-2);
+        padding: 0.65rem 0.85rem;
+        border-radius: 999px;
+        border: 1px solid var(--color-border-default);
+        background: var(--color-bg-default);
+        color: var(--color-text-primary);
+        font: inherit;
+        cursor: pointer;
+      }
+
+      .detail-tab.is-active {
+        border-color: var(--color-primary);
+        background: color-mix(in srgb, var(--color-primary) 10%, var(--color-bg-soft));
+      }
+
+      .detail-tab.is-alert {
+        border-color: color-mix(in srgb, var(--color-warning) 40%, var(--color-border-default));
+      }
+
+      .detail-card--active {
+        padding: 0;
+        border: none;
+        background: transparent;
+      }
+
       .detail-card {
         display: grid;
         gap: var(--space-3);
@@ -646,7 +838,8 @@ import { ProductCleanupService } from "./data/product-cleanup.service";
       }
 
       .ui-table-wrapper {
-        overflow-x: auto;
+        width: 100%;
+        overflow-x: hidden;
       }
 
       .compact-table {
@@ -679,6 +872,11 @@ import { ProductCleanupService } from "./data/product-cleanup.service";
         white-space: normal;
         overflow-wrap: anywhere;
         vertical-align: top;
+      }
+
+      .compact-table th:last-child,
+      .compact-table td:last-child {
+        width: 22%;
       }
 
       .compact-table td {
@@ -742,9 +940,13 @@ import { ProductCleanupService } from "./data/product-cleanup.service";
           align-items: stretch;
         }
 
+        .detail-tabs,
         .detail-head,
-        .decision-card__head {
+        .decision-card__head,
+        .decision-card__actions,
+        .summary-metric {
           flex-direction: column;
+          align-items: stretch;
         }
       }
     `,
@@ -767,6 +969,7 @@ export class ProductCleanupPreviewPageComponent {
   protected successMessage = "";
   protected preview: ProductCleanupPreviewResponse | null = null;
   protected executionResult: ProductCleanupExecuteResponse | null = null;
+  protected activeDetailTab: DetailTabId = "products";
 
   private lastPreviewPayload: ProductCleanupPreviewRequest | null = null;
 
@@ -803,6 +1006,7 @@ export class ProductCleanupPreviewPageComponent {
     this.productCleanupService.preview(payload).subscribe({
       next: (response) => {
         this.preview = response;
+        this.activeDetailTab = this.selectDefaultDetailTab(response);
         this.lastPreviewPayload = payload;
         this.loading = false;
       },
@@ -909,43 +1113,106 @@ export class ProductCleanupPreviewPageComponent {
       { label: "Items de venta", value: String(result.deletedSaleItems) },
       { label: "Pagos eliminados", value: String(result.deletedSalePayments) },
       { label: "Items de cotizacion", value: String(result.deletedQuoteItems) },
+      { label: "Ordenes eliminadas", value: String(result.deletedPurchaseOrders) },
+      { label: "Items de orden", value: String(result.deletedPurchaseOrderItems) },
+      { label: "Recepciones eliminadas", value: String(result.deletedPurchaseReceipts) },
+      { label: "Items de recepcion", value: String(result.deletedPurchaseReceiptItems) },
       { label: "Saldos de stock", value: String(result.deletedStockBalances) },
       { label: "Movimientos", value: String(result.deletedInventoryMovements) },
       { label: "Transferencias", value: String(result.deletedStockTransferItems) },
     ];
   }
 
-  protected summaryCards(
+  protected summaryGroups(
     result: ProductCleanupPreviewResponse,
   ): Array<{
-    label: string;
-    value: string;
-    note?: string;
-    tone?: "success" | "warning" | "danger";
+    title: string;
+    items: Array<{ label: string; value: string }>;
   }> {
     return [
-      { label: "Total productos", value: String(result.summary.totalProducts) },
-      { label: "Encontrados", value: String(result.summary.foundProducts) },
-      { label: "Activos", value: String(result.summary.activeProducts) },
-      { label: "Inactivos", value: String(result.summary.inactiveProducts) },
-      { label: "Ventas relacionadas", value: String(result.summary.relatedSales) },
-      { label: "Ventas mixtas", value: String(result.summary.mixedSales) },
-      { label: "Ventas puras", value: String(result.summary.pureSales) },
-      { label: "Movimientos", value: String(result.summary.relatedInventoryMovements) },
-      { label: "Documentos", value: String(result.summary.relatedDocuments) },
       {
-        label: "Puede purgarse",
-        value: result.summary.purgeable ? "Sí" : "No",
-        note: result.summary.purgeable
-          ? "Sin bloqueos en este preview"
-          : "Hay bloqueos detectados",
-        tone: result.summary.purgeable
-          ? "success"
-          : result.blockers.length > 0
-            ? "danger"
-            : "warning",
+        title: "Productos",
+        items: [
+          { label: "Total", value: String(result.summary.totalProducts) },
+          { label: "Encontrados", value: String(result.summary.foundProducts) },
+          { label: "Activos", value: String(result.summary.activeProducts) },
+          { label: "Inactivos", value: String(result.summary.inactiveProducts) },
+        ],
+      },
+      {
+        title: "Ventas",
+        items: [
+          { label: "Relacionadas", value: String(result.summary.relatedSales) },
+          { label: "Completas", value: String(result.summary.pureSales) },
+          { label: "Mezcladas", value: String(result.summary.mixedSales) },
+        ],
+      },
+      {
+        title: "Compras",
+        items: [
+          { label: "Ordenes", value: String(result.summary.relatedPurchaseOrders) },
+          { label: "Ordenes completas", value: String(result.summary.purePurchaseOrders) },
+          { label: "Ordenes mezcladas", value: String(result.summary.mixedPurchaseOrders) },
+          { label: "Recepciones", value: String(result.summary.relatedPurchaseReceipts) },
+          { label: "Recepciones completas", value: String(result.summary.purePurchaseReceipts) },
+          { label: "Recepciones mezcladas", value: String(result.summary.mixedPurchaseReceipts) },
+        ],
+      },
+      {
+        title: "Inventario",
+        items: [
+          { label: "Movimientos", value: String(result.summary.relatedInventoryMovements) },
+          { label: "Saldos", value: String(result.stockBalances.length) },
+          { label: "Transferencias", value: String(result.stockTransferItems.length) },
+        ],
+      },
+      {
+        title: "Documentos",
+        items: [
+          { label: "Relacionados", value: String(result.summary.relatedDocuments) },
+        ],
+      },
+      {
+        title: "Bloqueos",
+        items: [
+          { label: "Detectados", value: String(result.blockers.length) },
+        ],
       },
     ];
+  }
+
+  protected detailTabs(result: ProductCleanupPreviewResponse): Array<{
+    id: DetailTabId;
+    label: string;
+    count: number;
+    alert: boolean;
+  }> {
+    return [
+      { id: "products", label: "Productos", count: result.foundProducts.length, alert: result.summary.activeProducts > 0 },
+      { id: "sales", label: "Ventas", count: result.relatedSales.length, alert: result.summary.mixedSales > 0 },
+      {
+        id: "purchaseOrders",
+        label: "Ordenes",
+        count: result.purchaseOrders.length,
+        alert: result.summary.mixedPurchaseOrders > 0,
+      },
+      {
+        id: "purchaseReceipts",
+        label: "Recepciones",
+        count: result.purchaseReceipts.length,
+        alert: result.summary.mixedPurchaseReceipts > 0,
+      },
+      {
+        id: "inventory",
+        label: "Stock y movimientos",
+        count: this.inventoryRows(result).length,
+        alert: result.summary.relatedDocuments > 0 || result.stockTransferItems.length > 0,
+      },
+    ];
+  }
+
+  protected setActiveDetailTab(tab: DetailTabId): void {
+    this.activeDetailTab = tab;
   }
 
   protected pureSales(
@@ -960,12 +1227,58 @@ export class ProductCleanupPreviewPageComponent {
     return result.relatedSales.filter((sale) => sale.mixedSale);
   }
 
+  protected purePurchaseOrders(
+    result: ProductCleanupPreviewResponse,
+  ): ProductCleanupPurchaseOrderPreview[] {
+    return result.purchaseOrders.filter((order) => order.purePurchaseOrder);
+  }
+
+  protected mixedPurchaseOrders(
+    result: ProductCleanupPreviewResponse,
+  ): ProductCleanupPurchaseOrderPreview[] {
+    return result.purchaseOrders.filter((order) => order.mixedPurchaseOrder);
+  }
+
+  protected purePurchaseReceipts(
+    result: ProductCleanupPreviewResponse,
+  ): ProductCleanupPurchaseReceiptPreview[] {
+    return result.purchaseReceipts.filter((receipt) => receipt.purePurchaseReceipt);
+  }
+
+  protected mixedPurchaseReceipts(
+    result: ProductCleanupPreviewResponse,
+  ): ProductCleanupPurchaseReceiptPreview[] {
+    return result.purchaseReceipts.filter((receipt) => receipt.mixedPurchaseReceipt);
+  }
+
   protected saleTypeLabel(sale: ProductCleanupSalePreview): string {
     if (sale.mixedSale) {
-      return "Venta mixta";
+      return "Venta mezclada";
     }
     if (sale.pureSale) {
-      return "Venta pura";
+      return "Venta completa";
+    }
+    return "Relacionada";
+  }
+
+  protected purchaseOrderTypeLabel(order: ProductCleanupPurchaseOrderPreview): string {
+    if (order.mixedPurchaseOrder) {
+      return "Orden mezclada";
+    }
+    if (order.purePurchaseOrder) {
+      return "Orden completa";
+    }
+    return "Relacionada";
+  }
+
+  protected purchaseReceiptTypeLabel(
+    receipt: ProductCleanupPurchaseReceiptPreview,
+  ): string {
+    if (receipt.mixedPurchaseReceipt) {
+      return "Recepcion mezclada";
+    }
+    if (receipt.purePurchaseReceipt) {
+      return "Recepcion completa";
     }
     return "Relacionada";
   }
@@ -977,13 +1290,25 @@ export class ProductCleanupPreviewPageComponent {
       reasons.push(`${result.summary.activeProducts} producto(s) activo(s)`);
     }
     if (result.summary.mixedSales > 0) {
-      reasons.push(`${result.summary.mixedSales} venta(s) mixta(s)`);
+      reasons.push(`${result.summary.mixedSales} venta(s) mezclada(s)`);
     }
     if (result.summary.relatedDocuments > 0) {
       reasons.push(`${result.summary.relatedDocuments} documento(s) relacionado(s)`);
     }
     if (result.summary.pureSales > 0) {
-      reasons.push(`${result.summary.pureSales} venta(s) pura(s)`);
+      reasons.push(`${result.summary.pureSales} venta(s) completa(s)`);
+    }
+    if (result.summary.mixedPurchaseOrders > 0) {
+      reasons.push(`${result.summary.mixedPurchaseOrders} orden(es) mezclada(s)`);
+    }
+    if (result.summary.purePurchaseOrders > 0) {
+      reasons.push(`${result.summary.purePurchaseOrders} orden(es) completa(s)`);
+    }
+    if (result.summary.mixedPurchaseReceipts > 0) {
+      reasons.push(`${result.summary.mixedPurchaseReceipts} recepcion(es) mezclada(s)`);
+    }
+    if (result.summary.purePurchaseReceipts > 0) {
+      reasons.push(`${result.summary.purePurchaseReceipts} recepcion(es) completa(s)`);
     }
     if (result.summary.relatedInventoryMovements > 0) {
       reasons.push(`${result.summary.relatedInventoryMovements} movimiento(s) de inventario`);
@@ -991,17 +1316,57 @@ export class ProductCleanupPreviewPageComponent {
     if (result.stockBalances.length > 0) {
       reasons.push(`${result.stockBalances.length} saldo(s) de stock`);
     }
-    if (result.purchaseOrderItems.length > 0) {
-      reasons.push(`${result.purchaseOrderItems.length} item(s) de orden de compra`);
-    }
-    if (result.purchaseReceiptItems.length > 0) {
-      reasons.push(`${result.purchaseReceiptItems.length} item(s) de recepcion de compra`);
-    }
     if (result.stockTransferItems.length > 0) {
       reasons.push(`${result.stockTransferItems.length} item(s) de transferencia`);
     }
 
     return reasons.length > 0 ? reasons : ["Sin bloqueos detectados en este preview"];
+  }
+
+  protected executeAvailabilityMessage(): string {
+    if (this.previewStale) {
+      return "Vuelve a analizar antes de ejecutar la purga.";
+    }
+    if (this.loading) {
+      return "Espera a que termine el analisis actual.";
+    }
+    if (this.executing) {
+      return "La purga ya se esta ejecutando.";
+    }
+    return "Confirma el preview actual para habilitar la purga.";
+  }
+
+  protected inventoryRows(
+    result: ProductCleanupPreviewResponse,
+  ): Array<{ id: string; productId: number; type: string; reference: string }> {
+    const movementRows = result.inventoryMovements.map((movement) => ({
+      id: String(movement.inventoryMovementId),
+      productId: movement.productId,
+      type: this.translateMovementType(movement.movementType),
+      reference: movement.referenceType || movement.referenceId
+        ? `${movement.referenceType || "Referencia"}${movement.referenceId ? ` #${movement.referenceId}` : ""}`
+        : movement.reason,
+    }));
+    const balanceRows = result.stockBalances.map((balance) => ({
+      id: `SB-${balance.stockBalanceId}`,
+      productId: balance.productId,
+      type: "Saldo de stock",
+      reference: `Almacen ${balance.warehouseId} · Cantidad ${balance.quantity}`,
+    }));
+    const transferRows = result.stockTransferItems.map((transfer) => ({
+      id: `TR-${transfer.stockTransferItemId}`,
+      productId: transfer.productId,
+      type: "Transferencia",
+      reference: `Transferencia #${transfer.transferId} · Cantidad ${transfer.quantity}`,
+    }));
+    const documentRows = result.electronicDocumentItems.map((document) => ({
+      id: `DOC-${document.electronicDocumentItemId}`,
+      productId: document.productId,
+      type: "Documento electronico",
+      reference: `${document.fullNumber} · Venta ${document.saleId}`,
+    }));
+
+    return [...movementRows, ...balanceRows, ...transferRows, ...documentRows];
   }
 
   protected visibleInventoryMovements(
@@ -1038,7 +1403,13 @@ export class ProductCleanupPreviewPageComponent {
     }
 
     if (normalized.includes("pure sale(s) detected")) {
-      return "Se detectaron ventas puras. Una ejecucion futura tendria que eliminar ventas completas y pagos relacionados.";
+      return "Se detectaron ventas completas. Una ejecucion futura tendria que eliminar ventas enteras y pagos relacionados.";
+    }
+    if (normalized.includes("pure purchase order(s) detected")) {
+      return "Se detectaron ordenes de compra completas. La purga eliminaria las ordenes enteras y sus items relacionados.";
+    }
+    if (normalized.includes("pure purchase receipt(s) detected")) {
+      return "Se detectaron recepciones de compra completas. La purga eliminaria las recepciones enteras y sus items relacionados.";
     }
     if (normalized.includes("sale payment(s) are linked")) {
       return "Hay pagos asociados a las ventas afectadas.";
@@ -1050,16 +1421,16 @@ export class ProductCleanupPreviewPageComponent {
       return "Hay movimientos de inventario relacionados con los productos seleccionados.";
     }
     if (normalized.includes("mixed sale(s) detected")) {
-      return "Hay ventas mixtas que combinan productos seleccionados con no seleccionados.";
+      return "Hay ventas mezcladas que combinan productos seleccionados con no seleccionados.";
     }
     if (normalized.includes("electronic document item(s) detected")) {
       return "Hay documentos electronicos relacionados que bloquean una purga segura.";
     }
-    if (normalized.includes("purchase order item(s) detected")) {
-      return "Hay ordenes de compra relacionadas que bloquean una purga segura.";
+    if (normalized.includes("mixed purchase order(s) detected")) {
+      return "Hay ordenes de compra mezcladas que combinan productos seleccionados con no seleccionados.";
     }
-    if (normalized.includes("purchase receipt item(s) detected")) {
-      return "Hay recepciones de compra relacionadas que bloquean una purga segura.";
+    if (normalized.includes("mixed purchase receipt(s) detected")) {
+      return "Hay recepciones de compra mezcladas o con orden padre mezclada que bloquean una purga segura.";
     }
     if (normalized.includes("stock transfer item(s) detected")) {
       return "Hay transferencias de stock relacionadas que bloquean una purga segura.";
@@ -1090,6 +1461,8 @@ export class ProductCleanupPreviewPageComponent {
         return "Salida por venta";
       case "SALE_VOID_IN":
         return "Entrada por anulacion de venta";
+      case "PURCHASE_IN":
+        return "Entrada por compra";
       case "PURCHASE_RECEIPT":
         return "Recepcion de compra";
       case "TRANSFER_OUT":
@@ -1099,6 +1472,48 @@ export class ProductCleanupPreviewPageComponent {
       default:
         return type || "-";
     }
+  }
+
+  protected translatePurchaseStatus(status: string | null): string {
+    switch ((status ?? "").trim().toUpperCase()) {
+      case "DRAFT":
+        return "Borrador";
+      case "APPROVED":
+        return "Aprobada";
+      case "PARTIALLY_RECEIVED":
+        return "Recepcion parcial";
+      case "RECEIVED":
+        return "Recepcionada";
+      case "CANCELLED":
+        return "Cancelada";
+      default:
+        return status || "-";
+    }
+  }
+
+  private selectDefaultDetailTab(result: ProductCleanupPreviewResponse): DetailTabId {
+    if (result.summary.mixedSales > 0 && result.relatedSales.length > 0) {
+      return "sales";
+    }
+    if (result.summary.mixedPurchaseOrders > 0 && result.purchaseOrders.length > 0) {
+      return "purchaseOrders";
+    }
+    if (result.summary.mixedPurchaseReceipts > 0 && result.purchaseReceipts.length > 0) {
+      return "purchaseReceipts";
+    }
+    if (result.foundProducts.length > 0) {
+      return "products";
+    }
+    if (result.relatedSales.length > 0) {
+      return "sales";
+    }
+    if (result.purchaseOrders.length > 0) {
+      return "purchaseOrders";
+    }
+    if (result.purchaseReceipts.length > 0) {
+      return "purchaseReceipts";
+    }
+    return "inventory";
   }
 
   private toExecuteErrorMessage(error: unknown): string {

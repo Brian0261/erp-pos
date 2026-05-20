@@ -20,6 +20,8 @@ export interface ProductCleanupPreviewResponse {
   inventoryMovements: ProductCleanupInventoryMovementPreview[];
   stockTransferItems: ProductCleanupStockTransferItemPreview[];
   quoteItems: ProductCleanupQuoteItemPreview[];
+  purchaseOrders: ProductCleanupPurchaseOrderPreview[];
+  purchaseReceipts: ProductCleanupPurchaseReceiptPreview[];
   purchaseOrderItems: ProductCleanupPurchaseOrderItemPreview[];
   purchaseReceiptItems: ProductCleanupPurchaseReceiptItemPreview[];
   electronicDocumentItems: ProductCleanupElectronicDocumentItemPreview[];
@@ -117,6 +119,26 @@ export interface ProductCleanupQuoteItemPreview {
   lineTotal: number;
 }
 
+export interface ProductCleanupPurchaseOrderPreview {
+  purchaseOrderId: number;
+  status: string;
+  itemCount: number;
+  selectedItemCount: number;
+  nonSelectedItemCount: number;
+  purePurchaseOrder: boolean;
+  mixedPurchaseOrder: boolean;
+}
+
+export interface ProductCleanupPurchaseReceiptPreview {
+  purchaseReceiptId: number;
+  purchaseOrderId: number;
+  itemCount: number;
+  selectedItemCount: number;
+  nonSelectedItemCount: number;
+  purePurchaseReceipt: boolean;
+  mixedPurchaseReceipt: boolean;
+}
+
 export interface ProductCleanupPurchaseOrderItemPreview {
   purchaseOrderItemId: number;
   purchaseOrderId: number;
@@ -155,6 +177,12 @@ export interface ProductCleanupSummary {
   relatedSales: number;
   mixedSales: number;
   pureSales: number;
+  relatedPurchaseOrders: number;
+  purePurchaseOrders: number;
+  mixedPurchaseOrders: number;
+  relatedPurchaseReceipts: number;
+  purePurchaseReceipts: number;
+  mixedPurchaseReceipts: number;
   relatedInventoryMovements: number;
   relatedDocuments: number;
   purgeable: boolean;
@@ -165,12 +193,16 @@ export interface ProductCleanupSummary {
 export interface ProductCleanupExecuteResponse {
   deletedProductIds: number[];
   deletedSaleIds: number[];
+  deletedPurchaseOrderIds: number[];
+  deletedPurchaseReceiptIds: number[];
   deletedProducts: number;
   deletedSales: number;
   deletedSaleItems: number;
   deletedSalePayments: number;
   deletedQuoteItems: number;
+  deletedPurchaseOrders: number;
   deletedPurchaseOrderItems: number;
+  deletedPurchaseReceipts: number;
   deletedPurchaseReceiptItems: number;
   deletedStockTransferItems: number;
   deletedStockBalances: number;

@@ -205,6 +205,18 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [x] No se finalizo venta real en esta fase; no hubo mutacion transaccional de stock/kardex.
 - [x] Sin cambios en backend, Flyway, DB, endpoints, servicios Angular, modelos, rutas, guards, AuthService, JWT/interceptor, facturacion, compras, outbox, OpenAI, Dockerfile ni nginx.conf.
 
+### Cleanup admin UX - Tabs y jerarquia visual (2026-05-20)
+
+- [x] Alcance visual aplicado solo a `frontend/src/app/features/admin/product-cleanup-preview-page.component.ts`.
+- [x] Pantalla `/admin/test-data-cleanup/products` validada manualmente tras compactar cabecera/formulario y reducir altura del textarea.
+- [x] Tarjeta principal de decision valida estado global: `Este conjunto parece purgable` / `No se puede purgar`.
+- [x] Se elimino la card redundante `Puede purgarse / Sí / Sin bloqueos...` y los KPIs quedaron agrupados por dominio.
+- [x] Tabs validados: `Productos`, `Ventas`, `Ordenes de compra`, `Recepciones de compra`, `Stock y movimientos`; cada tab muestra una sola tabla a ancho completo.
+- [x] Producto purgable con ventas/compras/recepciones puras muestra el estado esperado y `Ejecutar purga` sigue condicionado por `preview.purgeable`.
+- [x] Producto no purgable mantiene `No se puede purgar` y `Ejecutar purga` no se habilita.
+- [x] Modal de ejecucion conserva `confirmationText = ELIMINAR PRUEBAS`.
+- [x] Preview y execute siguen funcionando; `npm run build` frontend OK.
+
 ### POS Fase 2C - Busqueda unificada y limpieza visual (2026-05-08)
 
 - [x] Alcance aplicado solo a `frontend/src/app/features/sales/pos-page.component.ts` y evidencia QA en este checklist.
@@ -305,6 +317,14 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
   - [x] Tras la purga, los datos de prueba de producto/ventas/movimientos dejan de aparecer; no se alteraron productos reales.
   - [x] `npm run build` frontend exitoso tras la habilitacion segura del flujo destructivo.
 - [x] Filtro `Caja` en Ventas acepta solo enteros positivos en frontend y mantiene el mensaje `Ingresa un número de caja válido.` para valores invalidos.
+
+### Cleanup admin copy - completa / mezclada (2026-05-20)
+
+- [x] Pantalla `/admin/test-data-cleanup/products` validada manualmente con copy visible reemplazado a `completa` / `mezclada`.
+- [x] KPIs, badges, tablas y mensajes muestran el nuevo copy sin cambiar la logica destructiva.
+- [x] Microcopy educativo visible una sola vez y aclara que solo se eliminan relaciones con productos seleccionados.
+- [x] Preview sigue funcionando, `Execute` sigue condicionado por `preview.purgeable` y `ELIMINAR PRUEBAS` sigue vigente.
+- [x] `npm run build` frontend exitoso tras el ajuste de copy.
 - [x] Validación funcional del filtro de fechas:
   - [x] Sin filtros: carga ventas disponibles.
   - [x] Solo `Hasta = 09/05/2026`: incluye ventas del 09/05/2026.
