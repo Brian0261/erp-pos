@@ -23,38 +23,47 @@ import { toHttpErrorMessage } from "./data/http-error-message";
         </div>
       </header>
 
-      <form [formGroup]="form" (ngSubmit)="submit()" class="form-grid">
-        <label class="field">
-          <span>Nombre *</span>
+        <form [formGroup]="form" (ngSubmit)="submit()" class="form-grid">
+          <span class="field-label">Nombre *</span>
+          <span class="field-label">Descripcion</span>
+          <span class="field-label field-label--placeholder" aria-hidden="true"
+            >&nbsp;</span
+          >
+
           <input
             type="text"
             formControlName="name"
             placeholder="Ej. Cuadernos"
           />
-          <small class="field-error" *ngIf="isInvalid('name')"
-            >Nombre es obligatorio.</small
-          >
-        </label>
-
-        <label class="field">
-          <span>Descripcion</span>
           <input
             type="text"
             formControlName="description"
             placeholder="Descripcion breve para uso interno"
           />
-        </label>
+          <div class="form-action">
+            <button
+              type="submit"
+              class="ui-button ui-button--primary"
+              [disabled]="saving"
+            >
+              {{ saving ? "Creando..." : "Crear categoria" }}
+            </button>
+          </div>
 
-        <div class="form-action">
-          <button
-            type="submit"
-            class="ui-button ui-button--primary"
-            [disabled]="saving"
-          >
-            {{ saving ? "Creando..." : "Crear categoria" }}
-          </button>
-        </div>
-      </form>
+          <div class="field-feedback" aria-live="polite">
+            <small
+              class="field-error"
+              [class.field-error--hidden]="!isInvalid('name')"
+              >Nombre es obligatorio.</small
+            >
+          </div>
+          <div class="field-feedback" aria-hidden="true">
+            <small class="field-placeholder">&nbsp;</small>
+          </div>
+          <div class="field-feedback field-feedback--placeholder" aria-hidden="true">
+            <small class="field-placeholder">&nbsp;</small>
+          </div>
+        </form>
 
       <p class="ui-alert ui-alert--error" *ngIf="errorMessage">
         {{ errorMessage }}
@@ -109,23 +118,23 @@ import { toHttpErrorMessage } from "./data/http-error-message";
       .form-grid {
         display: grid;
         grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr) auto;
+        grid-template-rows: auto auto auto;
         gap: var(--space-3);
-        align-items: end;
+        align-items: start;
         border: 1px solid var(--color-border-default);
         border-radius: var(--radius-md);
         background: var(--color-bg-soft);
         padding: var(--space-3);
       }
 
-      .field {
-        display: grid;
-        gap: var(--space-1);
-      }
-
-      .field > span {
+      .field-label {
         font-size: var(--font-size-sm);
         color: var(--color-text-secondary);
         font-weight: 700;
+      }
+
+      .field-label--placeholder {
+        visibility: hidden;
       }
 
       input {
@@ -135,13 +144,32 @@ import { toHttpErrorMessage } from "./data/http-error-message";
       }
 
       .field-error {
+        min-height: 1rem;
+        line-height: 1rem;
         color: var(--color-danger);
         font-size: var(--font-size-xs);
+      }
+
+      .field-error--hidden {
+        visibility: hidden;
+      }
+
+      .field-feedback {
+        min-height: 1rem;
+      }
+
+      .field-feedback--placeholder {
+        justify-self: end;
+      }
+
+      .field-placeholder {
+        visibility: hidden;
       }
 
       .form-action {
         display: flex;
         justify-content: flex-end;
+        align-self: stretch;
       }
 
       .ui-button[disabled] {
@@ -160,6 +188,7 @@ import { toHttpErrorMessage } from "./data/http-error-message";
 
         .form-grid {
           grid-template-columns: 1fr;
+          grid-template-rows: auto;
         }
 
         .form-action {
