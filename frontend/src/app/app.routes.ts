@@ -12,6 +12,7 @@ import { BillingDocumentDetailPageComponent } from "./features/billing/billing-d
 import { BillingDocumentsPageComponent } from "./features/billing/billing-documents-page.component";
 import { BillingIssueFromSalePageComponent } from "./features/billing/billing-issue-from-sale-page.component";
 import { BillingSeriesPageComponent } from "./features/billing/billing-series-page.component";
+import { ProductCleanupPreviewPageComponent } from "./features/admin/product-cleanup-preview-page.component";
 import { DashboardComponent } from "./features/dashboard/dashboard.component";
 import { OutboxEventDetailPageComponent } from "./features/integrations/outbox-event-detail-page.component";
 import { OutboxEventsPageComponent } from "./features/integrations/outbox-events-page.component";
@@ -94,6 +95,11 @@ export const routes: Routes = [
         path: "ventas/:id",
         component: SaleDetailPageComponent,
         data: { allowedRoles: ROLES_SALES },
+      },
+      {
+        path: "admin/test-data-cleanup/products",
+        component: ProductCleanupPreviewPageComponent,
+        data: { allowedRoles: ROLES_ADMIN },
       },
       {
         path: "catalogo",

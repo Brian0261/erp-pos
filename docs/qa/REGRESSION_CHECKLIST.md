@@ -297,6 +297,13 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
   - [x] `Anulada` filtra sin requerir click en `Filtrar`.
   - [x] `Todos` limpia el filtro de estado y recarga el listado.
   - [x] `Filtrar` sigue disponible para los demas filtros y como accion manual general.
+- [x] Limpieza de datos de prueba de productos - QA manual frontend:
+  - [x] Pantalla admin analizada con SKU `TIJ01` y preview purgable `true`/`false` segun bloqueos reales.
+  - [x] Boton de purga solo se habilita cuando el preview es purgable.
+  - [x] Modal local exige confirmationText exacto `ELIMINAR PRUEBAS`; texto incorrecto o cancelacion no ejecutan la purga.
+  - [x] Confirmacion valida llama a `POST /api/v1/admin/test-data-cleanup/products/execute` y muestra resumen final de eliminacion.
+  - [x] Tras la purga, los datos de prueba de producto/ventas/movimientos dejan de aparecer; no se alteraron productos reales.
+  - [x] `npm run build` frontend exitoso tras la habilitacion segura del flujo destructivo.
 - [x] Filtro `Caja` en Ventas acepta solo enteros positivos en frontend y mantiene el mensaje `Ingresa un número de caja válido.` para valores invalidos.
 - [x] Validación funcional del filtro de fechas:
   - [x] Sin filtros: carga ventas disponibles.
