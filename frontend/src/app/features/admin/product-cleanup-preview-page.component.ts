@@ -149,6 +149,16 @@ type DetailTabId =
 
           <div class="decision-card__actions">
             <button
+              *ngIf="preview"
+              type="button"
+              class="ui-button ui-button--secondary"
+              (click)="downloadPreviewEvidence()"
+              [disabled]="loading || executing"
+              title="Descarga una copia del analisis antes de ejecutar cambios."
+            >
+              Descargar preview
+            </button>
+            <button
               *ngIf="result.purgeable"
               type="button"
               class="ui-button ui-button--danger"
@@ -985,6 +995,7 @@ export class ProductCleanupPreviewPageComponent {
   protected activeDetailTab: DetailTabId = "products";
 
   private lastPreviewPayload: ProductCleanupPreviewRequest | null = null;
+  private lastPreviewCriteriaRaw = "";
 
   constructor(
     private readonly formBuilder: FormBuilder,
@@ -1021,11 +1032,13 @@ export class ProductCleanupPreviewPageComponent {
         this.preview = response;
         this.activeDetailTab = this.selectDefaultDetailTab(response);
         this.lastPreviewPayload = payload;
+        this.lastPreviewCriteriaRaw = this.form.controls.productQuery.value ?? "";
         this.loading = false;
       },
       error: (error) => {
         this.loading = false;
         this.lastPreviewPayload = null;
+        this.lastPreviewCriteriaRaw = "";
         this.errorMessage = toHttpErrorMessage(
           error,
           "No se pudo consultar el preview de limpieza.",
@@ -1100,6 +1113,7 @@ export class ProductCleanupPreviewPageComponent {
           this.preview = null;
           this.previewStale = false;
           this.lastPreviewPayload = null;
+          this.lastPreviewCriteriaRaw = "";
           this.executionResult = response;
           this.successMessage =
             "Purga ejecutada correctamente. Los datos de prueba fueron eliminados de forma permanente.";
@@ -1112,6 +1126,7 @@ export class ProductCleanupPreviewPageComponent {
           this.preview = null;
           this.previewStale = false;
           this.lastPreviewPayload = null;
+          this.lastPreviewCriteriaRaw = "";
           this.errorMessage = this.toExecuteErrorMessage(error);
         },
       });
@@ -1349,6 +1364,16 @@ export class ProductCleanupPreviewPageComponent {
     return "Confirma el preview actual para habilitar la purga.";
   }
 
+  protected downloadPreviewEvidence(): void {
+    if (!this.preview) {
+      return;
+    }
+
+    const payload = this.buildPreviewEvidence();
+    const filename = `cleanup-preview-${this.formatEvidenceTimestamp(new Date())}.json`;
+    this.downloadJson(filename, payload);
+  }
+
   protected inventoryRows(
     result: ProductCleanupPreviewResponse,
   ): Array<{ id: string; productId: number; type: string; reference: string }> {
@@ -1380,6 +1405,59 @@ export class ProductCleanupPreviewPageComponent {
     }));
 
     return [...movementRows, ...balanceRows, ...transferRows, ...documentRows];
+  }
+
+  private buildPreviewEvidence(): Record<string, unknown> {
+    const parsedQuery = this.splitTokens(this.lastPreviewCriteriaRaw);
+    const productIds = parsedQuery
+      .filter((item) => /^\d+$/.test(item))
+      .map((item) => Number(item))
+      .filter((item) => Number.isInteger(item) && item > 0);
+    const skus = parsedQuery.filter((item) => !/^\d+$/.test(item));
+
+    return {
+      generatedAt: new Date().toISOString(),
+      criteria: {
+        inputOriginal: this.lastPreviewCriteriaRaw,
+        productIds,
+        skus,
+      },
+      summary: this.preview?.summary ?? null,
+      purgeable: this.preview?.purgeable ?? false,
+      blockers: this.preview?.blockers ?? [],
+      warnings: this.preview?.warnings ?? [],
+      productsFound: this.preview?.foundProducts ?? [],
+      productsNotFound: {
+        productIds: this.preview?.notFoundProductIds ?? [],
+        skus: this.preview?.notFoundSkus ?? [],
+      },
+      sales: this.preview?.relatedSales ?? [],
+      purchaseOrders: this.preview?.purchaseOrders ?? [],
+      purchaseReceipts: this.preview?.purchaseReceipts ?? [],
+      stockBalances: this.preview?.stockBalances ?? [],
+      inventoryMovements: this.preview?.inventoryMovements ?? [],
+      stockTransferItems: this.preview?.stockTransferItems ?? [],
+      documents: this.preview?.electronicDocumentItems ?? [],
+      note: "Este archivo es una evidencia del preview antes de ejecutar una purga. No representa una auditoria persistida.",
+    };
+  }
+
+  private downloadJson(filename: string, data: unknown): void {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.rel = "noopener";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  private formatEvidenceTimestamp(date: Date): string {
+    const pad = (value: number): string => String(value).padStart(2, "0");
+    return [date.getFullYear(), pad(date.getMonth() + 1), pad(date.getDate())].join("") + `-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
   }
 
   protected visibleInventoryMovements(

@@ -325,6 +325,14 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [x] Microcopy educativo visible una sola vez y aclara que solo se eliminan relaciones con productos seleccionados.
 - [x] Preview sigue funcionando, `Execute` sigue condicionado por `preview.purgeable` y `ELIMINAR PRUEBAS` sigue vigente.
 - [x] `npm run build` frontend exitoso tras el ajuste de copy.
+
+### Cleanup admin evidencia preview (2026-05-20)
+
+- [x] Boton `Descargar preview` aparece cuando existe un preview cargado.
+- [x] Descarga JSON correcta con preview purgable y no purgable.
+- [x] JSON incluye `generatedAt`, `criteria`, `summary`, `purgeable`, `blockers`, `warnings` y detalles principales.
+- [x] Descargar preview no llama a `execute` ni borra datos.
+- [x] `npm run build` frontend exitoso tras agregar descarga de evidencia.
 - [x] Validación funcional del filtro de fechas:
   - [x] Sin filtros: carga ventas disponibles.
   - [x] Solo `Hasta = 09/05/2026`: incluye ventas del 09/05/2026.
