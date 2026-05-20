@@ -16,6 +16,8 @@ public record ProductCleanupPreviewResponse(
         List<InventoryMovementPreview> inventoryMovements,
         List<StockTransferItemPreview> stockTransferItems,
         List<QuoteItemPreview> quoteItems,
+        List<PurchaseOrderPreview> purchaseOrders,
+        List<PurchaseReceiptPreview> purchaseReceipts,
         List<PurchaseOrderItemPreview> purchaseOrderItems,
         List<PurchaseReceiptItemPreview> purchaseReceiptItems,
         List<ElectronicDocumentItemPreview> electronicDocumentItems,
@@ -121,6 +123,28 @@ public record ProductCleanupPreviewResponse(
     ) {
     }
 
+    public record PurchaseOrderPreview(
+            Long purchaseOrderId,
+            String status,
+            int itemCount,
+            int selectedItemCount,
+            int nonSelectedItemCount,
+            boolean purePurchaseOrder,
+            boolean mixedPurchaseOrder
+    ) {
+    }
+
+    public record PurchaseReceiptPreview(
+            Long purchaseReceiptId,
+            Long purchaseOrderId,
+            int itemCount,
+            int selectedItemCount,
+            int nonSelectedItemCount,
+            boolean purePurchaseReceipt,
+            boolean mixedPurchaseReceipt
+    ) {
+    }
+
     public record PurchaseOrderItemPreview(
             Long purchaseOrderItemId,
             Long purchaseOrderId,
@@ -162,6 +186,12 @@ public record ProductCleanupPreviewResponse(
             int relatedSales,
             int mixedSales,
             int pureSales,
+            int relatedPurchaseOrders,
+            int purePurchaseOrders,
+            int mixedPurchaseOrders,
+            int relatedPurchaseReceipts,
+            int purePurchaseReceipts,
+            int mixedPurchaseReceipts,
             int relatedInventoryMovements,
             int relatedDocuments,
             boolean purgeable,

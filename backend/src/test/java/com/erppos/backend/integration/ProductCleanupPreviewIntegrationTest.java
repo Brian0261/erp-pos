@@ -123,6 +123,108 @@ class ProductCleanupPreviewIntegrationTest extends AbstractHttpIntegrationTest {
     }
 
     @Test
+    void shouldPreviewPurePurchaseOrderAsWarning() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = Long.toString(System.nanoTime());
+        long categoryId = createCategory(adminToken, suffix);
+        long unitId = createUnit(adminToken, suffix);
+        long warehouseId = createWarehouse(adminToken, suffix);
+        long supplierId = createSupplier(adminToken, suffix);
+        long productId = createProduct(adminToken, categoryId, unitId, suffix, BigDecimal.TEN);
+        long purchaseOrderId = createPurchaseOrder(adminToken, supplierId, warehouseId, new long[]{productId}, new BigDecimal[]{BigDecimal.valueOf(3)}, new BigDecimal[]{BigDecimal.TEN}).orderId();
+        deactivateProduct(adminToken, productId);
+
+        mockMvc.perform(post("/api/v1/admin/test-data-cleanup/products/preview")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(previewPayload(productId).toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.purgeable").value(true))
+                .andExpect(jsonPath("$.summary.relatedPurchaseOrders").value(1))
+                .andExpect(jsonPath("$.summary.purePurchaseOrders").value(1))
+                .andExpect(jsonPath("$.summary.mixedPurchaseOrders").value(0))
+                .andExpect(jsonPath("$.purchaseOrders[0].purchaseOrderId").value(purchaseOrderId))
+                .andExpect(jsonPath("$.purchaseOrders[0].purePurchaseOrder").value(true))
+                .andExpect(jsonPath("$.warnings[0]").exists());
+    }
+
+    @Test
+    void shouldPreviewPurePurchaseReceiptAsWarning() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = Long.toString(System.nanoTime());
+        long categoryId = createCategory(adminToken, suffix);
+        long unitId = createUnit(adminToken, suffix);
+        long warehouseId = createWarehouse(adminToken, suffix);
+        long supplierId = createSupplier(adminToken, suffix);
+        long productId = createProduct(adminToken, categoryId, unitId, suffix, BigDecimal.TEN);
+        PurchaseOrderData order = createPurchaseOrder(adminToken, supplierId, warehouseId, new long[]{productId}, new BigDecimal[]{BigDecimal.valueOf(4)}, new BigDecimal[]{BigDecimal.TEN});
+        approvePurchaseOrder(adminToken, order.orderId());
+        receivePurchaseOrder(adminToken, order.orderId(), new long[]{order.itemIds()[0]}, new BigDecimal[]{BigDecimal.valueOf(4)});
+        long purchaseReceiptId = latestPurchaseReceiptId(order.orderId());
+        deactivateProduct(adminToken, productId);
+
+        mockMvc.perform(post("/api/v1/admin/test-data-cleanup/products/preview")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(previewPayload(productId).toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.purgeable").value(true))
+                .andExpect(jsonPath("$.summary.purePurchaseOrders").value(1))
+                .andExpect(jsonPath("$.summary.purePurchaseReceipts").value(1))
+                .andExpect(jsonPath("$.purchaseReceipts[0].purchaseReceiptId").value(purchaseReceiptId))
+                .andExpect(jsonPath("$.purchaseReceipts[0].purePurchaseReceipt").value(true));
+    }
+
+    @Test
+    void shouldPreviewMixedPurchaseOrderAsBlocker() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = Long.toString(System.nanoTime());
+        long categoryId = createCategory(adminToken, suffix);
+        long unitId = createUnit(adminToken, suffix);
+        long warehouseId = createWarehouse(adminToken, suffix);
+        long supplierId = createSupplier(adminToken, suffix);
+        long targetProductId = createProduct(adminToken, categoryId, unitId, "A-" + suffix, BigDecimal.TEN);
+        long otherProductId = createProduct(adminToken, categoryId, unitId, "B-" + suffix, BigDecimal.valueOf(5));
+        createPurchaseOrder(adminToken, supplierId, warehouseId, new long[]{targetProductId, otherProductId}, new BigDecimal[]{BigDecimal.ONE, BigDecimal.ONE}, new BigDecimal[]{BigDecimal.TEN, BigDecimal.valueOf(5)});
+        deactivateProduct(adminToken, targetProductId);
+
+        mockMvc.perform(post("/api/v1/admin/test-data-cleanup/products/preview")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(previewPayload(targetProductId).toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.purgeable").value(false))
+                .andExpect(jsonPath("$.summary.mixedPurchaseOrders").value(1))
+                .andExpect(jsonPath("$.purchaseOrders[0].mixedPurchaseOrder").value(true))
+                .andExpect(jsonPath("$.blockers[0]").value(org.hamcrest.Matchers.containsString("mixed purchase order")));
+    }
+
+    @Test
+    void shouldPreviewMixedPurchaseReceiptAsBlocker() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = Long.toString(System.nanoTime());
+        long categoryId = createCategory(adminToken, suffix);
+        long unitId = createUnit(adminToken, suffix);
+        long warehouseId = createWarehouse(adminToken, suffix);
+        long supplierId = createSupplier(adminToken, suffix);
+        long targetProductId = createProduct(adminToken, categoryId, unitId, "A-" + suffix, BigDecimal.TEN);
+        long otherProductId = createProduct(adminToken, categoryId, unitId, "B-" + suffix, BigDecimal.valueOf(5));
+        PurchaseOrderData order = createPurchaseOrder(adminToken, supplierId, warehouseId, new long[]{targetProductId, otherProductId}, new BigDecimal[]{BigDecimal.valueOf(2), BigDecimal.ONE}, new BigDecimal[]{BigDecimal.TEN, BigDecimal.valueOf(5)});
+        approvePurchaseOrder(adminToken, order.orderId());
+        receivePurchaseOrder(adminToken, order.orderId(), new long[]{order.itemIds()[0]}, new BigDecimal[]{BigDecimal.ONE});
+        deactivateProduct(adminToken, targetProductId);
+
+        mockMvc.perform(post("/api/v1/admin/test-data-cleanup/products/preview")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(previewPayload(targetProductId).toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.purgeable").value(false))
+                .andExpect(jsonPath("$.summary.mixedPurchaseReceipts").value(1))
+                .andExpect(jsonPath("$.purchaseReceipts[0].mixedPurchaseReceipt").value(true));
+    }
+
+    @Test
     void shouldExecuteInactiveProductWithoutReferences() throws Exception {
         String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
         String suffix = Long.toString(System.nanoTime());
@@ -185,6 +287,68 @@ class ProductCleanupPreviewIntegrationTest extends AbstractHttpIntegrationTest {
 
         assertEquals(before, snapshotCounts());
         assertEquals(1L, countById("products", productId));
+    }
+
+    @Test
+    void shouldExecutePurePurchaseOrderAndDeleteWholeChain() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = Long.toString(System.nanoTime());
+        long categoryId = createCategory(adminToken, suffix);
+        long unitId = createUnit(adminToken, suffix);
+        long warehouseId = createWarehouse(adminToken, suffix);
+        long supplierId = createSupplier(adminToken, suffix);
+        long productId = createProduct(adminToken, categoryId, unitId, suffix, BigDecimal.TEN);
+        long controlProductId = createProduct(adminToken, categoryId, unitId, "CTRL-" + suffix, BigDecimal.valueOf(4));
+        PurchaseOrderData order = createPurchaseOrder(adminToken, supplierId, warehouseId, new long[]{productId}, new BigDecimal[]{BigDecimal.valueOf(3)}, new BigDecimal[]{BigDecimal.TEN});
+        deactivateProduct(adminToken, productId);
+
+        mockMvc.perform(post("/api/v1/admin/test-data-cleanup/products/execute")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(executePayload(productId, "ELIMINAR PRUEBAS").toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.deletedPurchaseOrderIds[0]").value(order.orderId()))
+                .andExpect(jsonPath("$.deletedPurchaseOrders").value(1))
+                .andExpect(jsonPath("$.deletedPurchaseOrderItems").value(1))
+                .andExpect(jsonPath("$.deletedPurchaseReceipts").value(0));
+
+        assertEquals(0L, countById("products", productId));
+        assertEquals(0L, countById("purchase_orders", order.orderId()));
+        assertEquals(0L, countByColumn("purchase_order_items", "purchase_order_id", order.orderId()));
+        assertEquals(1L, countById("products", controlProductId));
+    }
+
+    @Test
+    void shouldExecutePurePurchaseReceiptAndDeleteWholeChain() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = Long.toString(System.nanoTime());
+        long categoryId = createCategory(adminToken, suffix);
+        long unitId = createUnit(adminToken, suffix);
+        long warehouseId = createWarehouse(adminToken, suffix);
+        long supplierId = createSupplier(adminToken, suffix);
+        long productId = createProduct(adminToken, categoryId, unitId, suffix, BigDecimal.TEN);
+        PurchaseOrderData order = createPurchaseOrder(adminToken, supplierId, warehouseId, new long[]{productId}, new BigDecimal[]{BigDecimal.valueOf(5)}, new BigDecimal[]{BigDecimal.TEN});
+        approvePurchaseOrder(adminToken, order.orderId());
+        receivePurchaseOrder(adminToken, order.orderId(), new long[]{order.itemIds()[0]}, new BigDecimal[]{BigDecimal.valueOf(5)});
+        long purchaseReceiptId = latestPurchaseReceiptId(order.orderId());
+        deactivateProduct(adminToken, productId);
+
+        mockMvc.perform(post("/api/v1/admin/test-data-cleanup/products/execute")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(executePayload(productId, "ELIMINAR PRUEBAS").toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.deletedPurchaseOrderIds[0]").value(order.orderId()))
+                .andExpect(jsonPath("$.deletedPurchaseReceiptIds[0]").value(purchaseReceiptId))
+                .andExpect(jsonPath("$.deletedPurchaseOrders").value(1))
+                .andExpect(jsonPath("$.deletedPurchaseReceipts").value(1));
+
+        assertEquals(0L, countById("products", productId));
+        assertEquals(0L, countById("purchase_orders", order.orderId()));
+        assertEquals(0L, countById("purchase_receipts", purchaseReceiptId));
+        assertEquals(0L, countByColumn("purchase_receipt_items", "purchase_receipt_id", purchaseReceiptId));
+        assertEquals(0L, countByColumn("inventory_movements", "product_id", productId));
+        assertEquals(0L, countByColumn("stock_balances", "product_id", productId));
     }
 
     @Test
@@ -258,6 +422,65 @@ class ProductCleanupPreviewIntegrationTest extends AbstractHttpIntegrationTest {
     }
 
     @Test
+    void shouldBlockExecuteForMixedPurchaseOrderAndKeepDataUnchanged() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = Long.toString(System.nanoTime());
+        long categoryId = createCategory(adminToken, suffix);
+        long unitId = createUnit(adminToken, suffix);
+        long warehouseId = createWarehouse(adminToken, suffix);
+        long supplierId = createSupplier(adminToken, suffix);
+        long targetProductId = createProduct(adminToken, categoryId, unitId, "A-" + suffix, BigDecimal.TEN);
+        long otherProductId = createProduct(adminToken, categoryId, unitId, "B-" + suffix, BigDecimal.valueOf(5));
+        PurchaseOrderData order = createPurchaseOrder(adminToken, supplierId, warehouseId, new long[]{targetProductId, otherProductId}, new BigDecimal[]{BigDecimal.ONE, BigDecimal.ONE}, new BigDecimal[]{BigDecimal.TEN, BigDecimal.valueOf(5)});
+        deactivateProduct(adminToken, targetProductId);
+
+        Counts before = snapshotCounts();
+
+        mockMvc.perform(post("/api/v1/admin/test-data-cleanup/products/execute")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(executePayload(targetProductId, "ELIMINAR PRUEBAS").toString()))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("mixed purchase order")));
+
+        assertEquals(before, snapshotCounts());
+        assertEquals(1L, countById("products", targetProductId));
+        assertEquals(1L, countById("products", otherProductId));
+        assertEquals(1L, countById("purchase_orders", order.orderId()));
+    }
+
+    @Test
+    void shouldBlockExecuteForMixedPurchaseReceiptAndKeepDataUnchanged() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = Long.toString(System.nanoTime());
+        long categoryId = createCategory(adminToken, suffix);
+        long unitId = createUnit(adminToken, suffix);
+        long warehouseId = createWarehouse(adminToken, suffix);
+        long supplierId = createSupplier(adminToken, suffix);
+        long targetProductId = createProduct(adminToken, categoryId, unitId, "A-" + suffix, BigDecimal.TEN);
+        long otherProductId = createProduct(adminToken, categoryId, unitId, "B-" + suffix, BigDecimal.valueOf(5));
+        PurchaseOrderData order = createPurchaseOrder(adminToken, supplierId, warehouseId, new long[]{targetProductId, otherProductId}, new BigDecimal[]{BigDecimal.valueOf(2), BigDecimal.ONE}, new BigDecimal[]{BigDecimal.TEN, BigDecimal.valueOf(5)});
+        approvePurchaseOrder(adminToken, order.orderId());
+        receivePurchaseOrder(adminToken, order.orderId(), new long[]{order.itemIds()[0]}, new BigDecimal[]{BigDecimal.ONE});
+        long purchaseReceiptId = latestPurchaseReceiptId(order.orderId());
+        deactivateProduct(adminToken, targetProductId);
+
+        Counts before = snapshotCounts();
+
+        mockMvc.perform(post("/api/v1/admin/test-data-cleanup/products/execute")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(executePayload(targetProductId, "ELIMINAR PRUEBAS").toString()))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("mixed purchase receipt")));
+
+        assertEquals(before, snapshotCounts());
+        assertEquals(1L, countById("products", targetProductId));
+        assertEquals(1L, countById("purchase_receipts", purchaseReceiptId));
+        assertEquals(1L, countById("products", otherProductId));
+    }
+
+    @Test
     void shouldBlockExecuteWhenElectronicDocumentExistsAndKeepDataUnchanged() throws Exception {
         String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
         String suffix = Long.toString(System.nanoTime());
@@ -292,8 +515,13 @@ class ProductCleanupPreviewIntegrationTest extends AbstractHttpIntegrationTest {
         long categoryId = createCategory(adminToken, suffix);
         long unitId = createUnit(adminToken, suffix);
         long warehouseId = createWarehouse(adminToken, suffix);
+        long supplierId = createSupplier(adminToken, suffix);
         long productId = createProduct(adminToken, categoryId, unitId, suffix, BigDecimal.TEN);
-        registerInitialStock(adminToken, productId, warehouseId, BigDecimal.TEN, "IT pure sale");
+        long controlProductId = createProduct(adminToken, categoryId, unitId, "CTRL-" + suffix, BigDecimal.valueOf(3));
+        PurchaseOrderData order = createPurchaseOrder(adminToken, supplierId, warehouseId, new long[]{productId}, new BigDecimal[]{BigDecimal.valueOf(3)}, new BigDecimal[]{BigDecimal.TEN});
+        approvePurchaseOrder(adminToken, order.orderId());
+        receivePurchaseOrder(adminToken, order.orderId(), new long[]{order.itemIds()[0]}, new BigDecimal[]{BigDecimal.valueOf(3)});
+        long purchaseReceiptId = latestPurchaseReceiptId(order.orderId());
         openCash(adminToken, BigDecimal.valueOf(50), suffix);
         long saleId = createSale(adminToken, warehouseId, new long[]{productId}, new BigDecimal[]{BigDecimal.ONE}, BigDecimal.TEN);
         deactivateProduct(adminToken, productId);
@@ -310,17 +538,24 @@ class ProductCleanupPreviewIntegrationTest extends AbstractHttpIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.deletedProductIds[0]").value(productId))
                 .andExpect(jsonPath("$.deletedSaleIds[0]").value(saleId))
+                .andExpect(jsonPath("$.deletedPurchaseOrderIds[0]").value(order.orderId()))
+                .andExpect(jsonPath("$.deletedPurchaseReceiptIds[0]").value(purchaseReceiptId))
                 .andExpect(jsonPath("$.deletedProducts").value(1))
                 .andExpect(jsonPath("$.deletedSales").value(1))
                 .andExpect(jsonPath("$.deletedSaleItems").value((int) saleItemsBefore))
-                .andExpect(jsonPath("$.deletedSalePayments").value((int) salePaymentsBefore));
+                .andExpect(jsonPath("$.deletedSalePayments").value((int) salePaymentsBefore))
+                .andExpect(jsonPath("$.deletedPurchaseOrders").value(1))
+                .andExpect(jsonPath("$.deletedPurchaseReceipts").value(1));
 
         assertEquals(0L, countById("products", productId));
         assertEquals(0L, countById("sales", saleId));
+        assertEquals(0L, countById("purchase_orders", order.orderId()));
+        assertEquals(0L, countById("purchase_receipts", purchaseReceiptId));
         assertEquals(0L, countByColumn("sale_items", "sale_id", saleId));
         assertEquals(0L, countByColumn("sale_payments", "sale_id", saleId));
         assertEquals(0L, countByColumn("inventory_movements", "product_id", productId));
         assertEquals(0L, countByColumn("stock_balances", "product_id", productId));
+        assertEquals(1L, countById("products", controlProductId));
         assertTrue(movementsBefore > 0);
         assertTrue(balancesBefore > 0);
     }
@@ -369,6 +604,80 @@ class ProductCleanupPreviewIntegrationTest extends AbstractHttpIntegrationTest {
         return readJson(result).path("id").asLong();
     }
 
+    private long createSupplier(String token, String suffix) throws Exception {
+        ObjectNode payload = objectMapper.createObjectNode();
+        payload.put("documentNumber", "206" + suffix.substring(Math.max(0, suffix.length() - 8)));
+        payload.put("name", "Proveedor QA " + suffix);
+
+        MvcResult result = mockMvc.perform(post("/api/v1/suppliers")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload.toString()))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        return readJson(result).path("id").asLong();
+    }
+
+    private PurchaseOrderData createPurchaseOrder(String token, long supplierId, long warehouseId, long[] productIds, BigDecimal[] quantities, BigDecimal[] unitCosts) throws Exception {
+        ObjectNode payload = objectMapper.createObjectNode();
+        payload.put("supplierId", supplierId);
+        payload.put("warehouseId", warehouseId);
+        ArrayNode items = payload.putArray("items");
+        for (int index = 0; index < productIds.length; index++) {
+            ObjectNode item = items.addObject();
+            item.put("productId", productIds[index]);
+            item.put("quantityOrdered", quantities[index]);
+            item.put("unitCost", unitCosts[index]);
+        }
+
+        MvcResult result = mockMvc.perform(post("/api/v1/purchase-orders")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload.toString()))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        ObjectNode body = (ObjectNode) readJson(result);
+        ArrayNode responseItems = (ArrayNode) body.path("items");
+        long[] itemIds = new long[responseItems.size()];
+        for (int index = 0; index < responseItems.size(); index++) {
+            itemIds[index] = responseItems.get(index).path("id").asLong();
+        }
+        return new PurchaseOrderData(body.path("id").asLong(), itemIds);
+    }
+
+    private void approvePurchaseOrder(String token, long purchaseOrderId) throws Exception {
+        mockMvc.perform(post("/api/v1/purchase-orders/{id}/approve", purchaseOrderId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(token)))
+                .andExpect(status().isOk());
+    }
+
+    private void receivePurchaseOrder(String token, long purchaseOrderId, long[] purchaseOrderItemIds, BigDecimal[] quantities) throws Exception {
+        ObjectNode payload = objectMapper.createObjectNode();
+        ArrayNode items = payload.putArray("items");
+        for (int index = 0; index < purchaseOrderItemIds.length; index++) {
+            ObjectNode item = items.addObject();
+            item.put("purchaseOrderItemId", purchaseOrderItemIds[index]);
+            item.put("quantityReceived", quantities[index]);
+        }
+
+        mockMvc.perform(post("/api/v1/purchase-orders/{id}/receive", purchaseOrderId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload.toString()))
+                .andExpect(status().isOk());
+    }
+
+    private long latestPurchaseReceiptId(long purchaseOrderId) {
+        Long value = jdbcTemplate.queryForObject(
+                "select max(id) from purchase_receipts where purchase_order_id = ?",
+                Long.class,
+                purchaseOrderId
+        );
+        return value == null ? 0L : value;
+    }
+
     private void insertElectronicDocument(long saleId, long productId, String suffix) {
         Long seriesId = jdbcTemplate.queryForObject(
                 """
@@ -412,6 +721,10 @@ class ProductCleanupPreviewIntegrationTest extends AbstractHttpIntegrationTest {
                 count("sales"),
                 count("sale_items"),
                 count("sale_payments"),
+                count("purchase_orders"),
+                count("purchase_order_items"),
+                count("purchase_receipts"),
+                count("purchase_receipt_items"),
                 count("stock_balances"),
                 count("inventory_movements"),
                 count("electronic_documents"),
@@ -438,10 +751,17 @@ class ProductCleanupPreviewIntegrationTest extends AbstractHttpIntegrationTest {
             long sales,
             long saleItems,
             long salePayments,
+            long purchaseOrders,
+            long purchaseOrderItems,
+            long purchaseReceipts,
+            long purchaseReceiptItems,
             long stockBalances,
             long inventoryMovements,
             long electronicDocuments,
             long electronicDocumentItems
     ) {
+    }
+
+    private record PurchaseOrderData(long orderId, long[] itemIds) {
     }
 }

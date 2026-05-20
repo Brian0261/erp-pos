@@ -32,13 +32,23 @@ public class JdbcProductCleanupExecuteAdapter implements ProductCleanupExecutePo
     }
 
     @Override
-    public int deletePurchaseOrderItemsByProductIds(Set<Long> productIds) {
-        return deleteByProductIds("delete from purchase_order_items where product_id in (:productIds)", productIds);
+    public int deletePurchaseReceiptItemsByIds(Set<Long> purchaseReceiptIds) {
+        return deleteByIds("delete from purchase_receipt_items where purchase_receipt_id in (:ids)", purchaseReceiptIds);
     }
 
     @Override
-    public int deletePurchaseReceiptItemsByProductIds(Set<Long> productIds) {
-        return deleteByProductIds("delete from purchase_receipt_items where product_id in (:productIds)", productIds);
+    public int deletePurchaseReceiptsByIds(Set<Long> purchaseReceiptIds) {
+        return deleteByIds("delete from purchase_receipts where id in (:ids)", purchaseReceiptIds);
+    }
+
+    @Override
+    public int deletePurchaseOrderItemsByIds(Set<Long> purchaseOrderIds) {
+        return deleteByIds("delete from purchase_order_items where purchase_order_id in (:ids)", purchaseOrderIds);
+    }
+
+    @Override
+    public int deletePurchaseOrdersByIds(Set<Long> purchaseOrderIds) {
+        return deleteByIds("delete from purchase_orders where id in (:ids)", purchaseOrderIds);
     }
 
     @Override

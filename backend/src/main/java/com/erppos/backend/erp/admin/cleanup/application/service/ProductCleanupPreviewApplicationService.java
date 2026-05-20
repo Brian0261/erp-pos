@@ -87,9 +87,21 @@ public class ProductCleanupPreviewApplicationService implements ProductCleanupPr
         List<ProductCleanupPreviewQueryPort.PurchaseOrderItemRow> purchaseOrderItemRows = selectedProductIds.isEmpty()
                 ? List.of()
                 : queryPort.findPurchaseOrderItemsByProductIds(selectedProductIds);
+        Set<Long> purchaseOrderIds = purchaseOrderItemRows.stream()
+                .map(ProductCleanupPreviewQueryPort.PurchaseOrderItemRow::purchaseOrderId)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        List<ProductCleanupPreviewQueryPort.PurchaseOrderItemRow> relatedPurchaseOrderItemRows = purchaseOrderIds.isEmpty()
+                ? List.of()
+                : queryPort.findPurchaseOrderItemsByPurchaseOrderIds(purchaseOrderIds);
         List<ProductCleanupPreviewQueryPort.PurchaseReceiptItemRow> purchaseReceiptItemRows = selectedProductIds.isEmpty()
                 ? List.of()
                 : queryPort.findPurchaseReceiptItemsByProductIds(selectedProductIds);
+        Set<Long> purchaseReceiptIds = purchaseReceiptItemRows.stream()
+                .map(ProductCleanupPreviewQueryPort.PurchaseReceiptItemRow::purchaseReceiptId)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        List<ProductCleanupPreviewQueryPort.PurchaseReceiptItemRow> relatedPurchaseReceiptItemRows = purchaseReceiptIds.isEmpty()
+                ? List.of()
+                : queryPort.findPurchaseReceiptItemsByPurchaseReceiptIds(purchaseReceiptIds);
         List<ProductCleanupPreviewQueryPort.ElectronicDocumentItemRow> electronicDocumentItemRows = selectedProductIds.isEmpty()
                 ? List.of()
                 : queryPort.findElectronicDocumentItemsByProductIds(selectedProductIds);
@@ -113,6 +125,38 @@ public class ProductCleanupPreviewApplicationService implements ProductCleanupPr
                 .map(ProductCleanupPreviewResult.SaleImpact::saleId)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
 
+        Map<Long, List<ProductCleanupPreviewQueryPort.PurchaseOrderItemRow>> purchaseOrderItemsByOrderId = relatedPurchaseOrderItemRows.stream()
+                .collect(Collectors.groupingBy(ProductCleanupPreviewQueryPort.PurchaseOrderItemRow::purchaseOrderId, LinkedHashMap::new, Collectors.toList()));
+        List<ProductCleanupPreviewResult.PurchaseOrderImpact> purchaseOrderImpacts = purchaseOrderItemsByOrderId.entrySet().stream()
+                .map(entry -> toPurchaseOrderImpact(entry.getKey(), entry.getValue(), selectedProductIds))
+                .sorted(Comparator.comparing(ProductCleanupPreviewResult.PurchaseOrderImpact::purchaseOrderId))
+                .toList();
+        Map<Long, ProductCleanupPreviewResult.PurchaseOrderImpact> purchaseOrderImpactById = purchaseOrderImpacts.stream()
+                .collect(Collectors.toMap(ProductCleanupPreviewResult.PurchaseOrderImpact::purchaseOrderId, Function.identity(), (left, right) -> left, LinkedHashMap::new));
+        Set<Long> mixedPurchaseOrderIds = purchaseOrderImpacts.stream()
+                .filter(ProductCleanupPreviewResult.PurchaseOrderImpact::mixedPurchaseOrder)
+                .map(ProductCleanupPreviewResult.PurchaseOrderImpact::purchaseOrderId)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        Set<Long> purePurchaseOrderIds = purchaseOrderImpacts.stream()
+                .filter(ProductCleanupPreviewResult.PurchaseOrderImpact::purePurchaseOrder)
+                .map(ProductCleanupPreviewResult.PurchaseOrderImpact::purchaseOrderId)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+
+        Map<Long, List<ProductCleanupPreviewQueryPort.PurchaseReceiptItemRow>> purchaseReceiptItemsByReceiptId = relatedPurchaseReceiptItemRows.stream()
+                .collect(Collectors.groupingBy(ProductCleanupPreviewQueryPort.PurchaseReceiptItemRow::purchaseReceiptId, LinkedHashMap::new, Collectors.toList()));
+        List<ProductCleanupPreviewResult.PurchaseReceiptImpact> purchaseReceiptImpacts = purchaseReceiptItemsByReceiptId.entrySet().stream()
+                .map(entry -> toPurchaseReceiptImpact(entry.getKey(), entry.getValue(), selectedProductIds, purchaseOrderImpactById))
+                .sorted(Comparator.comparing(ProductCleanupPreviewResult.PurchaseReceiptImpact::purchaseReceiptId))
+                .toList();
+        Set<Long> mixedPurchaseReceiptIds = purchaseReceiptImpacts.stream()
+                .filter(ProductCleanupPreviewResult.PurchaseReceiptImpact::mixedPurchaseReceipt)
+                .map(ProductCleanupPreviewResult.PurchaseReceiptImpact::purchaseReceiptId)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        Set<Long> purePurchaseReceiptIds = purchaseReceiptImpacts.stream()
+                .filter(ProductCleanupPreviewResult.PurchaseReceiptImpact::purePurchaseReceipt)
+                .map(ProductCleanupPreviewResult.PurchaseReceiptImpact::purchaseReceiptId)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+
         List<ProductCleanupPreviewResult.ProductImpact> productImpacts = foundProducts.stream()
                 .map(product -> toProductImpact(
                         product,
@@ -124,7 +168,11 @@ public class ProductCleanupPreviewApplicationService implements ProductCleanupPr
                         stockTransferItemRows,
                         quoteItemRows,
                         purchaseOrderItemRows,
+                        mixedPurchaseOrderIds,
+                        purePurchaseOrderIds,
                         purchaseReceiptItemRows,
+                        mixedPurchaseReceiptIds,
+                        purePurchaseReceiptIds,
                         electronicDocumentItemRows
                 ))
                 .sorted(Comparator.comparing(ProductCleanupPreviewResult.ProductImpact::productId))
@@ -140,14 +188,18 @@ public class ProductCleanupPreviewApplicationService implements ProductCleanupPr
                 mixedSaleIds.size() + " mixed sale(s) detected. These sales combine selected and non-selected products.");
         addIf(!electronicDocumentItemRows.isEmpty(), blockers,
                 electronicDocumentItemRows.size() + " electronic document item(s) detected. Billing history blocks purge.");
-        addIf(!purchaseOrderItemRows.isEmpty(), blockers,
-                purchaseOrderItemRows.size() + " purchase order item(s) detected. Procurement history blocks purge.");
-        addIf(!purchaseReceiptItemRows.isEmpty(), blockers,
-                purchaseReceiptItemRows.size() + " purchase receipt item(s) detected. Receipt history blocks purge.");
+        addIf(!mixedPurchaseOrderIds.isEmpty(), blockers,
+                mixedPurchaseOrderIds.size() + " mixed purchase order(s) detected. These orders combine selected and non-selected products.");
+        addIf(!mixedPurchaseReceiptIds.isEmpty(), blockers,
+                mixedPurchaseReceiptIds.size() + " mixed purchase receipt(s) detected. These receipts or their parent orders combine selected and non-selected products.");
         addIf(!stockTransferItemRows.isEmpty(), blockers,
                 stockTransferItemRows.size() + " stock transfer item(s) detected. Transfer history blocks purge.");
         addIf(!pureSaleIds.isEmpty(), warnings,
                 pureSaleIds.size() + " pure sale(s) detected. Future execute would need to remove complete sales and related payments.");
+        addIf(!purePurchaseOrderIds.isEmpty(), warnings,
+                purePurchaseOrderIds.size() + " pure purchase order(s) detected. Future execute would remove complete purchase orders and related items.");
+        addIf(!purePurchaseReceiptIds.isEmpty(), warnings,
+                purePurchaseReceiptIds.size() + " pure purchase receipt(s) detected. Future execute would remove complete purchase receipts and related items.");
         addIf(!salePaymentRows.isEmpty(), warnings,
                 salePaymentRows.size() + " sale payment(s) are linked to affected sales.");
         addIf(!stockBalanceRows.isEmpty(), warnings,
@@ -276,6 +328,12 @@ public class ProductCleanupPreviewApplicationService implements ProductCleanupPr
                 saleImpacts.size(),
                 mixedSaleIds.size(),
                 pureSaleIds.size(),
+                purchaseOrderImpacts.size(),
+                purePurchaseOrderIds.size(),
+                mixedPurchaseOrderIds.size(),
+                purchaseReceiptImpacts.size(),
+                purePurchaseReceiptIds.size(),
+                mixedPurchaseReceiptIds.size(),
                 inventoryMovementRows.size(),
                 electronicDocumentItemRows.size(),
                 purgeable,
@@ -296,6 +354,8 @@ public class ProductCleanupPreviewApplicationService implements ProductCleanupPr
                 inventoryMovementImpacts,
                 stockTransferItemImpacts,
                 quoteItemImpacts,
+                purchaseOrderImpacts,
+                purchaseReceiptImpacts,
                 purchaseOrderItemImpacts,
                 purchaseReceiptItemImpacts,
                 electronicDocumentItemImpacts,
@@ -328,12 +388,22 @@ public class ProductCleanupPreviewApplicationService implements ProductCleanupPr
                 .filter(ProductCleanupPreviewResult.SaleImpact::pureSale)
                 .map(ProductCleanupPreviewResult.SaleImpact::saleId)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
+        Set<Long> purePurchaseOrderIds = preview.purchaseOrders().stream()
+                .filter(ProductCleanupPreviewResult.PurchaseOrderImpact::purePurchaseOrder)
+                .map(ProductCleanupPreviewResult.PurchaseOrderImpact::purchaseOrderId)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        Set<Long> purePurchaseReceiptIds = preview.purchaseReceipts().stream()
+                .filter(ProductCleanupPreviewResult.PurchaseReceiptImpact::purePurchaseReceipt)
+                .map(ProductCleanupPreviewResult.PurchaseReceiptImpact::purchaseReceiptId)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
 
         int deletedSaleItems = executePort.deleteSaleItemsBySaleIds(pureSaleIds);
         int deletedSalePayments = executePort.deleteSalePaymentsBySaleIds(pureSaleIds);
         int deletedQuoteItems = executePort.deleteQuoteItemsByProductIds(productIds);
-        int deletedPurchaseReceiptItems = executePort.deletePurchaseReceiptItemsByProductIds(productIds);
-        int deletedPurchaseOrderItems = executePort.deletePurchaseOrderItemsByProductIds(productIds);
+        int deletedPurchaseReceiptItems = executePort.deletePurchaseReceiptItemsByIds(purePurchaseReceiptIds);
+        int deletedPurchaseReceipts = executePort.deletePurchaseReceiptsByIds(purePurchaseReceiptIds);
+        int deletedPurchaseOrderItems = executePort.deletePurchaseOrderItemsByIds(purePurchaseOrderIds);
+        int deletedPurchaseOrders = executePort.deletePurchaseOrdersByIds(purePurchaseOrderIds);
         int deletedStockTransferItems = executePort.deleteStockTransferItemsByProductIds(productIds);
         int deletedStockBalances = executePort.deleteStockBalancesByProductIds(productIds);
         int deletedInventoryMovements = executePort.deleteInventoryMovementsByProductIds(productIds);
@@ -343,12 +413,16 @@ public class ProductCleanupPreviewApplicationService implements ProductCleanupPr
         return new ProductCleanupExecuteResult(
                 List.copyOf(productIds),
                 List.copyOf(pureSaleIds),
+                List.copyOf(purePurchaseOrderIds),
+                List.copyOf(purePurchaseReceiptIds),
                 deletedProducts,
                 deletedSales,
                 deletedSaleItems,
                 deletedSalePayments,
                 deletedQuoteItems,
+                deletedPurchaseOrders,
                 deletedPurchaseOrderItems,
+                deletedPurchaseReceipts,
                 deletedPurchaseReceiptItems,
                 deletedStockTransferItems,
                 deletedStockBalances,
@@ -402,7 +476,11 @@ public class ProductCleanupPreviewApplicationService implements ProductCleanupPr
             List<ProductCleanupPreviewQueryPort.StockTransferItemRow> stockTransferItems,
             List<ProductCleanupPreviewQueryPort.QuoteItemRow> quoteItems,
             List<ProductCleanupPreviewQueryPort.PurchaseOrderItemRow> purchaseOrderItems,
+            Set<Long> mixedPurchaseOrderIds,
+            Set<Long> purePurchaseOrderIds,
             List<ProductCleanupPreviewQueryPort.PurchaseReceiptItemRow> purchaseReceiptItems,
+            Set<Long> mixedPurchaseReceiptIds,
+            Set<Long> purePurchaseReceiptIds,
             List<ProductCleanupPreviewQueryPort.ElectronicDocumentItemRow> documentItems
     ) {
         long mixedSales = saleItems.stream()
@@ -421,8 +499,30 @@ public class ProductCleanupPreviewApplicationService implements ProductCleanupPr
         long inventoryMovementCount = inventoryMovements.stream().filter(item -> product.id().equals(item.productId())).count();
         long stockTransferCount = stockTransferItems.stream().filter(item -> product.id().equals(item.productId())).count();
         long quoteCount = quoteItems.stream().filter(item -> product.id().equals(item.productId())).count();
-        long purchaseOrderCount = purchaseOrderItems.stream().filter(item -> product.id().equals(item.productId())).count();
-        long purchaseReceiptCount = purchaseReceiptItems.stream().filter(item -> product.id().equals(item.productId())).count();
+        long mixedPurchaseOrderCount = purchaseOrderItems.stream()
+                .filter(item -> product.id().equals(item.productId()))
+                .map(ProductCleanupPreviewQueryPort.PurchaseOrderItemRow::purchaseOrderId)
+                .filter(mixedPurchaseOrderIds::contains)
+                .distinct()
+                .count();
+        long purePurchaseOrderCount = purchaseOrderItems.stream()
+                .filter(item -> product.id().equals(item.productId()))
+                .map(ProductCleanupPreviewQueryPort.PurchaseOrderItemRow::purchaseOrderId)
+                .filter(purePurchaseOrderIds::contains)
+                .distinct()
+                .count();
+        long mixedPurchaseReceiptCount = purchaseReceiptItems.stream()
+                .filter(item -> product.id().equals(item.productId()))
+                .map(ProductCleanupPreviewQueryPort.PurchaseReceiptItemRow::purchaseReceiptId)
+                .filter(mixedPurchaseReceiptIds::contains)
+                .distinct()
+                .count();
+        long purePurchaseReceiptCount = purchaseReceiptItems.stream()
+                .filter(item -> product.id().equals(item.productId()))
+                .map(ProductCleanupPreviewQueryPort.PurchaseReceiptItemRow::purchaseReceiptId)
+                .filter(purePurchaseReceiptIds::contains)
+                .distinct()
+                .count();
         long documentCount = documentItems.stream().filter(item -> product.id().equals(item.productId())).count();
 
         List<String> warnings = new ArrayList<>();
@@ -431,10 +531,12 @@ public class ProductCleanupPreviewApplicationService implements ProductCleanupPr
         addIf(product.active(), blockers, "Product is active.");
         addIf(mixedSales > 0, blockers, mixedSales + " mixed sale(s) include this product.");
         addIf(documentCount > 0, blockers, documentCount + " electronic document item(s) reference this product.");
-        addIf(purchaseOrderCount > 0, blockers, purchaseOrderCount + " purchase order item(s) reference this product.");
-        addIf(purchaseReceiptCount > 0, blockers, purchaseReceiptCount + " purchase receipt item(s) reference this product.");
+        addIf(mixedPurchaseOrderCount > 0, blockers, mixedPurchaseOrderCount + " mixed purchase order(s) reference this product.");
+        addIf(mixedPurchaseReceiptCount > 0, blockers, mixedPurchaseReceiptCount + " mixed purchase receipt(s) reference this product.");
         addIf(stockTransferCount > 0, blockers, stockTransferCount + " stock transfer item(s) reference this product.");
         addIf(pureSales > 0, warnings, pureSales + " pure sale(s) include this product.");
+        addIf(purePurchaseOrderCount > 0, warnings, purePurchaseOrderCount + " pure purchase order(s) include this product.");
+        addIf(purePurchaseReceiptCount > 0, warnings, purePurchaseReceiptCount + " pure purchase receipt(s) include this product.");
         addIf(stockBalanceCount > 0, warnings, stockBalanceCount + " stock balance row(s) reference this product.");
         addIf(inventoryMovementCount > 0, warnings, inventoryMovementCount + " inventory movement row(s) reference this product.");
         addIf(quoteCount > 0, warnings, quoteCount + " quote item(s) reference this product.");
@@ -449,6 +551,56 @@ public class ProductCleanupPreviewApplicationService implements ProductCleanupPr
                 !blockers.isEmpty(),
                 List.copyOf(warnings),
                 List.copyOf(blockers)
+        );
+    }
+
+    private ProductCleanupPreviewResult.PurchaseOrderImpact toPurchaseOrderImpact(
+            Long purchaseOrderId,
+            List<ProductCleanupPreviewQueryPort.PurchaseOrderItemRow> items,
+            Set<Long> selectedProductIds
+    ) {
+        int selectedItemCount = (int) items.stream().filter(item -> selectedProductIds.contains(item.productId())).count();
+        int itemCount = items.size();
+        int nonSelectedItemCount = itemCount - selectedItemCount;
+        boolean purePurchaseOrder = selectedItemCount > 0 && nonSelectedItemCount == 0;
+        boolean mixedPurchaseOrder = selectedItemCount > 0 && nonSelectedItemCount > 0;
+        String status = items.isEmpty() ? null : items.get(0).status();
+
+        return new ProductCleanupPreviewResult.PurchaseOrderImpact(
+                purchaseOrderId,
+                status,
+                itemCount,
+                selectedItemCount,
+                nonSelectedItemCount,
+                purePurchaseOrder,
+                mixedPurchaseOrder
+        );
+    }
+
+    private ProductCleanupPreviewResult.PurchaseReceiptImpact toPurchaseReceiptImpact(
+            Long purchaseReceiptId,
+            List<ProductCleanupPreviewQueryPort.PurchaseReceiptItemRow> items,
+            Set<Long> selectedProductIds,
+            Map<Long, ProductCleanupPreviewResult.PurchaseOrderImpact> purchaseOrderImpactById
+    ) {
+        int selectedItemCount = (int) items.stream().filter(item -> selectedProductIds.contains(item.productId())).count();
+        int itemCount = items.size();
+        int nonSelectedItemCount = itemCount - selectedItemCount;
+        Long purchaseOrderId = items.isEmpty() ? null : items.get(0).purchaseOrderId();
+        boolean parentOrderPure = purchaseOrderId != null
+                && purchaseOrderImpactById.containsKey(purchaseOrderId)
+                && purchaseOrderImpactById.get(purchaseOrderId).purePurchaseOrder();
+        boolean purePurchaseReceipt = selectedItemCount > 0 && nonSelectedItemCount == 0 && parentOrderPure;
+        boolean mixedPurchaseReceipt = selectedItemCount > 0 && (!parentOrderPure || nonSelectedItemCount > 0);
+
+        return new ProductCleanupPreviewResult.PurchaseReceiptImpact(
+                purchaseReceiptId,
+                purchaseOrderId,
+                itemCount,
+                selectedItemCount,
+                nonSelectedItemCount,
+                purePurchaseReceipt,
+                mixedPurchaseReceipt
         );
     }
 

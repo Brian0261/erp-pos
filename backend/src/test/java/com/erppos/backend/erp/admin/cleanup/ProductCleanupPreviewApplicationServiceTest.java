@@ -118,6 +118,72 @@ class ProductCleanupPreviewApplicationServiceTest {
     }
 
     @Test
+    void shouldWarnForPurePurchaseOrder() {
+        queryPort.products = List.of(new ProductCleanupPreviewQueryPort.ProductRow(19L, "SKU-PO", null, "PO", false));
+        queryPort.purchaseOrderItems = List.of(new ProductCleanupPreviewQueryPort.PurchaseOrderItemRow(
+                5000L, 900L, "APPROVED", 19L, BigDecimal.TEN, BigDecimal.ZERO, BigDecimal.TEN
+        ));
+
+        ProductCleanupPreviewResult result = service.preview(new ProductCleanupPreviewCommand(List.of(19L), List.of()));
+
+        assertTrue(result.purgeable());
+        assertEquals(1, result.summary().purePurchaseOrders());
+        assertEquals(0, result.summary().mixedPurchaseOrders());
+        assertTrue(result.warnings().stream().anyMatch(message -> message.contains("pure purchase order")));
+    }
+
+    @Test
+    void shouldWarnForPurePurchaseReceipt() {
+        queryPort.products = List.of(new ProductCleanupPreviewQueryPort.ProductRow(20L, "SKU-PR", null, "PR", false));
+        queryPort.purchaseOrderItems = List.of(new ProductCleanupPreviewQueryPort.PurchaseOrderItemRow(
+                5001L, 901L, "RECEIVED", 20L, BigDecimal.TEN, BigDecimal.TEN, BigDecimal.TEN
+        ));
+        queryPort.purchaseReceiptItems = List.of(new ProductCleanupPreviewQueryPort.PurchaseReceiptItemRow(
+                6001L, 902L, 901L, 5001L, 20L, BigDecimal.TEN
+        ));
+
+        ProductCleanupPreviewResult result = service.preview(new ProductCleanupPreviewCommand(List.of(20L), List.of()));
+
+        assertTrue(result.purgeable());
+        assertEquals(1, result.summary().purePurchaseReceipts());
+        assertEquals(0, result.summary().mixedPurchaseReceipts());
+        assertTrue(result.warnings().stream().anyMatch(message -> message.contains("pure purchase receipt")));
+    }
+
+    @Test
+    void shouldBlockMixedPurchaseOrder() {
+        queryPort.products = List.of(new ProductCleanupPreviewQueryPort.ProductRow(21L, "SKU-MPO", null, "MPO", false));
+        queryPort.purchaseOrderItems = List.of(
+                new ProductCleanupPreviewQueryPort.PurchaseOrderItemRow(5002L, 903L, "APPROVED", 21L, BigDecimal.ONE, BigDecimal.ZERO, BigDecimal.TEN),
+                new ProductCleanupPreviewQueryPort.PurchaseOrderItemRow(5003L, 903L, "APPROVED", 999L, BigDecimal.ONE, BigDecimal.ZERO, BigDecimal.TEN)
+        );
+
+        ProductCleanupPreviewResult result = service.preview(new ProductCleanupPreviewCommand(List.of(21L), List.of()));
+
+        assertFalse(result.purgeable());
+        assertEquals(1, result.summary().mixedPurchaseOrders());
+        assertTrue(result.blockers().stream().anyMatch(message -> message.contains("mixed purchase order")));
+    }
+
+    @Test
+    void shouldBlockMixedPurchaseReceipt() {
+        queryPort.products = List.of(new ProductCleanupPreviewQueryPort.ProductRow(22L, "SKU-MPR", null, "MPR", false));
+        queryPort.purchaseOrderItems = List.of(
+                new ProductCleanupPreviewQueryPort.PurchaseOrderItemRow(5004L, 904L, "PARTIALLY_RECEIVED", 22L, BigDecimal.ONE, BigDecimal.ONE, BigDecimal.TEN),
+                new ProductCleanupPreviewQueryPort.PurchaseOrderItemRow(5005L, 904L, "PARTIALLY_RECEIVED", 999L, BigDecimal.ONE, BigDecimal.ZERO, BigDecimal.TEN)
+        );
+        queryPort.purchaseReceiptItems = List.of(new ProductCleanupPreviewQueryPort.PurchaseReceiptItemRow(
+                6002L, 905L, 904L, 5004L, 22L, BigDecimal.ONE
+        ));
+
+        ProductCleanupPreviewResult result = service.preview(new ProductCleanupPreviewCommand(List.of(22L), List.of()));
+
+        assertFalse(result.purgeable());
+        assertEquals(1, result.summary().mixedPurchaseReceipts());
+        assertTrue(result.blockers().stream().anyMatch(message -> message.contains("mixed purchase receipt")));
+    }
+
+    @Test
     void shouldBlockElectronicDocuments() {
         queryPort.products = List.of(new ProductCleanupPreviewQueryPort.ProductRow(15L, "SKU-DOC", null, "Doc", false));
         queryPort.documentItems = List.of(new ProductCleanupPreviewQueryPort.ElectronicDocumentItemRow(
@@ -140,6 +206,36 @@ class ProductCleanupPreviewApplicationServiceTest {
         assertEquals(List.of(16L), result.deletedProductIds());
         assertEquals(1, result.deletedProducts());
         assertEquals(Set.of(16L), executePort.deletedProductIds);
+    }
+
+    @Test
+    void shouldExecutePurePurchaseChainInSafeOrder() {
+        queryPort.products = List.of(new ProductCleanupPreviewQueryPort.ProductRow(23L, "SKU-CHAIN", null, "Chain", false));
+        queryPort.purchaseOrderItems = List.of(new ProductCleanupPreviewQueryPort.PurchaseOrderItemRow(
+                5006L, 906L, "RECEIVED", 23L, BigDecimal.TEN, BigDecimal.TEN, BigDecimal.TEN
+        ));
+        queryPort.purchaseReceiptItems = List.of(new ProductCleanupPreviewQueryPort.PurchaseReceiptItemRow(
+                6003L, 907L, 906L, 5006L, 23L, BigDecimal.TEN
+        ));
+
+        ProductCleanupExecuteResult result = service.execute(new ProductCleanupExecuteCommand(List.of(23L), List.of(), "ELIMINAR PRUEBAS"));
+
+        assertEquals(List.of(906L), result.deletedPurchaseOrderIds());
+        assertEquals(List.of(907L), result.deletedPurchaseReceiptIds());
+        assertEquals(List.of(
+                "deleteSaleItems",
+                "deleteSalePayments",
+                "deleteQuoteItems",
+                "deletePurchaseReceiptItems",
+                "deletePurchaseReceipts",
+                "deletePurchaseOrderItems",
+                "deletePurchaseOrders",
+                "deleteStockTransferItems",
+                "deleteStockBalances",
+                "deleteInventoryMovements",
+                "deleteSales",
+                "deleteProducts"
+        ), executePort.operations);
     }
 
     @Test
@@ -216,12 +312,22 @@ class ProductCleanupPreviewApplicationServiceTest {
 
         @Override
         public List<PurchaseOrderItemRow> findPurchaseOrderItemsByProductIds(Set<Long> productIds) {
-            return purchaseOrderItems;
+            return purchaseOrderItems.stream().filter(item -> productIds.contains(item.productId())).toList();
+        }
+
+        @Override
+        public List<PurchaseOrderItemRow> findPurchaseOrderItemsByPurchaseOrderIds(Set<Long> purchaseOrderIds) {
+            return purchaseOrderItems.stream().filter(item -> purchaseOrderIds.contains(item.purchaseOrderId())).toList();
         }
 
         @Override
         public List<PurchaseReceiptItemRow> findPurchaseReceiptItemsByProductIds(Set<Long> productIds) {
-            return purchaseReceiptItems;
+            return purchaseReceiptItems.stream().filter(item -> productIds.contains(item.productId())).toList();
+        }
+
+        @Override
+        public List<PurchaseReceiptItemRow> findPurchaseReceiptItemsByPurchaseReceiptIds(Set<Long> purchaseReceiptIds) {
+            return purchaseReceiptItems.stream().filter(item -> purchaseReceiptIds.contains(item.purchaseReceiptId())).toList();
         }
 
         @Override
@@ -232,54 +338,77 @@ class ProductCleanupPreviewApplicationServiceTest {
 
     private static final class StubProductCleanupExecutePort implements ProductCleanupExecutePort {
         private Set<Long> deletedProductIds = Set.of();
+        private final List<String> operations = new java.util.ArrayList<>();
 
         @Override
         public int deleteSaleItemsBySaleIds(Set<Long> saleIds) {
+            operations.add("deleteSaleItems");
             return 0;
         }
 
         @Override
         public int deleteSalePaymentsBySaleIds(Set<Long> saleIds) {
+            operations.add("deleteSalePayments");
             return 0;
         }
 
         @Override
         public int deleteQuoteItemsByProductIds(Set<Long> productIds) {
+            operations.add("deleteQuoteItems");
             return 0;
         }
 
         @Override
-        public int deletePurchaseOrderItemsByProductIds(Set<Long> productIds) {
+        public int deletePurchaseReceiptItemsByIds(Set<Long> purchaseReceiptIds) {
+            operations.add("deletePurchaseReceiptItems");
             return 0;
         }
 
         @Override
-        public int deletePurchaseReceiptItemsByProductIds(Set<Long> productIds) {
+        public int deletePurchaseReceiptsByIds(Set<Long> purchaseReceiptIds) {
+            operations.add("deletePurchaseReceipts");
+            return 0;
+        }
+
+        @Override
+        public int deletePurchaseOrderItemsByIds(Set<Long> purchaseOrderIds) {
+            operations.add("deletePurchaseOrderItems");
+            return 0;
+        }
+
+        @Override
+        public int deletePurchaseOrdersByIds(Set<Long> purchaseOrderIds) {
+            operations.add("deletePurchaseOrders");
             return 0;
         }
 
         @Override
         public int deleteStockTransferItemsByProductIds(Set<Long> productIds) {
+            operations.add("deleteStockTransferItems");
             return 0;
         }
 
         @Override
         public int deleteStockBalancesByProductIds(Set<Long> productIds) {
+            operations.add("deleteStockBalances");
             return 0;
         }
 
         @Override
         public int deleteInventoryMovementsByProductIds(Set<Long> productIds) {
+            operations.add("deleteInventoryMovements");
             return 0;
         }
 
         @Override
         public int deleteSalesByIds(Set<Long> saleIds) {
+            operations.add("deleteSales");
             return 0;
         }
 
         @Override
         public int deleteProductsByIds(Set<Long> productIds) {
+            operations.add("deleteProducts");
             deletedProductIds = Set.copyOf(productIds);
             return productIds.size();
         }

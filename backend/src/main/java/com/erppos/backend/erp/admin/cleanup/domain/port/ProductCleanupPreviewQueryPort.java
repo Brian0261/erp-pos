@@ -24,7 +24,11 @@ public interface ProductCleanupPreviewQueryPort {
 
     List<PurchaseOrderItemRow> findPurchaseOrderItemsByProductIds(Set<Long> productIds);
 
+    List<PurchaseOrderItemRow> findPurchaseOrderItemsByPurchaseOrderIds(Set<Long> purchaseOrderIds);
+
     List<PurchaseReceiptItemRow> findPurchaseReceiptItemsByProductIds(Set<Long> productIds);
+
+    List<PurchaseReceiptItemRow> findPurchaseReceiptItemsByPurchaseReceiptIds(Set<Long> purchaseReceiptIds);
 
     List<ElectronicDocumentItemRow> findElectronicDocumentItemsByProductIds(Set<Long> productIds);
 

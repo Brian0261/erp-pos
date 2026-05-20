@@ -16,6 +16,8 @@ public record ProductCleanupPreviewResult(
         List<InventoryMovementImpact> inventoryMovements,
         List<StockTransferItemImpact> stockTransferItems,
         List<QuoteItemImpact> quoteItems,
+        List<PurchaseOrderImpact> purchaseOrders,
+        List<PurchaseReceiptImpact> purchaseReceipts,
         List<PurchaseOrderItemImpact> purchaseOrderItems,
         List<PurchaseReceiptItemImpact> purchaseReceiptItems,
         List<ElectronicDocumentItemImpact> electronicDocumentItems,
@@ -121,6 +123,28 @@ public record ProductCleanupPreviewResult(
     ) {
     }
 
+    public record PurchaseOrderImpact(
+            Long purchaseOrderId,
+            String status,
+            int itemCount,
+            int selectedItemCount,
+            int nonSelectedItemCount,
+            boolean purePurchaseOrder,
+            boolean mixedPurchaseOrder
+    ) {
+    }
+
+    public record PurchaseReceiptImpact(
+            Long purchaseReceiptId,
+            Long purchaseOrderId,
+            int itemCount,
+            int selectedItemCount,
+            int nonSelectedItemCount,
+            boolean purePurchaseReceipt,
+            boolean mixedPurchaseReceipt
+    ) {
+    }
+
     public record PurchaseOrderItemImpact(
             Long purchaseOrderItemId,
             Long purchaseOrderId,
@@ -162,6 +186,12 @@ public record ProductCleanupPreviewResult(
             int relatedSales,
             int mixedSales,
             int pureSales,
+            int relatedPurchaseOrders,
+            int purePurchaseOrders,
+            int mixedPurchaseOrders,
+            int relatedPurchaseReceipts,
+            int purePurchaseReceipts,
+            int mixedPurchaseReceipts,
             int relatedInventoryMovements,
             int relatedDocuments,
             boolean purgeable,

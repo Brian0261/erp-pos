@@ -10,9 +10,13 @@ public interface ProductCleanupExecutePort {
 
     int deleteQuoteItemsByProductIds(Set<Long> productIds);
 
-    int deletePurchaseOrderItemsByProductIds(Set<Long> productIds);
+    int deletePurchaseReceiptItemsByIds(Set<Long> purchaseReceiptIds);
 
-    int deletePurchaseReceiptItemsByProductIds(Set<Long> productIds);
+    int deletePurchaseReceiptsByIds(Set<Long> purchaseReceiptIds);
+
+    int deletePurchaseOrderItemsByIds(Set<Long> purchaseOrderIds);
+
+    int deletePurchaseOrdersByIds(Set<Long> purchaseOrderIds);
 
     int deleteStockTransferItemsByProductIds(Set<Long> productIds);
 

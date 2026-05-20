@@ -226,6 +226,30 @@ public class JdbcProductCleanupPreviewQueryAdapter implements ProductCleanupPrev
     }
 
     @Override
+    public List<PurchaseOrderItemRow> findPurchaseOrderItemsByPurchaseOrderIds(Set<Long> purchaseOrderIds) {
+        return queryByIds(
+                """
+                        select poi.id, poi.purchase_order_id, po.status, poi.product_id,
+                               poi.quantity_ordered, poi.quantity_received, poi.line_total
+                        from purchase_order_items poi
+                        join purchase_orders po on po.id = poi.purchase_order_id
+                        where poi.purchase_order_id in (:ids)
+                        order by poi.purchase_order_id, poi.id
+                        """,
+                purchaseOrderIds,
+                (rs, rowNum) -> new PurchaseOrderItemRow(
+                        rs.getLong("id"),
+                        rs.getLong("purchase_order_id"),
+                        rs.getString("status"),
+                        rs.getLong("product_id"),
+                        rs.getBigDecimal("quantity_ordered"),
+                        rs.getBigDecimal("quantity_received"),
+                        rs.getBigDecimal("line_total")
+                )
+        );
+    }
+
+    @Override
     public List<PurchaseReceiptItemRow> findPurchaseReceiptItemsByProductIds(Set<Long> productIds) {
         return queryByProductIds(
                 """
@@ -237,6 +261,29 @@ public class JdbcProductCleanupPreviewQueryAdapter implements ProductCleanupPrev
                         order by pri.product_id, pri.id
                         """,
                 productIds,
+                (rs, rowNum) -> new PurchaseReceiptItemRow(
+                        rs.getLong("id"),
+                        rs.getLong("purchase_receipt_id"),
+                        rs.getLong("purchase_order_id"),
+                        rs.getLong("purchase_order_item_id"),
+                        rs.getLong("product_id"),
+                        rs.getBigDecimal("quantity_received")
+                )
+        );
+    }
+
+    @Override
+    public List<PurchaseReceiptItemRow> findPurchaseReceiptItemsByPurchaseReceiptIds(Set<Long> purchaseReceiptIds) {
+        return queryByIds(
+                """
+                        select pri.id, pri.purchase_receipt_id, pr.purchase_order_id, pri.purchase_order_item_id,
+                               pri.product_id, pri.quantity_received
+                        from purchase_receipt_items pri
+                        join purchase_receipts pr on pr.id = pri.purchase_receipt_id
+                        where pri.purchase_receipt_id in (:ids)
+                        order by pri.purchase_receipt_id, pri.id
+                        """,
+                purchaseReceiptIds,
                 (rs, rowNum) -> new PurchaseReceiptItemRow(
                         rs.getLong("id"),
                         rs.getLong("purchase_receipt_id"),
