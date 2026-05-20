@@ -26,6 +26,12 @@ public class CategoryPersistenceAdapter implements CategoryRepositoryPort {
     public boolean existsByNameIgnoreCase(String name) {
         return categoryJpaRepository.existsByNameIgnoreCase(name);
     }
+
+    @Override
+    public boolean existsByNameIgnoreCaseAndIdNot(String name, Long id) {
+        return categoryJpaRepository.existsByNameIgnoreCaseAndIdNot(name, id);
+    }
+
     @Override
     public List<Category> findAll() {
         return categoryJpaRepository.findAllByOrderByNameAsc().stream().map(CategoryMapper::toDomain).toList();

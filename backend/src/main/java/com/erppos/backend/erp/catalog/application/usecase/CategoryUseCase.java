@@ -4,4 +4,6 @@ import java.util.List;
 public interface CategoryUseCase {
     Category create(CreateCategoryCommand command);
     List<Category> list(Boolean active);
+    Category update(Long id, UpdateCategoryCommand command);
+    Category changeStatus(Long id, ChangeCategoryStatusCommand command);
 }

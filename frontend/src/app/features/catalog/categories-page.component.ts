@@ -5,6 +5,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
 import { Category } from "./data/catalog.models";
 import { CategoryService } from "./data/category.service";
 import { toHttpErrorMessage } from "./data/http-error-message";
+import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.service";
 
 @Component({
   selector: "app-categories-page",
@@ -46,7 +47,16 @@ import { toHttpErrorMessage } from "./data/http-error-message";
               class="ui-button ui-button--primary"
               [disabled]="saving"
             >
-              {{ saving ? "Creando..." : "Crear categoria" }}
+              {{ submitButtonLabel }}
+            </button>
+            <button
+              type="button"
+              class="ui-button ui-button--secondary"
+              *ngIf="isEditing"
+              [disabled]="saving"
+              (click)="cancelEdit()"
+            >
+              Cancelar
             </button>
           </div>
 
@@ -76,16 +86,20 @@ import { toHttpErrorMessage } from "./data/http-error-message";
         <table class="ui-table">
           <thead>
             <tr>
-              <th>ID</th>
               <th>Nombre</th>
               <th>Descripcion</th>
               <th>Estado</th>
+              <th>Acciones</th>
             </tr>
           </thead>
           <tbody>
             <tr *ngFor="let category of categories">
-              <td class="cell-id">{{ category.id }}</td>
-              <td>{{ category.name }}</td>
+              <td>
+                <div class="name-cell">
+                  <span>{{ category.name }}</span>
+                  <span *ngIf="isReservedCategory(category)" class="ui-chip ui-chip--neutral name-chip">Sistema</span>
+                </div>
+              </td>
               <td>{{ category.description || "-" }}</td>
               <td>
                 <span
@@ -95,6 +109,41 @@ import { toHttpErrorMessage } from "./data/http-error-message";
                 >
                   {{ category.active ? "Activa" : "Inactiva" }}
                 </span>
+              </td>
+              <td>
+                <div class="actions">
+                  <ng-container *ngIf="!isReservedCategory(category); else reservedCategory">
+                    <button
+                      type="button"
+                      class="ui-button ui-button--secondary"
+                      [disabled]="saving"
+                      (click)="editCategory(category)"
+                    >
+                      Editar
+                    </button>
+                    <button
+                      *ngIf="category.active"
+                      type="button"
+                      class="ui-button ui-button--danger"
+                      [disabled]="saving"
+                      (click)="changeStatus(category, false)"
+                    >
+                      Desactivar
+                    </button>
+                    <button
+                      *ngIf="!category.active"
+                      type="button"
+                      class="ui-button ui-button--secondary"
+                      [disabled]="saving"
+                      (click)="changeStatus(category, true)"
+                    >
+                      Reactivar
+                    </button>
+                  </ng-container>
+                  <ng-template #reservedCategory>
+                    <span class="ui-chip ui-chip--neutral actions-chip">Reservada</span>
+                  </ng-template>
+                </div>
               </td>
             </tr>
             <tr *ngIf="categories.length === 0">
@@ -168,17 +217,39 @@ import { toHttpErrorMessage } from "./data/http-error-message";
 
       .form-action {
         display: flex;
+        gap: var(--space-2);
+        flex-wrap: wrap;
         justify-content: flex-end;
         align-self: stretch;
+      }
+
+      .actions {
+        display: flex;
+        gap: var(--space-2);
+        flex-wrap: wrap;
+        align-items: center;
+      }
+
+      .name-cell {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+        flex-wrap: wrap;
+      }
+
+      .name-chip,
+      .actions-chip {
+        white-space: nowrap;
+      }
+
+      .ui-table th,
+      .ui-table td {
+        vertical-align: middle;
       }
 
       .ui-button[disabled] {
         opacity: 0.55;
         cursor: not-allowed;
-      }
-
-      .cell-id {
-        white-space: nowrap;
       }
 
       @media (max-width: 900px) {
@@ -192,6 +263,10 @@ import { toHttpErrorMessage } from "./data/http-error-message";
         }
 
         .form-action {
+          justify-content: flex-start;
+        }
+
+        .actions {
           justify-content: flex-start;
         }
       }
@@ -208,10 +283,12 @@ export class CategoriesPageComponent implements OnInit {
   saving = false;
   errorMessage = "";
   successMessage = "";
+  editingCategoryId: number | null = null;
 
   constructor(
     private readonly formBuilder: FormBuilder,
     private readonly categoryService: CategoryService,
+    private readonly confirmDialog: ConfirmDialogService,
   ) {}
 
   ngOnInit(): void {
@@ -229,31 +306,125 @@ export class CategoriesPageComponent implements OnInit {
     this.successMessage = "";
 
     const value = this.form.getRawValue();
-    this.categoryService
-      .create({
-        name: (value.name ?? "").trim(),
-        description: this.cleanOptional(value.description),
-      })
-      .subscribe({
-        next: () => {
-          this.saving = false;
-          this.successMessage = "Categoria creada correctamente.";
-          this.form.reset();
-          this.loadCategories();
-        },
-        error: (error: unknown) => {
-          this.saving = false;
-          this.errorMessage = toHttpErrorMessage(
-            error,
-            "No se pudo crear la categoria.",
-          );
-        },
-      });
+    const payload = {
+      name: (value.name ?? "").trim(),
+      description: this.cleanOptional(value.description),
+    };
+
+    const request$ = this.editingCategoryId === null
+      ? this.categoryService.create(payload)
+      : this.categoryService.update(this.editingCategoryId, payload);
+
+    request$.subscribe({
+      next: () => {
+        this.saving = false;
+        this.successMessage = this.editingCategoryId === null
+          ? "Categoria creada correctamente."
+          : "Categoria actualizada correctamente.";
+        this.cancelEdit();
+        this.loadCategories();
+      },
+      error: (error: unknown) => {
+        this.saving = false;
+        this.errorMessage = toHttpErrorMessage(
+          error,
+          this.editingCategoryId === null
+            ? "No se pudo crear la categoria."
+            : "No se pudo actualizar la categoria.",
+        );
+      },
+    });
   }
 
   isInvalid(controlName: string): boolean {
     const control = this.form.get(controlName);
     return !!control && control.invalid && (control.touched || control.dirty);
+  }
+
+  get isEditing(): boolean {
+    return this.editingCategoryId !== null;
+  }
+
+  get submitButtonLabel(): string {
+    if (this.saving) {
+      return this.isEditing ? "Actualizando..." : "Creando...";
+    }
+
+    return this.isEditing ? "Actualizar categoria" : "Crear categoria";
+  }
+
+  editCategory(category: Category): void {
+    if (this.saving || this.isReservedCategory(category)) {
+      return;
+    }
+
+    this.editingCategoryId = category.id;
+    this.form.setValue({
+      name: category.name,
+      description: category.description ?? "",
+    });
+    this.form.markAsPristine();
+    this.form.markAsUntouched();
+    this.errorMessage = "";
+    this.successMessage = "";
+  }
+
+  cancelEdit(): void {
+    this.editingCategoryId = null;
+    this.form.reset({
+      name: "",
+      description: "",
+    });
+    this.form.markAsPristine();
+    this.form.markAsUntouched();
+  }
+
+  async changeStatus(category: Category, active: boolean): Promise<void> {
+    if (this.saving || this.isReservedCategory(category)) {
+      return;
+    }
+
+    const accepted = await this.confirmDialog.confirm({
+      title: active ? "Reactivar categoría" : "Desactivar categoría",
+      description: active
+        ? "La categoría volverá a estar disponible para nuevas operaciones del catálogo."
+        : "La categoría se marcará como inactiva. Seguirá disponible en el historial, pero dejará de usarse en nuevas operaciones.",
+      highlightText: category.name,
+      confirmText: active ? "Reactivar categoría" : "Desactivar categoría",
+      cancelText: "Cancelar",
+      variant: active ? "info" : "warning",
+    });
+
+    if (!accepted) {
+      return;
+    }
+
+    this.saving = true;
+    this.errorMessage = "";
+    this.successMessage = "";
+
+    this.categoryService.changeStatus(category.id, { active }).subscribe({
+      next: () => {
+        this.saving = false;
+        this.successMessage = active
+          ? "Categoria reactivada correctamente."
+          : "Categoria desactivada correctamente.";
+        this.loadCategories();
+      },
+      error: (error: unknown) => {
+        this.saving = false;
+        this.errorMessage = toHttpErrorMessage(
+          error,
+          active
+            ? "No se pudo reactivar la categoria."
+            : "No se pudo desactivar la categoria.",
+        );
+      },
+    });
+  }
+
+  isReservedCategory(category: Category): boolean {
+    return this.normalizeCategoryName(category.name) === "por clasificar";
   }
 
   private loadCategories(): void {
@@ -273,5 +444,9 @@ export class CategoriesPageComponent implements OnInit {
   private cleanOptional(value: string | null): string | null {
     const trimmed = (value ?? "").trim();
     return trimmed.length > 0 ? trimmed : null;
+  }
+
+  private normalizeCategoryName(value: string): string {
+    return (value ?? "").trim().toLowerCase();
   }
 }

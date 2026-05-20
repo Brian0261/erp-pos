@@ -49,6 +49,15 @@ export interface CategoryCreateRequest {
   description: string | null;
 }
 
+export interface CategoryUpdateRequest {
+  name: string;
+  description: string | null;
+}
+
+export interface CategoryStatusRequest {
+  active: boolean;
+}
+
 export interface UnitCreateRequest {
   code: string;
   name: string;

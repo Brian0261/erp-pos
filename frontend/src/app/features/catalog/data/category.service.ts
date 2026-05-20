@@ -3,7 +3,12 @@ import { Injectable } from "@angular/core";
 import { Observable } from "rxjs";
 
 import { environment } from "../../../../environments/environment";
-import { Category, CategoryCreateRequest } from "./catalog.models";
+import {
+  Category,
+  CategoryCreateRequest,
+  CategoryStatusRequest,
+  CategoryUpdateRequest,
+} from "./catalog.models";
 
 @Injectable({ providedIn: "root" })
 export class CategoryService {
@@ -26,5 +31,13 @@ export class CategoryService {
 
   create(payload: CategoryCreateRequest): Observable<Category> {
     return this.http.post<Category>(this.endpoint, payload);
+  }
+
+  update(id: number, payload: CategoryUpdateRequest): Observable<Category> {
+    return this.http.put<Category>(`${this.endpoint}/${id}`, payload);
+  }
+
+  changeStatus(id: number, payload: CategoryStatusRequest): Observable<Category> {
+    return this.http.patch<Category>(`${this.endpoint}/${id}/status`, payload);
   }
 }

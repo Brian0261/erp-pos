@@ -3,10 +3,12 @@ import com.erppos.backend.erp.catalog.application.service.AuditUserProvider;
 import com.erppos.backend.erp.catalog.application.service.CategoryApplicationService;
 import com.erppos.backend.erp.catalog.application.service.ProductApplicationService;
 import com.erppos.backend.erp.catalog.application.service.UnitApplicationService;
+import com.erppos.backend.erp.catalog.application.usecase.ChangeCategoryStatusCommand;
 import com.erppos.backend.erp.catalog.application.usecase.CreateCategoryCommand;
 import com.erppos.backend.erp.catalog.application.usecase.ProductBarcodeStatus;
 import com.erppos.backend.erp.catalog.application.usecase.CreateProductCommand;
 import com.erppos.backend.erp.catalog.application.usecase.CreateUnitCommand;
+import com.erppos.backend.erp.catalog.application.usecase.UpdateCategoryCommand;
 import com.erppos.backend.erp.catalog.domain.exception.CatalogBusinessRuleException;
 import com.erppos.backend.erp.catalog.domain.exception.CatalogConflictException;
 import com.erppos.backend.erp.catalog.domain.model.Category;
@@ -55,6 +57,46 @@ class CatalogApplicationServiceTest {
         categoryService.create(new CreateCategoryCommand("Papeles", null));
         assertThrows(CatalogConflictException.class,
                 () -> categoryService.create(new CreateCategoryCommand("PAPELES", null)));
+    }
+
+    @Test
+    void shouldUpdateCategorySuccessfully() {
+        Category category = categoryService.create(new CreateCategoryCommand("Cuadernos", "Escolares"));
+
+        Category updated = categoryService.update(category.id(), new UpdateCategoryCommand("Cuadernos Prime", "Escolares y premium"));
+
+        assertEquals(category.id(), updated.id());
+        assertEquals("Cuadernos Prime", updated.name());
+        assertEquals("Escolares y premium", updated.description());
+        assertTrue(updated.active());
+    }
+
+    @Test
+    void shouldRejectDuplicatedCategoryNameOnUpdate() {
+        Category first = categoryService.create(new CreateCategoryCommand("Cuadernos", null));
+        Category second = categoryService.create(new CreateCategoryCommand("Papeles", null));
+
+        assertThrows(CatalogConflictException.class,
+                () -> categoryService.update(second.id(), new UpdateCategoryCommand(first.name().toLowerCase(), null)));
+    }
+
+    @Test
+    void shouldChangeCategoryStatusSuccessfully() {
+        Category category = categoryService.create(new CreateCategoryCommand("Cuadernos", null));
+
+        Category updated = categoryService.changeStatus(category.id(), new ChangeCategoryStatusCommand(false));
+
+        assertFalse(updated.active());
+    }
+
+    @Test
+    void shouldBlockReservedCategoryUpdateAndStatusChange() {
+        Category reserved = categoryRepository.save(new Category(null, "Por clasificar", null, true, null, null, "system", "system"));
+
+        assertThrows(CatalogBusinessRuleException.class,
+                () -> categoryService.update(reserved.id(), new UpdateCategoryCommand("Por clasificar", "Cambio")));
+        assertThrows(CatalogBusinessRuleException.class,
+                () -> categoryService.changeStatus(reserved.id(), new ChangeCategoryStatusCommand(false)));
     }
     @Test
     void shouldCreateUnitSuccessfully() {
@@ -235,6 +277,11 @@ class CatalogApplicationServiceTest {
         @Override
         public boolean existsByNameIgnoreCase(String name) {
             return storage.values().stream().anyMatch(c -> c.name().equalsIgnoreCase(name));
+        }
+
+        @Override
+        public boolean existsByNameIgnoreCaseAndIdNot(String name, Long id) {
+            return storage.values().stream().anyMatch(c -> c.name().equalsIgnoreCase(name) && !c.id().equals(id));
         }
         @Override
         public List<Category> findAll() {
