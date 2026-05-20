@@ -542,6 +542,7 @@ type DetailTabId =
       .summary-grid {
         grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
         margin-top: var(--space-3);
+        align-items: stretch;
       }
 
       .summary-groups {
@@ -650,6 +651,9 @@ type DetailTabId =
       textarea {
         resize: vertical;
         min-height: 64px;
+        padding: 0.45rem 1rem 0.85rem;
+        box-sizing: border-box;
+        line-height: 1.4;
       }
 
       .criteria-actions,
@@ -706,10 +710,11 @@ type DetailTabId =
       }
 
       .summary-metric {
-        display: flex;
-        align-items: baseline;
-        justify-content: space-between;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
         gap: var(--space-3);
+        align-items: start;
+        min-height: 1.9rem;
       }
 
       .summary-metric span {
@@ -723,13 +728,21 @@ type DetailTabId =
 
       .summary-card {
         display: grid;
-        gap: 0.35rem;
-        align-content: start;
+        grid-template-rows: minmax(2.6rem, auto) auto;
+        gap: 0.45rem;
+        height: 100%;
+      }
+
+      .summary-label {
+        display: flex;
+        align-items: flex-start;
+        min-height: 2.6rem;
       }
 
       .summary-card strong {
         font-size: 1.28rem;
         line-height: 1.15;
+        margin-top: auto;
       }
 
       .summary-note {
