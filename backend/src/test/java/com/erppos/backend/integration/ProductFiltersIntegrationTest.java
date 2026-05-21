@@ -137,11 +137,12 @@ class ProductFiltersIntegrationTest extends AbstractHttpIntegrationTest {
 
         long category = createCategory(adminToken, suffix);
         long unitId = createUnit(adminToken, suffix);
-        long productId = createProduct(adminToken, category, unitId, "SKU-MT-" + suffix, "BC-MT-" + suffix, "TEMPERA CAJA X7 C/PINCEL DAVID", BigDecimal.valueOf(18));
+        String marker = "" + suffix.substring(suffix.length() - 6);
+        long productId = createProduct(adminToken, category, unitId, "SKU-MT-" + suffix, "BC-MT-" + suffix, "TEMPERA CAJA X7 C/PINCEL DAVID " + marker, BigDecimal.valueOf(18));
 
         mockMvc.perform(get("/api/v1/products/lookup")
                         .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
-                        .param("q", "caja david")
+                        .param("q", "caja david " + marker)
                         .param("limit", "10"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))

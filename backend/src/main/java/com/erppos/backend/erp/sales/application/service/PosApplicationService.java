@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.stream.Stream;
 
 @Service
 public class PosApplicationService implements PosUseCase {
@@ -32,9 +33,15 @@ public class PosApplicationService implements PosUseCase {
 
     @Override
     public List<PosProductView> search(String query, Long warehouseId) {
-        return catalogReadPort.searchByNameOrCode(query, 50)
+        List<PosProductView> results = catalogReadPort.searchByNameOrCode(query, 25)
                 .stream()
                 .map(product -> toView(product, inventorySalesPort.stockAvailable(product.id(), warehouseId)))
+                .toList();
+
+        return Stream.concat(
+                        results.stream().filter(view -> view.stockAvailable().compareTo(BigDecimal.ZERO) > 0),
+                        results.stream().filter(view -> view.stockAvailable().compareTo(BigDecimal.ZERO) <= 0)
+                )
                 .toList();
     }
 

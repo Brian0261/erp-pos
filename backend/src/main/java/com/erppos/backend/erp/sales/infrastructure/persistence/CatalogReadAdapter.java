@@ -8,7 +8,6 @@ import com.erppos.backend.erp.sales.domain.port.CatalogReadPort;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
-import java.util.Locale;
 import java.util.Optional;
 
 @Component
@@ -37,7 +36,7 @@ public class CatalogReadAdapter implements CatalogReadPort {
             return Optional.empty();
         }
 
-        return productUseCase.search(normalized).stream()
+        return productUseCase.lookup(normalized, true, 25).stream()
                 .filter(p -> p.sku().equalsIgnoreCase(normalized)
                         || (p.barcode() != null && p.barcode().equalsIgnoreCase(normalized)))
                 .findFirst()
@@ -46,14 +45,22 @@ public class CatalogReadAdapter implements CatalogReadPort {
 
     @Override
     public List<PosProductSnapshot> searchByNameOrCode(String query, int limit) {
-        String normalized = query == null ? "" : query.trim();
+        String normalized = normalizeQuery(query);
         if (normalized.isEmpty()) {
             return List.of();
         }
-        return productUseCase.search(normalized).stream()
-                .limit(limit)
+        int resolvedLimit = Math.min(Math.max(limit, 1), 25);
+        return productUseCase.lookup(normalized, true, resolvedLimit).stream()
                 .map(this::toSnapshot)
                 .toList();
+    }
+
+    private String normalizeQuery(String value) {
+        if (value == null) {
+            return "";
+        }
+
+        return value.trim().toLowerCase().replaceAll("\\s+", " ");
     }
 
     private PosProductSnapshot toSnapshot(Product product) {
