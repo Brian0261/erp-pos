@@ -6,6 +6,7 @@ import java.util.List;
 
 public interface WarehouseJpaRepository extends JpaRepository<WarehouseEntity, Long> {
     boolean existsByCodeIgnoreCase(String code);
+    boolean existsByCodeIgnoreCaseAndIdNot(String code, Long id);
     List<WarehouseEntity> findAllByOrderByNameAsc();
     List<WarehouseEntity> findByActiveTrueOrderByNameAsc();
 }

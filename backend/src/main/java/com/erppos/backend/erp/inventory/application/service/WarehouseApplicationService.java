@@ -2,7 +2,9 @@ package com.erppos.backend.erp.inventory.application.service;
 
 import com.erppos.backend.erp.inventory.application.usecase.CreateWarehouseCommand;
 import com.erppos.backend.erp.inventory.application.usecase.ChangeWarehouseStatusCommand;
+import com.erppos.backend.erp.inventory.application.usecase.UpdateWarehouseCommand;
 import com.erppos.backend.erp.inventory.application.usecase.WarehouseUseCase;
+import com.erppos.backend.erp.inventory.domain.exception.InventoryBusinessRuleException;
 import com.erppos.backend.erp.inventory.domain.exception.InventoryConflictException;
 import com.erppos.backend.erp.inventory.domain.exception.InventoryNotFoundException;
 import com.erppos.backend.erp.inventory.domain.model.Warehouse;
@@ -24,15 +26,22 @@ public class WarehouseApplicationService implements WarehouseUseCase {
 
     @Override
     public Warehouse create(CreateWarehouseCommand command) {
-        String normalizedCode = command.code().trim();
-        if (warehouseRepositoryPort.existsByCodeIgnoreCase(normalizedCode)) {
+        String code = trimToNull(command.code());
+        String name = trimToNull(command.name());
+        if (code == null) {
+            throw new InventoryBusinessRuleException("Warehouse code is required");
+        }
+        if (name == null) {
+            throw new InventoryBusinessRuleException("Warehouse name is required");
+        }
+        if (warehouseRepositoryPort.existsByCodeIgnoreCase(code)) {
             throw new InventoryConflictException("Warehouse code already exists");
         }
         String actor = auditUserProvider.currentUsername();
         Warehouse warehouse = new Warehouse(
                 null,
-                normalizedCode,
-                command.name().trim(),
+                code,
+                name,
                 command.type(),
                 true,
                 null,
@@ -41,6 +50,36 @@ public class WarehouseApplicationService implements WarehouseUseCase {
                 actor
         );
         return warehouseRepositoryPort.save(warehouse);
+    }
+
+    @Override
+    public Warehouse update(Long id, UpdateWarehouseCommand command) {
+        Warehouse current = getById(id);
+        String code = trimToNull(command.code());
+        String name = trimToNull(command.name());
+        if (code == null) {
+            throw new InventoryBusinessRuleException("Warehouse code is required");
+        }
+        if (name == null) {
+            throw new InventoryBusinessRuleException("Warehouse name is required");
+        }
+        if (warehouseRepositoryPort.existsByCodeIgnoreCaseAndIdNot(code, id)) {
+            throw new InventoryConflictException("Warehouse code already exists");
+        }
+
+        String actor = auditUserProvider.currentUsername();
+        Warehouse updated = new Warehouse(
+                current.id(),
+                code,
+                name,
+                current.type(),
+                current.active(),
+                current.createdAt(),
+                current.updatedAt(),
+                current.createdBy(),
+                actor
+        );
+        return warehouseRepositoryPort.save(updated);
     }
 
     @Override
@@ -78,6 +117,14 @@ public class WarehouseApplicationService implements WarehouseUseCase {
                 actor
         );
         return warehouseRepositoryPort.save(updated);
+    }
+
+    private String trimToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 }
 

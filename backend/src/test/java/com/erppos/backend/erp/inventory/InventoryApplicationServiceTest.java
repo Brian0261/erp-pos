@@ -9,8 +9,10 @@ import com.erppos.backend.erp.inventory.application.usecase.RegisterAdjustmentCo
 import com.erppos.backend.erp.inventory.application.usecase.RegisterInitialStockCommand;
 import com.erppos.backend.erp.inventory.application.usecase.TransferStockCommand;
 import com.erppos.backend.erp.inventory.application.usecase.TransferStockItemCommand;
+import com.erppos.backend.erp.inventory.application.usecase.UpdateWarehouseCommand;
 import com.erppos.backend.erp.inventory.domain.exception.InventoryBusinessRuleException;
 import com.erppos.backend.erp.inventory.domain.exception.InventoryConflictException;
+import com.erppos.backend.erp.inventory.domain.exception.InventoryNotFoundException;
 import com.erppos.backend.erp.inventory.domain.model.InventoryMovement;
 import com.erppos.backend.erp.inventory.domain.model.InventoryMovementType;
 import com.erppos.backend.erp.inventory.domain.model.InventoryProductSnapshot;
@@ -84,6 +86,50 @@ class InventoryApplicationServiceTest {
         assertNotNull(warehouse.id());
         assertEquals("WH-01", warehouse.code());
         assertTrue(warehouse.active());
+    }
+
+    @Test
+    void shouldUpdateWarehouseSuccessfully() {
+        Warehouse warehouse = warehouseService.create(new CreateWarehouseCommand("WH-01", "Almacen Principal", WarehouseType.MAIN_WAREHOUSE));
+
+        Warehouse updated = warehouseService.update(warehouse.id(), new UpdateWarehouseCommand("WH-02", "Almacen Central"));
+
+        assertEquals(warehouse.id(), updated.id());
+        assertEquals("WH-02", updated.code());
+        assertEquals("Almacen Central", updated.name());
+        assertEquals(WarehouseType.MAIN_WAREHOUSE, updated.type());
+        assertTrue(updated.active());
+    }
+
+    @Test
+    void shouldRejectDuplicatedWarehouseCodeOnUpdate() {
+        Warehouse warehouse = warehouseService.create(new CreateWarehouseCommand("WH-01", "Almacen Principal", WarehouseType.MAIN_WAREHOUSE));
+        warehouseService.create(new CreateWarehouseCommand("WH-02", "Almacen Secundario", WarehouseType.STORE));
+
+        assertThrows(InventoryConflictException.class,
+                () -> warehouseService.update(warehouse.id(), new UpdateWarehouseCommand("wh-02", "Otro nombre")));
+    }
+
+    @Test
+    void shouldRejectBlankWarehouseCodeOnUpdate() {
+        Warehouse warehouse = warehouseService.create(new CreateWarehouseCommand("WH-01", "Almacen Principal", WarehouseType.MAIN_WAREHOUSE));
+
+        assertThrows(InventoryBusinessRuleException.class,
+                () -> warehouseService.update(warehouse.id(), new UpdateWarehouseCommand("   ", "Otro nombre")));
+    }
+
+    @Test
+    void shouldRejectBlankWarehouseNameOnUpdate() {
+        Warehouse warehouse = warehouseService.create(new CreateWarehouseCommand("WH-01", "Almacen Principal", WarehouseType.MAIN_WAREHOUSE));
+
+        assertThrows(InventoryBusinessRuleException.class,
+                () -> warehouseService.update(warehouse.id(), new UpdateWarehouseCommand("WH-02", "   ")));
+    }
+
+    @Test
+    void shouldRejectMissingWarehouseOnUpdate() {
+        assertThrows(InventoryNotFoundException.class,
+                () -> warehouseService.update(999L, new UpdateWarehouseCommand("WH-02", "Almacen Central")));
     }
 
     @Test
@@ -357,6 +403,12 @@ class InventoryApplicationServiceTest {
         @Override
         public boolean existsByCodeIgnoreCase(String code) {
             return storage.values().stream().anyMatch(w -> w.code().equalsIgnoreCase(code));
+        }
+
+        @Override
+        public boolean existsByCodeIgnoreCaseAndIdNot(String code, Long id) {
+            return storage.values().stream()
+                    .anyMatch(w -> w.id() != null && !w.id().equals(id) && w.code().equalsIgnoreCase(code));
         }
 
         @Override

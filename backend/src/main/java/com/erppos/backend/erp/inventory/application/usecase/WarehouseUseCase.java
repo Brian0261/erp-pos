@@ -6,6 +6,7 @@ import java.util.List;
 
 public interface WarehouseUseCase {
     Warehouse create(CreateWarehouseCommand command);
+    Warehouse update(Long id, UpdateWarehouseCommand command);
     List<Warehouse> list(Boolean active);
     Warehouse getById(Long id);
     void deactivate(Long id);

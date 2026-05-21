@@ -6,6 +6,7 @@ import { environment } from "../../../../environments/environment";
 import {
   WarehouseCreateRequest,
   WarehouseResponse,
+  WarehouseUpdateRequest,
   WarehouseStatusRequest,
 } from "./inventory.models";
 
@@ -30,6 +31,10 @@ export class WarehouseService {
 
   create(payload: WarehouseCreateRequest): Observable<WarehouseResponse> {
     return this.http.post<WarehouseResponse>(this.endpoint, payload);
+  }
+
+  update(id: number, payload: WarehouseUpdateRequest): Observable<WarehouseResponse> {
+    return this.http.put<WarehouseResponse>(`${this.endpoint}/${id}`, payload);
   }
 
   deactivate(id: number): Observable<void> {

@@ -35,6 +35,11 @@ public class WarehousePersistenceAdapter implements WarehouseRepositoryPort {
     }
 
     @Override
+    public boolean existsByCodeIgnoreCaseAndIdNot(String code, Long id) {
+        return warehouseJpaRepository.existsByCodeIgnoreCaseAndIdNot(code, id);
+    }
+
+    @Override
     public List<Warehouse> findAll() {
         return warehouseJpaRepository.findAllByOrderByNameAsc().stream().map(WarehouseMapper::toDomain).toList();
     }

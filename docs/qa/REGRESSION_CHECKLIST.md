@@ -82,12 +82,11 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 
 ### Inventario - Almacenes (2026-05-20)
 
-- [ ] Almacenes: crear almacen desde UI y validar persistencia.
-- [ ] Almacenes: desactivar desde UI con confirmacion y validar `PATCH /api/v1/warehouses/{id}/status`.
-- [ ] Almacenes: reactivar desde UI con confirmacion y validar `PATCH /api/v1/warehouses/{id}/status`.
-- [ ] Almacenes: validar tipo traducido visualmente en tabla y select; valores internos se mantienen como `STORE`, `MAIN_WAREHOUSE`, `VIRTUAL`.
-- [ ] Almacenes: validar ID oculto y formulario sin desnivel.
-- [ ] Almacenes: si ya existe cobertura, validar impacto de almacen inactivo en ventas, compras e inventario.
+- [ ] Almacenes: editar code/name desde UI y validar `PUT /api/v1/warehouses/{id}`.
+- [ ] Almacenes: cancelar edicion y volver a estado Crear almacen.
+- [ ] Almacenes: desactivar/reactivar desde UI con confirmacion y validar `PATCH /api/v1/warehouses/{id}/status`.
+- [ ] Almacenes: validar label `Tipo de almacén *`, header de tabla `Tipo` y tipos traducidos en español.
+- [ ] Almacenes: validar ID oculto, formulario estable y sin impacto en stock/compras/ventas/kardex.
 
 ### POS touch-friendly Fase 1.1 - Grid fijo sin scroll de pagina (2026-05-06)
 

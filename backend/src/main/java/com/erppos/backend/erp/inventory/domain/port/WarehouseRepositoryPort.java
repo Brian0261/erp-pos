@@ -8,6 +8,7 @@ import java.util.Optional;
 public interface WarehouseRepositoryPort {
     Warehouse save(Warehouse warehouse);
     boolean existsByCodeIgnoreCase(String code);
+    boolean existsByCodeIgnoreCaseAndIdNot(String code, Long id);
     List<Warehouse> findAll();
     List<Warehouse> findActive();
     Optional<Warehouse> findById(Long id);

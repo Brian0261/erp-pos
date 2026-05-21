@@ -8,6 +8,7 @@ import { toHttpErrorMessage } from "./data/http-error-message";
 import {
   WarehouseCreateRequest,
   WarehouseResponse,
+  WarehouseUpdateRequest,
   WarehouseType,
 } from "./data/inventory.models";
 import { WarehouseService } from "./data/warehouse.service";
@@ -23,7 +24,7 @@ import { WarehouseService } from "./data/warehouse.service";
           <p class="ui-page-kicker">Inventario InkToy</p>
           <h1 class="ui-page-title">Almacenes</h1>
           <p class="ui-page-description">
-            Lista, crea y desactiva almacenes para controlar stock por
+            Lista, crea, edita y desactiva almacenes para controlar stock por
             ubicacion.
           </p>
         </div>
@@ -32,7 +33,7 @@ import { WarehouseService } from "./data/warehouse.service";
       <form [formGroup]="form" (ngSubmit)="submit()" class="form-grid">
         <span class="field-label">Codigo *</span>
         <span class="field-label">Nombre *</span>
-        <span class="field-label">Tipo *</span>
+        <span class="field-label">Tipo de almacén *</span>
         <span class="field-label field-label--placeholder" aria-hidden="true">&nbsp;</span>
 
         <input type="text" formControlName="code" placeholder="Ej. ALM-CEN" />
@@ -54,7 +55,16 @@ import { WarehouseService } from "./data/warehouse.service";
             class="ui-button ui-button--primary"
             [disabled]="saving || !canManageWarehouses"
           >
-            {{ saving ? "Guardando..." : "Crear almacen" }}
+            {{ submitButtonLabel }}
+          </button>
+          <button
+            *ngIf="isEditing"
+            type="button"
+            class="ui-button ui-button--secondary"
+            [disabled]="saving || !canManageWarehouses"
+            (click)="cancelEdit()"
+          >
+            Cancelar
           </button>
         </div>
 
@@ -73,7 +83,7 @@ import { WarehouseService } from "./data/warehouse.service";
       </form>
 
       <p class="ui-alert ui-alert--info" *ngIf="!canManageWarehouses">
-        Tu rol puede consultar almacenes, pero no crear ni desactivar.
+        Tu rol puede consultar almacenes, pero no crear, editar ni desactivar.
       </p>
       <p class="ui-alert ui-alert--error" *ngIf="errorMessage">
         {{ errorMessage }}
@@ -98,8 +108,8 @@ import { WarehouseService } from "./data/warehouse.service";
               <td class="cell-code">{{ warehouse.code }}</td>
               <td>{{ warehouse.name }}</td>
               <td>
-                <span class="ui-badge">{{ warehouseTypeLabel(warehouse.type) }}</span>
-              </td>
+                  <span class="ui-badge">{{ warehouseTypeLabel(warehouse.type) }}</span>
+                </td>
               <td>
                 <span
                   class="ui-badge"
@@ -111,10 +121,18 @@ import { WarehouseService } from "./data/warehouse.service";
               </td>
               <td class="actions">
                 <button
+                  type="button"
+                  class="ui-button ui-button--secondary"
+                  [disabled]="saving || !canManageWarehouses"
+                  (click)="editWarehouse(warehouse)"
+                >
+                  Editar
+                </button>
+                <button
                   *ngIf="warehouse.active"
                   type="button"
                   class="ui-button ui-button--danger"
-                  [disabled]="!canManageWarehouses"
+                  [disabled]="saving || !canManageWarehouses"
                   (click)="changeStatus(warehouse, false)"
                 >
                   Desactivar
@@ -123,7 +141,7 @@ import { WarehouseService } from "./data/warehouse.service";
                   *ngIf="!warehouse.active"
                   type="button"
                   class="ui-button ui-button--secondary"
-                  [disabled]="!canManageWarehouses"
+                  [disabled]="saving || !canManageWarehouses"
                   (click)="changeStatus(warehouse, true)"
                 >
                   Reactivar
@@ -131,7 +149,7 @@ import { WarehouseService } from "./data/warehouse.service";
               </td>
             </tr>
             <tr *ngIf="warehouses.length === 0">
-              <td colspan="6" class="ui-table__empty">
+              <td colspan="5" class="ui-table__empty">
                 <div class="ui-empty-state">No hay almacenes registrados.</div>
               </td>
             </tr>
@@ -196,9 +214,11 @@ import { WarehouseService } from "./data/warehouse.service";
 
       .field-action {
         display: flex;
+        gap: var(--space-2);
+        flex-wrap: wrap;
         justify-content: flex-end;
         align-self: stretch;
-        align-items: stretch;
+        align-items: center;
       }
 
       .field-action .ui-button {
@@ -220,6 +240,9 @@ import { WarehouseService } from "./data/warehouse.service";
 
       .actions {
         display: flex;
+        gap: var(--space-2);
+        flex-wrap: wrap;
+        align-items: center;
         justify-content: flex-start;
       }
 
@@ -271,6 +294,7 @@ export class WarehousesPageComponent implements OnInit {
   errorMessage = "";
   successMessage = "";
   canManageWarehouses = false;
+  editingWarehouseId: number | null = null;
 
   constructor(
     private readonly formBuilder: FormBuilder,
@@ -286,7 +310,9 @@ export class WarehousesPageComponent implements OnInit {
 
   submit(): void {
     if (!this.canManageWarehouses) {
-      this.errorMessage = "No tienes permisos para crear almacenes.";
+      this.errorMessage = this.isEditing
+        ? "No tienes permisos para actualizar almacenes."
+        : "No tienes permisos para crear almacenes.";
       return;
     }
 
@@ -299,28 +325,63 @@ export class WarehousesPageComponent implements OnInit {
     this.errorMessage = "";
     this.successMessage = "";
 
+    const isEditing = this.isEditing;
+
     const value = this.form.getRawValue();
-    const payload: WarehouseCreateRequest = {
+    const updatePayload: WarehouseUpdateRequest = {
       code: (value.code ?? "").trim(),
       name: (value.name ?? "").trim(),
+    };
+
+    const createPayload: WarehouseCreateRequest = {
+      code: updatePayload.code,
+      name: updatePayload.name,
       type: value.type as WarehouseType,
     };
 
-    this.warehouseService.create(payload).subscribe({
+    const request$ = isEditing && this.editingWarehouseId !== null
+      ? this.warehouseService.update(this.editingWarehouseId, updatePayload)
+      : this.warehouseService.create(createPayload);
+
+    request$.subscribe({
       next: () => {
         this.saving = false;
-        this.successMessage = "Almacen creado correctamente.";
-        this.form.reset();
+        this.successMessage = isEditing
+          ? "Almacen actualizado correctamente."
+          : "Almacen creado correctamente.";
+        if (isEditing) {
+          this.cancelEdit();
+        } else {
+          this.form.reset();
+        }
         this.loadWarehouses();
       },
       error: (error: unknown) => {
         this.saving = false;
         this.errorMessage = toHttpErrorMessage(
           error,
-          "No se pudo crear el almacen.",
+          isEditing ? "No se pudo actualizar el almacen." : "No se pudo crear el almacen.",
         );
       },
     });
+  }
+
+  editWarehouse(warehouse: WarehouseResponse): void {
+    this.editingWarehouseId = warehouse.id;
+    this.errorMessage = "";
+    this.successMessage = "";
+    this.form.patchValue({
+      code: warehouse.code,
+      name: warehouse.name,
+      type: warehouse.type,
+    });
+    this.form.get("type")?.disable();
+  }
+
+  cancelEdit(): void {
+    this.editingWarehouseId = null;
+    this.form.reset({ code: "", name: "", type: null });
+    this.form.get("type")?.enable();
   }
 
   async changeStatus(warehouse: WarehouseResponse, active: boolean): Promise<void> {
@@ -386,6 +447,18 @@ export class WarehousesPageComponent implements OnInit {
       default:
         return "-";
     }
+  }
+
+  get isEditing(): boolean {
+    return this.editingWarehouseId !== null;
+  }
+
+  get submitButtonLabel(): string {
+    if (this.saving) {
+      return this.isEditing ? "Actualizando..." : "Guardando...";
+    }
+
+    return this.isEditing ? "Actualizar almacen" : "Crear almacen";
   }
 
   private resolvePermissions(): void {

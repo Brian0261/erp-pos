@@ -24,6 +24,11 @@ export interface WarehouseCreateRequest {
   type: WarehouseType;
 }
 
+export interface WarehouseUpdateRequest {
+  code: string;
+  name: string;
+}
+
 export interface WarehouseStatusRequest {
   active: boolean;
 }
