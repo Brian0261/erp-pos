@@ -48,6 +48,10 @@ public interface ProductJpaRepository extends JpaRepository<ProductEntity, Long>
     @Override
     @EntityGraph(attributePaths = {"category", "unit"})
     java.util.Optional<ProductEntity> findById(Long id);
+
+    @EntityGraph(attributePaths = {"category", "unit"})
+    List<ProductEntity> findByActive(boolean active);
+
     boolean existsBySkuIgnoreCase(String sku);
     boolean existsBySkuIgnoreCaseAndIdNot(String sku, Long id);
     boolean existsByBarcode(String barcode);

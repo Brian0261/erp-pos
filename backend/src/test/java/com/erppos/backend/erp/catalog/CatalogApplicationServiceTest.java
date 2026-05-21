@@ -245,6 +245,23 @@ class CatalogApplicationServiceTest {
         assertEquals(2, productService.lookup("Producto", true, 2).size());
         assertTrue(productService.lookup("P", true, 10).isEmpty());
     }
+
+    @Test
+    void shouldPrioritizeExactSkuAndBarcodeInLookup() {
+        Long[] ids = seedActiveCategoryAndUnit();
+        Product exactSku = productService.create(new CreateProductCommand("SKU-EXACT", "BC-EXACT", "Caja Exacta", null, ids[0], ids[1], BigDecimal.ONE));
+        Product exactBarcode = productService.create(new CreateProductCommand("SKU-BAR", "BC-BAR", "Codigo Exacto", null, ids[0], ids[1], BigDecimal.ONE));
+        productService.create(new CreateProductCommand("SKU-MATCH", null, "Producto SKU-EXACT", null, ids[0], ids[1], BigDecimal.ONE));
+        productService.create(new CreateProductCommand("SKU-MATCH-2", null, "Producto BC-BAR", null, ids[0], ids[1], BigDecimal.ONE));
+
+        List<Product> skuResults = productService.lookup("SKU-EXACT", true, 10);
+        assertFalse(skuResults.isEmpty());
+        assertEquals(exactSku.id(), skuResults.get(0).id());
+
+        List<Product> barcodeResults = productService.lookup("BC-BAR", true, 10);
+        assertFalse(barcodeResults.isEmpty());
+        assertEquals(exactBarcode.id(), barcodeResults.get(0).id());
+    }
     @Test
     void shouldListProductsWithoutFiltersKeepingPagination() {
         Long[] ids = seedActiveCategoryAndUnit();
@@ -477,18 +494,68 @@ class CatalogApplicationServiceTest {
         @Override
         public List<Product> lookup(String query, Boolean active, int limit) {
             Boolean resolvedActive = active == null ? Boolean.TRUE : active;
-            String normalized = query.toLowerCase(Locale.ROOT);
+            String normalized = query == null ? "" : query.trim().toLowerCase(Locale.ROOT).replaceAll("\\s+", " ");
+            List<String> tokens = Arrays.stream(normalized.split(" "))
+                    .filter(token -> !token.isBlank())
+                    .toList();
+
             return storage.values().stream()
-                    .filter(p -> p.name().toLowerCase(Locale.ROOT).contains(normalized)
-                            || p.sku().toLowerCase(Locale.ROOT).contains(normalized)
-                            || (p.barcode() != null && p.barcode().toLowerCase(Locale.ROOT).contains(normalized)))
                     .filter(p -> resolvedActive == null || p.active() == resolvedActive)
+                    .filter(p -> matchesTokens(p, tokens))
                     .sorted(Comparator
-                            .comparing((Product p) -> !p.sku().equalsIgnoreCase(query))
-                            .thenComparing(p -> p.barcode() == null || !p.barcode().equalsIgnoreCase(query))
-                            .thenComparing(Product::name))
+                            .comparingInt((Product p) -> ranking(p, normalized, tokens))
+                            .thenComparing(Product::name)
+                            .thenComparing(Product::sku)
+                            .thenComparing(Product::id))
                     .limit(limit)
                     .toList();
+        }
+
+        private boolean matchesTokens(Product product, List<String> tokens) {
+            String name = normalized(product.name());
+            String sku = normalized(product.sku());
+            String barcode = normalized(product.barcode());
+
+            for (String token : tokens) {
+                if (!name.contains(token) && !sku.contains(token) && !barcode.contains(token)) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private int ranking(Product product, String query, List<String> tokens) {
+            String name = normalized(product.name());
+            String sku = normalized(product.sku());
+            String barcode = normalized(product.barcode());
+
+            if (sku.equals(query) || (!barcode.isBlank() && barcode.equals(query))) {
+                return 0;
+            }
+            if (sku.startsWith(query) || (!barcode.isBlank() && barcode.startsWith(query))) {
+                return 1;
+            }
+            if (name.startsWith(query)) {
+                return 2;
+            }
+            if (containsAllTokens(name, tokens)) {
+                return 3;
+            }
+            return 4;
+        }
+
+        private boolean containsAllTokens(String text, List<String> tokens) {
+            for (String token : tokens) {
+                if (!text.contains(token)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private String normalized(String value) {
+            return value == null ? "" : value.trim().toLowerCase(Locale.ROOT).replaceAll("\\s+", " ");
         }
 
         @Override

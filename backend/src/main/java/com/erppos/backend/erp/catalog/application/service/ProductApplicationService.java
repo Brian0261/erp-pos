@@ -180,6 +180,6 @@ public class ProductApplicationService implements ProductUseCase {
     }
     private String normalizeQuery(String value) {
         String trimmed = trimToNull(value);
-        return trimmed == null ? null : trimmed.toLowerCase(Locale.ROOT);
+        return trimmed == null ? null : trimmed.toLowerCase(Locale.ROOT).replaceAll("\\s+", " ");
     }
 }

@@ -130,6 +130,24 @@ class ProductFiltersIntegrationTest extends AbstractHttpIntegrationTest {
                 .andExpect(jsonPath("$.length()").value(1));
     }
 
+    @Test
+    void shouldLookupProductsByMultipleTokensSeparatedInName() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = Long.toString(System.nanoTime());
+
+        long category = createCategory(adminToken, suffix);
+        long unitId = createUnit(adminToken, suffix);
+        long productId = createProduct(adminToken, category, unitId, "SKU-MT-" + suffix, "BC-MT-" + suffix, "TEMPERA CAJA X7 C/PINCEL DAVID", BigDecimal.valueOf(18));
+
+        mockMvc.perform(get("/api/v1/products/lookup")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
+                        .param("q", "caja david")
+                        .param("limit", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].id").value(productId));
+    }
+
     private long createProduct(String token, long categoryId, long unitId, String sku, String barcode, String name, BigDecimal salePrice) throws Exception {
         ObjectNode payload = objectMapper.createObjectNode();
         payload.put("sku", sku);
