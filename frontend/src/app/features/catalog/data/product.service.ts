@@ -7,6 +7,7 @@ import {
   PageResponse,
   Product,
   ProductCreateRequest,
+  ProductLookupResponse,
   ProductUpdateRequest,
 } from "./catalog.models";
 
@@ -53,6 +54,21 @@ export class ProductService {
   search(query: string): Observable<Product[]> {
     const params = new HttpParams().set("q", query);
     return this.http.get<Product[]>(`${this.endpoint}/search`, { params });
+  }
+
+  lookup(
+    query: string,
+    active = true,
+    limit = 10,
+  ): Observable<ProductLookupResponse[]> {
+    let params = new HttpParams()
+      .set("q", query)
+      .set("active", String(active))
+      .set("limit", String(limit));
+
+    return this.http.get<ProductLookupResponse[]>(`${this.endpoint}/lookup`, {
+      params,
+    });
   }
 
   getById(id: number): Observable<Product> {

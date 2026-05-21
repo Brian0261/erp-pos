@@ -29,6 +29,7 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
 - Modo claro/oscuro con persistencia local.
 - Rutas protegidas y experiencia RBAC validadas en QA.
 - Frontend desplegado via Nginx con proxy /api.
+- Stock de Inventario actualizado a autocomplete server-side para Producto, sin precarga masiva de catálogo y con tabla simplificada (sin ID/Versión, fecha `dd/MM/yyyy HH:mm`).
 
 ## Estado backend
 
@@ -39,6 +40,7 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
 - Catalogo reforzado: Categorias con update/status y proteccion de `Por clasificar`; Unidades con update/status y validacion de estado.
 - Catalogo frontend operativo: Categorias y Unidades ya tienen mantenimiento basico completo en UI (crear/editar/estado) con tablas sin ID.
 - Inventario/Almacenes con alta/baja logica operativa: `PATCH /api/v1/warehouses/{id}/status`, `DELETE` como alias de desactivacion y UI con desactivar/reactivar.
+- Catalogo expone lookup compacto `GET /api/v1/products/lookup` para autocomplete de productos por nombre/SKU/barcode.
 
 ## Estado QA
 

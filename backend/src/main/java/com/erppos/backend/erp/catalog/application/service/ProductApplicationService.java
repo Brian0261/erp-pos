@@ -131,6 +131,18 @@ public class ProductApplicationService implements ProductUseCase {
         }
         return productRepositoryPort.search(normalizedQuery, 50);
     }
+
+    @Override
+    public List<Product> lookup(String query, Boolean active, int limit) {
+        String normalizedQuery = normalizeQuery(query);
+        if (normalizedQuery == null || normalizedQuery.length() < 2) {
+            return List.of();
+        }
+
+        int resolvedLimit = Math.min(Math.max(limit, 1), 25);
+        Boolean resolvedActive = active == null ? Boolean.TRUE : active;
+        return productRepositoryPort.lookup(normalizedQuery, resolvedActive, resolvedLimit);
+    }
     private void validateCreateConstraints(String sku, String barcode) {
         if (productRepositoryPort.existsBySkuIgnoreCase(sku.trim())) {
             throw new CatalogConflictException("SKU already exists");

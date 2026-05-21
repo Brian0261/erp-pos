@@ -88,6 +88,20 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [ ] Almacenes: validar label `Tipo de almacén *`, header de tabla `Tipo` y tipos traducidos en español.
 - [ ] Almacenes: validar ID oculto, formulario estable y sin impacto en stock/compras/ventas/kardex.
 
+### Inventario - Stock autocomplete Producto (2026-05-21)
+
+- [ ] Stock: escribir 2+ caracteres en Producto y validar lookup server-side.
+- [ ] Stock: buscar por nombre y poder seleccionar resultado.
+- [ ] Stock: buscar por SKU y poder seleccionar resultado.
+- [ ] Stock: buscar por código de barras y poder seleccionar resultado.
+- [ ] Stock: con menos de 2 caracteres no mostrar resultados útiles del lookup.
+- [ ] Stock: seleccionar producto y validar que el filtro siga enviando `productId` a `/api/v1/inventory/stocks`.
+- [ ] Stock: `Limpiar producto` vuelve a estado `Todos`.
+- [ ] Stock: `Limpiar` general resetea producto, almacén y filtros activos.
+- [ ] Stock: filtro por almacén sigue operativo junto al autocomplete.
+- [ ] Stock: paginación sigue operativa con y sin producto seleccionado.
+- [ ] Stock: columna ID y Versión ocultas; fecha visible en formato `dd/MM/yyyy HH:mm`.
+
 ### POS touch-friendly Fase 1.1 - Grid fijo sin scroll de pagina (2026-05-06)
 
 - [x] Ajuste aplicado solo en `frontend/src/app/features/sales/pos-page.component.ts` y evidencia QA en este checklist.

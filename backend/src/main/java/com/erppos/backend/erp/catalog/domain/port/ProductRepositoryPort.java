@@ -11,6 +11,7 @@ public interface ProductRepositoryPort {
     Page<Product> findAll(Pageable pageable);
     Page<Product> findByFilters(String query, boolean applyQuery, Long categoryId, Boolean active, ProductBarcodeStatus barcodeStatus, Pageable pageable);
     List<Product> search(String query, int limit);
+    List<Product> lookup(String query, Boolean active, int limit);
     boolean existsBySkuIgnoreCase(String sku);
     boolean existsBySkuIgnoreCaseAndIdNot(String sku, Long id);
     boolean existsByBarcode(String barcode);

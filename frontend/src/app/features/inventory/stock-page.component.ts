@@ -1,14 +1,32 @@
 import { CommonModule } from "@angular/common";
-import { Component, OnInit } from "@angular/core";
+import { Component, OnDestroy, OnInit } from "@angular/core";
 import { FormBuilder, ReactiveFormsModule } from "@angular/forms";
-import { forkJoin } from "rxjs";
+import { forkJoin, of, Subject } from "rxjs";
+import {
+  catchError,
+  debounceTime,
+  distinctUntilChanged,
+  finalize,
+  map,
+  switchMap,
+  takeUntil,
+  tap,
+} from "rxjs/operators";
 
-import { Product } from "../catalog/data/catalog.models";
+import {
+  Product,
+  ProductLookupResponse,
+} from "../catalog/data/catalog.models";
 import { ProductService } from "../catalog/data/product.service";
 import { toHttpErrorMessage } from "./data/http-error-message";
 import { InventoryService } from "./data/inventory.service";
 import { StockResponse, WarehouseResponse } from "./data/inventory.models";
 import { WarehouseService } from "./data/warehouse.service";
+
+type ProductCacheItem = Pick<
+  Product,
+  "id" | "name" | "sku" | "barcode" | "active"
+>;
 
 @Component({
   selector: "app-stock-page",
@@ -32,46 +50,112 @@ import { WarehouseService } from "./data/warehouse.service";
         (ngSubmit)="applyFilters()"
         class="filters-grid"
       >
-        <label class="field">
-          <span>Producto</span>
-          <select formControlName="productId">
-            <option [ngValue]="null">Todos</option>
-            <option *ngFor="let product of products" [ngValue]="product.id">
-              {{ product.name }} (SKU: {{ product.sku }})
-            </option>
-          </select>
-        </label>
+        <div class="filters-top">
+          <div class="field-input field-input--product">
+            <div class="field-label field-label--product">Producto</div>
+            <div class="autocomplete">
+              <input
+                type="text"
+                [formControl]="productSearchControl"
+                placeholder="Buscar producto por nombre, SKU o codigo de barras"
+                autocomplete="off"
+                [disabled]="loading"
+                (focus)="openProductLookup()"
+                (blur)="closeProductLookup()"
+                (keydown.enter)="selectFirstProductLookupResult($event)"
+                (keydown.escape)="closeProductLookup()"
+              />
 
-        <label class="field">
-          <span>Almacen</span>
-          <select formControlName="warehouseId">
-            <option [ngValue]="null">Todos</option>
-            <option
-              *ngFor="let warehouse of warehouses"
-              [ngValue]="warehouse.id"
-            >
-              {{ warehouse.code }} - {{ warehouse.name }}
-            </option>
-          </select>
-        </label>
+              <div class="autocomplete-panel" *ngIf="productLookupOpen">
+                <p class="autocomplete-state" *ngIf="productLookupLoading">
+                  Buscando...
+                </p>
 
-        <div class="field-action">
-          <button
-            type="submit"
-            class="ui-button ui-button--primary"
-            [disabled]="loading"
-          >
-            Buscar
-          </button>
+                <p
+                  class="autocomplete-state autocomplete-state--error"
+                  *ngIf="!productLookupLoading && productLookupErrorMessage"
+                >
+                  {{ productLookupErrorMessage }}
+                </p>
+
+                <p
+                  class="autocomplete-state"
+                  *ngIf="
+                    !productLookupLoading &&
+                    !productLookupErrorMessage &&
+                    productSearchControl.value.trim().length >= 2 &&
+                    productLookupResults.length === 0
+                  "
+                >
+                  Sin resultados.
+                </p>
+
+                <button
+                  type="button"
+                  class="autocomplete-option"
+                  *ngFor="let product of productLookupResults"
+                  (mousedown)="selectProduct(product)"
+                >
+                  <strong>{{ product.name }}</strong>
+                  <span>
+                    SKU: {{ product.sku }}
+                    <ng-container *ngIf="product.barcode">
+                      - Codigo: {{ product.barcode }}
+                    </ng-container>
+                  </span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="filters-right">
+            <div class="field-input field-input--warehouse">
+              <div class="field-label field-label--warehouse">Almacen</div>
+              <select formControlName="warehouseId">
+                <option [ngValue]="null">Todos</option>
+                <option
+                  *ngFor="let warehouse of warehouses"
+                  [ngValue]="warehouse.id"
+                >
+                  {{ warehouse.name }}
+                </option>
+              </select>
+            </div>
+
+            <div class="filter-actions">
+              <button
+                type="submit"
+                class="ui-button ui-button--primary"
+                [disabled]="loading"
+              >
+                Buscar
+              </button>
+              <button
+                type="button"
+                class="ui-button ui-button--secondary"
+                (click)="clearFilters()"
+                [disabled]="loading"
+              >
+                Limpiar
+              </button>
+            </div>
+          </div>
         </div>
-        <div class="field-action">
+
+        <div class="autocomplete-meta autocomplete-meta--grid">
+          <span class="ui-chip ui-chip--neutral" *ngIf="!selectedProductId">
+            Todos
+          </span>
+          <span class="autocomplete-selection" *ngIf="selectedProductId">
+            Seleccionado: {{ selectedProductLabel }}
+          </span>
           <button
             type="button"
-            class="ui-button ui-button--secondary"
-            (click)="clearFilters()"
-            [disabled]="loading"
+            class="ui-button ui-button--secondary autocomplete-clear"
+            (click)="clearProductSelection()"
+            [disabled]="loading || (!selectedProductId && !productSearchControl.value.trim())"
           >
-            Limpiar
+            Limpiar producto
           </button>
         </div>
       </form>
@@ -95,12 +179,10 @@ import { WarehouseService } from "./data/warehouse.service";
         <table class="ui-table stock-table">
           <thead>
             <tr>
-              <th>ID</th>
               <th>Producto</th>
               <th>Almacen</th>
               <th>Cantidad</th>
               <th>Nivel</th>
-              <th>Version</th>
               <th>Ultima actualizacion</th>
             </tr>
           </thead>
@@ -110,7 +192,6 @@ import { WarehouseService } from "./data/warehouse.service";
               [class.row-critical]="isCritical(stock)"
               [class.row-low]="isLow(stock)"
             >
-              <td class="cell-id">{{ stock.id }}</td>
               <td>{{ resolveProductName(stock.productId) }}</td>
               <td>{{ resolveWarehouseName(stock.warehouseId) }}</td>
               <td class="cell-qty">{{ stock.quantity | number: "1.0-3" }}</td>
@@ -126,13 +207,12 @@ import { WarehouseService } from "./data/warehouse.service";
                   {{ stockLevelLabel(stock) }}
                 </span>
               </td>
-              <td>{{ stock.version }}</td>
               <td class="cell-date">
-                {{ stock.updatedAt | date: "yyyy-MM-dd HH:mm" }}
+                {{ stock.updatedAt | date: "dd/MM/yyyy HH:mm" }}
               </td>
             </tr>
             <tr *ngIf="stocks.length === 0">
-              <td colspan="7" class="ui-table__empty">
+              <td colspan="5" class="ui-table__empty">
                 <div class="ui-empty-state">
                   No hay stock para los filtros seleccionados.
                 </div>
@@ -179,35 +259,179 @@ import { WarehouseService } from "./data/warehouse.service";
 
       .filters-grid {
         display: grid;
-        grid-template-columns: repeat(4, minmax(180px, 1fr));
-        gap: var(--space-3);
-        align-items: end;
+        grid-template-columns: minmax(0, 1fr);
+        gap: var(--space-2);
         border: 1px solid var(--color-border-default);
         border-radius: var(--radius-md);
         background: var(--color-bg-soft);
         padding: var(--space-3);
       }
 
-      .field {
+      .filters-top {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: var(--space-3);
+        align-items: start;
+      }
+
+      .filters-right {
+        display: grid;
+        grid-template-columns: 260px max-content;
+        grid-template-rows: auto auto;
+        column-gap: var(--space-3);
+        row-gap: var(--space-1);
+        align-items: end;
+        justify-content: start;
+      }
+
+      .field-label {
+        font-size: var(--font-size-sm);
+        font-weight: 700;
+        color: var(--color-text-secondary);
+        margin-bottom: var(--space-1);
+      }
+
+      .field-input {
         display: grid;
         gap: var(--space-1);
       }
 
-      .field > span {
-        font-size: var(--font-size-sm);
-        font-weight: 700;
-        color: var(--color-text-secondary);
+      .field-input--product {
+        min-width: 0;
+        width: 100%;
       }
 
-      select {
+      .field-input--warehouse {
+        width: 260px;
+        min-width: 260px;
+        grid-column: 1;
+        grid-row: 1 / span 2;
+      }
+
+      .field-input--warehouse .field-label {
+        margin-bottom: var(--space-1);
+      }
+
+      select,
+      input {
         padding: 0.6rem 0.7rem;
         border: 1px solid var(--color-border-strong);
         border-radius: var(--radius-sm);
+        box-sizing: border-box;
+        width: 100%;
+        background: var(--color-bg-surface);
+        color: var(--color-text-primary);
       }
 
-      .field-action {
+      .autocomplete {
+        position: relative;
+        display: grid;
+        gap: var(--space-2);
+      }
+
+      .autocomplete-shell {
+        display: grid;
+        gap: var(--space-2);
+      }
+
+      .autocomplete-panel {
+        position: absolute;
+        top: calc(100% + 0.35rem);
+        left: 0;
+        right: 0;
+        z-index: 20;
+        max-height: 18rem;
+        overflow: auto;
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-md);
+        background: var(--color-bg-surface);
+        box-shadow: var(--shadow-md);
+      }
+
+      .autocomplete-state,
+      .autocomplete-option {
+        padding: var(--space-2) var(--space-3);
+      }
+
+      .autocomplete-state {
+        margin: 0;
+        color: var(--color-text-secondary);
+      }
+
+      .autocomplete-state--error {
+        color: var(--color-danger);
+      }
+
+      .autocomplete-option {
+        width: 100%;
+        display: grid;
+        gap: 0.15rem;
+        border: 0;
+        border-bottom: 1px solid var(--color-border-default);
+        background: transparent;
+        text-align: left;
+        cursor: pointer;
+      }
+
+      .autocomplete-option:last-child {
+        border-bottom: 0;
+      }
+
+      .autocomplete-option:hover,
+      .autocomplete-option:focus-visible {
+        background: var(--color-bg-soft);
+      }
+
+      .autocomplete-option strong {
+        color: var(--color-text-primary);
+        font-size: var(--font-size-sm);
+      }
+
+      .autocomplete-option span {
+        font-size: var(--font-size-xs);
+        color: var(--color-text-secondary);
+      }
+
+      .autocomplete-meta {
         display: flex;
-        justify-content: flex-end;
+        align-items: center;
+        gap: var(--space-2);
+        flex-wrap: wrap;
+        min-height: 2.25rem;
+      }
+
+      .autocomplete-meta--grid {
+        padding-left: 0.1rem;
+      }
+
+      .autocomplete-selection {
+        font-size: var(--font-size-xs);
+        color: var(--color-text-secondary);
+        overflow-wrap: anywhere;
+      }
+
+      .autocomplete-clear {
+        padding: 0.4rem 0.65rem;
+      }
+
+      .ui-chip {
+        white-space: nowrap;
+      }
+
+      .filter-actions {
+        grid-column: 2;
+        grid-row: 2;
+        display: flex;
+        gap: var(--space-2);
+        flex-wrap: wrap;
+        align-self: flex-end;
+        justify-self: start;
+        width: fit-content;
+      }
+
+      .filter-actions .ui-button {
+        height: 2.75rem;
+        box-sizing: border-box;
       }
 
       .stock-summary {
@@ -220,7 +444,6 @@ import { WarehouseService } from "./data/warehouse.service";
         min-width: 980px;
       }
 
-      .cell-id,
       .cell-qty,
       .cell-date {
         white-space: nowrap;
@@ -266,8 +489,32 @@ import { WarehouseService } from "./data/warehouse.service";
           grid-template-columns: 1fr;
         }
 
-        .field-action {
-          justify-content: flex-start;
+        .filters-top {
+          grid-template-columns: 1fr;
+        }
+
+        .filters-right {
+          grid-template-columns: 1fr;
+          grid-template-rows: auto auto auto;
+          justify-content: stretch;
+        }
+
+        .field-input--warehouse {
+          max-width: none;
+          width: 100%;
+          min-width: 0;
+          grid-column: auto;
+          grid-row: auto;
+        }
+
+        .filter-actions {
+          width: 100%;
+          grid-column: auto;
+          grid-row: auto;
+        }
+
+        .filter-actions .ui-button {
+          height: auto;
         }
 
         .pagination {
@@ -278,15 +525,26 @@ import { WarehouseService } from "./data/warehouse.service";
     `,
   ],
 })
-export class StockPageComponent implements OnInit {
+export class StockPageComponent implements OnInit, OnDestroy {
   readonly filtersForm = this.formBuilder.group({
     productId: [null as number | null],
     warehouseId: [null as number | null],
   });
 
-  products: Product[] = [];
+  readonly productSearchControl = this.formBuilder.control("", {
+    nonNullable: true,
+  });
+
   warehouses: WarehouseResponse[] = [];
   stocks: StockResponse[] = [];
+  productCache = new Map<number, ProductCacheItem>();
+
+  productLookupResults: ProductLookupResponse[] = [];
+  productLookupOpen = false;
+  productLookupLoading = false;
+  productLookupErrorMessage = "";
+  selectedProductLabel = "";
+  private productLookupFocused = false;
 
   page = 0;
   readonly pageSize = 20;
@@ -296,6 +554,9 @@ export class StockPageComponent implements OnInit {
   loading = true;
   errorMessage = "";
 
+  private readonly destroy$ = new Subject<void>();
+  private stockRequestId = 0;
+
   constructor(
     private readonly formBuilder: FormBuilder,
     private readonly productService: ProductService,
@@ -304,18 +565,86 @@ export class StockPageComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    this.loadLookupsAndStock();
+    this.watchProductLookup();
+    this.loadWarehousesAndStock();
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   applyFilters(): void {
     this.page = 0;
+    this.productLookupOpen = false;
     this.loadStock();
   }
 
   clearFilters(): void {
-    this.filtersForm.reset();
+    this.filtersForm.reset({
+      productId: null,
+      warehouseId: null,
+    });
+    this.clearProductSelection();
     this.page = 0;
     this.loadStock();
+  }
+
+  get selectedProductId(): number | null {
+    return this.filtersForm.getRawValue().productId;
+  }
+
+  openProductLookup(): void {
+    this.productLookupFocused = true;
+
+    if (this.selectedProductId !== null) {
+      return;
+    }
+
+    if (this.productSearchControl.value.trim().length >= 2) {
+      this.productLookupOpen = true;
+    }
+  }
+
+  closeProductLookup(): void {
+    this.productLookupFocused = false;
+    this.productLookupOpen = false;
+  }
+
+  selectFirstProductLookupResult(event: Event): void {
+    if (this.productLookupResults.length === 0) {
+      return;
+    }
+
+    event.preventDefault();
+    this.selectProduct(this.productLookupResults[0]);
+  }
+
+  selectProduct(product: ProductLookupResponse): void {
+    this.filtersForm.patchValue({
+      productId: product.id,
+    });
+    this.selectedProductLabel = this.formatProductLookupLabel(product);
+    this.productSearchControl.setValue(this.selectedProductLabel, {
+      emitEvent: false,
+    });
+    this.productCache.set(product.id, product);
+    this.productLookupResults = [];
+    this.productLookupOpen = false;
+    this.productLookupLoading = false;
+    this.productLookupErrorMessage = "";
+  }
+
+  clearProductSelection(): void {
+    this.filtersForm.patchValue({
+      productId: null,
+    });
+    this.selectedProductLabel = "";
+    this.productSearchControl.setValue("", { emitEvent: true });
+    this.productLookupResults = [];
+    this.productLookupOpen = false;
+    this.productLookupLoading = false;
+    this.productLookupErrorMessage = "";
   }
 
   previousPage(): void {
@@ -337,7 +666,7 @@ export class StockPageComponent implements OnInit {
   }
 
   resolveProductName(productId: number): string {
-    const product = this.products.find((item) => item.id === productId);
+    const product = this.productCache.get(productId);
     return product
       ? `${product.name} (SKU: ${product.sku})`
       : `Producto #${productId}`;
@@ -346,7 +675,7 @@ export class StockPageComponent implements OnInit {
   resolveWarehouseName(warehouseId: number): string {
     const warehouse = this.warehouses.find((item) => item.id === warehouseId);
     return warehouse
-      ? `${warehouse.code} - ${warehouse.name}`
+      ? warehouse.name
       : `Almacen #${warehouseId}`;
   }
 
@@ -381,31 +710,82 @@ export class StockPageComponent implements OnInit {
     return "Estable";
   }
 
-  private loadLookupsAndStock(): void {
+  private watchProductLookup(): void {
+    this.productSearchControl.valueChanges
+      .pipe(
+        takeUntil(this.destroy$),
+        debounceTime(250),
+        map((value) => value.trim()),
+        distinctUntilChanged(),
+        tap((query) => {
+          if (this.selectedProductLabel && query !== this.selectedProductLabel) {
+            this.filtersForm.patchValue({
+              productId: null,
+            });
+            this.selectedProductLabel = "";
+          }
+        }),
+        switchMap((query) => {
+          if (query.length < 2) {
+            this.productLookupResults = [];
+            this.productLookupLoading = false;
+            this.productLookupErrorMessage = "";
+            this.productLookupOpen = false;
+            return of({ query, results: [] as ProductLookupResponse[] });
+          }
+
+          this.productLookupLoading = true;
+          this.productLookupErrorMessage = "";
+          this.productLookupOpen = this.productLookupFocused;
+
+          return this.productService.lookup(query, true, 10).pipe(
+            map((results) => ({ query, results })),
+            catchError((error: unknown) => {
+              this.productLookupErrorMessage = toHttpErrorMessage(
+                error,
+                "No se pudieron cargar sugerencias de producto.",
+              );
+              return of({ query, results: [] as ProductLookupResponse[] });
+            }),
+            finalize(() => {
+              this.productLookupLoading = false;
+            }),
+          );
+        }),
+      )
+      .subscribe(({ query, results }) => {
+        if (query.length >= 2) {
+          this.productLookupResults = results;
+          this.productLookupOpen = this.productLookupFocused;
+        }
+      });
+  }
+
+  private loadWarehousesAndStock(): void {
     this.loading = true;
     this.errorMessage = "";
 
-    forkJoin({
-      productsPage: this.productService.list(0, 300),
-      warehouses: this.warehouseService.list(true),
-    }).subscribe({
-      next: ({ productsPage, warehouses }) => {
-        this.products = productsPage.content;
-        this.warehouses = warehouses;
-        this.loadStock();
-      },
-      error: (error: unknown) => {
-        this.loading = false;
-        this.errorMessage = toHttpErrorMessage(
-          error,
-          "No se pudieron cargar productos/almacenes para filtros.",
-        );
-      },
-    });
+    this.warehouseService
+      .list(true)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (warehouses) => {
+          this.warehouses = warehouses;
+          this.loadStock();
+        },
+        error: (error: unknown) => {
+          this.loading = false;
+          this.errorMessage = toHttpErrorMessage(
+            error,
+            "No se pudieron cargar almacenes para filtros.",
+          );
+        },
+      });
   }
 
   private loadStock(): void {
     const value = this.filtersForm.getRawValue();
+    const requestId = ++this.stockRequestId;
 
     this.loading = true;
     this.errorMessage = "";
@@ -417,15 +797,26 @@ export class StockPageComponent implements OnInit {
         productId: value.productId ?? undefined,
         warehouseId: value.warehouseId ?? undefined,
       })
+      .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: (response) => {
-          this.loading = false;
+          if (requestId !== this.stockRequestId) {
+            return;
+          }
+
           this.stocks = response.content;
           this.page = response.number;
           this.totalElements = response.totalElements;
           this.totalPages = Math.max(response.totalPages, 1);
+          this.loadVisibleProductDetails(response.content, requestId, () => {
+            this.loading = false;
+          });
         },
         error: (error: unknown) => {
+          if (requestId !== this.stockRequestId) {
+            return;
+          }
+
           this.loading = false;
           this.errorMessage = toHttpErrorMessage(
             error,
@@ -433,5 +824,60 @@ export class StockPageComponent implements OnInit {
           );
         },
       });
+  }
+
+  private loadVisibleProductDetails(
+    stocks: StockResponse[],
+    requestId: number,
+    done: () => void,
+  ): void {
+    const missingIds = Array.from(
+      new Set(
+        stocks
+          .map((stock) => stock.productId)
+          .filter((productId) => !this.productCache.has(productId)),
+      ),
+    );
+
+    if (missingIds.length === 0) {
+      done();
+      return;
+    }
+
+    forkJoin(
+      missingIds.map((productId) =>
+        this.productService.getById(productId).pipe(
+          catchError(() => of(null)),
+        ),
+      ),
+    )
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (products) => {
+          if (requestId !== this.stockRequestId) {
+            return;
+          }
+
+          products.forEach((product) => {
+            if (product) {
+              this.productCache.set(product.id, product);
+            }
+          });
+          done();
+        },
+        error: () => {
+          if (requestId !== this.stockRequestId) {
+            return;
+          }
+
+          done();
+        },
+      });
+  }
+
+  private formatProductLookupLabel(product: ProductLookupResponse): string {
+    return `${product.name} (SKU: ${product.sku}${
+      product.barcode ? ` - ${product.barcode}` : ""
+    })`;
   }
 }

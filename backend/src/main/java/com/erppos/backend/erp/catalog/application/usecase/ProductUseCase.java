@@ -10,4 +10,5 @@ public interface ProductUseCase {
     Product update(Long id, UpdateProductCommand command);
     void deactivate(Long id);
     List<Product> search(String query);
+    List<Product> lookup(String query, Boolean active, int limit);
 }

@@ -1,5 +1,6 @@
 package com.erppos.backend.erp.catalog.adapter.rest;
 import com.erppos.backend.erp.catalog.adapter.dto.ProductCreateRequest;
+import com.erppos.backend.erp.catalog.adapter.dto.ProductLookupResponse;
 import com.erppos.backend.erp.catalog.adapter.dto.ProductResponse;
 import com.erppos.backend.erp.catalog.adapter.dto.ProductUpdateRequest;
 import com.erppos.backend.erp.catalog.application.usecase.CreateProductCommand;
@@ -35,6 +36,16 @@ public class ProductController {
     @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR','ALMACENERO','CAJERO')")
     public ResponseEntity<List<ProductResponse>> search(@RequestParam("q") String query) {
         return ResponseEntity.ok(productUseCase.search(query).stream().map(this::toResponse).toList());
+    }
+
+    @GetMapping("/lookup")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR','ALMACENERO','CAJERO')")
+    public ResponseEntity<List<ProductLookupResponse>> lookup(
+            @RequestParam(value = "q", required = false, defaultValue = "") String query,
+            @RequestParam(value = "active", required = false, defaultValue = "true") Boolean active,
+            @RequestParam(value = "limit", required = false, defaultValue = "10") int limit
+    ) {
+        return ResponseEntity.ok(productUseCase.lookup(query, active, limit).stream().map(this::toLookupResponse).toList());
     }
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR','ALMACENERO','CAJERO')")
@@ -116,6 +127,16 @@ public class ProductController {
                 product.active(),
                 product.createdAt(),
                 product.updatedAt()
+        );
+    }
+
+    private ProductLookupResponse toLookupResponse(Product product) {
+        return new ProductLookupResponse(
+                product.id(),
+                product.name(),
+                product.sku(),
+                product.barcode(),
+                product.active()
         );
     }
 }

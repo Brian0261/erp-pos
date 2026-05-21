@@ -30,6 +30,14 @@ export interface Product {
   updatedAt: string;
 }
 
+export interface ProductLookupResponse {
+  id: number;
+  name: string;
+  sku: string;
+  barcode: string | null;
+  active: boolean;
+}
+
 export interface ProductCreateRequest {
   sku: string;
   barcode: string | null;

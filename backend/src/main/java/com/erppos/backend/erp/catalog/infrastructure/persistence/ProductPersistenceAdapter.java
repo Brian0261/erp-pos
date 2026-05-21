@@ -63,6 +63,12 @@ public class ProductPersistenceAdapter implements ProductRepositoryPort {
         Pageable pageable = PageRequest.of(0, limit);
         return productJpaRepository.search(query, pageable).stream().map(ProductMapper::toDomain).toList();
     }
+
+    @Override
+    public List<Product> lookup(String query, Boolean active, int limit) {
+        Pageable pageable = PageRequest.of(0, limit);
+        return productJpaRepository.lookup(query, active, pageable).stream().map(ProductMapper::toDomain).toList();
+    }
     @Override
     public boolean existsBySkuIgnoreCase(String sku) {
         return productJpaRepository.existsBySkuIgnoreCase(sku);

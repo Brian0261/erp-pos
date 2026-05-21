@@ -212,6 +212,39 @@ class CatalogApplicationServiceTest {
         List<Product> results = productService.search("EAN-100");
         assertEquals(1, results.size());
     }
+
+    @Test
+    void shouldLookupByNameSkuAndBarcode() {
+        Long[] ids = seedActiveCategoryAndUnit();
+        productService.create(new CreateProductCommand("SKU-021", "BC-021", "Cartulina", null, ids[0], ids[1], BigDecimal.ONE));
+
+        assertEquals(1, productService.lookup("Cartu", true, 10).size());
+        assertEquals(1, productService.lookup("sku-021", true, 10).size());
+        assertEquals(1, productService.lookup("bc-021", true, 10).size());
+    }
+
+    @Test
+    void shouldLookupRespectActiveDefaultAndExplicitInactive() {
+        Long[] ids = seedActiveCategoryAndUnit();
+        productService.create(new CreateProductCommand("SKU-022", null, "Activo", null, ids[0], ids[1], BigDecimal.ONE));
+        Product inactive = productService.create(new CreateProductCommand("SKU-023", null, "Inactivo", null, ids[0], ids[1], BigDecimal.ONE));
+        productService.deactivate(inactive.id());
+
+        assertEquals(0, productService.lookup("Inac", null, 10).size());
+        assertEquals(0, productService.lookup("Inac", true, 10).size());
+        assertEquals(1, productService.lookup("Inac", false, 10).size());
+    }
+
+    @Test
+    void shouldLookupRespectLimitAndShortQuery() {
+        Long[] ids = seedActiveCategoryAndUnit();
+        productService.create(new CreateProductCommand("SKU-024", null, "Producto 1", null, ids[0], ids[1], BigDecimal.ONE));
+        productService.create(new CreateProductCommand("SKU-025", null, "Producto 2", null, ids[0], ids[1], BigDecimal.ONE));
+        productService.create(new CreateProductCommand("SKU-026", null, "Producto 3", null, ids[0], ids[1], BigDecimal.ONE));
+
+        assertEquals(2, productService.lookup("Producto", true, 2).size());
+        assertTrue(productService.lookup("P", true, 10).isEmpty());
+    }
     @Test
     void shouldListProductsWithoutFiltersKeepingPagination() {
         Long[] ids = seedActiveCategoryAndUnit();
@@ -440,6 +473,24 @@ class CatalogApplicationServiceTest {
                     .limit(limit)
                     .toList();
         }
+
+        @Override
+        public List<Product> lookup(String query, Boolean active, int limit) {
+            Boolean resolvedActive = active == null ? Boolean.TRUE : active;
+            String normalized = query.toLowerCase(Locale.ROOT);
+            return storage.values().stream()
+                    .filter(p -> p.name().toLowerCase(Locale.ROOT).contains(normalized)
+                            || p.sku().toLowerCase(Locale.ROOT).contains(normalized)
+                            || (p.barcode() != null && p.barcode().toLowerCase(Locale.ROOT).contains(normalized)))
+                    .filter(p -> resolvedActive == null || p.active() == resolvedActive)
+                    .sorted(Comparator
+                            .comparing((Product p) -> !p.sku().equalsIgnoreCase(query))
+                            .thenComparing(p -> p.barcode() == null || !p.barcode().equalsIgnoreCase(query))
+                            .thenComparing(Product::name))
+                    .limit(limit)
+                    .toList();
+        }
+
         @Override
         public boolean existsBySkuIgnoreCase(String sku) {
             return storage.values().stream().anyMatch(p -> p.sku().equalsIgnoreCase(sku));

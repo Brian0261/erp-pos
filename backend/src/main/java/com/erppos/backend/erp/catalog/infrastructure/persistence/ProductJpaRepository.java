@@ -61,4 +61,24 @@ public interface ProductJpaRepository extends JpaRepository<ProductEntity, Long>
             ORDER BY p.name ASC
             """)
     List<ProductEntity> search(@Param("query") String query, Pageable pageable);
+
+    @EntityGraph(attributePaths = {"category", "unit"})
+    @Query("""
+            SELECT p FROM ProductEntity p
+            WHERE (
+                    LOWER(p.name) LIKE CONCAT('%', :query, '%')
+                 OR LOWER(p.sku) LIKE CONCAT('%', :query, '%')
+                 OR (p.barcode IS NOT NULL AND LOWER(p.barcode) LIKE CONCAT('%', :query, '%'))
+                  )
+              AND (:active IS NULL OR p.active = :active)
+            ORDER BY
+              CASE
+                WHEN LOWER(p.sku) = :query THEN 0
+                WHEN p.barcode IS NOT NULL AND LOWER(p.barcode) = :query THEN 1
+                WHEN LOWER(p.name) LIKE CONCAT(:query, '%') THEN 2
+                ELSE 3
+              END,
+              p.name ASC
+            """)
+    List<ProductEntity> lookup(@Param("query") String query, @Param("active") Boolean active, Pageable pageable);
 }
