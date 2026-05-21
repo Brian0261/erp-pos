@@ -24,6 +24,10 @@ export interface WarehouseCreateRequest {
   type: WarehouseType;
 }
 
+export interface WarehouseStatusRequest {
+  active: boolean;
+}
+
 export interface StockResponse {
   id: number;
   productId: number;

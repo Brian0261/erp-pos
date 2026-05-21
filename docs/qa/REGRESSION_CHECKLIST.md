@@ -80,6 +80,15 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [ ] Unidades: validar `PATCH /api/v1/units/{id}/status` en backend.
 - [ ] Unidades: verificar impacto en productos/importacion cuando la unidad queda inactiva.
 
+### Inventario - Almacenes (2026-05-20)
+
+- [ ] Almacenes: crear almacen desde UI y validar persistencia.
+- [ ] Almacenes: desactivar desde UI con confirmacion y validar `PATCH /api/v1/warehouses/{id}/status`.
+- [ ] Almacenes: reactivar desde UI con confirmacion y validar `PATCH /api/v1/warehouses/{id}/status`.
+- [ ] Almacenes: validar tipo traducido visualmente en tabla y select; valores internos se mantienen como `STORE`, `MAIN_WAREHOUSE`, `VIRTUAL`.
+- [ ] Almacenes: validar ID oculto y formulario sin desnivel.
+- [ ] Almacenes: si ya existe cobertura, validar impacto de almacen inactivo en ventas, compras e inventario.
+
 ### POS touch-friendly Fase 1.1 - Grid fijo sin scroll de pagina (2026-05-06)
 
 - [x] Ajuste aplicado solo en `frontend/src/app/features/sales/pos-page.component.ts` y evidencia QA en este checklist.

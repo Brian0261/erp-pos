@@ -3,6 +3,7 @@ import { Component, OnInit } from "@angular/core";
 import { FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
 
 import { AuthService } from "../../core/auth/auth.service";
+import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.service";
 import { toHttpErrorMessage } from "./data/http-error-message";
 import {
   WarehouseCreateRequest,
@@ -29,38 +30,23 @@ import { WarehouseService } from "./data/warehouse.service";
       </header>
 
       <form [formGroup]="form" (ngSubmit)="submit()" class="form-grid">
-        <label class="field">
-          <span>Codigo *</span>
-          <input type="text" formControlName="code" placeholder="Ej. ALM-CEN" />
-          <small class="field-error" *ngIf="isInvalid('code')"
-            >Codigo es obligatorio.</small
-          >
-        </label>
+        <span class="field-label">Codigo *</span>
+        <span class="field-label">Nombre *</span>
+        <span class="field-label">Tipo *</span>
+        <span class="field-label field-label--placeholder" aria-hidden="true">&nbsp;</span>
 
-        <label class="field">
-          <span>Nombre *</span>
-          <input
-            type="text"
-            formControlName="name"
-            placeholder="Nombre operativo del almacen"
-          />
-          <small class="field-error" *ngIf="isInvalid('name')"
-            >Nombre es obligatorio.</small
-          >
-        </label>
-
-        <label class="field">
-          <span>Tipo *</span>
-          <select formControlName="type">
-            <option [ngValue]="null">Selecciona un tipo</option>
-            <option *ngFor="let type of warehouseTypes" [ngValue]="type">
-              {{ type }}
-            </option>
-          </select>
-          <small class="field-error" *ngIf="isInvalid('type')"
-            >Tipo es obligatorio.</small
-          >
-        </label>
+        <input type="text" formControlName="code" placeholder="Ej. ALM-CEN" />
+        <input
+          type="text"
+          formControlName="name"
+          placeholder="Nombre operativo del almacen"
+        />
+        <select formControlName="type">
+          <option [ngValue]="null">Selecciona un tipo</option>
+          <option *ngFor="let type of warehouseTypes" [ngValue]="type">
+            {{ warehouseTypeLabel(type) }}
+          </option>
+        </select>
 
         <div class="field-action">
           <button
@@ -70,6 +56,19 @@ import { WarehouseService } from "./data/warehouse.service";
           >
             {{ saving ? "Guardando..." : "Crear almacen" }}
           </button>
+        </div>
+
+        <div class="field-feedback" aria-live="polite">
+          <small class="field-error" [class.field-error--hidden]="!isInvalid('code')">Codigo es obligatorio.</small>
+        </div>
+        <div class="field-feedback" aria-live="polite">
+          <small class="field-error" [class.field-error--hidden]="!isInvalid('name')">Nombre es obligatorio.</small>
+        </div>
+        <div class="field-feedback" aria-live="polite">
+          <small class="field-error" [class.field-error--hidden]="!isInvalid('type')">Tipo es obligatorio.</small>
+        </div>
+        <div class="field-feedback field-feedback--placeholder" aria-hidden="true">
+          <small class="field-placeholder">&nbsp;</small>
         </div>
       </form>
 
@@ -87,7 +86,6 @@ import { WarehouseService } from "./data/warehouse.service";
         <table class="ui-table inventory-table">
           <thead>
             <tr>
-              <th>ID</th>
               <th>Codigo</th>
               <th>Nombre</th>
               <th>Tipo</th>
@@ -97,11 +95,10 @@ import { WarehouseService } from "./data/warehouse.service";
           </thead>
           <tbody>
             <tr *ngFor="let warehouse of warehouses">
-              <td class="cell-id">{{ warehouse.id }}</td>
               <td class="cell-code">{{ warehouse.code }}</td>
               <td>{{ warehouse.name }}</td>
               <td>
-                <span class="ui-badge">{{ warehouse.type }}</span>
+                <span class="ui-badge">{{ warehouseTypeLabel(warehouse.type) }}</span>
               </td>
               <td>
                 <span
@@ -114,12 +111,22 @@ import { WarehouseService } from "./data/warehouse.service";
               </td>
               <td class="actions">
                 <button
+                  *ngIf="warehouse.active"
                   type="button"
                   class="ui-button ui-button--danger"
-                  [disabled]="!warehouse.active || !canManageWarehouses"
-                  (click)="deactivate(warehouse)"
+                  [disabled]="!canManageWarehouses"
+                  (click)="changeStatus(warehouse, false)"
                 >
                   Desactivar
+                </button>
+                <button
+                  *ngIf="!warehouse.active"
+                  type="button"
+                  class="ui-button ui-button--secondary"
+                  [disabled]="!canManageWarehouses"
+                  (click)="changeStatus(warehouse, true)"
+                >
+                  Reactivar
                 </button>
               </td>
             </tr>
@@ -144,23 +151,27 @@ import { WarehouseService } from "./data/warehouse.service";
       .form-grid {
         display: grid;
         grid-template-columns: repeat(4, minmax(180px, 1fr));
+        grid-template-rows: auto auto auto;
         gap: var(--space-3);
-        align-items: end;
+        align-items: start;
         border: 1px solid var(--color-border-default);
         border-radius: var(--radius-md);
         background: var(--color-bg-soft);
         padding: var(--space-3);
       }
 
-      .field {
-        display: grid;
-        gap: var(--space-1);
+      .form-grid > * {
+        min-width: 0;
       }
 
-      .field > span {
+      .field-label {
         font-size: var(--font-size-sm);
         font-weight: 700;
         color: var(--color-text-secondary);
+      }
+
+      .field-label--placeholder {
+        visibility: hidden;
       }
 
       input,
@@ -168,16 +179,43 @@ import { WarehouseService } from "./data/warehouse.service";
         padding: 0.6rem 0.7rem;
         border: 1px solid var(--color-border-strong);
         border-radius: var(--radius-sm);
+        box-sizing: border-box;
+        width: 100%;
       }
 
       .field-error {
+        min-height: 1rem;
+        line-height: 1rem;
         color: var(--color-danger);
         font-size: var(--font-size-xs);
+      }
+
+      .field-error--hidden {
+        visibility: hidden;
       }
 
       .field-action {
         display: flex;
         justify-content: flex-end;
+        align-self: stretch;
+        align-items: stretch;
+      }
+
+      .field-action .ui-button {
+        height: 100%;
+        box-sizing: border-box;
+      }
+
+      .field-feedback {
+        min-height: 1rem;
+      }
+
+      .field-feedback--placeholder {
+        justify-self: end;
+      }
+
+      .field-placeholder {
+        visibility: hidden;
       }
 
       .actions {
@@ -194,7 +232,6 @@ import { WarehouseService } from "./data/warehouse.service";
         min-width: 860px;
       }
 
-      .cell-id,
       .cell-code {
         white-space: nowrap;
       }
@@ -206,6 +243,7 @@ import { WarehouseService } from "./data/warehouse.service";
 
         .form-grid {
           grid-template-columns: 1fr;
+          grid-template-rows: auto;
         }
 
         .field-action {
@@ -238,6 +276,7 @@ export class WarehousesPageComponent implements OnInit {
     private readonly formBuilder: FormBuilder,
     private readonly warehouseService: WarehouseService,
     private readonly authService: AuthService,
+    private readonly confirmDialog: ConfirmDialogService,
   ) {}
 
   ngOnInit(): void {
@@ -284,31 +323,48 @@ export class WarehousesPageComponent implements OnInit {
     });
   }
 
-  deactivate(warehouse: WarehouseResponse): void {
+  async changeStatus(warehouse: WarehouseResponse, active: boolean): Promise<void> {
     if (!this.canManageWarehouses) {
-      this.errorMessage = "No tienes permisos para desactivar almacenes.";
+      this.errorMessage = active
+        ? "No tienes permisos para reactivar almacenes."
+        : "No tienes permisos para desactivar almacenes.";
       return;
     }
 
-    const accepted = window.confirm(
-      `Desactivar almacen ${warehouse.code} - ${warehouse.name}?`,
-    );
+    const accepted = await this.confirmDialog.confirm({
+      title: active ? "Reactivar almacén" : "Desactivar almacén",
+      description: active
+        ? `Vas a reactivar el almacén ${warehouse.code} - ${warehouse.name}. Volverá a estar disponible para nuevas operaciones.`
+        : `Vas a desactivar el almacén ${warehouse.code} - ${warehouse.name}. Dejará de estar disponible para nuevas operaciones.`,
+      highlightText: warehouse.name,
+      confirmText: active ? "Reactivar" : "Desactivar",
+      cancelText: "Cancelar",
+      variant: active ? "warning" : "danger",
+    });
+
     if (!accepted) {
       return;
     }
 
+    this.saving = true;
     this.errorMessage = "";
     this.successMessage = "";
 
-    this.warehouseService.deactivate(warehouse.id).subscribe({
+    this.warehouseService.changeStatus(warehouse.id, { active }).subscribe({
       next: () => {
-        this.successMessage = "Almacen desactivado correctamente.";
+        this.saving = false;
+        this.successMessage = active
+          ? "Almacen reactivado correctamente."
+          : "Almacen desactivado correctamente.";
         this.loadWarehouses();
       },
       error: (error: unknown) => {
+        this.saving = false;
         this.errorMessage = toHttpErrorMessage(
           error,
-          "No se pudo desactivar el almacen.",
+          active
+            ? "No se pudo reactivar el almacen."
+            : "No se pudo desactivar el almacen.",
         );
       },
     });
@@ -317,6 +373,19 @@ export class WarehousesPageComponent implements OnInit {
   isInvalid(controlName: string): boolean {
     const control = this.form.get(controlName);
     return !!control && control.invalid && (control.touched || control.dirty);
+  }
+
+  warehouseTypeLabel(type: WarehouseType | null | undefined): string {
+    switch (type) {
+      case "STORE":
+        return "Tienda";
+      case "MAIN_WAREHOUSE":
+        return "Almacén principal";
+      case "VIRTUAL":
+        return "Virtual";
+      default:
+        return "-";
+    }
   }
 
   private resolvePermissions(): void {

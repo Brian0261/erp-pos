@@ -26,6 +26,8 @@ Cada decision debe incluir:
 | D-010 | Mantener SUNAT/OSE/PSE productivo fuera del alcance actual; usar mock/sandbox en MVP.  | Reducir riesgo de compliance/operacion temprana.                                   | Flujo funcional validado sin bloqueo de proveedor externo real.        | Aceptada para MVP actual           | README + ADR-0002             |
 | D-011 | Proteger `Por clasificar` por nombre normalizado y diferir `is_system`.                | Evitar cambio estructural de schema/Flyway para una regla puntual de negocio.      | Bloqueo operativo inmediato sin migracion adicional.                   | Aceptada y activa                  | QA + Catalogo                  |
 | D-012 | Mantener `active` como estado operativo de categorias y unidades sin proteger bases.   | Evitar sobredimensionar reglas reservadas antes de necesitarlo en produccion.       | `UND/PQT/CJA/PLG` siguen editables/inactivables en esta fase.          | Aceptada y activa                  | QA + Catalogo                  |
+| D-013 | Mantener `active` en almacenes sin Flyway y usar `PATCH status` para alternar estado.   | Evitar migracion estructural para un flujo de estado ya soportado por dominio/UI.   | `DELETE` queda como alias de desactivacion y la UI expone Desactivar/Reactivar. | Aceptada y activa                  | QA + Inventario               |
+| D-014 | No proteger `MAIN_WAREHOUSE` todavia.                                                   | Dejar la reserva para una fase posterior con criterio explicito.                   | El almacen principal sigue editable/inactivable en esta etapa.         | Aceptada y activa                  | QA + Inventario               |
 
 ## Reglas de actualizacion del log
 

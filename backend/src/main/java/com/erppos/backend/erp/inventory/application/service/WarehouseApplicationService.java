@@ -1,6 +1,7 @@
 package com.erppos.backend.erp.inventory.application.service;
 
 import com.erppos.backend.erp.inventory.application.usecase.CreateWarehouseCommand;
+import com.erppos.backend.erp.inventory.application.usecase.ChangeWarehouseStatusCommand;
 import com.erppos.backend.erp.inventory.application.usecase.WarehouseUseCase;
 import com.erppos.backend.erp.inventory.domain.exception.InventoryConflictException;
 import com.erppos.backend.erp.inventory.domain.exception.InventoryNotFoundException;
@@ -58,19 +59,25 @@ public class WarehouseApplicationService implements WarehouseUseCase {
 
     @Override
     public void deactivate(Long id) {
+        changeStatus(id, new ChangeWarehouseStatusCommand(false));
+    }
+
+    @Override
+    public Warehouse changeStatus(Long id, ChangeWarehouseStatusCommand command) {
         Warehouse warehouse = getById(id);
-        Warehouse disabled = new Warehouse(
+        String actor = auditUserProvider.currentUsername();
+        Warehouse updated = new Warehouse(
                 warehouse.id(),
                 warehouse.code(),
                 warehouse.name(),
                 warehouse.type(),
-                false,
+                command.active(),
                 warehouse.createdAt(),
                 warehouse.updatedAt(),
                 warehouse.createdBy(),
-                auditUserProvider.currentUsername()
+                actor
         );
-        warehouseRepositoryPort.save(disabled);
+        return warehouseRepositoryPort.save(updated);
     }
 }
 

@@ -3,7 +3,11 @@ import { Injectable } from "@angular/core";
 import { Observable } from "rxjs";
 
 import { environment } from "../../../../environments/environment";
-import { WarehouseCreateRequest, WarehouseResponse } from "./inventory.models";
+import {
+  WarehouseCreateRequest,
+  WarehouseResponse,
+  WarehouseStatusRequest,
+} from "./inventory.models";
 
 @Injectable({ providedIn: "root" })
 export class WarehouseService {
@@ -30,5 +34,9 @@ export class WarehouseService {
 
   deactivate(id: number): Observable<void> {
     return this.http.delete<void>(`${this.endpoint}/${id}`);
+  }
+
+  changeStatus(id: number, payload: WarehouseStatusRequest): Observable<WarehouseResponse> {
+    return this.http.patch<WarehouseResponse>(`${this.endpoint}/${id}/status`, payload);
   }
 }

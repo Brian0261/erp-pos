@@ -9,5 +9,6 @@ public interface WarehouseUseCase {
     List<Warehouse> list(Boolean active);
     Warehouse getById(Long id);
     void deactivate(Long id);
+    Warehouse changeStatus(Long id, ChangeWarehouseStatusCommand command);
 }
 

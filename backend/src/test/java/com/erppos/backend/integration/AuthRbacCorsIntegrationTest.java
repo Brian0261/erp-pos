@@ -107,6 +107,18 @@ class AuthRbacCorsIntegrationTest extends AbstractHttpIntegrationTest {
         assertTrue(categoryPreflight.getResponse().getHeader("Access-Control-Allow-Methods").contains("PATCH"));
         assertTrue(unitPreflight.getResponse().getHeader("Access-Control-Allow-Methods").contains("PATCH"));
     }
+
+    @Test
+    void shouldAllowPatchPreflightForWarehouseStatusEndpoint() throws Exception {
+        MvcResult warehousePreflight = mockMvc.perform(options("/api/v1/warehouses/1/status")
+                        .header(HttpHeaders.ORIGIN, "http://localhost:4200")
+                        .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "PATCH")
+                        .header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, "Authorization,Content-Type"))
+                .andReturn();
+
+        assertEquals(200, warehousePreflight.getResponse().getStatus());
+        assertTrue(warehousePreflight.getResponse().getHeader("Access-Control-Allow-Methods").contains("PATCH"));
+    }
 }
 
 
