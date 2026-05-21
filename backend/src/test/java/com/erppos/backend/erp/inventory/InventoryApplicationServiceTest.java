@@ -439,6 +439,8 @@ class InventoryApplicationServiceTest {
                     id,
                     stockBalance.productId(),
                     stockBalance.warehouseId(),
+                    stockBalance.warehouseCode(),
+                    stockBalance.warehouseName(),
                     stockBalance.quantity(),
                     stockBalance.version() == null ? 0L : stockBalance.version() + 1,
                     stockBalance.createdAt() == null ? now : stockBalance.createdAt(),

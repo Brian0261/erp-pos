@@ -179,11 +179,11 @@ type ProductCacheItem = Pick<
         <table class="ui-table stock-table">
           <thead>
             <tr>
-              <th>Producto</th>
-              <th>Almacen</th>
-              <th>Cantidad</th>
-              <th>Nivel</th>
-              <th>Ultima actualizacion</th>
+              <th class="col-product">Producto</th>
+              <th class="col-warehouse">Almacen</th>
+              <th class="col-quantity">Cantidad</th>
+              <th class="col-level">Nivel</th>
+              <th class="col-updated-at">Ultima actualizacion</th>
             </tr>
           </thead>
           <tbody>
@@ -192,10 +192,10 @@ type ProductCacheItem = Pick<
               [class.row-critical]="isCritical(stock)"
               [class.row-low]="isLow(stock)"
             >
-              <td>{{ resolveProductName(stock.productId) }}</td>
-              <td>{{ resolveWarehouseName(stock.warehouseId) }}</td>
-              <td class="cell-qty">{{ stock.quantity | number: "1.0-3" }}</td>
-              <td>
+              <td class="col-product">{{ resolveProductName(stock.productId) }}</td>
+              <td class="col-warehouse">{{ formatWarehouseLabel(stock) }}</td>
+              <td class="cell-qty col-quantity">{{ stock.quantity | number: "1.0-3" }}</td>
+              <td class="col-level">
                 <span
                   class="ui-badge"
                   [class.ui-badge--danger]="isCritical(stock)"
@@ -207,7 +207,7 @@ type ProductCacheItem = Pick<
                   {{ stockLevelLabel(stock) }}
                 </span>
               </td>
-              <td class="cell-date">
+              <td class="cell-date col-updated-at">
                 {{ stock.updatedAt | date: "dd/MM/yyyy HH:mm" }}
               </td>
             </tr>
@@ -442,6 +442,47 @@ type ProductCacheItem = Pick<
 
       .stock-table {
         min-width: 980px;
+        table-layout: fixed;
+        width: 100%;
+      }
+
+      .stock-table th,
+      .stock-table td {
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .col-product,
+      .col-warehouse,
+      .col-quantity,
+      .col-level,
+      .col-updated-at {
+        white-space: nowrap;
+      }
+
+      .col-product {
+        width: 40%;
+        max-width: 40%;
+      }
+
+      .col-warehouse {
+        width: 20%;
+        max-width: 20%;
+      }
+
+      .col-quantity {
+        width: 10%;
+        max-width: 10%;
+      }
+
+      .col-level {
+        width: 12%;
+        max-width: 12%;
+      }
+
+      .col-updated-at {
+        width: 18%;
+        max-width: 18%;
       }
 
       .cell-qty,
@@ -566,6 +607,7 @@ export class StockPageComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.watchProductLookup();
+    this.watchWarehouseFilter();
     this.loadWarehousesAndStock();
   }
 
@@ -679,6 +721,18 @@ export class StockPageComponent implements OnInit, OnDestroy {
       : `Almacen #${warehouseId}`;
   }
 
+  formatWarehouseLabel(stock: StockResponse): string {
+    if (stock.warehouseName) {
+      return stock.warehouseName;
+    }
+
+    if (stock.warehouseCode) {
+      return stock.warehouseCode;
+    }
+
+    return this.resolveWarehouseName(stock.warehouseId);
+  }
+
   get criticalCount(): number {
     return this.stocks.filter((stock) => Number(stock.quantity) <= 0).length;
   }
@@ -758,6 +812,18 @@ export class StockPageComponent implements OnInit, OnDestroy {
           this.productLookupResults = results;
           this.productLookupOpen = this.productLookupFocused;
         }
+      });
+  }
+
+  private watchWarehouseFilter(): void {
+    this.filtersForm.controls.warehouseId.valueChanges
+      .pipe(
+        takeUntil(this.destroy$),
+        distinctUntilChanged(),
+      )
+      .subscribe(() => {
+        this.page = 0;
+        this.loadStock();
       });
   }
 

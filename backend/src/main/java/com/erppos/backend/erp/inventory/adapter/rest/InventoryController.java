@@ -112,6 +112,8 @@ public class InventoryController {
                 stockBalance.id(),
                 stockBalance.productId(),
                 stockBalance.warehouseId(),
+                stockBalance.warehouseCode(),
+                stockBalance.warehouseName(),
                 stockBalance.quantity(),
                 stockBalance.version(),
                 stockBalance.updatedAt()

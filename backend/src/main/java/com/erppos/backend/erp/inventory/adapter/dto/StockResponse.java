@@ -7,6 +7,8 @@ public record StockResponse(
         Long id,
         Long productId,
         Long warehouseId,
+        String warehouseCode,
+        String warehouseName,
         BigDecimal quantity,
         Long version,
         Instant updatedAt

@@ -93,6 +93,8 @@ public class InventoryApplicationService implements InventoryUseCase {
                 current == null ? null : current.id(),
                 command.productId(),
                 command.warehouseId(),
+                current == null ? null : current.warehouseCode(),
+                current == null ? null : current.warehouseName(),
                 next,
                 current == null ? null : current.version(),
                 current == null ? null : current.createdAt(),
@@ -142,6 +144,8 @@ public class InventoryApplicationService implements InventoryUseCase {
                 current == null ? null : current.id(),
                 command.productId(),
                 command.warehouseId(),
+                current == null ? null : current.warehouseCode(),
+                current == null ? null : current.warehouseName(),
                 next,
                 current == null ? null : current.version(),
                 current == null ? null : current.createdAt(),
@@ -199,10 +203,10 @@ public class InventoryApplicationService implements InventoryUseCase {
 
             StockBalance sourceBalance = stockBalanceRepositoryPort
                     .findByProductIdAndWarehouseIdForUpdate(item.productId(), command.sourceWarehouseId())
-                    .orElse(new StockBalance(null, item.productId(), command.sourceWarehouseId(), ZERO, null, null, null));
+                    .orElse(new StockBalance(null, item.productId(), command.sourceWarehouseId(), null, null, ZERO, null, null, null));
             StockBalance targetBalance = stockBalanceRepositoryPort
                     .findByProductIdAndWarehouseIdForUpdate(item.productId(), command.targetWarehouseId())
-                    .orElse(new StockBalance(null, item.productId(), command.targetWarehouseId(), ZERO, null, null, null));
+                    .orElse(new StockBalance(null, item.productId(), command.targetWarehouseId(), null, null, ZERO, null, null, null));
 
             BigDecimal sourcePrevious = sourceBalance.quantity();
             BigDecimal sourceNext = sourcePrevious.subtract(quantity);
@@ -217,6 +221,8 @@ public class InventoryApplicationService implements InventoryUseCase {
                     sourceBalance.id(),
                     sourceBalance.productId(),
                     sourceBalance.warehouseId(),
+                    sourceBalance.warehouseCode(),
+                    sourceBalance.warehouseName(),
                     sourceNext,
                     sourceBalance.version(),
                     sourceBalance.createdAt(),
@@ -227,6 +233,8 @@ public class InventoryApplicationService implements InventoryUseCase {
                     targetBalance.id(),
                     targetBalance.productId(),
                     targetBalance.warehouseId(),
+                    targetBalance.warehouseCode(),
+                    targetBalance.warehouseName(),
                     targetNext,
                     targetBalance.version(),
                     targetBalance.createdAt(),
@@ -290,6 +298,8 @@ public class InventoryApplicationService implements InventoryUseCase {
                 current == null ? null : current.id(),
                 command.productId(),
                 command.warehouseId(),
+                current == null ? null : current.warehouseCode(),
+                current == null ? null : current.warehouseName(),
                 next,
                 current == null ? null : current.version(),
                 current == null ? null : current.createdAt(),
@@ -327,7 +337,7 @@ public class InventoryApplicationService implements InventoryUseCase {
         }
 
         StockBalance current = stockBalanceRepositoryPort.findByProductIdAndWarehouseIdForUpdate(command.productId(), command.warehouseId())
-                .orElse(new StockBalance(null, command.productId(), command.warehouseId(), ZERO, null, null, null));
+                .orElse(new StockBalance(null, command.productId(), command.warehouseId(), null, null, ZERO, null, null, null));
 
         BigDecimal previous = current.quantity();
         BigDecimal next = previous.subtract(quantity);
@@ -339,6 +349,8 @@ public class InventoryApplicationService implements InventoryUseCase {
                 current.id(),
                 command.productId(),
                 command.warehouseId(),
+                current.warehouseCode(),
+                current.warehouseName(),
                 next,
                 current.version(),
                 current.createdAt(),
@@ -376,7 +388,7 @@ public class InventoryApplicationService implements InventoryUseCase {
         }
 
         StockBalance current = stockBalanceRepositoryPort.findByProductIdAndWarehouseIdForUpdate(command.productId(), command.warehouseId())
-                .orElse(new StockBalance(null, command.productId(), command.warehouseId(), ZERO, null, null, null));
+                .orElse(new StockBalance(null, command.productId(), command.warehouseId(), null, null, ZERO, null, null, null));
 
         BigDecimal previous = current.quantity();
         BigDecimal next = previous.add(quantity);
@@ -385,6 +397,8 @@ public class InventoryApplicationService implements InventoryUseCase {
                 current.id(),
                 command.productId(),
                 command.warehouseId(),
+                current.warehouseCode(),
+                current.warehouseName(),
                 next,
                 current.version(),
                 current.createdAt(),

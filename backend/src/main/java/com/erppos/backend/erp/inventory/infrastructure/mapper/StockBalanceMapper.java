@@ -14,6 +14,8 @@ public final class StockBalanceMapper {
                 entity.getId(),
                 entity.getProduct().getId(),
                 entity.getWarehouse().getId(),
+                entity.getWarehouse().getCode(),
+                entity.getWarehouse().getName(),
                 entity.getQuantity(),
                 entity.getVersion(),
                 entity.getCreatedAt(),

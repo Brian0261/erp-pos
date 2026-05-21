@@ -63,6 +63,8 @@ class PaginationContractIntegrationTest extends AbstractHttpIntegrationTest {
                 .andExpect(jsonPath("$.totalPages").exists())
                 .andExpect(jsonPath("$.page").exists())
                 .andExpect(jsonPath("$.size").exists())
+                .andExpect(jsonPath("$.items[0].warehouseCode").value("WIT" + suffix))
+                .andExpect(jsonPath("$.items[0].warehouseName").value("Warehouse IT " + suffix))
                 .andExpect(jsonPath("$.content").doesNotExist());
 
         mockMvc.perform(get("/api/v1/inventory/stocks")
@@ -72,6 +74,8 @@ class PaginationContractIntegrationTest extends AbstractHttpIntegrationTest {
                         .param("page", "0")
                         .param("size", "20"))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].warehouseCode").value("WIT" + suffix))
+                .andExpect(jsonPath("$.content[0].warehouseName").value("Warehouse IT " + suffix))
                 .andExpect(jsonPath("$.content").isArray());
     }
 }

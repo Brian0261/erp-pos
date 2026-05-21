@@ -37,6 +37,8 @@ export interface StockResponse {
   id: number;
   productId: number;
   warehouseId: number;
+  warehouseCode: string | null;
+  warehouseName: string | null;
   quantity: number;
   version: number;
   updatedAt: string;

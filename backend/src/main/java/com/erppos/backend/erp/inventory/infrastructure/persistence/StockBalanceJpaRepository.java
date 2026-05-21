@@ -12,21 +12,32 @@ import java.util.Optional;
 
 public interface StockBalanceJpaRepository extends JpaRepository<StockBalanceEntity, Long> {
 
-    @Query("""
+    @Query(value = """
             SELECT sb FROM StockBalanceEntity sb
+            JOIN FETCH sb.product
+            JOIN FETCH sb.warehouse
             WHERE sb.product.id = :productId AND sb.warehouse.id = :warehouseId
             """)
     Optional<StockBalanceEntity> findByProductAndWarehouse(@Param("productId") Long productId, @Param("warehouseId") Long warehouseId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("""
+    @Query(value = """
             SELECT sb FROM StockBalanceEntity sb
+            JOIN FETCH sb.product
+            JOIN FETCH sb.warehouse
             WHERE sb.product.id = :productId AND sb.warehouse.id = :warehouseId
             """)
     Optional<StockBalanceEntity> findByProductAndWarehouseForUpdate(@Param("productId") Long productId, @Param("warehouseId") Long warehouseId);
 
-    @Query("""
+    @Query(value = """
             SELECT sb FROM StockBalanceEntity sb
+            JOIN FETCH sb.product
+            JOIN FETCH sb.warehouse
+            WHERE (:productId IS NULL OR sb.product.id = :productId)
+              AND (:warehouseId IS NULL OR sb.warehouse.id = :warehouseId)
+            """,
+            countQuery = """
+            SELECT COUNT(sb) FROM StockBalanceEntity sb
             WHERE (:productId IS NULL OR sb.product.id = :productId)
               AND (:warehouseId IS NULL OR sb.warehouse.id = :warehouseId)
             """)
