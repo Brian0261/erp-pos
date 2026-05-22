@@ -102,6 +102,24 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [ ] Stock: paginación sigue operativa con y sin producto seleccionado.
 - [ ] Stock: columna ID y Versión ocultas; fecha visible en formato `dd/MM/yyyy HH:mm`.
 
+### Catalogo - Productos busqueda multi-token y tabla compacta (2026-05-22)
+
+- [ ] Productos: buscar `caja david` y validar resultados multi-token.
+- [ ] Productos: buscar `lapicero rojo` y validar resultados multi-token.
+- [ ] Productos: buscar por SKU exacto/parcial y validar resultados.
+- [ ] Productos: buscar por codigo de barras exacto/parcial y validar resultados.
+- [ ] Productos: combinar busqueda con categoria y validar filtrado.
+- [ ] Productos: combinar busqueda con estado y validar filtrado.
+- [ ] Productos: combinar busqueda con filtro de codigo de barras y validar filtrado.
+- [ ] Productos: Limpiar vuelve al listado completo.
+- [ ] Productos: paginacion sigue operativa con filtros y busqueda.
+- [ ] Productos: Crear producto, Importar productos, Editar y Desactivar siguen visibles.
+- [ ] Productos: Precio venta se ve completo.
+- [ ] Productos: nombres largos no rompen la tabla.
+- [ ] Productos: boton Desactivar no se recorta.
+- [ ] Productos: filas compactas siguen legibles.
+- [ ] Productos: Enter en busqueda rapida ejecuta la consulta.
+
 ### POS draft persistente y UX select/botones (2026-05-21)
 
 - [ ] POS: entrar/salir conserva almacén, búsqueda, resultados, carrito y pagos.

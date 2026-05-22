@@ -37,59 +37,59 @@ import { UnitService } from "./data/unit.service";
         </div>
       </header>
 
-      <form
-        [formGroup]="searchForm"
-        (ngSubmit)="onSearch()"
-        class="search-panel"
-      >
-        <label class="search-field">
-          <span>Busqueda rapida</span>
-          <input
-            type="text"
-            formControlName="q"
-            placeholder="Nombre, SKU o codigo de barras"
-          />
-        </label>
+      <form [formGroup]="searchForm" (ngSubmit)="onSearch()" class="search-panel">
+        <div class="search-panel__primary">
+          <label class="search-field search-field--query">
+            <span>Busqueda rapida</span>
+            <input
+              type="text"
+              formControlName="q"
+              placeholder="Nombre, SKU o codigo de barras"
+            />
+          </label>
 
-        <label class="search-field">
-          <span>Categoria</span>
-          <select formControlName="categoryId" (change)="applySelectFilters()">
-            <option value="">Todas</option>
-            <option *ngFor="let category of categories" [value]="category.id">
-              {{ category.name }}
-            </option>
-          </select>
-        </label>
+          <div class="search-actions">
+            <button type="submit" class="ui-button ui-button--primary">
+              Buscar
+            </button>
+            <button
+              type="button"
+              class="ui-button ui-button--secondary"
+              (click)="clearSearch()"
+            >
+              Limpiar
+            </button>
+          </div>
+        </div>
 
-        <label class="search-field">
-          <span>Estado</span>
-          <select formControlName="active" (change)="applySelectFilters()">
-            <option value="">Todos</option>
-            <option value="true">Activo</option>
-            <option value="false">Inactivo</option>
-          </select>
-        </label>
+        <div class="search-panel__secondary">
+          <label class="search-field">
+            <span>Categoria</span>
+            <select formControlName="categoryId" (change)="applySelectFilters()">
+              <option value="">Todas</option>
+              <option *ngFor="let category of categories" [value]="category.id">
+                {{ category.name }}
+              </option>
+            </select>
+          </label>
 
-        <label class="search-field">
-          <span>Codigo de barras</span>
-          <select formControlName="barcodeStatus" (change)="applySelectFilters()">
-            <option value="">Todos</option>
-            <option value="WITH_BARCODE">Con codigo</option>
-            <option value="WITHOUT_BARCODE">Sin codigo</option>
-          </select>
-        </label>
+          <label class="search-field">
+            <span>Estado</span>
+            <select formControlName="active" (change)="applySelectFilters()">
+              <option value="">Todos</option>
+              <option value="true">Activo</option>
+              <option value="false">Inactivo</option>
+            </select>
+          </label>
 
-        <div class="search-actions">
-          <button type="submit" class="ui-button ui-button--primary">
-            Buscar
-          </button>
-          <button
-            type="button"
-            class="ui-button ui-button--secondary"
-            (click)="clearSearch()"
-          >
-            Limpiar
-          </button>
+          <label class="search-field">
+            <span>Codigo de barras</span>
+            <select formControlName="barcodeStatus" (change)="applySelectFilters()">
+              <option value="">Todos</option>
+              <option value="WITH_BARCODE">Con codigo</option>
+              <option value="WITHOUT_BARCODE">Sin codigo</option>
+            </select>
+          </label>
         </div>
       </form>
 
@@ -103,7 +103,7 @@ import { UnitService } from "./data/unit.service";
         Cargando productos...
       </p>
 
-      <div class="ui-table-wrapper" *ngIf="!loading">
+      <div class="ui-table-wrapper table-scroll" *ngIf="!loading">
         <table class="ui-table catalog-table">
           <colgroup>
             <col class="col-sku" />
@@ -131,7 +131,7 @@ import { UnitService } from "./data/unit.service";
             <tr *ngFor="let product of products">
               <td class="cell-code">{{ product.sku }}</td>
               <td class="cell-code">{{ barcodeLabel(product.barcode) }}</td>
-              <td class="cell-name">{{ product.name }}</td>
+              <td class="cell-name" [title]="product.name">{{ product.name }}</td>
               <td>{{ categoryLabel(product.categoryId) }}</td>
               <td>{{ unitLabel(product.unitId) }}</td>
               <td class="cell-right">
@@ -258,19 +258,36 @@ import { UnitService } from "./data/unit.service";
 
       .search-panel {
         display: grid;
-        grid-template-columns: minmax(220px, 2fr) repeat(3, minmax(140px, 1fr)) auto;
         gap: var(--space-3);
-        align-items: end;
         border: 1px solid var(--color-border-default);
         border-radius: var(--radius-md);
         background: var(--color-bg-soft);
         padding: var(--space-3);
         margin-top: 0.35rem;
+        --catalog-control-height: 2.75rem;
+      }
+
+      .search-panel__primary {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: var(--space-3);
+        align-items: end;
+      }
+
+      .search-panel__secondary {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: var(--space-3);
+        align-items: end;
       }
 
       .search-field {
         display: grid;
         gap: var(--space-1);
+      }
+
+      .search-field--query {
+        min-width: 0;
       }
 
       .search-field span {
@@ -285,6 +302,8 @@ import { UnitService } from "./data/unit.service";
         border: 1px solid var(--color-border-strong);
         border-radius: var(--radius-sm);
         background: var(--color-bg-surface);
+        box-sizing: border-box;
+        height: var(--catalog-control-height);
       }
 
       .header-actions {
@@ -306,9 +325,11 @@ import { UnitService } from "./data/unit.service";
 
       .search-actions {
         display: flex;
-        gap: var(--space-2);
+        gap: 0.4rem;
         flex-wrap: wrap;
         justify-content: flex-end;
+        align-self: end;
+        align-items: stretch;
       }
 
       .ui-button[disabled] {
@@ -318,28 +339,48 @@ import { UnitService } from "./data/unit.service";
 
       .actions {
         display: flex;
-        gap: 0.35rem;
+        gap: 0.28rem;
         align-items: center;
         flex-wrap: nowrap;
         justify-content: flex-start;
+        white-space: nowrap;
+        min-width: 0;
       }
 
       .header-actions .ui-button,
       .search-actions .ui-button,
       .actions .ui-button {
-        min-height: 1.8rem;
-        padding-block: 0.33rem;
-        padding-inline: 0.7rem;
+        min-height: 1.65rem;
+        padding-inline: 0.58rem;
+      }
+
+      .actions .ui-button {
+        box-sizing: border-box;
+        min-height: 1.65rem;
+        padding-block: 0.22rem;
+        padding-inline: 0.58rem;
+        display: inline-flex;
+        align-items: center;
+      }
+
+      .search-actions .ui-button {
+        box-sizing: border-box;
+        height: var(--catalog-control-height);
+        min-height: var(--catalog-control-height);
+        padding-block: 0;
+        display: inline-flex;
+        align-items: center;
       }
 
       .catalog-table tbody td {
-        padding: var(--space-2) var(--space-2);
+        padding: 0.36rem var(--space-2);
       }
 
       .catalog-table thead th {
         font-size: 0.9rem;
-        padding-top: 0.65rem;
-        padding-bottom: 0.65rem;
+        padding-top: 0.48rem;
+        padding-bottom: 0.48rem;
+        white-space: nowrap;
       }
 
       .action-deactivate {
@@ -370,13 +411,11 @@ import { UnitService } from "./data/unit.service";
 
       .catalog-table th,
       .catalog-table td {
-        overflow: hidden;
-        text-overflow: ellipsis;
         vertical-align: middle;
       }
 
       .col-sku {
-        width: 8%;
+        width: 9%;
       }
 
       .col-barcode {
@@ -384,27 +423,36 @@ import { UnitService } from "./data/unit.service";
       }
 
       .col-name {
-        width: 44%;
+        width: 39%;
       }
 
       .col-category {
-        width: 7%;
+        width: 8%;
       }
 
       .col-unit {
-        width: 5%;
-      }
-
-      .col-price {
         width: 6%;
       }
 
+      .col-price {
+        width: 11%;
+      }
+
       .col-state {
-        width: 5%;
+        width: 6%;
       }
 
       .col-actions {
         width: 14%;
+      }
+
+      .catalog-table td.actions {
+        overflow: visible;
+      }
+
+      .table-scroll {
+        overflow-x: auto;
+        overflow-y: hidden;
       }
 
       .pagination {
@@ -466,6 +514,11 @@ import { UnitService } from "./data/unit.service";
         }
 
         .search-panel {
+          gap: var(--space-3);
+        }
+
+        .search-panel__primary,
+        .search-panel__secondary {
           grid-template-columns: 1fr;
         }
 
