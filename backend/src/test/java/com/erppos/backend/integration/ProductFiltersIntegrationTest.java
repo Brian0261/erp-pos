@@ -71,6 +71,28 @@ class ProductFiltersIntegrationTest extends AbstractHttpIntegrationTest {
     }
 
     @Test
+    void shouldFilterProductsByMultipleTokensThroughListEndpoint() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = Long.toString(System.nanoTime());
+
+        long category = createCategory(adminToken, suffix);
+        long unitId = createUnit(adminToken, suffix);
+        long match = createProduct(adminToken, category, unitId, "SKU-MT-LIST-" + suffix, "BC-MT-LIST-" + suffix, "TEMPERA CAJA X7 C/PINCEL DAVID " + suffix, BigDecimal.valueOf(18));
+        createProduct(adminToken, category, unitId, "SKU-MT-LIST-2-" + suffix, null, "TEMPERA AZUL " + suffix, BigDecimal.valueOf(19));
+
+        mockMvc.perform(get("/api/v1/products")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
+                        .param("page", "0")
+                        .param("size", "10")
+                        .param("q", "caja david")
+                        .param("categoryId", String.valueOf(category))
+                        .param("active", "true"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].id").value(match));
+    }
+
+    @Test
     void shouldLookupProductsByNameSkuAndBarcodeWithDefaultActiveFilter() throws Exception {
         String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
         String suffix = Long.toString(System.nanoTime());

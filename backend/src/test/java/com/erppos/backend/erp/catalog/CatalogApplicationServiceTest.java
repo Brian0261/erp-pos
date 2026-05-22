@@ -290,6 +290,18 @@ class CatalogApplicationServiceTest {
         assertEquals(1, page.getTotalElements());
         assertEquals("SKU-016", page.getContent().get(0).sku());
     }
+
+    @Test
+    void shouldFilterProductsByMultipleTokensInList() {
+        Long[] ids = seedActiveCategoryAndUnit();
+        productService.create(new CreateProductCommand("SKU-030", "BC-030", "TEMPERA CAJA X7 C/PINCEL DAVID", null, ids[0], ids[1], BigDecimal.ONE));
+        productService.create(new CreateProductCommand("SKU-031", null, "TEMPERA AZUL", null, ids[0], ids[1], BigDecimal.ONE));
+
+        Page<Product> page = productService.list("caja david", ids[0], true, null, PageRequest.of(0, 10));
+
+        assertEquals(1, page.getTotalElements());
+        assertEquals("SKU-030", page.getContent().get(0).sku());
+    }
     @Test
     void shouldFilterProductsByBarcodeStatus() {
         Long[] ids = seedActiveCategoryAndUnit();
@@ -454,11 +466,11 @@ class CatalogApplicationServiceTest {
         }
         @Override
         public Page<Product> findByFilters(String query, boolean applyQuery, Long categoryId, Boolean active, ProductBarcodeStatus barcodeStatus, Pageable pageable) {
+            String normalizedQuery = normalizeQuery(query);
+            List<String> tokens = applyQuery ? tokenize(normalizedQuery) : List.of();
+
             List<Product> filtered = storage.values().stream()
-                    .filter(product -> !applyQuery
-                            || product.name().toLowerCase(Locale.ROOT).contains(query)
-                            || product.sku().toLowerCase(Locale.ROOT).contains(query)
-                            || (product.barcode() != null && product.barcode().toLowerCase(Locale.ROOT).contains(query)))
+                    .filter(product -> !applyQuery || tokens.isEmpty() || matchesTokens(product, tokens))
                     .filter(product -> categoryId == null || product.categoryId().equals(categoryId))
                     .filter(product -> active == null || product.active() == active)
                     .filter(product -> {
@@ -472,7 +484,10 @@ class CatalogApplicationServiceTest {
                             case WITHOUT_BARCODE -> !hasBarcode;
                         };
                     })
-                    .sorted(Comparator.comparing(Product::id))
+                    .sorted(Comparator
+                            .comparing(Product::name, String.CASE_INSENSITIVE_ORDER)
+                            .thenComparing(Product::sku, String.CASE_INSENSITIVE_ORDER)
+                            .thenComparing(Product::id, Comparator.nullsLast(Long::compareTo)))
                     .toList();
 
             int start = (int) pageable.getOffset();
@@ -523,6 +538,24 @@ class CatalogApplicationServiceTest {
             }
 
             return true;
+        }
+
+        private String normalizeQuery(String value) {
+            if (value == null) {
+                return "";
+            }
+
+            return value.trim().toLowerCase(Locale.ROOT).replaceAll("\\s+", " ");
+        }
+
+        private List<String> tokenize(String query) {
+            if (query.isBlank()) {
+                return List.of();
+            }
+
+            return Arrays.stream(query.split(" "))
+                    .filter(token -> !token.isBlank())
+                    .toList();
         }
 
         private int ranking(Product product, String query, List<String> tokens) {

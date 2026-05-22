@@ -8,8 +8,14 @@ import com.erppos.backend.erp.catalog.infrastructure.mapper.ProductMapper;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.jpa.domain.Specification;
 
+import jakarta.persistence.criteria.JoinType;
+import jakarta.persistence.criteria.Predicate;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
@@ -17,6 +23,7 @@ import java.util.Locale;
 import java.util.Optional;
 
 @Component
+@Transactional(readOnly = true)
 public class ProductPersistenceAdapter implements ProductRepositoryPort {
     private final ProductJpaRepository productJpaRepository;
     private final CategoryJpaRepository categoryJpaRepository;
@@ -33,6 +40,7 @@ public class ProductPersistenceAdapter implements ProductRepositoryPort {
     }
 
     @Override
+    @Transactional
     public Product save(Product product) {
         CategoryEntity categoryEntity = categoryJpaRepository.findById(product.categoryId())
                 .orElseThrow(() -> new CatalogNotFoundException("Category not found"));
@@ -60,14 +68,16 @@ public class ProductPersistenceAdapter implements ProductRepositoryPort {
 
     @Override
     public Page<Product> findByFilters(String query, boolean applyQuery, Long categoryId, Boolean active, ProductBarcodeStatus barcodeStatus, Pageable pageable) {
-        return productJpaRepository.findByFilters(
+        Pageable resolvedPageable = ensureStableSort(pageable);
+        Specification<ProductEntity> specification = buildFiltersSpecification(
                 query,
                 applyQuery,
                 categoryId,
                 active,
-                barcodeStatus == null ? null : barcodeStatus.name(),
-                pageable
-        ).map(ProductMapper::toDomain);
+                barcodeStatus
+        );
+
+        return productJpaRepository.findAll(specification, resolvedPageable).map(ProductMapper::toDomain);
     }
 
     @Override
@@ -183,5 +193,83 @@ public class ProductPersistenceAdapter implements ProductRepositoryPort {
         }
 
         return value.trim().toLowerCase(Locale.ROOT).replaceAll("\\s+", " ");
+    }
+
+    private Pageable ensureStableSort(Pageable pageable) {
+        if (pageable.getSort().isSorted()) {
+            return pageable;
+        }
+
+        return PageRequest.of(
+                pageable.getPageNumber(),
+                pageable.getPageSize(),
+                Sort.by(Sort.Order.asc("name"), Sort.Order.asc("sku"), Sort.Order.asc("id"))
+        );
+    }
+
+    private Specification<ProductEntity> buildFiltersSpecification(
+            String query,
+            boolean applyQuery,
+            Long categoryId,
+            Boolean active,
+            ProductBarcodeStatus barcodeStatus
+    ) {
+        String normalizedQuery = normalizeQuery(query);
+        List<String> tokens = applyQuery ? tokenize(normalizedQuery) : List.of();
+
+        return (root, cq, cb) -> {
+            if (!Long.class.equals(cq.getResultType()) && !long.class.equals(cq.getResultType())) {
+                root.fetch("category", JoinType.LEFT);
+                root.fetch("unit", JoinType.LEFT);
+                cq.distinct(true);
+            }
+
+            List<Predicate> predicates = new ArrayList<>();
+
+            if (applyQuery && !tokens.isEmpty()) {
+                predicates.add(allTokensPredicate(root, cb, tokens));
+            }
+
+            if (categoryId != null) {
+                predicates.add(cb.equal(root.get("category").get("id"), categoryId));
+            }
+
+            if (active != null) {
+                predicates.add(cb.equal(root.get("active"), active));
+            }
+
+            if (barcodeStatus != null && barcodeStatus != ProductBarcodeStatus.ALL) {
+                Predicate hasBarcode = cb.and(
+                        cb.isNotNull(root.get("barcode")),
+                        cb.notEqual(cb.trim(root.get("barcode")), "")
+                );
+                Predicate withoutBarcode = cb.or(
+                        cb.isNull(root.get("barcode")),
+                        cb.equal(cb.trim(root.get("barcode")), "")
+                );
+
+                predicates.add(barcodeStatus == ProductBarcodeStatus.WITH_BARCODE ? hasBarcode : withoutBarcode);
+            }
+
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+    }
+
+    private Predicate allTokensPredicate(
+            jakarta.persistence.criteria.Root<ProductEntity> root,
+            jakarta.persistence.criteria.CriteriaBuilder cb,
+            List<String> tokens
+    ) {
+        List<Predicate> tokenPredicates = new ArrayList<>();
+        for (String token : tokens) {
+            String pattern = "%" + token + "%";
+            tokenPredicates.add(cb.or(
+                    cb.like(cb.lower(root.get("name")), pattern),
+                    cb.like(cb.lower(root.get("sku")), pattern),
+                    cb.like(cb.lower(cb.coalesce(root.get("barcode"), "")), pattern)
+            ));
+        }
+
+        return cb.and(tokenPredicates.toArray(new Predicate[0]));
     }
 }
