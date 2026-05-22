@@ -12,6 +12,7 @@ import { toHttpErrorMessage } from "./data/http-error-message";
 import { PosService } from "./data/pos.service";
 import { PosDraftState, PosStateService } from "./data/pos-state.service";
 import { SalesService } from "./data/sales.service";
+import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.service";
 import {
   CashRegisterResponse,
   CreateSaleRequest,
@@ -1974,6 +1975,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
     private readonly cashRegisterService: CashRegisterService,
     private readonly posService: PosService,
     private readonly posStateService: PosStateService,
+    private readonly confirmDialog: ConfirmDialogService,
     private readonly salesService: SalesService,
   ) {}
 
@@ -2622,45 +2624,53 @@ export class PosPageComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const confirmed = window.confirm(this.buildFinalizeConfirmationMessage());
-    if (!confirmed) {
-      return;
-    }
+    void this.confirmDialog.confirm({
+      title: "Confirmar venta",
+      description: this.buildFinalizeConfirmationMessage(),
+      highlightText: "Venta real",
+      confirmText: "Cobrar",
+      cancelText: "Cancelar",
+      variant: "warning",
+    }).then((confirmed) => {
+      if (!confirmed) {
+        return;
+      }
 
-    const warehouseId = this.saleForm.value.warehouseId as number;
+      const warehouseId = this.saleForm.value.warehouseId as number;
 
-    const payload: CreateSaleRequest = {
-      warehouseId,
-      items: this.cart.map((item) => ({
-        productId: item.productId,
-        quantity: this.normalizeQuantity(item.quantity),
-        discountAmount: this.normalizeNumber(item.discountAmount),
-      })),
-      payments: this.payments
-        .map((payment) => ({
-          paymentMethod: payment.paymentMethod,
-          amount: this.normalizeNumber(payment.amount),
-          reference: payment.reference.trim() ? payment.reference.trim() : null,
-        }))
-        .filter((payment) => payment.amount > 0),
-    };
+      const payload: CreateSaleRequest = {
+        warehouseId,
+        items: this.cart.map((item) => ({
+          productId: item.productId,
+          quantity: this.normalizeQuantity(item.quantity),
+          discountAmount: this.normalizeNumber(item.discountAmount),
+        })),
+        payments: this.payments
+          .map((payment) => ({
+            paymentMethod: payment.paymentMethod,
+            amount: this.normalizeNumber(payment.amount),
+            reference: payment.reference.trim() ? payment.reference.trim() : null,
+          }))
+          .filter((payment) => payment.amount > 0),
+      };
 
-    this.submitting = true;
+      this.submitting = true;
 
-    this.salesService.create(payload).subscribe({
-      next: (sale) => {
-        this.submitting = false;
-        this.successMessage = `Venta ${sale.saleNumber} registrada correctamente.`;
-        this.lastSaleId = sale.id;
-        this.resetDraftAfterCheckout(true);
-      },
-      error: (error: unknown) => {
-        this.submitting = false;
-        this.errorMessage = toHttpErrorMessage(
-          error,
-          "No se pudo registrar la venta.",
-        );
-      },
+      this.salesService.create(payload).subscribe({
+        next: (sale) => {
+          this.submitting = false;
+          this.successMessage = `Venta ${sale.saleNumber} registrada correctamente.`;
+          this.lastSaleId = sale.id;
+          this.resetDraftAfterCheckout(true);
+        },
+        error: (error: unknown) => {
+          this.submitting = false;
+          this.errorMessage = toHttpErrorMessage(
+            error,
+            "No se pudo registrar la venta.",
+          );
+        },
+      });
     });
   }
 

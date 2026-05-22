@@ -12,6 +12,7 @@ Estandarizar cambios tecnicos para reducir regresiones y mantener trazabilidad e
 4. No mezclar cambios funcionales con cambios cosmeticos sin acuerdo previo.
 5. Mantener foco en alcance explicitamente solicitado.
 6. En POS, documentar cambios de persistencia frontend, validacion de almacén y ajustes visuales de búsqueda/botones como nota operativa breve cuando impacten la experiencia de caja.
+7. En POS, registrar como mejora UX el reemplazo de confirm nativo por modal propio al cobrar, sin alterar la logica transaccional.
 
 ## Tipos de commit sugeridos (cuando se autorice commit)
 

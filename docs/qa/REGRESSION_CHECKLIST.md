@@ -176,6 +176,15 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [x] `docker compose up --build -d` y `docker compose ps` exitosos tras rebuild del runtime.
 - [x] Sin cambios en backend, Flyway, DB, endpoints, servicios Angular, rutas, guards, AuthService, JWT/interceptor, facturacion, compras, outbox, OpenAI, Dockerfile ni nginx.conf.
 
+### POS modal de cobro propio (2026-05-21)
+
+- [ ] POS: al cobrar aparece el modal propio del sistema, no el confirm nativo del navegador.
+- [ ] POS: el modal muestra cantidad de ítems, total, monto pagado y vuelto.
+- [ ] POS: Cancelar, ESC y backdrop no registran venta.
+- [ ] POS: Cobrar registra la venta como antes.
+- [ ] POS: el draft POS se limpia tras la venta exitosa.
+- [ ] POS: sin cambios en cálculo de total/pagado/vuelto ni en el flujo de cobro.
+
 ### POS Touch-Friendly Fase 1.x - Cierre consolidado (2026-05-07)
 
 - [x] Cierre consolidado de mejoras visuales acumuladas en `/pos`: rediseño touch-friendly, vista unica sin scroll vertical de pagina, buscador principal grande, resultados en tarjetas, carrito visible, pagos visibles, total destacado y `COBRAR` siempre visible.
