@@ -191,6 +191,26 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [ ] Stock inicial: `quantity=0`, `-1`, `0.5` y `1.25` se rechazan con validacion, no con `500`.
 - [ ] Stock inicial: solo este flujo queda endurecido; ajustes/transferencias/compras/ventas no cambian.
 
+### Inventario - Ajustes de stock UX estable y decimal controlado (2026-05-22)
+
+- [ ] Ajustes: escribir 2+ caracteres en Producto y validar lookup server-side.
+- [ ] Ajustes: buscar por nombre, SKU y codigo de barras.
+- [ ] Ajustes: buscar por multi-palabra y seleccionar resultado.
+- [ ] Ajustes: seleccionar producto y luego limpiar producto.
+- [ ] Ajustes: Almacen muestra solo el nombre operativo.
+- [ ] Ajustes: Tipo de ajuste se entiende como Aumentar stock (IN) y Disminuir stock (OUT).
+- [ ] Ajustes: Cantidad acepta `1`, `1.5` y `0.5`.
+- [ ] Ajustes: Cantidad rechaza `0`, `0.0`, `-1`, `0000`, `01`, `1.25` y letras/simbolos.
+- [ ] Ajustes: layout no se mueve al mostrar errores de Cantidad o Motivo.
+- [ ] Ajustes: cancelar modal propio no registra.
+- [ ] Ajustes: confirmar modal propio registra.
+- [ ] Ajustes: OUT muestra advertencia de reduccion de stock real.
+- [ ] Ajustes: success aparece arriba del formulario.
+- [ ] Ajustes: post-success conserva tipo y almacen.
+- [ ] Ajustes: post-success limpia producto, cantidad y motivo.
+- [ ] Ajustes: post-success no deja errores visibles inmediatos.
+- [ ] Ajustes: impacto reflejado luego en Stock/Kardex segun el movimiento registrado.
+
 ### POS Touch-Friendly Fase 1.x - Cierre consolidado (2026-05-07)
 
 - [x] Cierre consolidado de mejoras visuales acumuladas en `/pos`: rediseño touch-friendly, vista unica sin scroll vertical de pagina, buscador principal grande, resultados en tarjetas, carrito visible, pagos visibles, total destacado y `COBRAR` siempre visible.
