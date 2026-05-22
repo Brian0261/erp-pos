@@ -31,6 +31,8 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
 - Frontend desplegado via Nginx con proxy /api.
 - Stock de Inventario actualizado a autocomplete server-side para Producto, sin precarga masiva de catálogo y con tabla simplificada (sin ID/Versión, fecha `dd/MM/yyyy HH:mm`).
 - Ajustes de stock optimizado en frontend: autocomplete server-side, layout estable, almacén por nombre, cantidad decimal controlada con maximo 1 decimal, confirmacion propia y reset limpio post-success.
+- ProductAutocompleteComponent compartido creado en frontend y ya consumido por Transferencias con lookup server-side, navegacion teclado, item activo sombreado y clear reutilizable.
+- Transferencias migrado a lista/carrito operativo con autocomplete compartido, almacenes por nombre, tabla alineada Producto/Cantidad/Accion y confirmacion propia.
 - Catalogo/Productos optimizado: busqueda multi-token en listado paginado, filtros reorganizados por prioridad, tabla compacta y acciones estables sin recorte.
 - POS con draft persistente frontend (`sessionStorage`) y UX afinada: rehidratacion por usuario/caja, Enter/Buscar unificados, búsqueda textual sin almacén, validacion de almacén para agregar/cobrar, select operativo por nombre y botones Agregar uniformes.
 

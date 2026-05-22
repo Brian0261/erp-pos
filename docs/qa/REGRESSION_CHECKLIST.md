@@ -229,6 +229,37 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [ ] Ajustes: post-success no deja errores visibles inmediatos.
 - [ ] Ajustes: impacto reflejado luego en Stock/Kardex segun el movimiento registrado.
 
+### Inventario - Transferencias con autocomplete compartido (2026-05-22)
+
+- [ ] Transferencias: buscar producto por nombre y seleccionar resultado.
+- [ ] Transferencias: buscar producto por SKU y seleccionar resultado.
+- [ ] Transferencias: buscar producto por codigo de barras y seleccionar resultado.
+- [ ] Transferencias: buscar por multi-palabra y obtener coincidencias.
+- [ ] Transferencias: ArrowDown/ArrowUp recorren resultados del autocomplete compartido.
+- [ ] Transferencias: Enter selecciona el item activo.
+- [ ] Transferencias: Escape cierra el panel.
+- [ ] Transferencias: item activo se resalta con sombreado del sistema.
+- [ ] Transferencias: seleccion por mouse/mousedown sigue funcionando.
+- [ ] Transferencias: producto duplicado no se agrega silenciosamente.
+- [ ] Transferencias: cantidad valida `1`, `1.5` y `0.5`.
+- [ ] Transferencias: cantidad rechaza `0`, `0.0`, `-1`, `0000`, `01`, `1.25` y letras/simbolos.
+- [ ] Transferencias: columnas Producto/Cantidad/Accion quedan alineadas con headers.
+- [ ] Transferencias: `Quitar` no se superpone con `Cantidad`.
+- [ ] Transferencias: separadores horizontales se ven rectos y consistentes.
+- [ ] Transferencias: modal propio de confirmacion aparece antes de registrar.
+- [ ] Transferencias: cancelar modal no registra.
+- [ ] Transferencias: confirmar modal registra y deja formulario limpio.
+- [ ] Transferencias: post-success conserva almacenes si sigue siendo operativo y limpia motivo, buscador y lista.
+
+### Reutilizable - ProductAutocompleteComponent compartido (2026-05-22)
+
+- [ ] Validar debounce 250 ms y minimo 2 caracteres en el componente compartido.
+- [ ] Validar navegacion teclado consistente en cualquier pantalla que lo use.
+- [ ] Validar `scrollIntoView` del item activo en panel con resultados largos.
+- [ ] Validar sombreado hover/active con tokens InkToy.
+- [ ] Validar que `clear()` limpia query, resultados y seleccion sin romper el padre.
+- [ ] Validar que el componente no acopla Transferencias y se puede reutilizar luego en Stock, Stock inicial y Ajustes.
+
 ### POS Touch-Friendly Fase 1.x - Cierre consolidado (2026-05-07)
 
 - [x] Cierre consolidado de mejoras visuales acumuladas en `/pos`: rediseño touch-friendly, vista unica sin scroll vertical de pagina, buscador principal grande, resultados en tarjetas, carrito visible, pagos visibles, total destacado y `COBRAR` siempre visible.
