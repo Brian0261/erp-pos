@@ -11,6 +11,7 @@ Estandarizar cambios tecnicos para reducir regresiones y mantener trazabilidad e
 3. No mezclar backend/frontend cuando el requerimiento no lo exige.
 4. No mezclar cambios funcionales con cambios cosmeticos sin acuerdo previo.
 5. Mantener foco en alcance explicitamente solicitado.
+6. En POS, documentar cambios de persistencia frontend, validacion de almacén y ajustes visuales de búsqueda/botones como nota operativa breve cuando impacten la experiencia de caja.
 
 ## Tipos de commit sugeridos (cuando se autorice commit)
 

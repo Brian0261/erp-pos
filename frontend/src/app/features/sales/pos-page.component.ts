@@ -1,13 +1,16 @@
 import { CommonModule } from "@angular/common";
-import { Component, HostListener, OnInit } from "@angular/core";
+import { Component, HostListener, OnDestroy, OnInit } from "@angular/core";
 import { FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
 import { RouterLink } from "@angular/router";
+import { Subscription } from "rxjs";
 
+import { AuthService } from "../../core/auth/auth.service";
 import { WarehouseService } from "../inventory/data/warehouse.service";
 import { WarehouseResponse } from "../inventory/data/inventory.models";
 import { CashRegisterService } from "./data/cash-register.service";
 import { toHttpErrorMessage } from "./data/http-error-message";
 import { PosService } from "./data/pos.service";
+import { PosDraftState, PosStateService } from "./data/pos-state.service";
 import { SalesService } from "./data/sales.service";
 import {
   CashRegisterResponse,
@@ -92,7 +95,7 @@ interface PaymentLine {
                   [ngValue]="warehouse.id"
                   [title]="warehouse.code + ' - ' + warehouse.name"
                 >
-                  {{ warehouse.code }} - {{ warehouse.name }}
+                  {{ getWarehouseDisplayLabel(warehouse) }}
                 </option>
               </select>
             </label>
@@ -121,7 +124,7 @@ interface PaymentLine {
                 <button
                   type="button"
                   class="ui-button ui-button--secondary pos-button pos-button--quiet"
-                  (click)="searchUnifiedText()"
+                  (click)="submitUnifiedSearch()"
                   [disabled]="loadingSearch"
                 >
                   {{ loadingSearch ? "Buscando..." : "Buscar" }}
@@ -214,7 +217,7 @@ interface PaymentLine {
                   </p>
                   <button
                     type="button"
-                    class="ui-button ui-button--primary pos-button pos-button--add"
+                    class="ui-button ui-button--primary pos-button pos-button--add result-add-button"
                     (click)="addToCart(result)"
                   >
                     Agregar
@@ -243,7 +246,7 @@ interface PaymentLine {
                 <button
                   type="button"
                   class="ui-button ui-button--secondary pos-button pos-button--quiet"
-                  (click)="clearCart()"
+                  (click)="cancelSale()"
                   [disabled]="cart.length === 0"
                 >
                   Cancelar venta
@@ -1114,10 +1117,16 @@ interface PaymentLine {
       }
 
       .result-card__action {
-        grid-template-columns: minmax(72px, auto) minmax(96px, 1fr);
+        grid-template-columns: minmax(72px, auto) minmax(7.5rem, 1fr);
         align-items: center;
         align-content: center;
         gap: 0.5rem;
+      }
+
+      .result-add-button {
+        width: 100%;
+        min-width: 7.5rem;
+        justify-self: stretch;
       }
 
       .result-card__sku,
@@ -1915,7 +1924,7 @@ interface PaymentLine {
     `,
   ],
 })
-export class PosPageComponent implements OnInit {
+export class PosPageComponent implements OnInit, OnDestroy {
   readonly quickSearchTerms = [
     "Cartulina",
     "Papelógrafo",
@@ -1935,6 +1944,7 @@ export class PosPageComponent implements OnInit {
 
   warehouses: WarehouseResponse[] = [];
   currentCashSession: CashRegisterResponse | null = null;
+  currentUserId: string | null = null;
   searchResults: PosProductResponse[] = [];
   cart: PosCartItem[] = [];
   payments: PaymentLine[] = [
@@ -1950,17 +1960,260 @@ export class PosPageComponent implements OnInit {
   successMessage = "";
   lastSaleId: number | null = null;
 
+  private readonly subscriptions = new Subscription();
+  private warehousesLoaded = false;
+  private currentUserLoaded = false;
+  private cashSessionLoaded = false;
+  private draftInitialized = false;
+  private isHydratingDraft = false;
+
   constructor(
     private readonly formBuilder: FormBuilder,
+    private readonly authService: AuthService,
     private readonly warehouseService: WarehouseService,
     private readonly cashRegisterService: CashRegisterService,
     private readonly posService: PosService,
+    private readonly posStateService: PosStateService,
     private readonly salesService: SalesService,
   ) {}
 
   ngOnInit(): void {
+    this.bindDraftPersistence();
+    this.loadCurrentUser();
     this.loadWarehouses();
     this.refreshCashSession();
+  }
+
+  ngOnDestroy(): void {
+    this.subscriptions.unsubscribe();
+  }
+
+  private bindDraftPersistence(): void {
+    const codeControl = this.saleForm.controls.code;
+    const warehouseControl = this.saleForm.controls.warehouseId;
+
+    this.subscriptions.add(
+      codeControl.valueChanges.subscribe((value) => {
+        if (this.isHydratingDraft) {
+          return;
+        }
+
+        const code = typeof value === "string" ? value : "";
+        if (this.saleForm.controls.query.value !== code) {
+          this.saleForm.patchValue({ query: code }, { emitEvent: false });
+        }
+        this.persistDraftState();
+      }),
+    );
+
+    this.subscriptions.add(
+      warehouseControl.valueChanges.subscribe(() => {
+        if (!this.isHydratingDraft) {
+          this.persistDraftState();
+        }
+      }),
+    );
+  }
+
+  private loadCurrentUser(): void {
+    this.authService.me().subscribe({
+      next: (user) => {
+        this.currentUserId = user.id;
+        this.currentUserLoaded = true;
+        this.maybeRestoreDraft();
+      },
+      error: () => {
+        this.currentUserId = null;
+        this.currentUserLoaded = true;
+        this.maybeRestoreDraft();
+      },
+    });
+  }
+
+  private maybeRestoreDraft(): void {
+    if (
+      this.draftInitialized ||
+      !this.warehousesLoaded ||
+      !this.currentUserLoaded ||
+      !this.cashSessionLoaded
+    ) {
+      return;
+    }
+
+    this.draftInitialized = true;
+
+    const draft = this.posStateService.load();
+
+    if (!this.currentCashSession) {
+      this.posStateService.clearAll();
+      this.initializeEmptyDraft(draft?.lastWarehouseId ?? null, false);
+      return;
+    }
+
+    if (
+      draft &&
+      draft.userId &&
+      this.currentUserId &&
+      draft.userId !== this.currentUserId
+    ) {
+      this.posStateService.clearAll();
+      this.initializeEmptyDraft(draft.lastWarehouseId, true);
+      return;
+    }
+
+    if (
+      draft &&
+      draft.cashRegisterSessionId !== null &&
+      draft.cashRegisterSessionId !== this.currentCashSession.id
+    ) {
+      this.posStateService.clearAll();
+      this.initializeEmptyDraft(draft.lastWarehouseId, true);
+      return;
+    }
+
+    if (draft) {
+      this.restoreDraft(draft);
+      return;
+    }
+
+    this.initializeEmptyDraft(null, true);
+  }
+
+  private restoreDraft(draft: PosDraftState): void {
+    const warehouseId = this.resolveWarehouseId(
+      draft.warehouseId ?? draft.lastWarehouseId,
+    );
+
+    this.isHydratingDraft = true;
+    this.saleForm.patchValue(
+      {
+        warehouseId,
+        code: draft.code,
+        query: draft.query || draft.code,
+      },
+      { emitEvent: false },
+    );
+    this.searchResults = [...draft.searchResults];
+    this.cart = draft.cart.map((item) => ({ ...item }));
+    this.payments =
+      draft.payments.length > 0
+        ? draft.payments.map((payment) => ({ ...payment }))
+        : [{ paymentMethod: "CASH", amount: 0, reference: "" }];
+    this.lastSaleId = draft.lastSaleId;
+    this.loadingLookup = false;
+    this.loadingSearch = false;
+    this.submitting = false;
+    this.isFullCartOpen = false;
+    this.isHydratingDraft = false;
+
+    this.persistDraftState();
+  }
+
+  private initializeEmptyDraft(
+    preferredWarehouseId: number | null,
+    persistState: boolean,
+  ): void {
+    const warehouseId = this.resolveWarehouseId(preferredWarehouseId);
+
+    this.isHydratingDraft = true;
+    this.saleForm.patchValue(
+      {
+        warehouseId,
+        code: "",
+        query: "",
+      },
+      { emitEvent: false },
+    );
+    this.searchResults = [];
+    this.cart = [];
+    this.payments = [{ paymentMethod: "CASH", amount: 0, reference: "" }];
+    this.lastSaleId = null;
+    this.loadingLookup = false;
+    this.loadingSearch = false;
+    this.submitting = false;
+    this.isFullCartOpen = false;
+    this.successMessage = "";
+    this.isHydratingDraft = false;
+
+    if (persistState) {
+      this.persistDraftState();
+    }
+  }
+
+  private resolveWarehouseId(preferredWarehouseId: number | null): number | null {
+    if (
+      preferredWarehouseId !== null &&
+      this.warehouses.some((warehouse) => warehouse.id === preferredWarehouseId)
+    ) {
+      return preferredWarehouseId;
+    }
+
+    if (this.warehouses.length > 0) {
+      return this.warehouses[0].id;
+    }
+
+    return null;
+  }
+
+  private persistDraftState(): void {
+    if (this.isHydratingDraft || !this.currentUserId || !this.currentCashSession) {
+      return;
+    }
+
+    const currentWarehouseId = this.saleForm.value.warehouseId ?? null;
+    const existingDraft = this.posStateService.load();
+
+    this.posStateService.save({
+      userId: this.currentUserId,
+      cashRegisterSessionId: this.currentCashSession.id,
+      warehouseId: currentWarehouseId,
+      lastWarehouseId: currentWarehouseId ?? existingDraft?.lastWarehouseId ?? null,
+      code: this.saleForm.value.code ?? "",
+      query: this.saleForm.value.query ?? this.saleForm.value.code ?? "",
+      searchResults: this.searchResults.map((item) => ({ ...item })),
+      cart: this.cart.map((item) => ({ ...item })),
+      payments: this.payments.map((payment) => ({ ...payment })),
+      lastSaleId: this.lastSaleId,
+    });
+  }
+
+  private resetDraftAfterCheckout(preserveLastSaleId: boolean): void {
+    const warehouseId = this.saleForm.value.warehouseId ?? null;
+
+    this.isHydratingDraft = true;
+    this.saleForm.patchValue(
+      {
+        warehouseId,
+        code: "",
+        query: "",
+      },
+      { emitEvent: false },
+    );
+    this.searchResults = [];
+    this.cart = [];
+    this.payments = [{ paymentMethod: "CASH", amount: 0, reference: "" }];
+    if (!preserveLastSaleId) {
+      this.lastSaleId = null;
+    }
+    this.loadingLookup = false;
+    this.loadingSearch = false;
+    this.submitting = false;
+    this.isFullCartOpen = false;
+    this.errorMessage = "";
+    if (!preserveLastSaleId) {
+      this.successMessage = "";
+    }
+    this.isHydratingDraft = false;
+
+    this.posStateService.clearDraft(preserveLastSaleId);
+
+    if (this.currentCashSession && this.currentUserId) {
+      this.persistDraftState();
+    }
+  }
+
+  cancelSale(): void {
+    this.resetDraftAfterCheckout(false);
   }
 
   get subtotal(): number {
@@ -1995,6 +2248,10 @@ export class PosPageComponent implements OnInit {
     return warehouse
       ? `${warehouse.code} - ${warehouse.name}`
       : "Selecciona almacen";
+  }
+
+  getWarehouseDisplayLabel(warehouse: WarehouseResponse): string {
+    return warehouse.name?.trim() || warehouse.code?.trim() || "Selecciona almacen";
   }
 
   get cartTitle(): string {
@@ -2049,6 +2306,7 @@ export class PosPageComponent implements OnInit {
         this.loadingLookup = false;
         this.addToCart(product);
         this.saleForm.patchValue({ code: "" });
+        this.persistDraftState();
       },
       error: (error: unknown) => {
         this.loadingLookup = false;
@@ -2061,14 +2319,16 @@ export class PosPageComponent implements OnInit {
   }
 
   submitUnifiedSearch(): void {
-    this.lookupUnifiedSearch(true);
+    this.searchUnifiedText();
   }
 
   addExactFromUnifiedSearch(): void {
-    this.lookupUnifiedSearch(false);
+    this.lookupByCode();
   }
 
-  searchUnifiedText(rawQuery = this.saleForm.value.code ?? ""): void {
+  searchUnifiedText(
+    rawQuery = this.saleForm.value.query ?? this.saleForm.value.code ?? "",
+  ): void {
     const query = rawQuery.trim();
     if (query.length < 2) {
       this.errorMessage =
@@ -2089,6 +2349,7 @@ export class PosPageComponent implements OnInit {
         if (results.length === 0) {
           this.errorMessage = "No se encontraron productos para la busqueda.";
         }
+        this.persistDraftState();
       },
       error: (error: unknown) => {
         this.loadingSearch = false;
@@ -2101,35 +2362,7 @@ export class PosPageComponent implements OnInit {
   }
 
   searchByName(): void {
-    const query = (this.saleForm.value.query ?? "").trim();
-    if (query.length < 2) {
-      this.errorMessage =
-        "Ingresa al menos 2 caracteres para buscar por nombre.";
-      return;
-    }
-
-    const warehouseId = this.saleForm.value.warehouseId ?? undefined;
-
-    this.loadingSearch = true;
-    this.errorMessage = "";
-    this.successMessage = "";
-
-    this.posService.search(query, warehouseId).subscribe({
-      next: (results) => {
-        this.loadingSearch = false;
-        this.searchResults = results;
-        if (results.length === 0) {
-          this.errorMessage = "No se encontraron productos para la busqueda.";
-        }
-      },
-      error: (error: unknown) => {
-        this.loadingSearch = false;
-        this.errorMessage = toHttpErrorMessage(
-          error,
-          "No se pudo realizar la busqueda por nombre.",
-        );
-      },
-    });
+    this.searchUnifiedText(this.saleForm.value.query ?? this.saleForm.value.code ?? "");
   }
 
   applyQuickSearch(term: string): void {
@@ -2138,47 +2371,12 @@ export class PosPageComponent implements OnInit {
   }
 
   private lookupUnifiedSearch(fallbackToSearch: boolean): void {
-    const code = (this.saleForm.value.code ?? "").trim();
-    if (!code) {
-      this.errorMessage = "Ingresa un barcode, SKU o nombre de producto.";
+    if (fallbackToSearch) {
+      this.searchUnifiedText();
       return;
     }
 
-    const warehouseId = this.saleForm.value.warehouseId ?? undefined;
-    if (!warehouseId) {
-      this.errorMessage = "Selecciona un almacen antes de buscar.";
-      return;
-    }
-
-    this.loadingLookup = true;
-    this.errorMessage = "";
-    this.successMessage = "";
-
-    this.posService.lookup(code, warehouseId).subscribe({
-      next: (product) => {
-        this.loadingLookup = false;
-        this.addToCart(product);
-        this.saleForm.patchValue({ code: "", query: "" });
-      },
-      error: (error: unknown) => {
-        this.loadingLookup = false;
-        if (this.isNotFoundError(error)) {
-          if (fallbackToSearch && code.length >= 2) {
-            this.searchUnifiedText(code);
-            return;
-          }
-
-          this.errorMessage =
-            "No hay coincidencia exacta. Usa Buscar para ver productos relacionados.";
-          return;
-        }
-
-        this.errorMessage = toHttpErrorMessage(
-          error,
-          "No se encontro un producto exacto para agregar.",
-        );
-      },
-    });
+    this.lookupByCode();
   }
 
   private isNotFoundError(error: unknown): boolean {
@@ -2206,6 +2404,13 @@ export class PosPageComponent implements OnInit {
     this.errorMessage = "";
     this.successMessage = "";
 
+    const warehouseId = this.saleForm.value.warehouseId;
+    if (!warehouseId) {
+      this.errorMessage =
+        "Selecciona un almacen antes de agregar productos al carrito.";
+      return;
+    }
+
     if (this.cart.length === 0 && this.lastSaleId !== null) {
       this.lastSaleId = null;
     }
@@ -2221,6 +2426,7 @@ export class PosPageComponent implements OnInit {
         return;
       }
       existing.quantity = nextQty;
+      this.persistDraftState();
       return;
     }
 
@@ -2243,10 +2449,13 @@ export class PosPageComponent implements OnInit {
       quantity: 1,
       discountAmount: 0,
     });
+
+    this.persistDraftState();
   }
 
   removeFromCart(index: number): void {
     this.cart.splice(index, 1);
+    this.persistDraftState();
   }
 
   clearCart(clearLastSaleReference = true): void {
@@ -2255,6 +2464,7 @@ export class PosPageComponent implements OnInit {
     if (clearLastSaleReference) {
       this.lastSaleId = null;
     }
+    this.persistDraftState();
   }
 
   selectQuantityInput(input: HTMLInputElement): void {
@@ -2283,6 +2493,8 @@ export class PosPageComponent implements OnInit {
     if (input) {
       input.value = String(item.quantity);
     }
+
+    this.persistDraftState();
   }
 
   increaseQuantity(index: number): void {
@@ -2318,10 +2530,12 @@ export class PosPageComponent implements OnInit {
 
     if (parsed > maxDiscount) {
       item.discountAmount = maxDiscount;
+      this.persistDraftState();
       return;
     }
 
     item.discountAmount = parsed;
+    this.persistDraftState();
   }
 
   lineSubtotal(item: PosCartItem): number {
@@ -2339,6 +2553,7 @@ export class PosPageComponent implements OnInit {
 
   addPaymentLine(): void {
     this.payments.push({ paymentMethod: "CASH", amount: 0, reference: "" });
+    this.persistDraftState();
   }
 
   removePaymentLine(index: number): void {
@@ -2346,6 +2561,7 @@ export class PosPageComponent implements OnInit {
       return;
     }
     this.payments.splice(index, 1);
+    this.persistDraftState();
   }
 
   setPaymentMethod(index: number, value: string): void {
@@ -2356,6 +2572,7 @@ export class PosPageComponent implements OnInit {
 
     if (value === "CASH" || value === "CARD" || value === "TRANSFER") {
       payment.paymentMethod = value;
+      this.persistDraftState();
     }
   }
 
@@ -2366,6 +2583,7 @@ export class PosPageComponent implements OnInit {
     }
 
     payment.amount = Math.max(this.normalizeNumber(rawValue), 0);
+    this.persistDraftState();
   }
 
   setPaymentReference(index: number, rawValue: string): void {
@@ -2375,15 +2593,20 @@ export class PosPageComponent implements OnInit {
     }
 
     payment.reference = rawValue;
+    this.persistDraftState();
   }
 
   refreshCashSession(): void {
     this.cashRegisterService.current().subscribe({
       next: (session) => {
         this.currentCashSession = session;
+        this.cashSessionLoaded = true;
+        this.maybeRestoreDraft();
       },
       error: () => {
         this.currentCashSession = null;
+        this.cashSessionLoaded = true;
+        this.maybeRestoreDraft();
       },
     });
   }
@@ -2429,8 +2652,7 @@ export class PosPageComponent implements OnInit {
         this.submitting = false;
         this.successMessage = `Venta ${sale.saleNumber} registrada correctamente.`;
         this.lastSaleId = sale.id;
-        this.clearCart(false);
-        this.searchResults = [];
+        this.resetDraftAfterCheckout(true);
       },
       error: (error: unknown) => {
         this.submitting = false;
@@ -2446,12 +2668,16 @@ export class PosPageComponent implements OnInit {
     this.warehouseService.list(true).subscribe({
       next: (warehouses) => {
         this.warehouses = warehouses;
+        this.warehousesLoaded = true;
+        this.maybeRestoreDraft();
       },
       error: (error: unknown) => {
         this.errorMessage = toHttpErrorMessage(
           error,
           "No se pudieron cargar los almacenes.",
         );
+        this.warehousesLoaded = true;
+        this.maybeRestoreDraft();
       },
     });
   }

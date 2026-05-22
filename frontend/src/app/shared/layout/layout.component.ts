@@ -11,6 +11,7 @@ import { filter, Subscription } from "rxjs";
 
 import { AuthService } from "../../core/auth/auth.service";
 import { UserProfile } from "../../core/auth/auth.models";
+import { PosStateService } from "../../features/sales/data/pos-state.service";
 import { ConfirmDialogComponent } from "../dialogs/confirm-dialog.component";
 
 type AppRole = "ADMIN" | "CAJERO" | "ALMACENERO" | "SUPERVISOR";
@@ -1107,6 +1108,7 @@ export class LayoutComponent implements OnInit, OnDestroy {
   constructor(
     private readonly authService: AuthService,
     private readonly router: Router,
+    private readonly posStateService: PosStateService,
   ) {}
 
   ngOnInit(): void {
@@ -1219,6 +1221,7 @@ export class LayoutComponent implements OnInit, OnDestroy {
   }
 
   logout(): void {
+    this.posStateService.clearAll();
     this.authService.logout();
     this.router.navigate(["/login"]);
   }

@@ -102,6 +102,18 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [ ] Stock: paginación sigue operativa con y sin producto seleccionado.
 - [ ] Stock: columna ID y Versión ocultas; fecha visible en formato `dd/MM/yyyy HH:mm`.
 
+### POS draft persistente y UX select/botones (2026-05-21)
+
+- [ ] POS: entrar/salir conserva almacén, búsqueda, resultados, carrito y pagos.
+- [ ] POS: Enter y Buscar ejecutan el mismo flujo de búsqueda.
+- [ ] POS: cancelar limpia el draft.
+- [ ] POS: cobrar limpia el draft.
+- [ ] POS: logout limpia el draft.
+- [ ] POS: cambio de caja/usuario limpia el draft.
+- [ ] POS: agregar/cobrar sin almacén bloquea con validacion clara.
+- [ ] POS: select de almacén muestra solo el nombre operativo.
+- [ ] POS: botones Agregar mantienen ancho uniforme y alineacion estable.
+
 ### POS touch-friendly Fase 1.1 - Grid fijo sin scroll de pagina (2026-05-06)
 
 - [x] Ajuste aplicado solo en `frontend/src/app/features/sales/pos-page.component.ts` y evidencia QA en este checklist.

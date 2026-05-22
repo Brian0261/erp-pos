@@ -30,6 +30,7 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
 - Rutas protegidas y experiencia RBAC validadas en QA.
 - Frontend desplegado via Nginx con proxy /api.
 - Stock de Inventario actualizado a autocomplete server-side para Producto, sin precarga masiva de catálogo y con tabla simplificada (sin ID/Versión, fecha `dd/MM/yyyy HH:mm`).
+- POS con draft persistente frontend (`sessionStorage`) y UX afinada: rehidratacion por usuario/caja, Enter/Buscar unificados, búsqueda textual sin almacén, validacion de almacén para agregar/cobrar, select operativo por nombre y botones Agregar uniformes.
 
 ## Estado backend
 
