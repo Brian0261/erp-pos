@@ -191,7 +191,7 @@ abstract class AbstractHttpIntegrationTest {
         ObjectNode payload = objectMapper.createObjectNode();
         payload.put("productId", productId);
         payload.put("warehouseId", warehouseId);
-        payload.put("quantity", quantity);
+        payload.put("quantity", quantity.stripTrailingZeros());
         payload.put("reason", reason);
 
         mockMvc.perform(post("/api/v1/inventory/initial-stock")

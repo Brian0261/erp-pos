@@ -78,6 +78,7 @@ public class InventoryApplicationService implements InventoryUseCase {
     public InventoryMovement registerInitialStock(RegisterInitialStockCommand command) {
         ensureProductActive(command.productId());
         ensureWarehouseActive(command.warehouseId());
+        ensureInitialStockQuantityIsIntegerPositive(command.quantity());
 
         if (inventoryMovementRepositoryPort.existsByProductIdAndWarehouseId(command.productId(), command.warehouseId())) {
             throw new InventoryBusinessRuleException(INITIAL_STOCK_ALREADY_REGISTERED_MESSAGE);
@@ -446,6 +447,12 @@ public class InventoryApplicationService implements InventoryUseCase {
             throw new InventoryBusinessRuleException("Warehouse is inactive");
         }
         return warehouse;
+    }
+
+    private void ensureInitialStockQuantityIsIntegerPositive(BigDecimal quantity) {
+        if (quantity == null || quantity.compareTo(BigDecimal.ONE) < 0 || quantity.scale() > 0) {
+            throw new InventoryBusinessRuleException("Initial stock quantity must be an integer greater than 0");
+        }
     }
 
     private BigDecimal normalizeQuantity(BigDecimal quantity) {

@@ -185,6 +185,12 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [ ] POS: el draft POS se limpia tras la venta exitosa.
 - [ ] POS: sin cambios en cálculo de total/pagado/vuelto ni en el flujo de cobro.
 
+### Stock inicial - cantidad entera positiva (2026-05-21)
+
+- [ ] Stock inicial: `quantity=1` y `quantity=10` registran `201`.
+- [ ] Stock inicial: `quantity=0`, `-1`, `0.5` y `1.25` se rechazan con validacion, no con `500`.
+- [ ] Stock inicial: solo este flujo queda endurecido; ajustes/transferencias/compras/ventas no cambian.
+
 ### POS Touch-Friendly Fase 1.x - Cierre consolidado (2026-05-07)
 
 - [x] Cierre consolidado de mejoras visuales acumuladas en `/pos`: rediseño touch-friendly, vista unica sin scroll vertical de pagina, buscador principal grande, resultados en tarjetas, carrito visible, pagos visibles, total destacado y `COBRAR` siempre visible.

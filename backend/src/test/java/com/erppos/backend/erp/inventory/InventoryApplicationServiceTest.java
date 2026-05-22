@@ -157,6 +157,36 @@ class InventoryApplicationServiceTest {
     }
 
     @Test
+    void shouldRejectZeroInitialStockQuantity() {
+        Long warehouseId = seedWarehouse("WH-A");
+        Long productId = seedActiveProduct("SKU-1");
+
+        assertThrows(InventoryBusinessRuleException.class,
+                () -> inventoryService.registerInitialStock(new RegisterInitialStockCommand(productId, warehouseId, BigDecimal.ZERO, "Carga inicial")));
+    }
+
+    @Test
+    void shouldRejectNegativeInitialStockQuantity() {
+        Long warehouseId = seedWarehouse("WH-A");
+        Long productId = seedActiveProduct("SKU-1");
+
+        assertThrows(InventoryBusinessRuleException.class,
+                () -> inventoryService.registerInitialStock(new RegisterInitialStockCommand(productId, warehouseId, BigDecimal.valueOf(-1), "Carga inicial")));
+    }
+
+    @Test
+    void shouldRejectDecimalInitialStockQuantity() {
+        Long warehouseId = seedWarehouse("WH-A");
+        Long productId = seedActiveProduct("SKU-1");
+
+        assertThrows(InventoryBusinessRuleException.class,
+                () -> inventoryService.registerInitialStock(new RegisterInitialStockCommand(productId, warehouseId, new BigDecimal("0.5"), "Carga inicial")));
+
+        assertThrows(InventoryBusinessRuleException.class,
+                () -> inventoryService.registerInitialStock(new RegisterInitialStockCommand(productId, warehouseId, new BigDecimal("1.25"), "Carga inicial")));
+    }
+
+    @Test
     void shouldRejectSecondInitialStockForSameProductAndWarehouse() {
         Long warehouseId = seedWarehouse("WH-A");
         Long productId = seedActiveProduct("SKU-1");

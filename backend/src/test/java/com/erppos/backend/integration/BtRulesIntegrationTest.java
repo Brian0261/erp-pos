@@ -89,6 +89,29 @@ class BtRulesIntegrationTest extends AbstractHttpIntegrationTest {
     }
 
     @Test
+    void shouldRejectNonIntegerPositiveQuantityForInitialStockAtApiBoundary() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = Long.toString(System.nanoTime());
+
+        long categoryId = createCategory(adminToken, suffix);
+        long unitId = createUnit(adminToken, suffix);
+        long warehouseId = createWarehouse(adminToken, suffix);
+        long productId = createProduct(adminToken, categoryId, unitId, suffix, new BigDecimal("15.00"));
+
+        String[] invalidQuantities = {"0", "-1", "0.5", "1.25"};
+        for (String quantity : invalidQuantities) {
+            MvcResult result = mockMvc.perform(post("/api/v1/inventory/initial-stock")
+                            .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
+                            .contentType("application/json")
+                            .content("{\"productId\":" + productId + ",\"warehouseId\":" + warehouseId + ",\"quantity\":" + quantity + ",\"reason\":\"BT-003 invalid qty\"}"))
+                    .andExpect(status().isBadRequest())
+                    .andReturn();
+
+            assertTrue(result.getResponse().getStatus() != 500);
+        }
+    }
+
+    @Test
     void shouldEnforceBt002SingleQuoteConversion() throws Exception {
         String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
         ensureNoOpenCash(adminToken);
