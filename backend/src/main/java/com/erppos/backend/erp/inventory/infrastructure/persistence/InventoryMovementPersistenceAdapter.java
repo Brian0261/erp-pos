@@ -6,10 +6,11 @@ import com.erppos.backend.erp.catalog.infrastructure.persistence.ProductJpaRepos
 import com.erppos.backend.erp.inventory.domain.model.InventoryMovement;
 import com.erppos.backend.erp.inventory.domain.port.InventoryMovementRepositoryPort;
 import com.erppos.backend.erp.inventory.infrastructure.mapper.InventoryMovementMapper;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
-import java.util.List;
 
 @Component
 public class InventoryMovementPersistenceAdapter implements InventoryMovementRepositoryPort {
@@ -47,14 +48,12 @@ public class InventoryMovementPersistenceAdapter implements InventoryMovementRep
     }
 
     @Override
-    public List<InventoryMovement> findKardex(Long productId, Long warehouseId, Instant fromInclusive, Instant toExclusive) {
+    public Page<InventoryMovement> findKardex(Long productId, Long warehouseId, Instant fromInclusive, Instant toExclusive, Pageable pageable) {
         Instant from = fromInclusive == null ? MIN_INSTANT : fromInclusive;
         Instant to = toExclusive == null ? MAX_INSTANT_EXCLUSIVE : toExclusive;
 
-        return inventoryMovementJpaRepository.findKardex(productId, warehouseId, from, to)
-                .stream()
-                .map(InventoryMovementMapper::toDomain)
-                .toList();
+        return inventoryMovementJpaRepository.findKardex(productId, warehouseId, from, to, pageable)
+                .map(InventoryMovementMapper::toDomain);
     }
 }
 

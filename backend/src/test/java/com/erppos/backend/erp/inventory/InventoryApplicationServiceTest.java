@@ -205,8 +205,8 @@ class InventoryApplicationServiceTest {
         assertThrows(InventoryBusinessRuleException.class,
                 () -> inventoryService.registerInitialStock(new RegisterInitialStockCommand(productId, warehouseId, BigDecimal.ONE, "Reintento")));
 
-        List<InventoryMovement> kardex = inventoryService.kardex(productId, warehouseId, null, null);
-        long initialStockMovements = kardex.stream()
+        Page<InventoryMovement> kardex = inventoryService.kardex(productId, warehouseId, null, null, Pageable.unpaged());
+        long initialStockMovements = kardex.getContent().stream()
                 .filter(m -> m.movementType() == InventoryMovementType.INITIAL_STOCK)
                 .count();
 
@@ -350,10 +350,16 @@ class InventoryApplicationServiceTest {
         inventoryService.registerInitialStock(new RegisterInitialStockCommand(productId, warehouseId, BigDecimal.TEN, "Carga inicial"));
         inventoryService.registerAdjustment(new RegisterAdjustmentCommand(productId, warehouseId, BigDecimal.valueOf(2), false, "Salida"));
 
-        List<InventoryMovement> kardex = inventoryService.kardex(productId, warehouseId, LocalDate.now(ZoneOffset.UTC).minusDays(1), LocalDate.now(ZoneOffset.UTC).plusDays(1));
+        Page<InventoryMovement> kardex = inventoryService.kardex(
+                productId,
+                warehouseId,
+                LocalDate.now(ZoneOffset.UTC).minusDays(1),
+                LocalDate.now(ZoneOffset.UTC).plusDays(1),
+                Pageable.unpaged()
+        );
 
-        assertEquals(2, kardex.size());
-        InventoryMovement lastMovement = kardex.stream()
+        assertEquals(2, kardex.getContent().size());
+        InventoryMovement lastMovement = kardex.getContent().stream()
                 .filter(m -> m.movementType() == InventoryMovementType.ADJUSTMENT_OUT)
                 .findFirst()
                 .orElseThrow();
@@ -543,14 +549,15 @@ class InventoryApplicationServiceTest {
         }
 
         @Override
-        public List<InventoryMovement> findKardex(Long productId, Long warehouseId, Instant fromInclusive, Instant toExclusive) {
-            return storage.values().stream()
+        public Page<InventoryMovement> findKardex(Long productId, Long warehouseId, Instant fromInclusive, Instant toExclusive, Pageable pageable) {
+            List<InventoryMovement> results = storage.values().stream()
                     .filter(m -> productId == null || Objects.equals(m.productId(), productId))
                     .filter(m -> warehouseId == null || Objects.equals(m.warehouseId(), warehouseId))
                     .filter(m -> fromInclusive == null || !m.createdAt().isBefore(fromInclusive))
                     .filter(m -> toExclusive == null || m.createdAt().isBefore(toExclusive))
                     .sorted((a, b) -> b.createdAt().compareTo(a.createdAt()))
                     .toList();
+            return new PageImpl<>(results, pageable, results.size());
         }
     }
 

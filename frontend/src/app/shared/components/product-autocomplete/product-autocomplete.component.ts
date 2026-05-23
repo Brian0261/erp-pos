@@ -66,7 +66,10 @@ let productAutocompleteUid = 0;
         </div>
       </label>
 
-      <div class="product-autocomplete__selected" *ngIf="displaySelectedProduct">
+      <div
+        class="product-autocomplete__selected"
+        *ngIf="showSelectedCard && displaySelectedProduct"
+      >
         <div class="product-autocomplete__selected-copy">
           <span class="product-autocomplete__selected-label">Producto seleccionado</span>
           <strong>{{ displaySelectedProduct.name }}</strong>
@@ -288,6 +291,7 @@ export class ProductAutocompleteComponent implements OnInit, OnDestroy {
   @Input() disabled = false;
   @Input() compact = false;
   @Input() allowClear = true;
+  @Input() showSelectedCard = true;
   @Input() selectedProduct: ProductLookupResponse | null = null;
 
   @Output() productSelected = new EventEmitter<ProductLookupResponse>();

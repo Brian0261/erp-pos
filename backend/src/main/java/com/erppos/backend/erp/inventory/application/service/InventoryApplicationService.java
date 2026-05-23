@@ -426,10 +426,13 @@ public class InventoryApplicationService implements InventoryUseCase {
     }
 
     @Override
-    public List<InventoryMovement> kardex(Long productId, Long warehouseId, LocalDate from, LocalDate to) {
+    public Page<InventoryMovement> kardex(Long productId, Long warehouseId, LocalDate from, LocalDate to, Pageable pageable) {
+        if (from != null && to != null && to.isBefore(from)) {
+            throw new InventoryBusinessRuleException("to must be >= from");
+        }
         Instant fromInclusive = from == null ? null : from.atStartOfDay().toInstant(ZoneOffset.UTC);
         Instant toExclusive = to == null ? null : to.plusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC);
-        return inventoryMovementRepositoryPort.findKardex(productId, warehouseId, fromInclusive, toExclusive);
+        return inventoryMovementRepositoryPort.findKardex(productId, warehouseId, fromInclusive, toExclusive, pageable);
     }
 
     private void ensureProductActive(Long productId) {

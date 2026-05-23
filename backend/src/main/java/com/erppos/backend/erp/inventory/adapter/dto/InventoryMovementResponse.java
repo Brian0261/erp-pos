@@ -8,7 +8,12 @@ import java.time.Instant;
 public record InventoryMovementResponse(
         Long id,
         Long productId,
+        String productName,
+        String productSku,
+        String productBarcode,
         Long warehouseId,
+        String warehouseName,
+        String warehouseCode,
         InventoryMovementType movementType,
         BigDecimal quantity,
         BigDecimal previousStock,

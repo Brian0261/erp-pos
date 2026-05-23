@@ -229,6 +229,27 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [ ] Ajustes: post-success no deja errores visibles inmediatos.
 - [ ] Ajustes: impacto reflejado luego en Stock/Kardex segun el movimiento registrado.
 
+### Inventario - Kardex enriquecido y filtros claros (2026-05-22)
+
+- [x] Kardex: Producto usa `ProductAutocompleteComponent` y permite buscar por nombre/SKU/codigo de barras.
+- [x] Kardex: Almacen muestra solo nombre operativo.
+- [x] Kardex: Desde solo funciona.
+- [x] Kardex: Hasta solo funciona.
+- [x] Kardex: Desde + Hasta funciona.
+- [x] Kardex: Desde > Hasta muestra error y no consulta.
+- [x] Kardex: Buscar y Limpiar quedan juntos.
+- [x] Kardex: un solo Limpiar global (autocomplete sin boton interno duplicado).
+- [x] Kardex: Fecha en tabla se ve `dd/MM/yyyy HH:mm`.
+- [x] Kardex: Producto muestra nombre real y ya no cae a `Producto #id` en casos normales.
+- [x] Kardex: Almacen en tabla muestra solo nombre.
+- [x] Kardex: Movimiento se traduce a espanol.
+- [x] Kardex: Delta se muestra como Variacion con signo +/-. 
+- [x] Kardex: Stock anterior/nuevo se muestran como Stock antes/despues.
+- [x] Kardex: Motivo y Usuario siguen visibles.
+- [x] Kardex: tabla real alineada con 10 columnas, wrappers internos y scroll horizontal controlado.
+- [x] Kardex: paginacion server-side con `Anterior/Siguiente/Ir a pág.` y `pageSize=20`.
+- [x] Kardex: backend responde enriquecido con `productName/productSku/productBarcode` y `warehouseName/warehouseCode`.
+
 ### Inventario - Transferencias con autocomplete compartido (2026-05-22)
 
 - [ ] Transferencias: buscar producto por nombre y seleccionar resultado.

@@ -1,10 +1,16 @@
 import { CommonModule } from "@angular/common";
-import { Component, OnInit } from "@angular/core";
-import { FormBuilder, ReactiveFormsModule } from "@angular/forms";
-import { forkJoin } from "rxjs";
+import { Component, OnDestroy, OnInit, ViewChild } from "@angular/core";
+import {
+  FormBuilder,
+  ReactiveFormsModule,
+  ValidationErrors,
+  ValidatorFn,
+} from "@angular/forms";
+import { Subject } from "rxjs";
+import { takeUntil } from "rxjs/operators";
 
-import { Product } from "../catalog/data/catalog.models";
-import { ProductService } from "../catalog/data/product.service";
+import { ProductLookupResponse } from "../catalog/data/catalog.models";
+import { ProductAutocompleteComponent } from "../../shared/components/product-autocomplete/product-autocomplete.component";
 import { toHttpErrorMessage } from "./data/http-error-message";
 import { InventoryService } from "./data/inventory.service";
 import {
@@ -13,197 +19,354 @@ import {
 } from "./data/inventory.models";
 import { WarehouseService } from "./data/warehouse.service";
 
+type MovementKind =
+  | "INITIAL_STOCK"
+  | "ADJUSTMENT_IN"
+  | "ADJUSTMENT_OUT"
+  | "TRANSFER_IN"
+  | "TRANSFER_OUT"
+  | "PURCHASE_IN"
+  | "SALE_OUT"
+  | "SALE_VOID_IN";
+
 @Component({
   selector: "app-kardex-page",
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, ProductAutocompleteComponent],
   template: `
-    <section class="ui-card inventory-page">
+    <section class="ui-card ui-module-page kardex-page">
       <header class="ui-page-head">
         <div>
           <p class="ui-page-kicker">Inventario InkToy</p>
           <h1 class="ui-page-title">Kardex</h1>
           <p class="ui-page-description">
-            Consulta movimientos por producto, almacen y fechas.
+            Consulta movimientos por producto, almacen y fechas con trazabilidad clara.
           </p>
         </div>
       </header>
 
-      <form
-        [formGroup]="filtersForm"
-        (ngSubmit)="search()"
-        class="filters-grid"
-      >
-        <label class="field">
-          <span>Producto</span>
-          <select formControlName="productId">
-            <option [ngValue]="null">Todos</option>
-            <option *ngFor="let product of products" [ngValue]="product.id">
-              {{ product.name }} (SKU: {{ product.sku }})
-            </option>
-          </select>
-        </label>
+      <p class="ui-alert ui-alert--error" *ngIf="errorMessage">{{ errorMessage }}</p>
 
-        <label class="field">
-          <span>Almacen</span>
-          <select formControlName="warehouseId">
-            <option [ngValue]="null">Todos</option>
-            <option
-              *ngFor="let warehouse of warehouses"
-              [ngValue]="warehouse.id"
-            >
-              {{ warehouse.code }} - {{ warehouse.name }}
-            </option>
-          </select>
-        </label>
+      <section class="ui-module-section">
+        <header class="ui-module-section__head">
+          <h2 class="ui-module-section__title">Filtros de consulta</h2>
+        </header>
 
-        <label class="field">
-          <span>Desde</span>
-          <input type="date" formControlName="from" />
-        </label>
+        <form class="kardex-filters" [formGroup]="filtersForm" (ngSubmit)="search()">
+          <div class="kardex-filters__row kardex-filters__row--product">
+            <app-product-autocomplete
+              class="kardex-product"
+              [placeholder]="'Buscar producto por nombre, SKU o código de barras'"
+              [minChars]="2"
+              [limit]="10"
+              [activeOnly]="true"
+              [compact]="true"
+              [allowClear]="false"
+              [showSelectedCard]="false"
+              [selectedProduct]="selectedProduct"
+              (productSelected)="onProductSelected($event)"
+              (cleared)="clearProductSelection()"
+            ></app-product-autocomplete>
+          </div>
 
-        <label class="field">
-          <span>Hasta</span>
-          <input type="date" formControlName="to" />
-        </label>
-
-        <div class="field-action">
-          <button
-            type="submit"
-            class="ui-button ui-button--primary"
-            [disabled]="loading"
-          >
-            Buscar
-          </button>
-        </div>
-        <div class="field-action">
-          <button
-            type="button"
-            class="ui-button ui-button--secondary"
-            (click)="clearFilters()"
-            [disabled]="loading"
-          >
-            Limpiar
-          </button>
-        </div>
-      </form>
-
-      <p class="ui-alert ui-alert--error" *ngIf="errorMessage">
-        {{ errorMessage }}
-      </p>
-      <p class="ui-alert ui-alert--info" *ngIf="loading">
-        Consultando movimientos...
-      </p>
-
-      <div class="ui-table-wrapper" *ngIf="!loading">
-        <table class="ui-table kardex-table">
-          <thead>
-            <tr>
-              <th>Fecha</th>
-              <th>Producto</th>
-              <th>Almacen</th>
-              <th>Movimiento</th>
-              <th>Cantidad</th>
-              <th>Delta</th>
-              <th>Stock anterior</th>
-              <th>Stock nuevo</th>
-              <th>Motivo</th>
-              <th>Usuario</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let movement of movements">
-              <td class="cell-date">
-                {{ movement.createdAt | date: "yyyy-MM-dd HH:mm" }}
-              </td>
-              <td>{{ resolveProductName(movement.productId) }}</td>
-              <td>{{ resolveWarehouseName(movement.warehouseId) }}</td>
-              <td>
-                <span class="ui-badge" [class]="movementBadgeClass(movement)">
-                  {{ movement.movementType }}
-                </span>
-              </td>
-              <td class="cell-number">
-                {{ movement.quantity | number: "1.0-3" }}
-              </td>
-              <td>
-                <span
-                  class="delta"
-                  [class.delta--in]="stockDelta(movement) > 0"
-                  [class.delta--out]="stockDelta(movement) < 0"
+          <div class="kardex-filters__row kardex-filters__row--secondary">
+            <label class="ui-field">
+              <span>Almacén</span>
+              <select formControlName="warehouseId" [title]="selectedWarehouseTitle">
+                <option [ngValue]="null">Todos</option>
+                <option
+                  *ngFor="let warehouse of warehouses"
+                  [ngValue]="warehouse.id"
+                  [title]="warehouseTitle(warehouse)"
                 >
-                  {{ stockDelta(movement) | number: "1.0-3" }}
-                </span>
-              </td>
-              <td class="cell-number">
-                {{ movement.previousStock | number: "1.0-3" }}
-              </td>
-              <td class="cell-number">
-                {{ movement.newStock | number: "1.0-3" }}
-              </td>
-              <td>{{ movement.reason }}</td>
-              <td>{{ movement.createdBy || "-" }}</td>
-            </tr>
-            <tr *ngIf="movements.length === 0">
-              <td colspan="10" class="ui-table__empty">
-                <div class="ui-empty-state">
-                  No hay movimientos para los filtros seleccionados.
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+                  {{ warehouseDisplayLabel(warehouse) }}
+                </option>
+              </select>
+            </label>
+
+            <label class="ui-field">
+              <span>Desde</span>
+              <input type="date" formControlName="from" />
+            </label>
+
+            <label class="ui-field">
+              <span>Hasta</span>
+              <input type="date" formControlName="to" />
+            </label>
+
+            <div class="kardex-actions">
+              <button
+                type="submit"
+                class="ui-button ui-button--primary"
+                [disabled]="loading"
+              >
+                Buscar
+              </button>
+              <button
+                type="button"
+                class="ui-button ui-button--secondary"
+                (click)="clearFilters()"
+                [disabled]="loading"
+              >
+                Limpiar
+              </button>
+            </div>
+          </div>
+
+          <p class="field-error field-error--visible" *ngIf="dateRangeErrorMessage">
+            {{ dateRangeErrorMessage }}
+          </p>
+        </form>
+      </section>
+
+      <section class="ui-module-section">
+        <header class="ui-module-section__head">
+          <h2 class="ui-module-section__title">Detalle de movimientos</h2>
+          <span class="ui-chip ui-chip--neutral">{{ totalElements }} registros</span>
+        </header>
+
+        <p class="ui-alert ui-alert--info" *ngIf="loading">Consultando movimientos...</p>
+
+        <div class="ui-table-wrapper kardex-table-wrapper" *ngIf="!loading">
+          <table class="ui-table kardex-table">
+            <colgroup>
+              <col class="col-date" />
+              <col class="col-product" />
+              <col class="col-warehouse" />
+              <col class="col-movement" />
+              <col class="col-quantity" />
+              <col class="col-variation" />
+              <col class="col-stock-before" />
+              <col class="col-stock-after" />
+              <col class="col-reason" />
+              <col class="col-user" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Producto</th>
+                <th>Almacén</th>
+                <th>Movimiento</th>
+                <th>Cantidad</th>
+                <th>Variación</th>
+                <th>Stock antes</th>
+                <th>Stock después</th>
+                <th>Motivo</th>
+                <th>Usuario</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let row of movements">
+                <td class="cell-date" [title]="formatDateTime(row.createdAt)">
+                  {{ row.createdAt | date: "dd/MM/yyyy HH:mm" }}
+                </td>
+                <td class="cell-product" [title]="productTitle(row)">
+                  <div class="cell-product__body">
+                    <strong>{{ row.productName || productFallback(row.productId) }}</strong>
+                    <span *ngIf="row.productSku || row.productBarcode">
+                      {{ productSubtitle(row) }}
+                    </span>
+                  </div>
+                </td>
+                <td class="cell-warehouse" [title]="warehouseTitleFromRow(row)">
+                  <div class="cell-warehouse__body">
+                    {{ row.warehouseName || warehouseFallback(row.warehouseId) }}
+                  </div>
+                </td>
+                <td>
+                  <span
+                    class="ui-chip"
+                    [ngClass]="movementChipClass(row.movementType)"
+                    [title]="row.movementType"
+                  >
+                    {{ movementLabel(row.movementType) }}
+                  </span>
+                </td>
+                <td class="cell-number">
+                  {{ numberOf(row.quantity) | number: "1.0-3" }}
+                </td>
+                <td class="cell-number">
+                  <span
+                    class="variation"
+                    [class.variation--positive]="stockDelta(row) > 0"
+                    [class.variation--negative]="stockDelta(row) < 0"
+                    [title]="stockDelta(row) > 0 ? 'Variación positiva' : stockDelta(row) < 0 ? 'Variación negativa' : 'Sin variación'"
+                  >
+                    {{ stockDelta(row) > 0 ? '+' : '' }}{{ numberOf(stockDelta(row)) | number: "1.0-3" }}
+                  </span>
+                </td>
+                <td class="cell-number">
+                  {{ numberOf(row.previousStock) | number: "1.0-3" }}
+                </td>
+                <td class="cell-number">
+                  {{ numberOf(row.newStock) | number: "1.0-3" }}
+                </td>
+                <td class="cell-reason" [title]="row.reason || '-'">
+                  {{ row.reason || '-' }}
+                </td>
+                <td class="cell-user">{{ row.createdBy || '-' }}</td>
+              </tr>
+              <tr *ngIf="!loading && movements.length === 0">
+                <td colspan="10" class="ui-table__empty">
+                  <div class="ui-empty-state">
+                    No hay movimientos para los filtros seleccionados.
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <footer class="pagination" *ngIf="!loading">
+          <p class="ui-muted pagination-copy">
+            Pagina {{ page + 1 }} de {{ totalPages }} - {{ totalElements }} resultados
+          </p>
+
+          <div class="pagination-actions">
+            <div class="page-jump" *ngIf="totalPages > 1">
+              <label class="page-jump__label" for="pageJumpInput">Ir a pág.</label>
+              <input
+                id="pageJumpInput"
+                class="page-jump__input"
+                type="text"
+                inputmode="numeric"
+                pattern="[0-9]*"
+                [value]="pageJumpValue"
+                (input)="onPageJumpInput($event)"
+                (keydown)="onPageJumpKeydown($event)"
+                [attr.aria-invalid]="!isPageJumpValid()"
+                [disabled]="loading"
+              />
+              <button
+                type="button"
+                class="ui-button ui-button--secondary page-jump__button"
+                (click)="goToPageJump()"
+                [disabled]="!isPageJumpValid() || loading"
+              >
+                Ir
+              </button>
+            </div>
+
+            <button
+              type="button"
+              class="ui-button ui-button--secondary"
+              (click)="previousPage()"
+              [disabled]="page === 0 || loading"
+            >
+              Anterior
+            </button>
+            <button
+              type="button"
+              class="ui-button ui-button--secondary"
+              (click)="nextPage()"
+              [disabled]="page + 1 >= totalPages || loading"
+            >
+              Siguiente
+            </button>
+          </div>
+        </footer>
+      </section>
     </section>
   `,
   styles: [
     `
-      .inventory-page {
-        padding: var(--space-5);
+      .kardex-filters {
         display: grid;
-        gap: var(--space-4);
-      }
-
-      .filters-grid {
-        display: grid;
-        grid-template-columns: repeat(6, minmax(150px, 1fr));
         gap: var(--space-3);
-        align-items: end;
-        border: 1px solid var(--color-border-default);
-        border-radius: var(--radius-md);
-        background: var(--color-bg-soft);
-        padding: var(--space-3);
       }
 
-      .field {
+      .kardex-filters__row {
         display: grid;
-        gap: var(--space-1);
+        gap: var(--space-3);
       }
 
-      .field > span {
-        font-size: var(--font-size-sm);
-        font-weight: 700;
-        color: var(--color-text-secondary);
+      .kardex-filters__row--product {
+        grid-template-columns: minmax(0, 1fr);
       }
 
-      input,
-      select {
-        padding: 0.6rem 0.7rem;
-        border: 1px solid var(--color-border-strong);
-        border-radius: var(--radius-sm);
+      .kardex-filters__row--secondary {
+        grid-template-columns: minmax(180px, 1.1fr) repeat(2, minmax(160px, 0.8fr)) auto;
+        align-items: end;
       }
 
-      .field-action {
+      .kardex-actions {
         display: flex;
+        gap: var(--space-2);
         justify-content: flex-end;
+        flex-wrap: wrap;
+      }
+
+      .field-error {
+        min-height: 1rem;
+        color: var(--color-danger);
+        font-size: var(--font-size-xs);
+        visibility: hidden;
+      }
+
+      .field-error--visible {
+        visibility: visible;
+      }
+
+      .kardex-table-wrapper {
+        overflow-x: auto;
       }
 
       .kardex-table {
-        min-width: 1380px;
+        table-layout: fixed;
+        min-width: 1500px;
+      }
+
+      .kardex-table th,
+      .kardex-table td {
+        vertical-align: top;
+      }
+
+      .kardex-table td {
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .kardex-table .col-date {
+        width: 9rem;
+      }
+
+      .kardex-table .col-product {
+        width: 24rem;
+      }
+
+      .kardex-table .col-warehouse {
+        width: 8.5rem;
+      }
+
+      .kardex-table .col-movement {
+        width: 10.5rem;
+      }
+
+      .kardex-table .col-quantity {
+        width: 6rem;
+      }
+
+      .kardex-table .col-variation {
+        width: 6.75rem;
+      }
+
+      .kardex-table .col-stock-before,
+      .kardex-table .col-stock-after {
+        width: 7rem;
+      }
+
+      .kardex-table .col-reason {
+        width: 9rem;
+      }
+
+      .kardex-table .col-user {
+        width: 8rem;
       }
 
       .cell-date,
-      .cell-number {
+      .cell-number,
+      .cell-warehouse,
+      .cell-user {
         white-space: nowrap;
       }
 
@@ -211,31 +374,86 @@ import { WarehouseService } from "./data/warehouse.service";
         text-align: right;
       }
 
-      .delta {
+      .cell-reason,
+      .cell-user {
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .cell-product__body,
+      .cell-warehouse__body {
+        display: grid;
+        gap: 0.15rem;
+        min-width: 0;
+      }
+
+      .cell-product__body strong,
+      .cell-warehouse__body {
+        color: var(--color-text-primary);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .cell-product__body span {
+        color: var(--color-text-secondary);
+        font-size: var(--font-size-xs);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .cell-warehouse__body {
+        white-space: nowrap;
+      }
+
+      .variation {
         font-weight: 700;
       }
 
-      .delta--in {
+      .variation--positive {
         color: var(--color-success);
       }
 
-      .delta--out {
+      .variation--negative {
         color: var(--color-danger);
       }
 
-      .ui-badge--movement-in {
-        background: #dcfce7;
-        color: var(--color-success);
+      .pagination {
+        margin-top: var(--space-4);
+        display: flex;
+        gap: var(--space-3);
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
       }
 
-      .ui-badge--movement-out {
-        background: #fee2e2;
-        color: var(--color-danger);
+      .pagination-copy {
+        margin: 0;
       }
 
-      .ui-badge--movement-neutral {
-        background: #dbeafe;
-        color: var(--color-info);
+      .pagination-actions {
+        display: flex;
+        gap: var(--space-2);
+        justify-content: flex-end;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+
+      .page-jump {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+      }
+
+      .page-jump__label {
+        font-size: var(--font-size-sm);
+        color: var(--color-text-secondary);
+        white-space: nowrap;
+      }
+
+      .page-jump__input {
+        width: 5rem;
       }
 
       .ui-button[disabled] {
@@ -244,54 +462,282 @@ import { WarehouseService } from "./data/warehouse.service";
       }
 
       @media (max-width: 1200px) {
-        .inventory-page {
-          padding: var(--space-4);
-        }
-
-        .filters-grid {
+        .kardex-filters__row--secondary {
           grid-template-columns: 1fr;
         }
 
-        .field-action {
+        .kardex-actions {
           justify-content: flex-start;
         }
       }
     `,
   ],
 })
-export class KardexPageComponent implements OnInit {
-  readonly filtersForm = this.formBuilder.group({
-    productId: [null as number | null],
-    warehouseId: [null as number | null],
-    from: [""],
-    to: [""],
-  });
+export class KardexPageComponent implements OnInit, OnDestroy {
+  readonly filtersForm = this.formBuilder.group(
+    {
+      productId: [null as number | null],
+      warehouseId: [null as number | null],
+      from: [""],
+      to: [""],
+    },
+    { validators: [this.dateRangeValidator()] },
+  );
 
-  products: Product[] = [];
+  @ViewChild(ProductAutocompleteComponent)
+  private productAutocomplete?: ProductAutocompleteComponent;
+
+  readonly destroy$ = new Subject<void>();
+
+  selectedProduct: ProductLookupResponse | null = null;
   warehouses: WarehouseResponse[] = [];
   movements: InventoryMovementResponse[] = [];
-
+  page = 0;
+  pageSize = 20;
+  totalPages = 1;
+  totalElements = 0;
+  pageJumpValue = "";
   loading = true;
   errorMessage = "";
+  dateRangeErrorMessage = "";
 
   constructor(
     private readonly formBuilder: FormBuilder,
-    private readonly productService: ProductService,
     private readonly warehouseService: WarehouseService,
     private readonly inventoryService: InventoryService,
   ) {}
 
   ngOnInit(): void {
-    this.loadLookupsAndSearch();
+    this.loadWarehouses();
+    this.loadMovements();
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   search(): void {
-    const value = this.filtersForm.getRawValue();
-    if (value.from && value.to && value.from > value.to) {
-      this.errorMessage =
-        "El rango de fechas es invalido: desde no puede ser mayor que hasta.";
+    this.errorMessage = "";
+    this.dateRangeErrorMessage = "";
+
+    if (this.filtersForm.invalid) {
+      this.filtersForm.markAllAsTouched();
+      if (this.filtersForm.hasError("invalidDateRange")) {
+        this.dateRangeErrorMessage = "La fecha Desde no puede ser mayor que Hasta.";
+      }
       return;
     }
+
+    this.page = 0;
+    this.loadMovements();
+  }
+
+  clearFilters(): void {
+    this.filtersForm.reset({
+      productId: null,
+      warehouseId: null,
+      from: "",
+      to: "",
+    });
+    this.selectedProduct = null;
+    this.dateRangeErrorMessage = "";
+    this.errorMessage = "";
+    this.page = 0;
+    this.pageJumpValue = "";
+    this.productAutocomplete?.clear();
+    this.loadMovements();
+  }
+
+  previousPage(): void {
+    if (this.page === 0) {
+      return;
+    }
+
+    this.page -= 1;
+    this.pageJumpValue = String(this.page + 1);
+    this.loadMovements();
+  }
+
+  nextPage(): void {
+    if (this.page + 1 >= this.totalPages) {
+      return;
+    }
+
+    this.page += 1;
+    this.pageJumpValue = String(this.page + 1);
+    this.loadMovements();
+  }
+
+  onPageJumpInput(event: Event): void {
+    const input = event.target as HTMLInputElement | null;
+    if (!input) {
+      return;
+    }
+
+    const sanitized = input.value.replace(/\D+/g, "");
+    if (input.value !== sanitized) {
+      input.value = sanitized;
+    }
+
+    this.pageJumpValue = sanitized;
+  }
+
+  onPageJumpKeydown(event: KeyboardEvent): void {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      this.goToPageJump();
+      return;
+    }
+
+    if (
+      event.ctrlKey ||
+      event.metaKey ||
+      event.altKey ||
+      ["Backspace", "Delete", "Tab", "Escape", "ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)
+    ) {
+      return;
+    }
+
+    if (/^[0-9]$/.test(event.key)) {
+      return;
+    }
+
+    event.preventDefault();
+  }
+
+  isPageJumpValid(): boolean {
+    if (this.totalPages <= 1) {
+      return false;
+    }
+
+    const value = Number(this.pageJumpValue);
+    return Number.isInteger(value) && value >= 1 && value <= this.totalPages;
+  }
+
+  goToPageJump(): void {
+    if (!this.isPageJumpValid()) {
+      return;
+    }
+
+    const targetPage = Number(this.pageJumpValue) - 1;
+    if (targetPage === this.page) {
+      return;
+    }
+
+    this.page = targetPage;
+    this.loadMovements();
+  }
+
+  onProductSelected(product: ProductLookupResponse): void {
+    this.selectedProduct = product;
+    this.filtersForm.patchValue({ productId: product.id });
+  }
+
+  clearProductSelection(): void {
+    this.selectedProduct = null;
+    this.filtersForm.patchValue({ productId: null });
+  }
+
+  warehouseDisplayLabel(warehouse: WarehouseResponse): string {
+    return warehouse.name?.trim() || warehouse.code?.trim() || "Selecciona un almacén";
+  }
+
+  warehouseTitle(warehouse: WarehouseResponse): string {
+    const name = warehouse.name?.trim() || "";
+    const code = warehouse.code?.trim() || "";
+    return code && name ? `${code} - ${name}` : code || name || "Selecciona un almacén";
+  }
+
+  get selectedWarehouseTitle(): string {
+    const warehouseId = this.filtersForm.getRawValue().warehouseId;
+    const warehouse = this.warehouses.find((item) => item.id === warehouseId);
+    return warehouse ? this.warehouseTitle(warehouse) : "Todos";
+  }
+
+  movementLabel(movementType: string): string {
+    const map: Record<MovementKind, string> = {
+      INITIAL_STOCK: "Stock inicial",
+      ADJUSTMENT_IN: "Ajuste positivo",
+      ADJUSTMENT_OUT: "Ajuste negativo",
+      TRANSFER_IN: "Transferencia entrada",
+      TRANSFER_OUT: "Transferencia salida",
+      PURCHASE_IN: "Compra",
+      SALE_OUT: "Venta",
+      SALE_VOID_IN: "Anulación de venta",
+    };
+
+    return map[movementType as MovementKind] || movementType;
+  }
+
+  movementChipClass(movementType: string): string {
+    switch (movementType as MovementKind) {
+      case "SALE_OUT":
+      case "TRANSFER_OUT":
+        return "ui-chip--warning";
+      case "SALE_VOID_IN":
+      case "PURCHASE_IN":
+      case "TRANSFER_IN":
+      case "INITIAL_STOCK":
+        return "ui-chip--success";
+      case "ADJUSTMENT_IN":
+      case "ADJUSTMENT_OUT":
+        return "ui-chip--info";
+      default:
+        return "ui-chip--neutral";
+    }
+  }
+
+  stockDelta(movement: InventoryMovementResponse): number {
+    return Number(movement.newStock) - Number(movement.previousStock);
+  }
+
+  numberOf(value: unknown): number {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  formatDateTime(value: string): string {
+    return value ? new Date(value).toLocaleString() : "";
+  }
+
+  productTitle(row: InventoryMovementResponse): string {
+    return [
+      row.productName || this.productFallback(row.productId),
+      row.productSku ? `SKU: ${row.productSku}` : "",
+      row.productBarcode ? `Código: ${row.productBarcode}` : "",
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  }
+
+  productSubtitle(row: InventoryMovementResponse): string {
+    const parts = [];
+    if (row.productSku) {
+      parts.push(`SKU: ${row.productSku}`);
+    }
+    if (row.productBarcode) {
+      parts.push(`Código: ${row.productBarcode}`);
+    }
+    return parts.join(" · ");
+  }
+
+  warehouseTitleFromRow(row: InventoryMovementResponse): string {
+    return row.warehouseCode && row.warehouseName
+      ? `${row.warehouseCode} - ${row.warehouseName}`
+      : row.warehouseName || this.warehouseFallback(row.warehouseId);
+  }
+
+  productFallback(productId: number): string {
+    return `Producto #${productId}`;
+  }
+
+  warehouseFallback(warehouseId: number): string {
+    return `Almacén #${warehouseId}`;
+  }
+
+  private loadMovements(): void {
+    const value = this.filtersForm.getRawValue();
 
     this.loading = true;
     this.errorMessage = "";
@@ -302,82 +748,50 @@ export class KardexPageComponent implements OnInit {
         warehouseId: value.warehouseId ?? undefined,
         from: value.from ? value.from : undefined,
         to: value.to ? value.to : undefined,
+        page: this.page,
+        size: this.pageSize,
       })
+      .pipe(takeUntil(this.destroy$))
       .subscribe({
-        next: (movements) => {
+        next: (response) => {
           this.loading = false;
-          this.movements = movements;
+          this.movements = response.content;
+          this.page = response.number;
+          this.totalElements = response.totalElements;
+          this.totalPages = Math.max(response.totalPages, 1);
+          this.pageJumpValue = String(this.page + 1);
         },
         error: (error: unknown) => {
           this.loading = false;
-          this.errorMessage = toHttpErrorMessage(
-            error,
-            "No se pudo consultar el kardex.",
-          );
+          this.errorMessage = toHttpErrorMessage(error, "No se pudo consultar el kardex.");
         },
       });
   }
 
-  clearFilters(): void {
-    this.filtersForm.reset();
-    this.search();
+  private loadWarehouses(): void {
+    this.warehouseService
+      .list(true)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (warehouses) => {
+          this.warehouses = warehouses;
+        },
+        error: (error: unknown) => {
+          this.errorMessage = toHttpErrorMessage(error, "No se pudieron cargar almacenes.");
+        },
+      });
   }
 
-  resolveProductName(productId: number): string {
-    const product = this.products.find((item) => item.id === productId);
-    return product
-      ? `${product.name} (SKU: ${product.sku})`
-      : `Producto #${productId}`;
-  }
+  private dateRangeValidator(): ValidatorFn {
+    return (control): ValidationErrors | null => {
+      const from = String(control.get("from")?.value ?? "").trim();
+      const to = String(control.get("to")?.value ?? "").trim();
 
-  resolveWarehouseName(warehouseId: number): string {
-    const warehouse = this.warehouses.find((item) => item.id === warehouseId);
-    return warehouse
-      ? `${warehouse.code} - ${warehouse.name}`
-      : `Almacen #${warehouseId}`;
-  }
+      if (!from || !to) {
+        return null;
+      }
 
-  stockDelta(movement: InventoryMovementResponse): number {
-    return Number(movement.newStock) - Number(movement.previousStock);
-  }
-
-  movementBadgeClass(movement: InventoryMovementResponse): string {
-    const type = (movement.movementType || "").toUpperCase();
-    if (type.includes("OUT") || type.includes("VOID")) {
-      return "ui-badge--movement-out";
-    }
-
-    if (
-      type.includes("IN") ||
-      type.includes("INITIAL") ||
-      type.includes("ADJUST")
-    ) {
-      return "ui-badge--movement-in";
-    }
-
-    return "ui-badge--movement-neutral";
-  }
-
-  private loadLookupsAndSearch(): void {
-    this.loading = true;
-    this.errorMessage = "";
-
-    forkJoin({
-      productsPage: this.productService.list(0, 300),
-      warehouses: this.warehouseService.list(),
-    }).subscribe({
-      next: ({ productsPage, warehouses }) => {
-        this.products = productsPage.content;
-        this.warehouses = warehouses;
-        this.search();
-      },
-      error: (error: unknown) => {
-        this.loading = false;
-        this.errorMessage = toHttpErrorMessage(
-          error,
-          "No se pudieron cargar productos/almacenes.",
-        );
-      },
-    });
+      return from > to ? { invalidDateRange: true } : null;
+    };
   }
 }

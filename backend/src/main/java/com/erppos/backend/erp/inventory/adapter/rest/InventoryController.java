@@ -17,6 +17,7 @@ import com.erppos.backend.erp.inventory.domain.model.InventoryMovement;
 import com.erppos.backend.erp.inventory.domain.model.StockBalance;
 import com.erppos.backend.erp.inventory.domain.model.StockTransfer;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -38,9 +39,12 @@ import java.util.List;
 public class InventoryController {
 
     private final InventoryUseCase inventoryUseCase;
+    private final InventoryMovementResponseAssembler inventoryMovementResponseAssembler;
 
-    public InventoryController(InventoryUseCase inventoryUseCase) {
+    public InventoryController(InventoryUseCase inventoryUseCase,
+                               InventoryMovementResponseAssembler inventoryMovementResponseAssembler) {
         this.inventoryUseCase = inventoryUseCase;
+        this.inventoryMovementResponseAssembler = inventoryMovementResponseAssembler;
     }
 
     @GetMapping("/stocks")
@@ -94,17 +98,27 @@ public class InventoryController {
 
     @GetMapping("/kardex")
     @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR')")
-    public ResponseEntity<List<InventoryMovementResponse>> kardex(
+    public ResponseEntity<Page<InventoryMovementResponse>> kardex(
             @RequestParam(required = false) Long productId,
             @RequestParam(required = false) Long warehouseId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            Pageable pageable
     ) {
-        return ResponseEntity.ok(inventoryUseCase.kardex(productId, warehouseId, from, to).stream().map(this::toMovementResponse).toList());
+        Page<InventoryMovement> page = inventoryUseCase.kardex(productId, warehouseId, from, to, pageable);
+        return ResponseEntity.ok(new PageImpl<>(
+                inventoryMovementResponseAssembler.toResponses(page.getContent()),
+                pageable,
+                page.getTotalElements()
+        ));
     }
 
     private TransferStockItemCommand toTransferItemCommand(TransferItemRequest item) {
         return new TransferStockItemCommand(item.productId(), item.quantity());
+    }
+
+    private InventoryMovementResponse toMovementResponse(InventoryMovement movement) {
+        return inventoryMovementResponseAssembler.toResponses(List.of(movement)).get(0);
     }
 
     private StockResponse toStockResponse(StockBalance stockBalance) {
@@ -117,23 +131,6 @@ public class InventoryController {
                 stockBalance.quantity(),
                 stockBalance.version(),
                 stockBalance.updatedAt()
-        );
-    }
-
-    private InventoryMovementResponse toMovementResponse(InventoryMovement movement) {
-        return new InventoryMovementResponse(
-                movement.id(),
-                movement.productId(),
-                movement.warehouseId(),
-                movement.movementType(),
-                movement.quantity(),
-                movement.previousStock(),
-                movement.newStock(),
-                movement.reason(),
-                movement.referenceType(),
-                movement.referenceId(),
-                movement.createdAt(),
-                movement.createdBy()
         );
     }
 

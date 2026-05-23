@@ -7,7 +7,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDate;
-import java.util.List;
 
 public interface InventoryUseCase {
     Page<StockBalance> listStocks(Long productId, Long warehouseId, Pageable pageable);
@@ -17,5 +16,5 @@ public interface InventoryUseCase {
     InventoryMovement registerSaleOut(RegisterSaleOutCommand command);
     InventoryMovement registerSaleVoidIn(RegisterSaleVoidInCommand command);
     StockTransfer transfer(TransferStockCommand command);
-    List<InventoryMovement> kardex(Long productId, Long warehouseId, LocalDate from, LocalDate to);
+    Page<InventoryMovement> kardex(Long productId, Long warehouseId, LocalDate from, LocalDate to, Pageable pageable);
 }

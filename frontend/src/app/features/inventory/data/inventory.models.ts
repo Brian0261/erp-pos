@@ -47,7 +47,12 @@ export interface StockResponse {
 export interface InventoryMovementResponse {
   id: number;
   productId: number;
+  productName: string | null;
+  productSku: string | null;
+  productBarcode: string | null;
   warehouseId: number;
+  warehouseName: string | null;
+  warehouseCode: string | null;
   movementType: string;
   quantity: number;
   previousStock: number;
@@ -110,4 +115,6 @@ export interface KardexFilters {
   warehouseId?: number;
   from?: string;
   to?: string;
+  page?: number;
+  size?: number;
 }

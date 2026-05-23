@@ -67,7 +67,7 @@ export class InventoryService {
     );
   }
 
-  kardex(filters: KardexFilters): Observable<InventoryMovementResponse[]> {
+  kardex(filters: KardexFilters): Observable<PageResponse<InventoryMovementResponse>> {
     let params = new HttpParams();
 
     if (filters.productId !== undefined) {
@@ -86,7 +86,10 @@ export class InventoryService {
       params = params.set("to", filters.to);
     }
 
-    return this.http.get<InventoryMovementResponse[]>(
+    params = params.set("page", String(filters.page ?? 0));
+    params = params.set("size", String(filters.size ?? 20));
+
+    return this.http.get<PageResponse<InventoryMovementResponse>>(
       `${this.endpoint}/kardex`,
       {
         params,

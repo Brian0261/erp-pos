@@ -7,6 +7,7 @@ import org.springframework.test.web.servlet.MvcResult;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -67,7 +68,7 @@ class BtRulesIntegrationTest extends AbstractHttpIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn();
 
-        JsonNode movements = readJson(kardex);
+        JsonNode movements = readJson(kardex).path("content");
         int initialStockCount = 0;
         for (JsonNode movement : movements) {
             if ("INITIAL_STOCK".equals(movement.path("movementType").asText())) {
@@ -109,6 +110,59 @@ class BtRulesIntegrationTest extends AbstractHttpIntegrationTest {
 
             assertTrue(result.getResponse().getStatus() != 500);
         }
+    }
+
+    @Test
+    void shouldReturnEnrichedKardexAndAcceptPartialDateFilters() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = Long.toString(System.nanoTime());
+
+        long categoryId = createCategory(adminToken, suffix);
+        long unitId = createUnit(adminToken, suffix);
+        long warehouseId = createWarehouse(adminToken, suffix);
+        long productId = createProduct(adminToken, categoryId, unitId, suffix, new BigDecimal("15.00"));
+
+        registerInitialStock(adminToken, productId, warehouseId, new BigDecimal("7.00"), "Kardex seed");
+
+        LocalDate today = LocalDate.now(ZoneOffset.UTC);
+
+        JsonNode fromOnly = readJson(mockMvc.perform(get("/api/v1/inventory/kardex")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
+                        .param("productId", String.valueOf(productId))
+                        .param("from", today.minusDays(1).toString()))
+                .andExpect(status().isOk())
+                .andReturn()).path("content");
+        assertEquals(1, fromOnly.size());
+        assertEquals("Producto IT " + suffix, fromOnly.get(0).path("productName").asText());
+        assertEquals("SKU-IT-" + suffix, fromOnly.get(0).path("productSku").asText());
+        assertEquals("BC-IT-" + suffix, fromOnly.get(0).path("productBarcode").asText());
+        assertEquals("Warehouse IT " + suffix, fromOnly.get(0).path("warehouseName").asText());
+        assertEquals("WIT" + suffix, fromOnly.get(0).path("warehouseCode").asText());
+
+        assertEquals(200, mockMvc.perform(get("/api/v1/inventory/kardex")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
+                        .param("productId", String.valueOf(productId))
+                        .param("to", today.plusDays(1).toString()))
+                .andReturn().getResponse().getStatus());
+
+        assertEquals(200, mockMvc.perform(get("/api/v1/inventory/kardex")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
+                        .param("productId", String.valueOf(productId))
+                        .param("from", today.minusDays(1).toString())
+                        .param("to", today.plusDays(1).toString()))
+                .andReturn().getResponse().getStatus());
+
+        assertEquals(200, mockMvc.perform(get("/api/v1/inventory/kardex")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
+                        .param("productId", String.valueOf(productId)))
+                .andReturn().getResponse().getStatus());
+
+        assertEquals(422, mockMvc.perform(get("/api/v1/inventory/kardex")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
+                        .param("productId", String.valueOf(productId))
+                        .param("from", today.plusDays(1).toString())
+                        .param("to", today.toString()))
+                .andReturn().getResponse().getStatus());
     }
 
     @Test
