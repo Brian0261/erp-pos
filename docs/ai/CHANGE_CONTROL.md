@@ -19,6 +19,7 @@ Estandarizar cambios tecnicos para reducir regresiones y mantener trazabilidad e
  11. En Inventario/Kardex, documentar cambios de auditoria cuando el endpoint se enriquezca con nombres operativos, el frontend use paginacion server-side, un solo Limpiar y tabla alineada sin tocar el contrato base `/api/v1/inventory/kardex`.
 12. En Inventario, documentar la consolidacion del autocomplete compartido cuando `Stock` use `filterMode=true`, `disabled` reactivo y limpieza visual final sin textos redundantes bajo Producto.
 13. En Compras, documentar el rediseño UX/UI de Proveedores cuando la pantalla pase a tabla principal con drawer/modal local para crear/editar y confirmaciones del sistema para estados.
+14. En Compras, documentar el rediseño completo de Órdenes de compra en 5 fases cuando el flujo pase de listado → nueva → edición → detalle → recepción con tablas operativas, ProductAutocompleteComponent, sanitización de cantidades/costos, ConfirmDialogService y formateo local Intl sin tocar backend, endpoints ni contratos.
 
 ## Tipos de commit sugeridos (cuando se autorice commit)
 

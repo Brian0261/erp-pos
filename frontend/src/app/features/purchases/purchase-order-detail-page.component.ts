@@ -4,15 +4,22 @@ import { ActivatedRoute, Router, RouterLink } from "@angular/router";
 import { forkJoin } from "rxjs";
 
 import { AuthService } from "../../core/auth/auth.service";
+import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.service";
 import { ProductService } from "../catalog/data/product.service";
 import { WarehouseService } from "../inventory/data/warehouse.service";
 import { toHttpErrorMessage } from "./data/http-error-message";
 import {
+  PurchaseOrderItemResponse,
   PurchaseOrderResponse,
   PurchaseOrderStatus,
 } from "./data/purchases.models";
 import { PurchaseOrderService } from "./data/purchase-order.service";
 import { SupplierService } from "./data/supplier.service";
+
+type ProductDisplayInfo = {
+  primary: string;
+  secondary: string;
+};
 
 @Component({
   selector: "app-purchase-order-detail-page",
@@ -63,19 +70,23 @@ import { SupplierService } from "./data/supplier.service";
           <h2>Datos generales</h2>
           <p>
             <span class="label">Proveedor</span>
-            <strong>{{ supplierName(order.supplierId) }}</strong>
+            <strong class="text-ellipsis" [title]="supplierName(order.supplierId)">
+              {{ supplierName(order.supplierId) }}
+            </strong>
           </p>
           <p>
             <span class="label">Almacen</span>
-            <strong>{{ warehouseName(order.warehouseId) }}</strong>
+            <strong class="text-ellipsis" [title]="warehouseTitle(order.warehouseId)">
+              {{ warehouseName(order.warehouseId) }}
+            </strong>
           </p>
           <p>
             <span class="label">Fecha orden</span>
-            <strong>{{ order.orderDate | date: "yyyy-MM-dd" }}</strong>
+            <strong>{{ formatLocalDate(orderDateValue()) }}</strong>
           </p>
           <p *ngIf="order.expectedDate">
             <span class="label">Fecha esperada</span>
-            <strong>{{ order.expectedDate | date: "yyyy-MM-dd" }}</strong>
+            <strong>{{ formatLocalDate(order.expectedDate) }}</strong>
           </p>
         </article>
 
@@ -83,17 +94,15 @@ import { SupplierService } from "./data/supplier.service";
           <h2>Totales y seguimiento</h2>
           <p>
             <span class="label">Total</span>
-            <strong class="amount">{{
-              order.totalAmount | number: "1.2-2"
-            }}</strong>
+            <strong class="amount">{{ formatCurrency(totalAmountValue()) }}</strong>
           </p>
           <p>
             <span class="label">Actualizado</span>
-            <strong>{{ order.updatedAt | date: "yyyy-MM-dd HH:mm" }}</strong>
+            <strong>{{ formatLocalDateTime(order.updatedAt) || "-" }}</strong>
           </p>
           <p *ngIf="order.notes">
             <span class="label">Notas</span>
-            <strong>{{ order.notes }}</strong>
+            <strong class="text-ellipsis" [title]="order.notes">{{ order.notes }}</strong>
           </p>
         </article>
       </section>
@@ -137,31 +146,45 @@ import { SupplierService } from "./data/supplier.service";
 
       <div class="ui-table-wrapper">
         <table class="ui-table detail-table">
+          <colgroup>
+            <col class="col-index" />
+            <col class="col-product" />
+            <col class="col-qty" />
+            <col class="col-qty" />
+            <col class="col-qty" />
+            <col class="col-money" />
+            <col class="col-money" />
+          </colgroup>
           <thead>
             <tr>
-              <th>Item</th>
-              <th>Producto</th>
-              <th>Ordenado</th>
-              <th>Recibido</th>
-              <th>Pendiente</th>
-              <th>Costo unit.</th>
-              <th>Subtotal</th>
+              <th class="th-index">Item</th>
+              <th class="th-product">Producto</th>
+              <th class="th-number">Ordenado</th>
+              <th class="th-number">Recibido</th>
+              <th class="th-number">Pendiente</th>
+              <th class="th-number">Costo unit.</th>
+              <th class="th-number">Subtotal</th>
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let item of order.items; let index = index">
-              <td>{{ index + 1 }}</td>
-              <td>{{ productName(item.productId) }}</td>
-              <td>{{ item.quantityOrdered | number: "1.3-3" }}</td>
-              <td>{{ item.quantityReceived | number: "1.3-3" }}</td>
-              <td>
-                {{
-                  pending(item.quantityOrdered, item.quantityReceived)
-                    | number: "1.3-3"
-                }}
+            <tr *ngFor="let item of orderItems(); let index = index">
+              <td class="cell-index">{{ index + 1 }}</td>
+              <td class="cell-product" [title]="productTitle(item.productId)">
+                <strong>{{ productName(item.productId) }}</strong>
+                <span *ngIf="productSecondary(item.productId)">
+                  {{ productSecondary(item.productId) }}
+                </span>
               </td>
-              <td>{{ item.unitCost | number: "1.2-4" }}</td>
-              <td>{{ item.lineTotal | number: "1.2-2" }}</td>
+              <td class="cell-number">{{ formatQuantity(item.quantityOrdered) }}</td>
+              <td class="cell-number">{{ formatQuantity(item.quantityReceived) }}</td>
+              <td class="cell-number">{{ formatQuantity(pending(item.quantityOrdered, item.quantityReceived)) }}</td>
+              <td class="cell-number">{{ formatCurrency(item.unitCost) }}</td>
+              <td class="cell-number">{{ formatCurrency(itemLineTotal(item)) }}</td>
+            </tr>
+            <tr *ngIf="orderItems().length === 0">
+              <td colspan="7" class="ui-table__empty">
+                <div class="ui-empty-state">No hay ítems registrados para esta orden.</div>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -263,14 +286,86 @@ import { SupplierService } from "./data/supplier.service";
         font-size: 1.25rem;
       }
 
+      .text-ellipsis {
+        display: block;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .detail-table {
+        min-width: 1080px;
+        table-layout: fixed;
+      }
+
+      .detail-table .col-index {
+        width: 4.5rem;
+      }
+
+      .detail-table .col-product {
+        width: 42%;
+      }
+
+      .detail-table .col-qty {
+        width: 8.5rem;
+      }
+
+      .detail-table .col-money {
+        width: 9.5rem;
+      }
+
+      .detail-table th,
+      .detail-table td {
+        vertical-align: top;
+      }
+
+      .detail-table th {
+        text-align: center;
+      }
+
+      .detail-table th.th-product,
+      .detail-table td.cell-product {
+        text-align: left;
+      }
+
+      .detail-table th.th-index,
+      .detail-table td.cell-index {
+        text-align: center;
+      }
+
+      .cell-index {
+        white-space: nowrap;
+        font-weight: 700;
+      }
+
+      .cell-product {
+        display: grid;
+        gap: 0.15rem;
+        min-width: 0;
+      }
+
+      .cell-product strong,
+      .cell-product span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .cell-product span {
+        color: var(--color-text-secondary);
+        font-size: var(--font-size-xs);
+      }
+
+      .cell-number {
+        white-space: nowrap;
+        text-align: center;
+        font-variant-numeric: tabular-nums;
+      }
+
       .workflow-actions {
         display: flex;
         flex-wrap: wrap;
         gap: var(--space-2);
-      }
-
-      .detail-table {
-        min-width: 980px;
       }
 
       .ui-button[disabled] {
@@ -305,7 +400,7 @@ export class PurchaseOrderDetailPageComponent implements OnInit {
 
   supplierNames = new Map<number, string>();
   warehouseNames = new Map<number, string>();
-  productNames = new Map<number, string>();
+  productNames = new Map<number, ProductDisplayInfo>();
 
   loading = false;
   savingAction = false;
@@ -322,6 +417,7 @@ export class PurchaseOrderDetailPageComponent implements OnInit {
     private readonly warehouseService: WarehouseService,
     private readonly productService: ProductService,
     private readonly authService: AuthService,
+    private readonly confirmDialog: ConfirmDialogService,
   ) {}
 
   ngOnInit(): void {
@@ -336,12 +432,21 @@ export class PurchaseOrderDetailPageComponent implements OnInit {
     this.loadOrder(id);
   }
 
-  approve(): void {
+  async approve(): Promise<void> {
     if (!this.order || !this.canManage || this.order.status !== "DRAFT") {
       return;
     }
 
-    if (!window.confirm(`Aprobar la orden #${this.order.id}?`)) {
+    const confirmed = await this.confirmDialog.confirm({
+      title: "Aprobar orden",
+      description: `Vas a aprobar la orden #${this.order.id}. Esta accion avanza el flujo hacia recepcion.`,
+      highlightText: `Orden #${this.order.id}`,
+      confirmText: "Aprobar orden",
+      cancelText: "Cancelar",
+      variant: "info",
+    });
+
+    if (!confirmed) {
       return;
     }
 
@@ -365,7 +470,7 @@ export class PurchaseOrderDetailPageComponent implements OnInit {
     });
   }
 
-  cancel(): void {
+  async cancel(): Promise<void> {
     if (
       !this.order ||
       !this.canManage ||
@@ -374,7 +479,16 @@ export class PurchaseOrderDetailPageComponent implements OnInit {
       return;
     }
 
-    if (!window.confirm(`Cancelar la orden #${this.order.id}?`)) {
+    const confirmed = await this.confirmDialog.confirm({
+      title: "Cancelar orden",
+      description: `Vas a cancelar la orden #${this.order.id}. La orden no seguira avanzando en el flujo.`,
+      highlightText: `Orden #${this.order.id}`,
+      confirmText: "Cancelar orden",
+      cancelText: "Volver",
+      variant: "warning",
+    });
+
+    if (!confirmed) {
       return;
     }
 
@@ -406,12 +520,110 @@ export class PurchaseOrderDetailPageComponent implements OnInit {
     return this.warehouseNames.get(warehouseId) ?? `Almacen #${warehouseId}`;
   }
 
+  warehouseTitle(warehouseId: number): string {
+    return this.warehouseNames.get(warehouseId) ?? `Almacen #${warehouseId}`;
+  }
+
   productName(productId: number): string {
-    return this.productNames.get(productId) ?? `Producto #${productId}`;
+    return this.productNames.get(productId)?.primary ?? `Producto #${productId}`;
+  }
+
+  productSecondary(productId: number): string {
+    return this.productNames.get(productId)?.secondary ?? "";
+  }
+
+  productTitle(productId: number): string {
+    const product = this.productNames.get(productId);
+    if (!product) {
+      return `Producto #${productId}`;
+    }
+
+    return product.secondary ? `${product.primary} - ${product.secondary}` : product.primary;
+  }
+
+  orderDateValue(): unknown {
+    return this.order?.orderDate ?? null;
+  }
+
+  totalAmountValue(): number {
+    const rawTotal = this.toNumber(this.order?.totalAmount);
+    if (rawTotal !== null) {
+      return rawTotal;
+    }
+
+    return this.orderItems().reduce(
+      (sum, item) => sum + this.itemLineTotal(item),
+      0,
+    );
+  }
+
+  orderItems(): PurchaseOrderItemResponse[] {
+    const rawItems = this.order?.items;
+    return Array.isArray(rawItems) ? rawItems : [];
+  }
+
+  itemLineTotal(item: PurchaseOrderItemResponse): number {
+    const lineTotal = this.toNumber(item.lineTotal);
+    if (lineTotal !== null) {
+      return lineTotal;
+    }
+
+    const quantity = this.toNumber(item.quantityOrdered) ?? 0;
+    const unitCost = this.toNumber(item.unitCost) ?? 0;
+    return quantity * unitCost;
   }
 
   pending(quantityOrdered: number, quantityReceived: number): number {
-    return Math.max(quantityOrdered - quantityReceived, 0);
+    const ordered = this.toNumber(quantityOrdered) ?? 0;
+    const received = this.toNumber(quantityReceived) ?? 0;
+    return Math.max(ordered - received, 0);
+  }
+
+  formatLocalDate(value: unknown): string {
+    const normalized = this.normalizeDateInput(value);
+    if (!normalized) {
+      return "-";
+    }
+
+    return new Intl.DateTimeFormat("es-PE", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    }).format(normalized);
+  }
+
+  formatLocalDateTime(value: unknown): string {
+    const normalized = this.normalizeDateInput(value);
+    if (!normalized) {
+      return "";
+    }
+
+    return new Intl.DateTimeFormat("es-PE", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(normalized);
+  }
+
+  formatCurrency(value: unknown): string {
+    const amount = this.toNumber(value) ?? 0;
+    return new Intl.NumberFormat("es-PE", {
+      style: "currency",
+      currency: "PEN",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(Number.isFinite(amount) ? amount : 0);
+  }
+
+  formatQuantity(value: unknown): string {
+    const amount = this.toNumber(value) ?? 0;
+    return new Intl.NumberFormat("es-PE", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 3,
+    }).format(Number.isFinite(amount) ? amount : 0);
   }
 
   statusLabel(status: PurchaseOrderStatus): string {
@@ -455,19 +667,30 @@ export class PurchaseOrderDetailPageComponent implements OnInit {
           suppliers.map((item) => [item.id, item.name]),
         );
         this.warehouseNames = new Map(
-          warehouses.map((item) => [item.id, `${item.code} - ${item.name}`]),
+          warehouses.map((item) => [
+            item.id,
+            item.name?.trim() || item.code?.trim() || `Almacen #${item.id}`,
+          ]),
         );
         this.productNames = new Map(
           productsPage.content.map((item) => [
             item.id,
-            `${item.name} (${item.sku})`,
+            {
+              primary: item.name,
+              secondary: [
+                item.sku ? `SKU: ${item.sku}` : "",
+                item.barcode ? `Código: ${item.barcode}` : "",
+              ]
+                .filter(Boolean)
+                .join(" | "),
+            },
           ]),
         );
       },
       error: () => {
-        this.supplierNames = new Map();
-        this.warehouseNames = new Map();
-        this.productNames = new Map();
+        this.supplierNames = new Map<number, string>();
+        this.warehouseNames = new Map<number, string>();
+        this.productNames = new Map<number, ProductDisplayInfo>();
       },
     });
   }
@@ -489,5 +712,65 @@ export class PurchaseOrderDetailPageComponent implements OnInit {
         );
       },
     });
+  }
+
+  private toNumber(value: unknown): number | null {
+    if (typeof value === "number") {
+      return Number.isFinite(value) ? value : null;
+    }
+
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (!trimmed) {
+        return null;
+      }
+
+      const numericValue = Number(trimmed);
+      return Number.isFinite(numericValue) ? numericValue : null;
+    }
+
+    return null;
+  }
+
+  private normalizeDateInput(value: unknown): Date | null {
+    if (!value) {
+      return null;
+    }
+
+    if (value instanceof Date) {
+      return Number.isNaN(value.getTime()) ? null : value;
+    }
+
+    if (typeof value === "number") {
+      const date = new Date(value);
+      return Number.isNaN(date.getTime()) ? null : date;
+    }
+
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (!trimmed) {
+        return null;
+      }
+
+      const isoDateMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (isoDateMatch) {
+        const [, year, month, day] = isoDateMatch;
+        return new Date(Number(year), Number(month) - 1, Number(day));
+      }
+
+      const date = new Date(trimmed);
+      return Number.isNaN(date.getTime()) ? null : date;
+    }
+
+    if (
+      Array.isArray(value) &&
+      (value.length === 3 || value.length >= 5) &&
+      value.every((part) => typeof part === "number")
+    ) {
+      const [year, month, day, hour = 0, minute = 0, second = 0] = value as number[];
+      return new Date(year, month - 1, day, hour, minute, second);
+    }
+
+    return null;
   }
 }

@@ -5,6 +5,7 @@ import { RouterLink } from "@angular/router";
 import { forkJoin } from "rxjs";
 
 import { AuthService } from "../../core/auth/auth.service";
+import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.service";
 import { WarehouseService } from "../inventory/data/warehouse.service";
 import { toHttpErrorMessage } from "./data/http-error-message";
 import {
@@ -100,7 +101,7 @@ import { SupplierService } from "./data/supplier.service";
         <table class="ui-table orders-table">
           <thead>
             <tr>
-              <th>ID</th>
+              <th>Orden</th>
               <th>Fecha orden</th>
               <th>Proveedor</th>
               <th>Almacen</th>
@@ -111,10 +112,10 @@ import { SupplierService } from "./data/supplier.service";
           </thead>
           <tbody>
             <tr *ngFor="let order of orders">
-              <td class="cell-id">#{{ order.id }}</td>
+              <td class="cell-order" [title]="'Orden #' + order.id">#{{ order.id }}</td>
               <td>{{ order.orderDate | date: "yyyy-MM-dd" }}</td>
-              <td>{{ supplierName(order.supplierId) }}</td>
-              <td>{{ warehouseName(order.warehouseId) }}</td>
+              <td class="cell-ellipsis" [title]="supplierName(order.supplierId)">{{ supplierName(order.supplierId) }}</td>
+              <td class="cell-ellipsis" [title]="warehouseName(order.warehouseId)">{{ warehouseName(order.warehouseId) }}</td>
               <td>
                 <span
                   class="ui-badge status-badge"
@@ -185,6 +186,10 @@ import { SupplierService } from "./data/supplier.service";
         gap: var(--space-4);
       }
 
+      .purchase-orders-page .ui-page-description {
+        white-space: nowrap;
+      }
+
       .filters-panel {
         display: grid;
         grid-template-columns: repeat(4, minmax(170px, 1fr));
@@ -219,6 +224,7 @@ import { SupplierService } from "./data/supplier.service";
         display: flex;
         gap: var(--space-2);
         flex-wrap: wrap;
+        align-items: center;
       }
 
       .orders-table {
@@ -260,9 +266,16 @@ import { SupplierService } from "./data/supplier.service";
         color: var(--color-danger);
       }
 
-      .cell-id {
+      .cell-order {
         white-space: nowrap;
         font-weight: 700;
+      }
+
+      .cell-ellipsis {
+        max-width: 14rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
 
       .amount {
@@ -330,6 +343,7 @@ export class PurchaseOrdersPageComponent implements OnInit {
     private readonly supplierService: SupplierService,
     private readonly warehouseService: WarehouseService,
     private readonly authService: AuthService,
+    private readonly confirmDialog: ConfirmDialogService,
   ) {}
 
   ngOnInit(): void {
@@ -347,12 +361,21 @@ export class PurchaseOrdersPageComponent implements OnInit {
     this.loadOrders();
   }
 
-  approve(order: PurchaseOrderResponse): void {
+  async approve(order: PurchaseOrderResponse): Promise<void> {
     if (!this.canApprove(order)) {
       return;
     }
 
-    if (!window.confirm(`Aprobar la orden #${order.id}?`)) {
+    const confirmed = await this.confirmDialog.confirm({
+      title: "Aprobar orden",
+      description: `Vas a aprobar la orden #${order.id}. Esta accion avanza el flujo hacia recepcion.`,
+      highlightText: `Orden #${order.id}`,
+      confirmText: "Aprobar orden",
+      cancelText: "Cancelar",
+      variant: "info",
+    });
+
+    if (!confirmed) {
       return;
     }
 
@@ -376,12 +399,21 @@ export class PurchaseOrdersPageComponent implements OnInit {
     });
   }
 
-  cancel(order: PurchaseOrderResponse): void {
+  async cancel(order: PurchaseOrderResponse): Promise<void> {
     if (!this.canCancel(order)) {
       return;
     }
 
-    if (!window.confirm(`Cancelar la orden #${order.id}?`)) {
+    const confirmed = await this.confirmDialog.confirm({
+      title: "Cancelar orden",
+      description: `Vas a cancelar la orden #${order.id}. La orden no seguira avanzando en el flujo.`,
+      highlightText: `Orden #${order.id}`,
+      confirmText: "Cancelar orden",
+      cancelText: "Volver",
+      variant: "warning",
+    });
+
+    if (!confirmed) {
       return;
     }
 
@@ -488,7 +520,10 @@ export class PurchaseOrdersPageComponent implements OnInit {
       next: ({ suppliers, warehouses }) => {
         this.suppliers = suppliers;
         this.warehouseNames = new Map(
-          warehouses.map((item) => [item.id, `${item.code} - ${item.name}`]),
+          warehouses.map((item) => [
+            item.id,
+            item.name?.trim() || item.code?.trim() || `Almacen #${item.id}`,
+          ]),
         );
       },
       error: (error: unknown) => {

@@ -259,6 +259,38 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [x] Kardex: paginacion server-side con `Anterior/Siguiente/Ir a pág.` y `pageSize=20`.
 - [x] Kardex: backend responde enriquecido con `productName/productSku/productBarcode` y `warehouseName/warehouseCode`.
 
+### Compras - Órdenes de compra rediseño Fases 1-5 (2026-05-23)
+
+- [ ] Listado: columna `Orden` muestra `#id`, almacén visible solo por nombre.
+- [ ] Listado: filtros manuales (estado, proveedor, fechas) siguen operativos.
+- [ ] Listado: Aprobar usa ConfirmDialogService y cambia estado a APROBADA.
+- [ ] Listado: Cancelar usa ConfirmDialogService y cambia estado a CANCELADA.
+- [ ] Nueva orden: Proveedor y Almacén con errores reservados sin desalineación.
+- [ ] Nueva orden: ProductAutocompleteComponent busca por nombre/SKU/código de barras.
+- [ ] Nueva orden: cantidad acepta `1`, `1.5`, `0.5` y rechaza `0`, `-1`, `e`, `E`, `+`, `-`, `,`, `0000`, `1.25`.
+- [ ] Nueva orden: costo unitario acepta `1`, `1.50`, `0.01` y rechaza `0`, `-1`, `e`, `E`, `+`, `-`, `,`, `0000`, `1.255`.
+- [ ] Nueva orden: subtotal y total estimado recalculan al cambiar cantidad/costo.
+- [ ] Nueva orden: crear orden genera DRAFT y redirige al detalle.
+- [ ] Editar orden: solo visible para órdenes DRAFT.
+- [ ] Editar orden: ProductAutocompleteComponent y sanitización igual a Nueva orden.
+- [ ] Editar orden: guardar actualiza y redirige al detalle.
+- [ ] Detalle: badge de estado legible (APROBADA, RECEPCIÓN PARCIAL, etc.).
+- [ ] Detalle: Proveedor, Almacén (solo nombre), Fecha orden dd/MM/yyyy, Total S/ visibles.
+- [ ] Detalle: tabla de ítems con colgroup, Producto con nombre + SKU/código secundario.
+- [ ] Detalle: Ordenado, Recibido, Pendiente, Costo unit., Subtotal alineados y centrados.
+- [ ] Detalle: líneas horizontales de filas rectas y continuas.
+- [ ] Detalle: Aprobar/Cancelar usan ConfirmDialogService.
+- [ ] Recepción: badge de estado legible y summary-grid con datos generales.
+- [ ] Recepción: Proveedor y Almacén (solo nombre) resueltos correctamente.
+- [ ] Recepción: Fecha orden dd/MM/yyyy y Total S/ visibles.
+- [ ] Recepción: tabla de pendientes con Item, Producto, Ordenado, Recibido, Pendiente, Recibir ahora.
+- [ ] Recepción: líneas horizontales de filas rectas y continuas.
+- [ ] Recepción: input Recibir ahora acepta `1`, `1.5`, `0.5` y rechaza `e`, `E`, `+`, `-`, `,`, `0000`.
+- [ ] Recepción: cantidad recibida no supera lo pendiente; error inline si excede.
+- [ ] Recepción: confirmar con todo en 0 muestra error global.
+- [ ] Recepción: ConfirmDialogService aparece antes de registrar recepción.
+- [ ] Recepción: registrar recepción redirige al detalle y actualiza estado.
+
 ### Compras - Proveedores UX rediseñada (2026-05-22)
 
 - [ ] Proveedores: la pantalla inicial muestra busqueda + tabla, sin formulario grande visible.
