@@ -90,15 +90,24 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 
 ### Inventario - Stock autocomplete Producto (2026-05-21)
 
+### Reutilizable - ProductAutocompleteComponent compartido (2026-05-22)
+
+- [ ] Buscar por nombre, SKU, código de barras y multi-palabra.
+- [ ] Navegar resultados con ArrowDown/ArrowUp.
+- [ ] Seleccionar con Enter y cerrar con Escape.
+- [ ] Limpiar selección/query con `clear()`.
+- [ ] Validar que la selección mantiene `productId` correcto en el padre.
+
+### Inventario - Stock autocomplete Producto (2026-05-22)
+
 - [ ] Stock: escribir 2+ caracteres en Producto y validar lookup server-side.
-- [ ] Stock: buscar por nombre y poder seleccionar resultado.
-- [ ] Stock: buscar por SKU y poder seleccionar resultado.
-- [ ] Stock: buscar por código de barras y poder seleccionar resultado.
+- [ ] Stock: buscar por nombre, SKU, código de barras y multi-palabra.
+- [ ] Stock: navegar con ArrowDown/ArrowUp, seleccionar con Enter y cerrar con Escape.
 - [ ] Stock: con menos de 2 caracteres no mostrar resultados útiles del lookup.
 - [ ] Stock: seleccionar producto y validar que el filtro siga enviando `productId` a `/api/v1/inventory/stocks`.
-- [ ] Stock: `Limpiar producto` vuelve a estado `Todos`.
-- [ ] Stock: `Limpiar` general resetea producto, almacén y filtros activos.
-- [ ] Stock: filtro por almacén sigue operativo junto al autocomplete.
+- [ ] Stock: `Limpiar` general resetea producto, almacén, pagina y resultados.
+- [ ] Stock: filtro por almacén sigue operativo junto al autocomplete y conserva producto seleccionado.
+- [ ] Stock: no mostrar `Todos`, `Producto filtrado` ni acciones redundantes bajo el autocomplete.
 - [ ] Stock: paginación sigue operativa con y sin producto seleccionado.
 - [ ] Stock: columna ID y Versión ocultas; fecha visible en formato `dd/MM/yyyy HH:mm`.
 
@@ -272,6 +281,33 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [ ] Transferencias: confirmar modal registra y deja formulario limpio.
 - [ ] Transferencias: post-success conserva almacenes si sigue siendo operativo y limpia motivo, buscador y lista.
 
+### Inventario - Carga inicial (2026-05-22)
+
+- [ ] Carga inicial: escribir 2+ caracteres en Producto y validar lookup server-side.
+- [ ] Carga inicial: buscar por nombre, SKU, código de barras y multi-palabra.
+- [ ] Carga inicial: seleccionar producto y registrar con cantidad entera positiva.
+- [ ] Carga inicial: `clear()`/Limpiar producto limpia selección y permite nueva búsqueda.
+
+### Inventario - Ajustes de stock (2026-05-22)
+
+- [ ] Ajustes: escribir 2+ caracteres en Producto y validar lookup server-side.
+- [ ] Ajustes: buscar por nombre, SKU, código de barras y multi-palabra.
+- [ ] Ajustes: seleccionar producto y registrar IN/OUT.
+- [ ] Ajustes: cantidad decimal positiva con maximo 1 decimal.
+- [ ] Ajustes: confirmacion OUT sigue apareciendo antes de registrar.
+
+### Inventario - Transferencias (2026-05-22)
+
+- [ ] Transferencias: autocomplete compartido mantiene lookup server-side y navegacion ArrowDown/ArrowUp/Enter/Escape.
+- [ ] Transferencias: agregar producto a la tabla de items sigue funcionando.
+- [ ] Transferencias: producto duplicado no se agrega silenciosamente.
+
+### Inventario - Kardex (2026-05-22)
+
+- [ ] Kardex: autocomplete compartido mantiene filtro por producto y paginacion server-side.
+- [ ] Kardex: un solo Limpiar global sigue reseteando filtros.
+- [ ] Kardex: tabla, columnas y fechas conservan formato esperado.
+
 ### Reutilizable - ProductAutocompleteComponent compartido (2026-05-22)
 
 - [ ] Validar debounce 250 ms y minimo 2 caracteres en el componente compartido.
@@ -279,7 +315,8 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [ ] Validar `scrollIntoView` del item activo en panel con resultados largos.
 - [ ] Validar sombreado hover/active con tokens InkToy.
 - [ ] Validar que `clear()` limpia query, resultados y seleccion sin romper el padre.
-- [ ] Validar que el componente no acopla Transferencias y se puede reutilizar luego en Stock, Stock inicial y Ajustes.
+- [ ] Validar que `disabled` reacciona cuando cambia desde el padre.
+- [ ] Validar que `filterMode=true` permite filtro editable en Stock sin romper selectoras.
 
 ### POS Touch-Friendly Fase 1.x - Cierre consolidado (2026-05-07)
 

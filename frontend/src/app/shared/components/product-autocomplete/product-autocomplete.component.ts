@@ -281,6 +281,7 @@ export class ProductAutocompleteComponent implements OnInit, OnDestroy {
   private internalSelectedProduct: ProductLookupResponse | null = null;
   private scrollFrame = 0;
   private lastEmittedQuery = "";
+  private _disabled = false;
 
   readonly queryControl = new FormControl("", { nonNullable: true });
 
@@ -288,11 +289,21 @@ export class ProductAutocompleteComponent implements OnInit, OnDestroy {
   @Input() minChars = 2;
   @Input() limit = 10;
   @Input() activeOnly = true;
-  @Input() disabled = false;
+  @Input()
+  set disabled(value: boolean) {
+    this._disabled = value;
+    this.syncDisabledState();
+  }
+
+  get disabled(): boolean {
+    return this._disabled;
+  }
+
   @Input() compact = false;
   @Input() allowClear = true;
   @Input() showSelectedCard = true;
   @Input() selectedProduct: ProductLookupResponse | null = null;
+  @Input() filterMode = false;
 
   @Output() productSelected = new EventEmitter<ProductLookupResponse>();
   @Output() cleared = new EventEmitter<void>();
@@ -471,6 +482,10 @@ export class ProductAutocompleteComponent implements OnInit, OnDestroy {
   }
 
   private handleSelectionMismatch(query: string): void {
+    if (this.filterMode) {
+      return;
+    }
+
     const label = this.displaySelectedProduct ? this.getProductLabel(this.displaySelectedProduct) : "";
     if (this.displaySelectedProduct && query !== label) {
       this.internalSelectedProduct = null;

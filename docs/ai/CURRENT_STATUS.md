@@ -29,11 +29,11 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
 - Modo claro/oscuro con persistencia local.
 - Rutas protegidas y experiencia RBAC validadas en QA.
 - Frontend desplegado via Nginx con proxy /api.
-- Stock de Inventario actualizado a autocomplete server-side para Producto, sin precarga masiva de catálogo y con tabla simplificada (sin ID/Versión, fecha `dd/MM/yyyy HH:mm`).
-- Ajustes de stock optimizado en frontend: autocomplete server-side, layout estable, almacén por nombre, cantidad decimal controlada con maximo 1 decimal, confirmacion propia y reset limpio post-success.
-- ProductAutocompleteComponent compartido creado en frontend y ya consumido por Transferencias con lookup server-side, navegacion teclado, item activo sombreado y clear reutilizable.
-- Transferencias migrado a lista/carrito operativo con autocomplete compartido, almacenes por nombre, tabla alineada Producto/Cantidad/Accion y confirmacion propia.
-- Kardex enriquecido: backend devuelve nombres operativos de producto/almacen; frontend usa autocomplete compartido, fechas locales, paginacion server-side, tabla alineada con wrappers internos y columnas de auditoria mas claras.
+- Stock de Inventario actualizado a `ProductAutocompleteComponent` compartido con `filterMode=true`, `disabled` reactivo, búsqueda editable por Producto, `Buscar` manual, auto-filtrado por Almacén y limpieza visual final sin `Todos` ni resumen inferior redundante.
+- Ajustes de stock optimizado en frontend: autocomplete compartido, layout estable, almacén por nombre, cantidad decimal controlada con maximo 1 decimal, confirmacion propia y reset limpio post-success.
+- ProductAutocompleteComponent compartido consolidado en Inventario con `disabled` reactivo y `filterMode` opt-in para pantallas filtro editables sin romper el comportamiento selector por defecto.
+- Transferencias migrado a lista/carrito operativo con autocomplete compartido, lookup server-side, navegación teclado, item activo sombreado, almacenes por nombre, tabla alineada Producto/Cantidad/Accion y confirmacion propia.
+- Kardex enriquecido: backend devuelve nombres operativos de producto/almacen; frontend usa autocomplete compartido, fechas locales, paginacion server-side, tabla alineada con wrappers internos y un solo Limpiar global.
 - Catalogo/Productos optimizado: busqueda multi-token en listado paginado, filtros reorganizados por prioridad, tabla compacta y acciones estables sin recorte.
 - POS con draft persistente frontend (`sessionStorage`) y UX afinada: rehidratacion por usuario/caja, Enter/Buscar unificados, búsqueda textual sin almacén, validacion de almacén para agregar/cobrar, select operativo por nombre y botones Agregar uniformes.
 

@@ -7,22 +7,11 @@ import {
   ValidationErrors,
   ValidatorFn,
   Validators,
-  FormControl,
 } from "@angular/forms";
-import { Subject, of } from "rxjs";
-import {
-  catchError,
-  debounceTime,
-  distinctUntilChanged,
-  finalize,
-  map,
-  switchMap,
-  takeUntil,
-  tap,
-} from "rxjs/operators";
+import { Subject, takeUntil } from "rxjs";
 
+import { ProductAutocompleteComponent } from "../../shared/components/product-autocomplete/product-autocomplete.component";
 import { ProductLookupResponse } from "../catalog/data/catalog.models";
-import { ProductService } from "../catalog/data/product.service";
 import { toHttpErrorMessage } from "./data/http-error-message";
 import { InventoryService } from "./data/inventory.service";
 import { WarehouseResponse } from "./data/inventory.models";
@@ -31,7 +20,7 @@ import { WarehouseService } from "./data/warehouse.service";
 @Component({
   selector: "app-initial-stock-page",
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, ProductAutocompleteComponent],
   template: `
     <section class="ui-card inventory-page">
       <header class="ui-page-head">
@@ -48,59 +37,19 @@ import { WarehouseService } from "./data/warehouse.service";
       <form [formGroup]="form" (ngSubmit)="submit()" class="form-grid">
         <label class="field field--product full">
           <span>Producto *</span>
-          <div class="autocomplete">
-            <input
-              type="text"
-              [formControl]="productSearchControl"
-              placeholder="Buscar producto por nombre, SKU o codigo de barras"
-              autocomplete="off"
-              [disabled]="saving"
-              (focus)="openProductLookup()"
-              (blur)="closeProductLookup()"
-              (keydown.enter)="selectFirstProductLookupResult($event)"
-              (keydown.escape)="closeProductLookup()"
-            />
-
-            <div class="autocomplete-panel" *ngIf="productLookupOpen">
-              <p class="autocomplete-state" *ngIf="productLookupLoading">
-                Buscando...
-              </p>
-
-              <p
-                class="autocomplete-state autocomplete-state--error"
-                *ngIf="!productLookupLoading && productLookupErrorMessage"
-              >
-                {{ productLookupErrorMessage }}
-              </p>
-
-              <p
-                class="autocomplete-state"
-                *ngIf="
-                  !productLookupLoading &&
-                  !productLookupErrorMessage &&
-                  productSearchControl.value.trim().length >= 2 &&
-                  productLookupResults.length === 0
-                "
-              >
-                Sin resultados.
-              </p>
-
-              <button
-                type="button"
-                class="autocomplete-option"
-                *ngFor="let product of productLookupResults"
-                (mousedown)="selectProduct(product)"
-              >
-                <strong>{{ product.name }}</strong>
-                <span>
-                  SKU: {{ product.sku }}
-                  <ng-container *ngIf="product.barcode">
-                    - Codigo: {{ product.barcode }}
-                  </ng-container>
-                </span>
-              </button>
-            </div>
-          </div>
+          <app-product-autocomplete
+            [placeholder]="'Buscar producto por nombre, SKU o código de barras'"
+            [minChars]="2"
+            [limit]="10"
+            [activeOnly]="true"
+            [compact]="true"
+            [allowClear]="false"
+            [showSelectedCard]="false"
+            [selectedProduct]="selectedProduct"
+            [disabled]="saving"
+            (productSelected)="selectProduct($event)"
+            (cleared)="clearSelectedProduct()"
+          ></app-product-autocomplete>
           <small class="field-error" *ngIf="isInvalid('productId')"
             >Producto es obligatorio.</small
           >
@@ -224,6 +173,10 @@ import { WarehouseService } from "./data/warehouse.service";
 
       .field--product {
         min-width: 0;
+      }
+
+      .field--product app-product-autocomplete::ng-deep .product-autocomplete__label {
+        display: none;
       }
 
       .field > span {
@@ -404,9 +357,7 @@ import { WarehouseService } from "./data/warehouse.service";
     `,
   ],
 })
-export class InitialStockPageComponent implements OnInit, OnDestroy {
-  readonly productSearchControl = new FormControl("", { nonNullable: true });
-
+  export class InitialStockPageComponent implements OnInit, OnDestroy {
   readonly integerPositiveValidator: ValidatorFn = (
     control: AbstractControl,
   ): ValidationErrors | null => {
@@ -432,11 +383,6 @@ export class InitialStockPageComponent implements OnInit, OnDestroy {
 
   warehouses: WarehouseResponse[] = [];
   selectedProduct: ProductLookupResponse | null = null;
-  productLookupResults: ProductLookupResponse[] = [];
-  productLookupLoading = false;
-  productLookupErrorMessage = "";
-  productLookupOpen = false;
-  productLookupFocused = false;
 
   saving = false;
   errorMessage = "";
@@ -446,14 +392,12 @@ export class InitialStockPageComponent implements OnInit, OnDestroy {
 
   constructor(
     private readonly formBuilder: FormBuilder,
-    private readonly productService: ProductService,
     private readonly warehouseService: WarehouseService,
     private readonly inventoryService: InventoryService,
   ) {}
 
   ngOnInit(): void {
     this.loadWarehouses();
-    this.watchProductLookup();
   }
 
   ngOnDestroy(): void {
@@ -499,55 +443,14 @@ export class InitialStockPageComponent implements OnInit, OnDestroy {
     return !!control && control.invalid && (control.touched || control.dirty);
   }
 
-  openProductLookup(): void {
-    this.productLookupFocused = true;
-    const currentValue = this.productSearchControl.value.trim();
-    if (
-      this.selectedProduct &&
-      currentValue === this.getProductLookupLabel(this.selectedProduct)
-    ) {
-      this.productLookupOpen = false;
-      return;
-    }
-
-    this.productLookupOpen = currentValue.length >= 2;
-  }
-
-  closeProductLookup(): void {
-    this.productLookupFocused = false;
-    this.productLookupOpen = false;
-  }
-
-  selectFirstProductLookupResult(event: Event): void {
-    if (this.productLookupResults.length === 0) {
-      return;
-    }
-
-    event.preventDefault();
-    this.selectProduct(this.productLookupResults[0]);
-  }
-
   selectProduct(product: ProductLookupResponse): void {
     this.selectedProduct = product;
     this.form.patchValue({ productId: product.id });
-    this.productSearchControl.setValue(this.getProductLookupLabel(product), {
-      emitEvent: false,
-    });
-    this.productLookupResults = [];
-    this.productLookupErrorMessage = "";
-    this.productLookupLoading = false;
-    this.productLookupOpen = false;
   }
 
   clearSelectedProduct(): void {
     this.selectedProduct = null;
     this.form.patchValue({ productId: null });
-    this.productSearchControl.setValue("", { emitEvent: false });
-    this.productLookupResults = [];
-    this.productLookupErrorMessage = "";
-    this.productLookupLoading = false;
-    this.productLookupOpen = false;
-    this.productLookupFocused = false;
   }
 
   blockInvalidQuantityKeys(event: KeyboardEvent): void {
@@ -569,62 +472,6 @@ export class InitialStockPageComponent implements OnInit, OnDestroy {
     return warehouse.name?.trim() || warehouse.code?.trim() || "Selecciona un almacén";
   }
 
-  private watchProductLookup(): void {
-    this.productSearchControl.valueChanges
-      .pipe(
-        takeUntil(this.destroy$),
-        debounceTime(250),
-        map((value) => value.trim()),
-        distinctUntilChanged(),
-        tap((query) => {
-          if (
-            this.selectedProduct &&
-            query !== this.getProductLookupLabel(this.selectedProduct)
-          ) {
-            this.detachSelectedProduct();
-          }
-        }),
-        switchMap((query) => {
-          if (query.length < 2) {
-            this.productLookupResults = [];
-            this.productLookupLoading = false;
-            this.productLookupErrorMessage = "";
-            this.productLookupOpen = false;
-            return of({ query, results: [] as ProductLookupResponse[] });
-          }
-
-          this.productLookupLoading = true;
-          this.productLookupErrorMessage = "";
-          this.productLookupOpen = this.productLookupFocused;
-
-          return this.productService.lookup(query, true, 10).pipe(
-            map((results) => ({ query, results })),
-            catchError((error: unknown) => {
-              this.productLookupErrorMessage = toHttpErrorMessage(
-                error,
-                "No se pudieron cargar sugerencias de producto.",
-              );
-              return of({ query, results: [] as ProductLookupResponse[] });
-            }),
-            finalize(() => {
-              this.productLookupLoading = false;
-            }),
-          );
-        }),
-      )
-      .subscribe(({ query, results }) => {
-        if (query.length >= 2) {
-          this.productLookupResults = results;
-          this.productLookupOpen = this.productLookupFocused;
-        }
-      });
-  }
-
-  private detachSelectedProduct(): void {
-    this.selectedProduct = null;
-    this.form.patchValue({ productId: null });
-  }
-
   private resetFormState(): void {
     this.form.reset({
       productId: null,
@@ -633,10 +480,6 @@ export class InitialStockPageComponent implements OnInit, OnDestroy {
       reason: "",
     });
     this.clearSelectedProduct();
-  }
-
-  private getProductLookupLabel(product: ProductLookupResponse): string {
-    return `${product.name} (SKU: ${product.sku})`;
   }
 
   private loadWarehouses(): void {
