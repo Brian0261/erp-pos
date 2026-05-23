@@ -3,6 +3,7 @@ import { Component, OnInit } from "@angular/core";
 import { FormBuilder, ReactiveFormsModule } from "@angular/forms";
 import { RouterLink } from "@angular/router";
 
+import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.service";
 import { toHttpErrorMessage } from "./data/http-error-message";
 import { QuoteService } from "./data/quote.service";
 import { QuoteResponse, QuoteStatus } from "./data/quotes.models";
@@ -39,11 +40,11 @@ import { QuoteResponse, QuoteStatus } from "./data/quotes.models";
           <span>Estado</span>
           <select formControlName="status">
             <option value="">Todos</option>
-            <option value="DRAFT">DRAFT</option>
-            <option value="SENT">SENT</option>
-            <option value="EXPIRED">EXPIRED</option>
-            <option value="CONVERTED">CONVERTED</option>
-            <option value="CANCELLED">CANCELLED</option>
+            <option value="DRAFT">BORRADOR</option>
+            <option value="SENT">ENVIADA</option>
+            <option value="EXPIRED">VENCIDA</option>
+            <option value="CONVERTED">CONVERTIDA</option>
+            <option value="CANCELLED">CANCELADA</option>
           </select>
         </label>
 
@@ -98,9 +99,17 @@ import { QuoteResponse, QuoteStatus } from "./data/quotes.models";
 
       <div class="ui-table-wrapper" *ngIf="!loading">
         <table class="ui-table quotes-table">
+          <colgroup>
+            <col class="col-number" />
+            <col class="col-customer" />
+            <col class="col-status" />
+            <col class="col-amount" />
+            <col class="col-date" />
+            <col class="col-actions" />
+          </colgroup>
           <thead>
             <tr>
-              <th>Numero</th>
+              <th>Cotizacion</th>
               <th>Cliente</th>
               <th>Estado</th>
               <th>Total</th>
@@ -110,29 +119,33 @@ import { QuoteResponse, QuoteStatus } from "./data/quotes.models";
           </thead>
           <tbody>
             <tr *ngFor="let quote of quotes">
-              <td class="quote-number">{{ quote.quoteNumber }}</td>
-              <td class="customer-cell">
-                <strong>{{ quote.customerName }}</strong>
-                <div class="customer-meta">
-                  {{ quote.customerDocument || "Sin documento" }}
+              <td class="cell-number">{{ quote.quoteNumber }}</td>
+              <td class="cell-customer" [title]="quote.customerName">
+                <div class="customer-inner">
+                  <strong>{{ quote.customerName }}</strong>
+                  <span class="customer-meta">
+                    {{ quote.customerDocument || "Sin documento" }}
+                  </span>
                 </div>
               </td>
-              <td>
+              <td class="cell-status">
                 <span
                   class="ui-badge status-badge"
                   [ngClass]="statusClass(quote.status)"
                 >
-                  {{ quote.status }}
+                  {{ statusLabel(quote.status) }}
                 </span>
               </td>
-              <td class="amount">{{ quote.totalAmount | number: "1.2-2" }}</td>
-              <td class="expires-col">
-                {{ quote.expiresAt }}
-                <span class="expired-note" *ngIf="isExpired(quote)">
-                  Vencida
-                </span>
+              <td class="cell-amount">{{ formatCurrency(quote.totalAmount) }}</td>
+              <td class="cell-date">
+                <div class="date-inner">
+                  {{ formatLocalDate(quote.expiresAt) }}
+                  <span class="expired-note" *ngIf="isExpired(quote)">
+                    Vencida
+                  </span>
+                </div>
               </td>
-              <td class="row-actions">
+              <td class="cell-actions">
                 <a
                   class="ui-button ui-button--secondary"
                   [routerLink]="['/cotizaciones', quote.id]"
@@ -231,16 +244,72 @@ import { QuoteResponse, QuoteStatus } from "./data/quotes.models";
 
       .quotes-table {
         min-width: 1080px;
+        table-layout: fixed;
       }
 
-      .quote-number {
+      .quotes-table .col-number {
+        width: 9rem;
+      }
+
+      .quotes-table .col-customer {
+        width: 24%;
+      }
+
+      .quotes-table .col-status {
+        width: 8.5rem;
+      }
+
+      .quotes-table .col-amount {
+        width: 9rem;
+      }
+
+      .quotes-table .col-date {
+        width: 10rem;
+      }
+
+      .quotes-table .col-actions {
+        width: auto;
+      }
+
+      .quotes-table th,
+      .quotes-table td {
+        vertical-align: top;
+      }
+
+      .quotes-table th {
+        text-align: center;
+      }
+
+      .quotes-table th:first-child,
+      .quotes-table td.cell-number {
+        text-align: left;
+      }
+
+      .quotes-table th:nth-child(2),
+      .quotes-table td.cell-customer {
+        text-align: left;
+      }
+
+      .cell-number {
         white-space: nowrap;
         font-weight: 700;
       }
 
-      .customer-cell {
+      .cell-customer {
+        min-width: 0;
+      }
+
+      .customer-inner {
         display: grid;
         gap: 0.2rem;
+        min-width: 0;
+      }
+
+      .customer-inner strong,
+      .customer-inner span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
 
       .customer-meta {
@@ -248,18 +317,22 @@ import { QuoteResponse, QuoteStatus } from "./data/quotes.models";
         color: var(--color-text-secondary);
       }
 
+      .cell-status {
+        text-align: center;
+      }
+
       .status-badge {
         font-weight: 700;
       }
 
       .status-draft {
-        background: #dbeafe;
-        color: var(--color-info);
+        background: #fef3c7;
+        color: var(--color-warning);
       }
 
       .status-sent {
-        background: #ede9fe;
-        color: #6d28d9;
+        background: #dbeafe;
+        color: var(--color-info);
       }
 
       .status-expired {
@@ -277,14 +350,21 @@ import { QuoteResponse, QuoteStatus } from "./data/quotes.models";
         color: #1f2937;
       }
 
-      .amount {
+      .cell-amount {
         white-space: nowrap;
+        text-align: center;
+        font-variant-numeric: tabular-nums;
         font-weight: 700;
       }
 
-      .expires-col {
+      .cell-date {
+        text-align: center;
+      }
+
+      .date-inner {
         display: grid;
         gap: 0.15rem;
+        min-width: 0;
       }
 
       .expired-note {
@@ -293,10 +373,11 @@ import { QuoteResponse, QuoteStatus } from "./data/quotes.models";
         font-weight: 700;
       }
 
-      .row-actions {
+      .cell-actions {
         display: flex;
         flex-wrap: wrap;
         gap: var(--space-2);
+        justify-content: flex-end;
       }
 
       .ui-button[disabled] {
@@ -343,6 +424,7 @@ export class QuotesPageComponent implements OnInit {
   constructor(
     private readonly formBuilder: FormBuilder,
     private readonly quoteService: QuoteService,
+    private readonly confirmDialog: ConfirmDialogService,
   ) {}
 
   ngOnInit(): void {
@@ -363,8 +445,16 @@ export class QuotesPageComponent implements OnInit {
     this.loadQuotes();
   }
 
-  sendQuote(quote: QuoteResponse): void {
-    const confirmed = window.confirm(this.buildSendConfirmationMessage(quote));
+  async sendQuote(quote: QuoteResponse): Promise<void> {
+    const confirmed = await this.confirmDialog.confirm({
+      title: "Enviar cotizacion",
+      description: `Vas a enviar la cotizacion ${quote.quoteNumber}. La cotizacion cambiara de estado.`,
+      highlightText: quote.quoteNumber,
+      confirmText: "Enviar",
+      cancelText: "Cancelar",
+      variant: "info",
+    });
+
     if (!confirmed) {
       return;
     }
@@ -389,10 +479,16 @@ export class QuotesPageComponent implements OnInit {
     });
   }
 
-  cancelQuote(quote: QuoteResponse): void {
-    const confirmed = window.confirm(
-      this.buildCancelConfirmationMessage(quote),
-    );
+  async cancelQuote(quote: QuoteResponse): Promise<void> {
+    const confirmed = await this.confirmDialog.confirm({
+      title: "Cancelar cotizacion",
+      description: `Vas a cancelar la cotizacion ${quote.quoteNumber}. La cotizacion quedara cancelada.`,
+      highlightText: quote.quoteNumber,
+      confirmText: "Cancelar cotizacion",
+      cancelText: "Volver",
+      variant: "warning",
+    });
+
     if (!confirmed) {
       return;
     }
@@ -459,6 +555,45 @@ export class QuotesPageComponent implements OnInit {
     }
   }
 
+  statusLabel(status: QuoteStatus): string {
+    switch (status) {
+      case "DRAFT":
+        return "BORRADOR";
+      case "SENT":
+        return "ENVIADA";
+      case "EXPIRED":
+        return "VENCIDA";
+      case "CONVERTED":
+        return "CONVERTIDA";
+      case "CANCELLED":
+        return "CANCELADA";
+      default:
+        return status;
+    }
+  }
+
+  formatCurrency(value: unknown): string {
+    const amount = this.toNumber(value) ?? 0;
+    return new Intl.NumberFormat("es-PE", {
+      style: "currency",
+      currency: "PEN",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(Number.isFinite(amount) ? amount : 0);
+  }
+
+  formatLocalDate(value: unknown): string {
+    const normalized = this.normalizeDateInput(value);
+    if (!normalized) {
+      return "-";
+    }
+    return new Intl.DateTimeFormat("es-PE", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    }).format(normalized);
+  }
+
   private loadQuotes(): void {
     this.loading = true;
     this.errorMessage = "";
@@ -497,23 +632,63 @@ export class QuotesPageComponent implements OnInit {
     return trimmed.length > 0 ? trimmed : null;
   }
 
-  private buildSendConfirmationMessage(quote: QuoteResponse): string {
-    return [
-      `Vas a enviar la cotizacion ${quote.quoteNumber}.`,
-      "",
-      "La cotizacion cambiara de estado.",
-      "",
-      "Confirmas enviar la cotizacion?",
-    ].join("\n");
+  private toNumber(value: unknown): number | null {
+    if (typeof value === "number") {
+      return Number.isFinite(value) ? value : null;
+    }
+
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (!trimmed) {
+        return null;
+      }
+
+      const numericValue = Number(trimmed);
+      return Number.isFinite(numericValue) ? numericValue : null;
+    }
+
+    return null;
   }
 
-  private buildCancelConfirmationMessage(quote: QuoteResponse): string {
-    return [
-      `Vas a cancelar la cotizacion ${quote.quoteNumber}.`,
-      "",
-      "La cotizacion quedara cancelada.",
-      "",
-      "Confirmas cancelar la cotizacion?",
-    ].join("\n");
+  private normalizeDateInput(value: unknown): Date | null {
+    if (!value) {
+      return null;
+    }
+
+    if (value instanceof Date) {
+      return Number.isNaN(value.getTime()) ? null : value;
+    }
+
+    if (typeof value === "number") {
+      const date = new Date(value);
+      return Number.isNaN(date.getTime()) ? null : date;
+    }
+
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (!trimmed) {
+        return null;
+      }
+
+      const isoDateMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (isoDateMatch) {
+        const [, year, month, day] = isoDateMatch;
+        return new Date(Number(year), Number(month) - 1, Number(day));
+      }
+
+      const date = new Date(trimmed);
+      return Number.isNaN(date.getTime()) ? null : date;
+    }
+
+    if (
+      Array.isArray(value) &&
+      (value.length === 3 || value.length >= 5) &&
+      value.every((part) => typeof part === "number")
+    ) {
+      const [year, month, day, hour = 0, minute = 0, second = 0] = value as number[];
+      return new Date(year, month - 1, day, hour, minute, second);
+    }
+
+    return null;
   }
 }

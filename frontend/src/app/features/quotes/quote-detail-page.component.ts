@@ -5,6 +5,7 @@ import { forkJoin } from "rxjs";
 
 import { Product } from "../catalog/data/catalog.models";
 import { ProductService } from "../catalog/data/product.service";
+import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.service";
 import { toHttpErrorMessage } from "./data/http-error-message";
 import { QuoteService } from "./data/quote.service";
 import {
@@ -35,7 +36,7 @@ import {
             class="ui-badge status-badge"
             [ngClass]="statusClass(quote.status)"
           >
-            {{ quote.status }}
+            {{ formatStatus(quote.status) }}
           </span>
           <a
             class="ui-button ui-button--secondary"
@@ -78,11 +79,11 @@ import {
           <h2>Datos de operacion</h2>
           <p>
             <span class="label">Emision</span>
-            <strong>{{ quote.issueDate }}</strong>
+            <strong>{{ formatDate(quote.issueDate) }}</strong>
           </p>
           <p>
             <span class="label">Vencimiento</span>
-            <strong>{{ quote.expiresAt }}</strong>
+            <strong>{{ formatDate(quote.expiresAt) }}</strong>
           </p>
           <p>
             <span class="label">Creado por</span>
@@ -148,42 +149,57 @@ import {
           <h2>Items</h2>
         </header>
 
-        <div class="ui-table-wrapper">
-          <table class="ui-table detail-table">
+        <div class="table-wrapper">
+          <table class="detail-table" *ngIf="quote.items.length > 0">
+            <colgroup>
+              <col style="width: 40%;" />
+              <col style="width: 12%;" />
+              <col style="width: 16%;" />
+              <col style="width: 16%;" />
+              <col style="width: 16%;" />
+            </colgroup>
             <thead>
               <tr>
                 <th>Producto</th>
-                <th>Cantidad</th>
-                <th>Precio unitario</th>
-                <th>Descuento</th>
-                <th>Total linea</th>
+                <th class="cell--numeric">Cantidad</th>
+                <th class="cell--numeric">P. Unitario</th>
+                <th class="cell--numeric">Descuento</th>
+                <th class="cell--numeric">Total linea</th>
               </tr>
             </thead>
             <tbody>
               <tr *ngFor="let item of quote.items">
-                <td>{{ productName(item.productId) }}</td>
-                <td>{{ item.quantity | number: "1.0-3" }}</td>
-                <td>{{ item.unitPrice | number: "1.2-2" }}</td>
-                <td>{{ item.discountAmount | number: "1.2-2" }}</td>
-                <td>{{ item.lineTotal | number: "1.2-2" }}</td>
+                <td>
+                  <div class="cell-product">
+                    <strong>{{ productName(item.productId) }}</strong>
+                    <span *ngIf="productSku(item.productId) as sku">SKU: {{ sku }}</span>
+                  </div>
+                </td>
+                <td class="cell--numeric">{{ item.quantity }}</td>
+                <td class="cell--numeric">{{ formatCurrency(item.unitPrice) }}</td>
+                <td class="cell--numeric">{{ formatCurrency(item.discountAmount) }}</td>
+                <td class="cell--numeric">{{ formatCurrency(item.lineTotal) }}</td>
               </tr>
             </tbody>
           </table>
+          <div class="ui-empty-state" *ngIf="quote.items.length === 0">
+            No hay items registrados.
+          </div>
         </div>
       </section>
 
       <section class="totals-strip">
         <article class="total-box">
           <p class="label">Subtotal</p>
-          <p class="value">{{ quote.subtotalAmount | number: "1.2-2" }}</p>
+          <p class="value">{{ formatCurrency(quote.subtotalAmount) }}</p>
         </article>
         <article class="total-box">
           <p class="label">Descuento</p>
-          <p class="value">{{ quote.discountAmount | number: "1.2-2" }}</p>
+          <p class="value">{{ formatCurrency(quote.discountAmount) }}</p>
         </article>
         <article class="total-box total-box--strong">
           <p class="label">Total</p>
-          <p class="value">{{ quote.totalAmount | number: "1.2-2" }}</p>
+          <p class="value">{{ formatCurrency(quote.totalAmount) }}</p>
         </article>
       </section>
 
@@ -192,8 +208,15 @@ import {
           <h2>Historial de estados</h2>
         </header>
 
-        <div class="ui-table-wrapper">
-          <table class="ui-table detail-table">
+        <div class="table-wrapper">
+          <table class="detail-table" *ngIf="history.length > 0">
+            <colgroup>
+              <col style="width: 18%;" />
+              <col style="width: 16%;" />
+              <col style="width: 16%;" />
+              <col style="width: 28%;" />
+              <col style="width: 22%;" />
+            </colgroup>
             <thead>
               <tr>
                 <th>Fecha</th>
@@ -205,19 +228,17 @@ import {
             </thead>
             <tbody>
               <tr *ngFor="let event of history">
-                <td>{{ event.changedAt | date: "yyyy-MM-dd HH:mm" }}</td>
-                <td>{{ event.previousStatus || "-" }}</td>
-                <td>{{ event.newStatus }}</td>
+                <td>{{ formatDateTime(event.changedAt) }}</td>
+                <td>{{ event.previousStatus ? formatStatus(event.previousStatus) : "-" }}</td>
+                <td>{{ formatStatus(event.newStatus) }}</td>
                 <td>{{ event.comment || "-" }}</td>
                 <td>{{ event.changedBy }}</td>
               </tr>
-              <tr *ngIf="history.length === 0">
-                <td colspan="5" class="ui-table__empty">
-                  <div class="ui-empty-state">No hay historial disponible.</div>
-                </td>
-              </tr>
             </tbody>
           </table>
+          <div class="ui-empty-state" *ngIf="history.length === 0">
+            No hay historial disponible.
+          </div>
         </div>
       </section>
     </section>
@@ -310,8 +331,64 @@ import {
         flex-wrap: wrap;
       }
 
+      .table-wrapper {
+        overflow-x: auto;
+      }
+
       .detail-table {
-        min-width: 920px;
+        width: 100%;
+        table-layout: fixed;
+        border-collapse: collapse;
+        min-width: 0;
+      }
+
+      .detail-table thead th {
+        text-align: left;
+        padding: 0.5rem 0.6rem;
+        color: var(--color-text-secondary);
+        font-size: var(--font-size-xs);
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        border-bottom: 1px solid var(--color-border-default);
+        white-space: nowrap;
+      }
+
+      .detail-table tbody td {
+        padding: 0.6rem;
+        border-bottom: 1px solid var(--color-border-default);
+        vertical-align: middle;
+        word-wrap: break-word;
+      }
+
+      .detail-table tbody tr:last-child td {
+        border-bottom: none;
+      }
+
+      .detail-table thead th.cell--numeric,
+      .detail-table tbody td.cell--numeric {
+        text-align: center;
+      }
+
+      .cell-product {
+        display: grid;
+        gap: 0.1rem;
+      }
+
+      .cell-product strong {
+        font-weight: 700;
+      }
+
+      .cell-product span {
+        font-size: var(--font-size-xs);
+        color: var(--color-text-secondary);
+      }
+
+      .ui-empty-state {
+        padding: var(--space-5);
+        text-align: center;
+        color: var(--color-text-secondary);
+        font-size: var(--font-size-sm);
       }
 
       .totals-strip {
@@ -330,24 +407,29 @@ import {
       }
 
       .total-box--strong {
-        border-color: #c7d2fe;
-        background: #eef2ff;
+        border-color: var(--color-border-strong);
+        border-top: 2px solid var(--color-border-strong);
       }
 
       .total-box .label {
         margin: 0;
-        font-size: var(--font-size-xs);
+        font-size: var(--font-size-sm);
+        color: var(--color-text-secondary);
         text-transform: uppercase;
         letter-spacing: 0.08em;
-        color: var(--color-text-secondary);
         font-weight: 700;
       }
 
       .total-box .value {
         margin: 0;
-        font-size: 1.15rem;
+        font-size: 1.35rem;
         font-family: var(--font-family-display);
         font-weight: 700;
+        white-space: nowrap;
+      }
+
+      .total-box--strong .value {
+        font-size: 1.5rem;
       }
 
       .status-draft {
@@ -410,6 +492,7 @@ export class QuoteDetailPageComponent implements OnInit {
     private readonly route: ActivatedRoute,
     private readonly quoteService: QuoteService,
     private readonly productService: ProductService,
+    private readonly confirmDialogService: ConfirmDialogService,
   ) {}
 
   ngOnInit(): void {
@@ -423,14 +506,19 @@ export class QuoteDetailPageComponent implements OnInit {
     this.loadData();
   }
 
-  sendQuote(): void {
+  async sendQuote(): Promise<void> {
     if (!this.quote || !this.canSend(this.quote)) {
       return;
     }
 
-    const confirmed = window.confirm(
-      this.buildSendConfirmationMessage(this.quote),
-    );
+    const confirmed = await this.confirmDialogService.confirm({
+      title: "Enviar cotizacion",
+      description: this.buildSendConfirmationMessage(this.quote),
+      confirmText: "Enviar",
+      cancelText: "Cancelar",
+      variant: "info",
+    });
+
     if (!confirmed) {
       return;
     }
@@ -455,14 +543,19 @@ export class QuoteDetailPageComponent implements OnInit {
     });
   }
 
-  cancelQuote(): void {
+  async cancelQuote(): Promise<void> {
     if (!this.quote || !this.canCancel(this.quote)) {
       return;
     }
 
-    const confirmed = window.confirm(
-      this.buildCancelConfirmationMessage(this.quote),
-    );
+    const confirmed = await this.confirmDialogService.confirm({
+      title: "Cancelar cotizacion",
+      description: this.buildCancelConfirmationMessage(this.quote),
+      confirmText: "Cancelar",
+      cancelText: "Volver",
+      variant: "warning",
+    });
+
     if (!confirmed) {
       return;
     }
@@ -508,8 +601,15 @@ export class QuoteDetailPageComponent implements OnInit {
     if (!product) {
       return `Producto #${productId}`;
     }
+    return product.name;
+  }
 
-    return `${product.name} (${product.sku})`;
+  productSku(productId: number): string | null {
+    const product = this.productById.get(productId);
+    if (!product || !product.sku) {
+      return null;
+    }
+    return product.sku;
   }
 
   statusClass(status: QuoteStatus): string {
@@ -527,6 +627,65 @@ export class QuoteDetailPageComponent implements OnInit {
       default:
         return "";
     }
+  }
+
+  formatStatus(status: QuoteStatus): string {
+    switch (status) {
+      case "DRAFT":
+        return "BORRADOR";
+      case "SENT":
+        return "ENVIADA";
+      case "EXPIRED":
+        return "VENCIDA";
+      case "CONVERTED":
+        return "CONVERTIDA";
+      case "CANCELLED":
+        return "CANCELADA";
+      default:
+        return status;
+    }
+  }
+
+  formatDate(value: string): string {
+    if (!value) {
+      return "-";
+    }
+    const parsed = new Date(value + "T00:00:00");
+    if (Number.isNaN(parsed.getTime())) {
+      return value;
+    }
+    return new Intl.DateTimeFormat("es-PE", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    }).format(parsed);
+  }
+
+  formatDateTime(value: string): string {
+    if (!value) {
+      return "-";
+    }
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      return value;
+    }
+    return new Intl.DateTimeFormat("es-PE", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(parsed);
+  }
+
+  formatCurrency(value: number | null | undefined): string {
+    const amount = Number(value ?? 0);
+    return new Intl.NumberFormat("es-PE", {
+      style: "currency",
+      currency: "PEN",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(Number.isFinite(amount) ? amount : 0);
   }
 
   private loadData(): void {
@@ -565,22 +724,10 @@ export class QuoteDetailPageComponent implements OnInit {
   }
 
   private buildSendConfirmationMessage(quote: QuoteResponse): string {
-    return [
-      `Vas a enviar la cotizacion ${quote.quoteNumber}.`,
-      "",
-      "La cotizacion cambiara de estado.",
-      "",
-      "Confirmas enviar la cotizacion?",
-    ].join("\n");
+    return `Vas a enviar la cotizacion ${quote.quoteNumber}. La cotizacion cambiara de estado a ENVIADA.`;
   }
 
   private buildCancelConfirmationMessage(quote: QuoteResponse): string {
-    return [
-      `Vas a cancelar la cotizacion ${quote.quoteNumber}.`,
-      "",
-      "La cotizacion quedara cancelada.",
-      "",
-      "Confirmas cancelar la cotizacion?",
-    ].join("\n");
+    return `Vas a cancelar la cotizacion ${quote.quoteNumber}. La cotizacion quedara en estado CANCELADA.`;
   }
 }

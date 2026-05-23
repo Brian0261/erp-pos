@@ -4,9 +4,11 @@ import {
   EventEmitter,
   HostBinding,
   Input,
+  OnChanges,
   OnDestroy,
   OnInit,
   Output,
+  SimpleChanges,
 } from "@angular/core";
 import { FormControl, ReactiveFormsModule } from "@angular/forms";
 import { Subject, of } from "rxjs";
@@ -275,7 +277,7 @@ let productAutocompleteUid = 0;
     `,
   ],
 })
-export class ProductAutocompleteComponent implements OnInit, OnDestroy {
+export class ProductAutocompleteComponent implements OnChanges, OnInit, OnDestroy {
   private readonly destroy$ = new Subject<void>();
   private readonly uid = ++productAutocompleteUid;
   private internalSelectedProduct: ProductLookupResponse | null = null;
@@ -303,6 +305,7 @@ export class ProductAutocompleteComponent implements OnInit, OnDestroy {
   @Input() allowClear = true;
   @Input() showSelectedCard = true;
   @Input() selectedProduct: ProductLookupResponse | null = null;
+  @Input() syncSelectedToInput = false;
   @Input() filterMode = false;
 
   @Output() productSelected = new EventEmitter<ProductLookupResponse>();
@@ -332,6 +335,16 @@ export class ProductAutocompleteComponent implements OnInit, OnDestroy {
 
   get activeOptionId(): string | null {
     return this.activeIndex >= 0 ? this.optionId(this.activeIndex) : null;
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes["selectedProduct"] && this.syncSelectedToInput) {
+      const product = changes["selectedProduct"].currentValue as ProductLookupResponse | null;
+      if (product) {
+        this.queryControl.setValue(this.getProductLabel(product), { emitEvent: false });
+        this.internalSelectedProduct = null;
+      }
+    }
   }
 
   ngOnInit(): void {
@@ -489,7 +502,9 @@ export class ProductAutocompleteComponent implements OnInit, OnDestroy {
     const label = this.displaySelectedProduct ? this.getProductLabel(this.displaySelectedProduct) : "";
     if (this.displaySelectedProduct && query !== label) {
       this.internalSelectedProduct = null;
-      this.cleared.emit();
+      if (!this.syncSelectedToInput) {
+        this.cleared.emit();
+      }
     }
   }
 

@@ -4,10 +4,13 @@ import { FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
 import { ActivatedRoute, RouterLink } from "@angular/router";
 import { catchError, forkJoin, of } from "rxjs";
 
+import { Product } from "../catalog/data/catalog.models";
+import { ProductService } from "../catalog/data/product.service";
 import { WarehouseResponse } from "../inventory/data/inventory.models";
 import { WarehouseService } from "../inventory/data/warehouse.service";
 import { CashRegisterService } from "../sales/data/cash-register.service";
 import { CashRegisterResponse } from "../sales/data/sales.models";
+import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.service";
 import { toHttpErrorMessage } from "./data/http-error-message";
 import { QuoteService } from "./data/quote.service";
 import {
@@ -19,7 +22,7 @@ import {
 
 interface PaymentLine {
   paymentMethod: QuotePaymentMethod;
-  amount: number;
+  amount: string;
   reference: string;
 }
 
@@ -34,15 +37,21 @@ interface PaymentLine {
           <p class="ui-page-kicker">Comercial InkToy</p>
           <h1 class="ui-page-title">Convertir cotizacion a venta</h1>
           <p class="ui-page-description">
-            Cotizacion {{ quote.quoteNumber }} | Estado {{ quote.status }}
+            Cotizacion {{ quote.quoteNumber }} lista para conversion a venta.
           </p>
         </div>
-        <a
-          class="ui-button ui-button--secondary"
-          [routerLink]="['/cotizaciones', quote.id]"
-        >
-          Volver al detalle
-        </a>
+
+        <div class="header-actions">
+          <span class="ui-badge status-badge" [ngClass]="statusClass(quote.status)">
+            {{ formatStatus(quote.status) }}
+          </span>
+          <a
+            class="ui-button ui-button--secondary"
+            [routerLink]="['/cotizaciones', quote.id]"
+          >
+            Volver al detalle
+          </a>
+        </div>
       </header>
 
       <p class="ui-alert ui-alert--error" *ngIf="errorMessage">
@@ -57,40 +66,82 @@ interface PaymentLine {
         <a class="inline-link" [routerLink]="['/caja']">/caja</a> antes de
         convertir.
       </p>
-      <p class="ui-alert ui-alert--success" *ngIf="currentCashSession">
-        Caja abierta #{{ currentCashSession.id }} desde
-        {{ currentCashSession.openedAt | date: "yyyy-MM-dd HH:mm" }}.
-      </p>
-      <p class="ui-alert ui-alert--info">
-        El stock disponible y reglas de negocio se validan al convertir.
-      </p>
+
+      <section class="meta-row" *ngIf="quote">
+        <span class="meta-chip" *ngIf="currentCashSession">
+          Caja abierta: #{{ currentCashSession.id }} ·
+          {{ formatDateTime(currentCashSession.openedAt) }}
+        </span>
+        <span class="meta-note">
+          Se validan stock y reglas al confirmar la conversion.
+        </span>
+      </section>
 
       <section class="summary-grid">
         <article class="summary-card">
-          <h2>Cotizacion</h2>
+          <h2>Cliente</h2>
           <p>
             <span class="label">Cliente</span>
             <strong>{{ quote.customerName }}</strong>
           </p>
           <p>
-            <span class="label">Vencimiento</span>
-            <strong>{{ quote.expiresAt }}</strong>
+            <span class="label">Documento</span>
+            <strong>{{ quote.customerDocument || "-" }}</strong>
           </p>
           <p>
-            <span class="label">Total cotizacion</span>
-            <strong class="amount">{{
-              quote.totalAmount | number: "1.2-2"
-            }}</strong>
+            <span class="label">Telefono</span>
+            <strong>{{ quote.customerPhone || "-" }}</strong>
+          </p>
+          <p>
+            <span class="label">Correo</span>
+            <strong>{{ quote.customerEmail || "-" }}</strong>
           </p>
         </article>
 
-        <article class="summary-card" *ngIf="quote.convertedSaleId">
-          <h2>Resultado conversion</h2>
+        <article class="summary-card">
+          <h2>Datos de operacion</h2>
           <p>
+            <span class="label">Emision</span>
+            <strong>{{ formatDate(quote.issueDate) }}</strong>
+          </p>
+          <p>
+            <span class="label">Vencimiento</span>
+            <strong>{{ formatDate(quote.expiresAt) }}</strong>
+          </p>
+          <p>
+            <span class="label">Estado</span>
+            <strong>{{ formatStatus(quote.status) }}</strong>
+          </p>
+          <p>
+            <span class="label">Notas</span>
+            <strong>{{ quote.notes || "-" }}</strong>
+          </p>
+        </article>
+
+        <article class="summary-card summary-card--strong summary-card--conversion">
+          <h2>Total y conversion</h2>
+          <p class="summary-row">
+            <span class="label">Total cotizacion</span>
+            <strong class="amount">{{ formatCurrency(quote.totalAmount) }}</strong>
+          </p>
+          <p class="summary-row">
+            <span class="label">Total pagado</span>
+            <strong>{{ formatCurrency(paidTotal) }}</strong>
+          </p>
+          <p class="summary-row">
+            <span class="label">Pendiente</span>
+            <strong [class.amount-pending]="pendingAmount > 0">{{ formatCurrency(pendingAmount) }}</strong>
+          </p>
+          <p class="summary-row">
+            <span class="label">Estado de caja</span>
+            <strong>{{ currentCashSession ? 'ABIERTA' : 'SIN CAJA ABIERTA' }}</strong>
+          </p>
+          <p *ngIf="quote.convertedSaleId">
             <span class="label">Venta generada</span>
             <strong>#{{ quote.convertedSaleId }}</strong>
           </p>
           <a
+            *ngIf="quote.convertedSaleId"
             class="ui-button ui-button--secondary"
             [routerLink]="['/ventas', quote.convertedSaleId]"
           >
@@ -106,22 +157,39 @@ interface PaymentLine {
 
         <div class="ui-table-wrapper">
           <table class="ui-table convert-table">
+            <colgroup>
+              <col style="width: 40%;" />
+              <col style="width: 12%;" />
+              <col style="width: 16%;" />
+              <col style="width: 16%;" />
+              <col style="width: 16%;" />
+            </colgroup>
             <thead>
               <tr>
                 <th>Producto</th>
-                <th>Cantidad</th>
-                <th>Precio unitario</th>
-                <th>Descuento</th>
-                <th>Total linea</th>
+                <th class="cell--numeric">Cantidad</th>
+                <th class="cell--numeric">Precio unitario</th>
+                <th class="cell--numeric">Descuento</th>
+                <th class="cell--numeric">Total linea</th>
               </tr>
             </thead>
             <tbody>
               <tr *ngFor="let item of quote.items">
-                <td>#{{ item.productId }}</td>
-                <td>{{ item.quantity | number: "1.0-3" }}</td>
-                <td>{{ item.unitPrice | number: "1.2-2" }}</td>
-                <td>{{ item.discountAmount | number: "1.2-2" }}</td>
-                <td>{{ item.lineTotal | number: "1.2-2" }}</td>
+                <td>
+                  <div class="cell-product">
+                    <strong>{{ productName(item.productId) }}</strong>
+                    <span *ngIf="productSecondary(item.productId) as secondary">{{ secondary }}</span>
+                  </div>
+                </td>
+                <td class="cell--numeric">{{ item.quantity }}</td>
+                <td class="cell--numeric">{{ formatCurrency(item.unitPrice) }}</td>
+                <td class="cell--numeric">{{ formatCurrency(item.discountAmount) }}</td>
+                <td class="cell--numeric">{{ formatCurrency(item.lineTotal) }}</td>
+              </tr>
+              <tr *ngIf="quote.items.length === 0">
+                <td colspan="5" class="ui-table__empty">
+                  <div class="ui-empty-state">No hay items registrados.</div>
+                </td>
               </tr>
             </tbody>
           </table>
@@ -142,7 +210,7 @@ interface PaymentLine {
                 *ngFor="let warehouse of warehouses"
                 [ngValue]="warehouse.id"
               >
-                {{ warehouse.code }} - {{ warehouse.name }}
+                {{ warehouseDisplay(warehouse) }}
               </option>
             </select>
           </label>
@@ -189,18 +257,19 @@ interface PaymentLine {
                       setPaymentMethod(index, $any($event.target).value)
                     "
                   >
-                    <option value="CASH">CASH</option>
-                    <option value="CARD">CARD</option>
-                    <option value="TRANSFER">TRANSFER</option>
+                    <option value="CASH">Efectivo</option>
+                    <option value="CARD">Tarjeta</option>
+                    <option value="TRANSFER">Transferencia</option>
                   </select>
                 </td>
                 <td>
                   <input
-                    type="number"
-                    min="0"
-                    step="0.01"
+                    type="text"
+                    inputmode="decimal"
                     [value]="payment.amount"
                     (input)="setPaymentAmount(index, $any($event.target).value)"
+                    (keydown)="blockInvalidDecimalKeys($event)"
+                    (blur)="normalizePaymentAmountOnBlur(index)"
                   />
                 </td>
                 <td>
@@ -232,14 +301,21 @@ interface PaymentLine {
       <section class="totals-strip">
         <article class="total-box">
           <p class="label">Total cotizacion</p>
-          <p class="value">{{ quote.totalAmount | number: "1.2-2" }}</p>
+          <p class="value">{{ formatCurrency(quote.totalAmount) }}</p>
         </article>
         <article
           class="total-box"
           [class.total-box--strong]="paidTotal >= quote.totalAmount"
         >
           <p class="label">Total pagado</p>
-          <p class="value">{{ paidTotal | number: "1.2-2" }}</p>
+          <p class="value">{{ formatCurrency(paidTotal) }}</p>
+        </article>
+        <article
+          class="total-box"
+          [class.total-box--strong]="pendingAmount <= 0"
+        >
+          <p class="label">Pendiente</p>
+          <p class="value">{{ formatCurrency(pendingAmount) }}</p>
         </article>
       </section>
 
@@ -277,6 +353,17 @@ interface PaymentLine {
         gap: var(--space-4);
       }
 
+      .header-actions {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+        flex-wrap: wrap;
+      }
+
+      .status-badge {
+        font-weight: 700;
+      }
+
       h2 {
         margin: 0;
         font-size: 1.05rem;
@@ -287,9 +374,33 @@ interface PaymentLine {
         text-decoration: underline;
       }
 
+      .meta-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-2);
+        align-items: center;
+      }
+
+      .meta-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        border: 1px solid var(--color-border-default);
+        border-radius: 999px;
+        padding: 0.35rem 0.65rem;
+        background: var(--color-bg-surface);
+        font-size: var(--font-size-sm);
+        font-weight: 700;
+      }
+
+      .meta-note {
+        color: var(--color-text-secondary);
+        font-size: var(--font-size-xs);
+      }
+
       .summary-grid {
         display: grid;
-        grid-template-columns: repeat(2, minmax(240px, 1fr));
+        grid-template-columns: repeat(3, minmax(220px, 1fr));
         gap: var(--space-3);
       }
 
@@ -297,9 +408,9 @@ interface PaymentLine {
         border: 1px solid var(--color-border-default);
         border-radius: var(--radius-md);
         background: var(--color-bg-surface);
-        padding: var(--space-3);
+        padding: var(--space-2);
         display: grid;
-        gap: var(--space-2);
+        gap: var(--space-1);
       }
 
       .summary-card p {
@@ -318,7 +429,31 @@ interface PaymentLine {
 
       .summary-card .amount {
         font-family: var(--font-family-display);
-        font-size: 1.2rem;
+        font-size: 1.3rem;
+      }
+
+      .summary-card--conversion {
+        gap: 0.35rem;
+      }
+
+      .summary-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: var(--space-2);
+      }
+
+      .summary-row .label {
+        margin: 0;
+      }
+
+      .amount-pending {
+        color: var(--color-danger);
+      }
+
+      .summary-card--strong {
+        border-color: var(--color-border-strong);
+        border-top: 2px solid var(--color-border-strong);
       }
 
       .data-section {
@@ -377,7 +512,31 @@ interface PaymentLine {
       }
 
       .convert-table {
+        table-layout: fixed;
         min-width: 900px;
+      }
+
+      .convert-table th,
+      .convert-table td {
+        vertical-align: middle;
+      }
+
+      .cell--numeric {
+        text-align: center;
+      }
+
+      .cell-product {
+        display: grid;
+        gap: 0.1rem;
+      }
+
+      .cell-product strong {
+        font-weight: 700;
+      }
+
+      .cell-product span {
+        font-size: var(--font-size-xs);
+        color: var(--color-text-secondary);
       }
 
       .payments-section td,
@@ -392,7 +551,7 @@ interface PaymentLine {
 
       .totals-strip {
         display: grid;
-        grid-template-columns: repeat(2, minmax(140px, 1fr));
+        grid-template-columns: repeat(3, minmax(140px, 1fr));
         gap: var(--space-3);
       }
 
@@ -424,6 +583,31 @@ interface PaymentLine {
         font-size: 1.15rem;
         font-family: var(--font-family-display);
         font-weight: 700;
+      }
+
+      .status-draft {
+        background: #dbeafe;
+        color: var(--color-info);
+      }
+
+      .status-sent {
+        background: #ede9fe;
+        color: #6d28d9;
+      }
+
+      .status-expired {
+        background: #fee2e2;
+        color: var(--color-danger);
+      }
+
+      .status-converted {
+        background: #dcfce7;
+        color: var(--color-success);
+      }
+
+      .status-cancelled {
+        background: #e5e7eb;
+        color: #1f2937;
       }
 
       .actions-bar {
@@ -465,9 +649,10 @@ export class QuoteConvertPageComponent implements OnInit {
   quote: QuoteResponse | null = null;
   warehouses: WarehouseResponse[] = [];
   currentCashSession: CashRegisterResponse | null = null;
+  private readonly productById = new Map<number, Product>();
 
   payments: PaymentLine[] = [
-    { paymentMethod: "CASH", amount: 0, reference: "" },
+    { paymentMethod: "CASH", amount: "", reference: "" },
   ];
 
   submitting = false;
@@ -478,8 +663,10 @@ export class QuoteConvertPageComponent implements OnInit {
     private readonly route: ActivatedRoute,
     private readonly formBuilder: FormBuilder,
     private readonly quoteService: QuoteService,
+    private readonly productService: ProductService,
     private readonly warehouseService: WarehouseService,
     private readonly cashRegisterService: CashRegisterService,
+    private readonly confirmDialogService: ConfirmDialogService,
   ) {}
 
   ngOnInit(): void {
@@ -500,8 +687,15 @@ export class QuoteConvertPageComponent implements OnInit {
     );
   }
 
+  get pendingAmount(): number {
+    if (!this.quote) {
+      return 0;
+    }
+    return Math.max(this.normalizeNumber(this.quote.totalAmount) - this.paidTotal, 0);
+  }
+
   addPaymentLine(): void {
-    this.payments.push({ paymentMethod: "CASH", amount: 0, reference: "" });
+    this.payments.push({ paymentMethod: "CASH", amount: "", reference: "" });
   }
 
   removePaymentLine(index: number): void {
@@ -528,7 +722,35 @@ export class QuoteConvertPageComponent implements OnInit {
       return;
     }
 
-    payment.amount = Math.max(this.normalizeNumber(value), 0);
+    payment.amount = this.sanitizeDecimalValue(value, 2, true);
+  }
+
+  normalizePaymentAmountOnBlur(index: number): void {
+    const payment = this.payments[index];
+    if (!payment) {
+      return;
+    }
+
+    const normalized = this.sanitizeDecimalValue(String(payment.amount ?? ""), 2, false);
+    if (!normalized) {
+      payment.amount = "";
+      return;
+    }
+
+    const numeric = Number(normalized);
+    if (!Number.isFinite(numeric) || numeric < 0) {
+      payment.amount = "";
+      return;
+    }
+
+    payment.amount = String(numeric);
+  }
+
+  blockInvalidDecimalKeys(event: KeyboardEvent): void {
+    const blockedKeys = ["e", "E", "+", "-", ","];
+    if (blockedKeys.includes(event.key)) {
+      event.preventDefault();
+    }
   }
 
   setPaymentReference(index: number, value: string): void {
@@ -560,6 +782,116 @@ export class QuoteConvertPageComponent implements OnInit {
   }
 
   convert(): void {
+    void this.convertInternal();
+  }
+
+  formatStatus(status: QuoteResponse["status"]): string {
+    switch (status) {
+      case "DRAFT":
+        return "BORRADOR";
+      case "SENT":
+        return "ENVIADA";
+      case "EXPIRED":
+        return "VENCIDA";
+      case "CONVERTED":
+        return "CONVERTIDA";
+      case "CANCELLED":
+        return "CANCELADA";
+      default:
+        return status;
+    }
+  }
+
+  statusClass(status: QuoteResponse["status"]): string {
+    switch (status) {
+      case "DRAFT":
+        return "status-draft";
+      case "SENT":
+        return "status-sent";
+      case "EXPIRED":
+        return "status-expired";
+      case "CONVERTED":
+        return "status-converted";
+      case "CANCELLED":
+        return "status-cancelled";
+      default:
+        return "";
+    }
+  }
+
+  productName(productId: number): string {
+    const product = this.productById.get(productId);
+    if (!product) {
+      return `Producto #${productId}`;
+    }
+    return product.name;
+  }
+
+  productSecondary(productId: number): string | null {
+    const product = this.productById.get(productId);
+    if (!product) {
+      return null;
+    }
+
+    if (product.barcode) {
+      return `SKU: ${product.sku} · Codigo: ${product.barcode}`;
+    }
+    return `SKU: ${product.sku}`;
+  }
+
+  warehouseDisplay(warehouse: WarehouseResponse): string {
+    if (warehouse.name) {
+      return warehouse.name;
+    }
+    if (warehouse.code) {
+      return warehouse.code;
+    }
+    return `Almacen #${warehouse.id}`;
+  }
+
+  formatDate(value: string): string {
+    if (!value) {
+      return "-";
+    }
+    const parsed = new Date(`${value}T00:00:00`);
+    if (Number.isNaN(parsed.getTime())) {
+      return value;
+    }
+    return new Intl.DateTimeFormat("es-PE", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    }).format(parsed);
+  }
+
+  formatDateTime(value: string): string {
+    if (!value) {
+      return "-";
+    }
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      return value;
+    }
+    return new Intl.DateTimeFormat("es-PE", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(parsed);
+  }
+
+  formatCurrency(value: unknown): string {
+    const amount = this.normalizeNumber(value);
+    return new Intl.NumberFormat("es-PE", {
+      style: "currency",
+      currency: "PEN",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(Number.isFinite(amount) ? amount : 0);
+  }
+
+  private async convertInternal(): Promise<void> {
     if (!this.quote) {
       this.errorMessage = "Cotizacion no disponible.";
       return;
@@ -571,9 +903,13 @@ export class QuoteConvertPageComponent implements OnInit {
       return;
     }
 
-    const confirmed = window.confirm(
-      this.buildConvertConfirmationMessage(this.quote),
-    );
+    const confirmed = await this.confirmDialogService.confirm({
+      title: "Convertir cotizacion",
+      description: this.buildConvertConfirmationMessage(this.quote),
+      confirmText: "Convertir",
+      cancelText: "Cancelar",
+      variant: "warning",
+    });
     if (!confirmed) {
       return;
     }
@@ -616,13 +952,18 @@ export class QuoteConvertPageComponent implements OnInit {
 
     forkJoin({
       quote: this.quoteService.getById(this.quoteId),
+      productsPage: this.productService.list(0, 500),
       warehouses: this.warehouseService.list(true),
       cashSession: this.cashRegisterService
         .current()
         .pipe(catchError(() => of(null))),
     }).subscribe({
-      next: ({ quote, warehouses, cashSession }) => {
+      next: ({ quote, productsPage, warehouses, cashSession }) => {
         this.quote = quote;
+        this.productById.clear();
+        for (const product of productsPage.content) {
+          this.productById.set(product.id, product);
+        }
         this.warehouses = warehouses.filter((warehouse) => warehouse.active);
         this.currentCashSession = cashSession;
 
@@ -703,13 +1044,53 @@ export class QuoteConvertPageComponent implements OnInit {
     return [
       `Vas a convertir la cotizacion ${quote.quoteNumber} a venta.`,
       "",
-      `Total cotizacion: S/ ${this.normalizeNumber(quote.totalAmount).toFixed(2)}`,
-      `Total pagado: S/ ${this.paidTotal.toFixed(2)}`,
+      `Total cotizacion: ${this.formatCurrency(quote.totalAmount)}`,
+      `Total pagado: ${this.formatCurrency(this.paidTotal)}`,
       "",
       "Se generara una venta real y podria impactar caja/stock segun el flujo actual.",
       "",
       "Confirmas convertir la cotizacion?",
     ].join("\n");
+  }
+
+  private sanitizeDecimalValue(
+    rawValue: string,
+    maxDecimals: number,
+    keepTrailingDot: boolean,
+  ): string {
+    const digitsAndDots = (rawValue ?? "").replace(/[^\d.]/g, "");
+    if (!digitsAndDots) {
+      return "";
+    }
+
+    const [integerRaw = "", ...decimalParts] = digitsAndDots.split(".");
+    const decimalRaw = decimalParts.join("");
+    const hasDot = digitsAndDots.includes(".");
+
+    let integerPart = integerRaw.replace(/\D/g, "");
+    if (integerPart.length > 0) {
+      if (/^0+$/.test(integerPart)) {
+        integerPart = "0";
+      } else {
+        integerPart = integerPart.replace(/^0+/, "");
+      }
+    }
+
+    if (!integerPart && (hasDot || decimalRaw.length > 0)) {
+      integerPart = "0";
+    }
+
+    const decimalPart = decimalRaw.replace(/\D/g, "").slice(0, maxDecimals);
+    if (hasDot) {
+      if (decimalPart.length > 0) {
+        return `${integerPart || "0"}.${decimalPart}`;
+      }
+      return keepTrailingDot
+        ? `${integerPart || "0"}.`
+        : `${integerPart || "0"}`;
+    }
+
+    return integerPart;
   }
 
   private normalizeOptional(value: string | null | undefined): string | null {
