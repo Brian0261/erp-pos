@@ -259,6 +259,20 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [x] Kardex: paginacion server-side con `Anterior/Siguiente/Ir a pág.` y `pageSize=20`.
 - [x] Kardex: backend responde enriquecido con `productName/productSku/productBarcode` y `warehouseName/warehouseCode`.
 
+### Compras - Proveedores UX rediseñada (2026-05-22)
+
+- [ ] Proveedores: la pantalla inicial muestra busqueda + tabla, sin formulario grande visible.
+- [ ] Proveedores: `Nuevo proveedor` abre drawer/modal local.
+- [ ] Proveedores: cancelar cierra sin cambios.
+- [ ] Proveedores: `Nombre es obligatorio` no desalinear Documento/Nombre.
+- [ ] Proveedores: crear proveedor valida y recarga tabla al cerrar.
+- [ ] Proveedores: editar proveedor abre el mismo formulario en modo edicion.
+- [ ] Proveedores: guardar cambios actualiza y recarga tabla.
+- [ ] Proveedores: desactivar usa `ConfirmDialogService`.
+- [ ] Proveedores: reactivar usa `ConfirmDialogService` y `update(..., active: true)`.
+- [ ] Proveedores: campos largos mantienen ellipsis/title y acciones compactas.
+- [ ] Proveedores: Buscar y Limpiar siguen funcionando.
+
 ### Inventario - Transferencias con autocomplete compartido (2026-05-22)
 
 - [ ] Transferencias: buscar producto por nombre y seleccionar resultado.

@@ -8,6 +8,7 @@ import {
 } from "@angular/forms";
 
 import { AuthService } from "../../core/auth/auth.service";
+import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.service";
 import { toHttpErrorMessage } from "./data/http-error-message";
 import {
   SupplierCreateRequest,
@@ -15,6 +16,8 @@ import {
   SupplierUpdateRequest,
 } from "./data/purchases.models";
 import { SupplierService } from "./data/supplier.service";
+
+type SupplierFormMode = "create" | "edit";
 
 @Component({
   selector: "app-suppliers-page",
@@ -26,7 +29,7 @@ import { SupplierService } from "./data/supplier.service";
         <div>
           <p class="ui-page-kicker">Compras InkToy</p>
           <h1 class="ui-page-title">Proveedores</h1>
-          <p class="ui-page-description">
+          <p class="ui-page-description suppliers-page__description">
             Gestiona proveedores para ordenar compras, editar datos de contacto
             y controlar su estado operativo.
           </p>
@@ -47,7 +50,15 @@ import { SupplierService } from "./data/supplier.service";
         </label>
 
         <div class="search-actions">
-          <button type="submit" class="ui-button ui-button--primary">
+          <button
+            *ngIf="canManage"
+            type="button"
+            class="ui-button ui-button--primary"
+            (click)="openCreatePanel()"
+          >
+            Nuevo proveedor
+          </button>
+          <button type="submit" class="ui-button ui-button--secondary">
             Buscar
           </button>
           <button
@@ -59,146 +70,6 @@ import { SupplierService } from "./data/supplier.service";
           </button>
         </div>
       </form>
-
-      <section class="supplier-panel" *ngIf="canManage">
-        <header class="panel-head">
-          <h2>Nuevo proveedor</h2>
-        </header>
-
-        <form [formGroup]="createForm" (ngSubmit)="create()" class="form-grid">
-          <label class="field">
-            <span>Documento</span>
-            <input
-              type="text"
-              formControlName="documentNumber"
-              maxlength="40"
-            />
-          </label>
-
-          <label class="field">
-            <span>Nombre *</span>
-            <input type="text" formControlName="name" maxlength="180" />
-            <small class="field-error" *ngIf="isCreateInvalid('name')"
-              >Nombre es obligatorio.</small
-            >
-          </label>
-
-          <label class="field">
-            <span>Contacto</span>
-            <input type="text" formControlName="contactName" maxlength="120" />
-          </label>
-
-          <label class="field">
-            <span>Telefono</span>
-            <input type="text" formControlName="phone" maxlength="40" />
-          </label>
-
-          <label class="field">
-            <span>Email</span>
-            <input type="email" formControlName="email" maxlength="160" />
-            <small class="field-error" *ngIf="isCreateInvalid('email')"
-              >Email invalido.</small
-            >
-          </label>
-
-          <label class="field full">
-            <span>Direccion</span>
-            <textarea
-              rows="2"
-              formControlName="address"
-              maxlength="300"
-            ></textarea>
-          </label>
-
-          <div class="form-actions full">
-            <button
-              type="submit"
-              class="ui-button ui-button--primary"
-              [disabled]="savingCreate"
-            >
-              {{ savingCreate ? "Guardando..." : "Crear proveedor" }}
-            </button>
-          </div>
-        </form>
-      </section>
-
-      <section
-        class="supplier-panel"
-        *ngIf="editingSupplierId !== null && canManage"
-      >
-        <header class="panel-head">
-          <h2>Editar proveedor #{{ editingSupplierId }}</h2>
-          <span class="ui-badge ui-badge--warning">Modo edicion</span>
-        </header>
-
-        <form [formGroup]="editForm" (ngSubmit)="update()" class="form-grid">
-          <label class="field">
-            <span>Documento</span>
-            <input
-              type="text"
-              formControlName="documentNumber"
-              maxlength="40"
-            />
-          </label>
-
-          <label class="field">
-            <span>Nombre *</span>
-            <input type="text" formControlName="name" maxlength="180" />
-            <small class="field-error" *ngIf="isEditInvalid('name')"
-              >Nombre es obligatorio.</small
-            >
-          </label>
-
-          <label class="field">
-            <span>Contacto</span>
-            <input type="text" formControlName="contactName" maxlength="120" />
-          </label>
-
-          <label class="field">
-            <span>Telefono</span>
-            <input type="text" formControlName="phone" maxlength="40" />
-          </label>
-
-          <label class="field">
-            <span>Email</span>
-            <input type="email" formControlName="email" maxlength="160" />
-            <small class="field-error" *ngIf="isEditInvalid('email')"
-              >Email invalido.</small
-            >
-          </label>
-
-          <label class="field full">
-            <span>Direccion</span>
-            <textarea
-              rows="2"
-              formControlName="address"
-              maxlength="300"
-            ></textarea>
-          </label>
-
-          <label class="checkbox-field full">
-            <input type="checkbox" formControlName="active" />
-            Proveedor activo
-          </label>
-
-          <div class="form-actions full">
-            <button
-              type="submit"
-              class="ui-button ui-button--primary"
-              [disabled]="savingEdit"
-            >
-              {{ savingEdit ? "Actualizando..." : "Actualizar proveedor" }}
-            </button>
-            <button
-              type="button"
-              class="ui-button ui-button--secondary"
-              (click)="cancelEdit()"
-            >
-              Cancelar
-            </button>
-          </div>
-        </form>
-      </section>
 
       <p class="ui-alert ui-alert--error" *ngIf="errorMessage">
         {{ errorMessage }}
@@ -214,7 +85,6 @@ import { SupplierService } from "./data/supplier.service";
         <table class="ui-table suppliers-table">
           <thead>
             <tr>
-              <th>ID</th>
               <th>Documento</th>
               <th>Nombre</th>
               <th>Contacto</th>
@@ -226,12 +96,11 @@ import { SupplierService } from "./data/supplier.service";
           </thead>
           <tbody>
             <tr *ngFor="let supplier of suppliers">
-              <td class="cell-id">{{ supplier.id }}</td>
-              <td>{{ supplier.documentNumber || "-" }}</td>
-              <td>{{ supplier.name }}</td>
-              <td>{{ supplier.contactName || "-" }}</td>
-              <td>{{ supplier.phone || "-" }}</td>
-              <td>{{ supplier.email || "-" }}</td>
+              <td class="cell-ellipsis" [title]="supplier.documentNumber || '-'">{{ supplier.documentNumber || "-" }}</td>
+              <td class="cell-ellipsis cell-name" [title]="supplier.name">{{ supplier.name }}</td>
+              <td class="cell-ellipsis" [title]="supplier.contactName || '-'">{{ supplier.contactName || "-" }}</td>
+              <td class="cell-ellipsis" [title]="supplier.phone || '-'">{{ supplier.phone || "-" }}</td>
+              <td class="cell-ellipsis" [title]="supplier.email || '-'">{{ supplier.email || "-" }}</td>
               <td>
                 <span
                   class="ui-badge"
@@ -246,27 +115,40 @@ import { SupplierService } from "./data/supplier.service";
                   type="button"
                   class="ui-button ui-button--secondary"
                   (click)="startEdit(supplier)"
+                  [disabled]="saving"
                 >
                   Editar
                 </button>
                 <button
+                  *ngIf="supplier.active"
                   type="button"
                   class="ui-button ui-button--danger"
-                  (click)="deactivate(supplier)"
-                  [disabled]="
-                    !supplier.active || deactivatingId === supplier.id
-                  "
+                  (click)="changeStatus(supplier, false)"
+                  [disabled]="statusChangingId === supplier.id"
                 >
                   {{
-                    deactivatingId === supplier.id
+                    statusChangingId === supplier.id
                       ? "Desactivando..."
                       : "Desactivar"
+                  }}
+                </button>
+                <button
+                  *ngIf="!supplier.active"
+                  type="button"
+                  class="ui-button ui-button--secondary"
+                  (click)="changeStatus(supplier, true)"
+                  [disabled]="statusChangingId === supplier.id"
+                >
+                  {{
+                    statusChangingId === supplier.id
+                      ? "Reactivando..."
+                      : "Reactivar"
                   }}
                 </button>
               </td>
             </tr>
             <tr *ngIf="suppliers.length === 0">
-              <td [attr.colspan]="canManage ? 8 : 7" class="ui-table__empty">
+              <td [attr.colspan]="canManage ? 7 : 6" class="ui-table__empty">
                 <div class="ui-empty-state">
                   No hay proveedores registrados.
                 </div>
@@ -275,6 +157,97 @@ import { SupplierService } from "./data/supplier.service";
           </tbody>
         </table>
       </div>
+
+      <section
+        class="supplier-drawer-backdrop"
+        *ngIf="panelOpen && canManage"
+        (click)="closePanel()"
+      >
+        <article
+          class="ui-card supplier-drawer"
+          role="dialog"
+          aria-modal="true"
+          [attr.aria-labelledby]="'supplier-drawer-title'"
+          (click)="$event.stopPropagation()"
+        >
+          <header class="supplier-drawer__head">
+            <div>
+              <span class="ui-chip ui-chip--warning" *ngIf="isEditing">Edicion</span>
+              <h2 id="supplier-drawer-title">{{ panelTitle }}</h2>
+              <p>{{ panelDescription }}</p>
+            </div>
+            <button
+              type="button"
+              class="ui-button ui-button--secondary"
+              (click)="closePanel()"
+              [disabled]="saving"
+            >
+              Cerrar
+            </button>
+          </header>
+
+          <form [formGroup]="form" (ngSubmit)="submit()" class="form-grid">
+            <label class="field">
+              <span>Documento</span>
+              <input type="text" formControlName="documentNumber" maxlength="40" />
+              <small class="field-error field-error--hidden" aria-hidden="true">&nbsp;</small>
+            </label>
+
+            <label class="field">
+              <span>Nombre *</span>
+              <input type="text" formControlName="name" maxlength="180" />
+              <small class="field-error" [class.field-error--hidden]="!isInvalid('name')">Nombre es obligatorio.</small>
+            </label>
+
+            <label class="field">
+              <span>Contacto</span>
+              <input type="text" formControlName="contactName" maxlength="120" />
+              <small class="field-error field-error--hidden" aria-hidden="true">&nbsp;</small>
+            </label>
+
+            <label class="field">
+              <span>Telefono</span>
+              <input type="text" formControlName="phone" maxlength="40" />
+              <small class="field-error field-error--hidden" aria-hidden="true">&nbsp;</small>
+            </label>
+
+            <label class="field">
+              <span>Email</span>
+              <input type="email" formControlName="email" maxlength="160" />
+              <small class="field-error" [class.field-error--hidden]="!isInvalid('email')">Email invalido.</small>
+            </label>
+
+            <label class="field full">
+              <span>Direccion</span>
+              <textarea rows="3" formControlName="address" maxlength="300"></textarea>
+              <small class="field-error field-error--hidden" aria-hidden="true">&nbsp;</small>
+            </label>
+
+            <label class="checkbox-field full" *ngIf="isEditing">
+              <input type="checkbox" formControlName="active" />
+              Proveedor activo
+            </label>
+
+            <div class="form-actions full">
+              <button
+                type="button"
+                class="ui-button ui-button--secondary"
+                (click)="closePanel()"
+                [disabled]="saving"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                class="ui-button ui-button--primary"
+                [disabled]="saving"
+              >
+                {{ saving ? savingLabel : submitButtonLabel }}
+              </button>
+            </div>
+          </form>
+        </article>
+      </section>
     </section>
   `,
   styles: [
@@ -285,7 +258,10 @@ import { SupplierService } from "./data/supplier.service";
         gap: var(--space-4);
       }
 
-      .panel-head,
+      .suppliers-page__description {
+        white-space: nowrap;
+      }
+
       h2 {
         margin: 0;
       }
@@ -321,6 +297,7 @@ import { SupplierService } from "./data/supplier.service";
         gap: var(--space-2);
         flex-wrap: wrap;
         justify-content: flex-end;
+        align-items: center;
       }
 
       input,
@@ -330,23 +307,6 @@ import { SupplierService } from "./data/supplier.service";
         border: 1px solid var(--color-border-strong);
         border-radius: var(--radius-sm);
         background: var(--color-bg-surface);
-      }
-
-      .supplier-panel {
-        border: 1px solid var(--color-border-default);
-        border-radius: var(--radius-md);
-        background: var(--color-bg-surface);
-        padding: var(--space-3);
-        display: grid;
-        gap: var(--space-3);
-      }
-
-      .panel-head {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: var(--space-2);
-        flex-wrap: wrap;
       }
 
       .form-grid {
@@ -367,6 +327,10 @@ import { SupplierService } from "./data/supplier.service";
         font-weight: 700;
       }
 
+      .checkbox-field input {
+        width: auto;
+      }
+
       .form-actions {
         display: flex;
         justify-content: flex-end;
@@ -383,26 +347,93 @@ import { SupplierService } from "./data/supplier.service";
         min-width: 980px;
       }
 
-      .cell-id {
+      .cell-name {
+        max-width: 18rem;
+      }
+
+      .cell-ellipsis {
+        max-width: 12rem;
         white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
 
       .actions-col {
         display: flex;
         gap: var(--space-2);
         flex-wrap: wrap;
+        align-items: stretch;
+      }
+
+      .actions-col .ui-button {
+        min-width: 7.75rem;
       }
 
       .field-error {
         margin: 0;
+        min-height: 1rem;
+        line-height: 1rem;
         color: var(--color-danger);
         font-size: var(--font-size-xs);
         font-weight: 700;
       }
 
+      .field-error--hidden {
+        visibility: hidden;
+      }
+
+      .supplier-drawer-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 120;
+        display: flex;
+        justify-content: flex-end;
+        background: rgba(16, 17, 20, 0.6);
+        backdrop-filter: blur(4px);
+        padding: var(--space-4);
+      }
+
+      .supplier-drawer {
+        width: min(42rem, 100%);
+        height: 100%;
+        max-height: calc(100vh - 2rem);
+        overflow: auto;
+        display: grid;
+        align-content: start;
+        gap: var(--space-4);
+        padding: var(--space-4);
+        border-radius: var(--radius-lg);
+        box-shadow: 0 24px 80px rgba(16, 17, 20, 0.34);
+      }
+
+      .supplier-drawer__head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: var(--space-3);
+      }
+
+      .supplier-drawer__head div {
+        display: grid;
+        gap: var(--space-2);
+      }
+
+      .supplier-drawer__head h2,
+      .supplier-drawer__head p {
+        margin: 0;
+      }
+
+      .supplier-drawer__head p {
+        color: var(--color-text-secondary);
+      }
+
       @media (max-width: 900px) {
         .suppliers-page {
           padding: var(--space-4);
+        }
+
+        .suppliers-page__description {
+          white-space: normal;
         }
 
         .search-panel {
@@ -420,21 +451,22 @@ import { SupplierService } from "./data/supplier.service";
         .form-actions {
           justify-content: flex-start;
         }
+
+        .supplier-drawer-backdrop {
+          padding: 0;
+        }
+
+        .supplier-drawer {
+          width: 100%;
+          max-height: 100vh;
+          border-radius: 0;
+        }
       }
     `,
   ],
 })
 export class SuppliersPageComponent implements OnInit {
-  readonly createForm = this.formBuilder.group({
-    documentNumber: ["", [Validators.maxLength(40)]],
-    name: ["", [Validators.required, Validators.maxLength(180)]],
-    contactName: ["", [Validators.maxLength(120)]],
-    phone: ["", [Validators.maxLength(40)]],
-    email: ["", [Validators.email, Validators.maxLength(160)]],
-    address: ["", [Validators.maxLength(300)]],
-  });
-
-  readonly editForm = this.formBuilder.group({
+  readonly form = this.formBuilder.group({
     documentNumber: ["", [Validators.maxLength(40)]],
     name: ["", [Validators.required, Validators.maxLength(180)]],
     contactName: ["", [Validators.maxLength(120)]],
@@ -448,10 +480,11 @@ export class SuppliersPageComponent implements OnInit {
   query = "";
 
   loading = false;
-  savingCreate = false;
-  savingEdit = false;
-  deactivatingId: number | null = null;
+  saving = false;
+  statusChangingId: number | null = null;
 
+  panelOpen = false;
+  formMode: SupplierFormMode = "create";
   editingSupplierId: number | null = null;
 
   errorMessage = "";
@@ -462,6 +495,7 @@ export class SuppliersPageComponent implements OnInit {
     private readonly formBuilder: FormBuilder,
     private readonly supplierService: SupplierService,
     private readonly authService: AuthService,
+    private readonly confirmDialog: ConfirmDialogService,
   ) {}
 
   ngOnInit(): void {
@@ -478,49 +512,81 @@ export class SuppliersPageComponent implements OnInit {
     this.loadSuppliers();
   }
 
-  create(): void {
+  get isEditing(): boolean {
+    return this.formMode === "edit" && this.editingSupplierId !== null;
+  }
+
+  get panelTitle(): string {
+    return this.isEditing ? "Editar proveedor" : "Nuevo proveedor";
+  }
+
+  get panelDescription(): string {
+    return this.isEditing
+      ? "Actualiza datos de contacto y disponibilidad operativa sin salir del listado."
+      : "Registra un proveedor nuevo manteniendo la tabla principal visible en segundo plano.";
+  }
+
+  get submitButtonLabel(): string {
+    return this.isEditing ? "Guardar cambios" : "Crear proveedor";
+  }
+
+  get savingLabel(): string {
+    return this.isEditing ? "Guardando..." : "Creando...";
+  }
+
+  openCreatePanel(): void {
     if (!this.canManage) {
       return;
     }
 
-    if (this.createForm.invalid) {
-      this.createForm.markAllAsTouched();
+    this.formMode = "create";
+    this.panelOpen = true;
+    this.editingSupplierId = null;
+    this.errorMessage = "";
+    this.form.reset(this.emptyFormValue());
+  }
+
+  submit(): void {
+    if (!this.canManage) {
       return;
     }
 
-    this.savingCreate = true;
+    if (this.form.invalid) {
+      this.form.markAllAsTouched();
+      return;
+    }
+
+    this.saving = true;
     this.errorMessage = "";
     this.successMessage = "";
 
+    if (this.isEditing) {
+      this.update();
+      return;
+    }
+
     const payload: SupplierCreateRequest = {
       documentNumber: this.normalizeOptional(
-        this.createForm.controls.documentNumber.value,
+        this.form.controls.documentNumber.value,
       ),
-      name: (this.createForm.controls.name.value ?? "").trim(),
+      name: (this.form.controls.name.value ?? "").trim(),
       contactName: this.normalizeOptional(
-        this.createForm.controls.contactName.value,
+        this.form.controls.contactName.value,
       ),
-      phone: this.normalizeOptional(this.createForm.controls.phone.value),
-      email: this.normalizeOptional(this.createForm.controls.email.value),
-      address: this.normalizeOptional(this.createForm.controls.address.value),
+      phone: this.normalizeOptional(this.form.controls.phone.value),
+      email: this.normalizeOptional(this.form.controls.email.value),
+      address: this.normalizeOptional(this.form.controls.address.value),
     };
 
     this.supplierService.create(payload).subscribe({
       next: () => {
-        this.savingCreate = false;
+        this.saving = false;
         this.successMessage = "Proveedor creado correctamente.";
-        this.createForm.reset({
-          documentNumber: "",
-          name: "",
-          contactName: "",
-          phone: "",
-          email: "",
-          address: "",
-        });
+        this.closePanel();
         this.loadSuppliers();
       },
       error: (error: unknown) => {
-        this.savingCreate = false;
+        this.saving = false;
         this.errorMessage = toHttpErrorMessage(
           error,
           "No se pudo crear el proveedor.",
@@ -535,7 +601,9 @@ export class SuppliersPageComponent implements OnInit {
     }
 
     this.editingSupplierId = supplier.id;
-    this.editForm.reset({
+    this.formMode = "edit";
+    this.panelOpen = true;
+    this.form.reset({
       documentNumber: supplier.documentNumber ?? "",
       name: supplier.name,
       contactName: supplier.contactName ?? "",
@@ -546,9 +614,15 @@ export class SuppliersPageComponent implements OnInit {
     });
   }
 
-  cancelEdit(): void {
+  closePanel(): void {
+    if (this.saving) {
+      return;
+    }
+
     this.editingSupplierId = null;
-    this.editForm.reset({ active: true });
+    this.panelOpen = false;
+    this.formMode = "create";
+    this.form.reset(this.emptyFormValue());
   }
 
   update(): void {
@@ -556,38 +630,29 @@ export class SuppliersPageComponent implements OnInit {
       return;
     }
 
-    if (this.editForm.invalid) {
-      this.editForm.markAllAsTouched();
-      return;
-    }
-
-    this.savingEdit = true;
-    this.errorMessage = "";
-    this.successMessage = "";
-
     const payload: SupplierUpdateRequest = {
       documentNumber: this.normalizeOptional(
-        this.editForm.controls.documentNumber.value,
+        this.form.controls.documentNumber.value,
       ),
-      name: (this.editForm.controls.name.value ?? "").trim(),
+      name: (this.form.controls.name.value ?? "").trim(),
       contactName: this.normalizeOptional(
-        this.editForm.controls.contactName.value,
+        this.form.controls.contactName.value,
       ),
-      phone: this.normalizeOptional(this.editForm.controls.phone.value),
-      email: this.normalizeOptional(this.editForm.controls.email.value),
-      address: this.normalizeOptional(this.editForm.controls.address.value),
-      active: this.editForm.controls.active.value ?? true,
+      phone: this.normalizeOptional(this.form.controls.phone.value),
+      email: this.normalizeOptional(this.form.controls.email.value),
+      address: this.normalizeOptional(this.form.controls.address.value),
+      active: this.form.controls.active.value ?? true,
     };
 
     this.supplierService.update(this.editingSupplierId, payload).subscribe({
       next: () => {
-        this.savingEdit = false;
+        this.saving = false;
         this.successMessage = "Proveedor actualizado correctamente.";
-        this.cancelEdit();
+        this.closePanel();
         this.loadSuppliers();
       },
       error: (error: unknown) => {
-        this.savingEdit = false;
+        this.saving = false;
         this.errorMessage = toHttpErrorMessage(
           error,
           "No se pudo actualizar el proveedor.",
@@ -596,30 +661,65 @@ export class SuppliersPageComponent implements OnInit {
     });
   }
 
-  deactivate(supplier: SupplierResponse): void {
-    if (!this.canManage || !supplier.active) {
+  async changeStatus(supplier: SupplierResponse, active: boolean): Promise<void> {
+    if (!this.canManage || this.statusChangingId !== null) {
       return;
     }
 
-    const confirmed = window.confirm(
-      `Desactivar proveedor ${supplier.name}? Esta accion no elimina datos.`,
-    );
+    const confirmed = await this.confirmDialog.confirm({
+      title: active ? "Reactivar proveedor" : "Desactivar proveedor",
+      description: active
+        ? "El proveedor volvera a estar disponible para operaciones de compra."
+        : "El proveedor se marcara como inactivo. Su historial se conserva y podras reactivarlo luego.",
+      highlightText: supplier.name,
+      confirmText: active ? "Reactivar proveedor" : "Desactivar proveedor",
+      cancelText: "Cancelar",
+      variant: active ? "info" : "warning",
+    });
     if (!confirmed) {
       return;
     }
 
-    this.deactivatingId = supplier.id;
+    this.statusChangingId = supplier.id;
     this.errorMessage = "";
     this.successMessage = "";
 
+    if (active) {
+      this.supplierService
+        .update(supplier.id, {
+          documentNumber: supplier.documentNumber,
+          name: supplier.name,
+          contactName: supplier.contactName,
+          phone: supplier.phone,
+          email: supplier.email,
+          address: supplier.address,
+          active: true,
+        })
+        .subscribe({
+          next: () => {
+            this.statusChangingId = null;
+            this.successMessage = "Proveedor reactivado correctamente.";
+            this.loadSuppliers();
+          },
+          error: (error: unknown) => {
+            this.statusChangingId = null;
+            this.errorMessage = toHttpErrorMessage(
+              error,
+              "No se pudo reactivar el proveedor.",
+            );
+          },
+        });
+      return;
+    }
+
     this.supplierService.deactivate(supplier.id).subscribe({
       next: () => {
-        this.deactivatingId = null;
+        this.statusChangingId = null;
         this.successMessage = "Proveedor desactivado correctamente.";
         this.loadSuppliers();
       },
       error: (error: unknown) => {
-        this.deactivatingId = null;
+        this.statusChangingId = null;
         this.errorMessage = toHttpErrorMessage(
           error,
           "No se pudo desactivar el proveedor.",
@@ -628,13 +728,8 @@ export class SuppliersPageComponent implements OnInit {
     });
   }
 
-  isCreateInvalid(controlName: string): boolean {
-    const control = this.createForm.get(controlName);
-    return !!control && control.invalid && (control.touched || control.dirty);
-  }
-
-  isEditInvalid(controlName: string): boolean {
-    const control = this.editForm.get(controlName);
+  isInvalid(controlName: string): boolean {
+    const control = this.form.get(controlName);
     return !!control && control.invalid && (control.touched || control.dirty);
   }
 
@@ -677,5 +772,17 @@ export class SuppliersPageComponent implements OnInit {
 
     const trimmed = value.trim();
     return trimmed.length > 0 ? trimmed : null;
+  }
+
+  private emptyFormValue() {
+    return {
+      documentNumber: "",
+      name: "",
+      contactName: "",
+      phone: "",
+      email: "",
+      address: "",
+      active: true,
+    };
   }
 }
