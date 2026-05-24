@@ -1,6 +1,6 @@
 import { HttpClient, HttpParams } from "@angular/common/http";
 import { Injectable } from "@angular/core";
-import { Observable } from "rxjs";
+import { map, Observable, of, switchMap } from "rxjs";
 
 import { environment } from "../../../../environments/environment";
 import {
@@ -52,9 +52,26 @@ export class ElectronicDocumentService {
       params = params.set("to", filters.to);
     }
 
-    return this.http.get<ElectronicDocumentResponse[]>(this.endpoint, {
-      params,
-    });
+    return this.http
+      .get<unknown>(this.endpoint, {
+        params,
+      })
+      .pipe(map((payload) => this.normalizeListResponse(payload)));
+  }
+
+  listBySaleId(saleId: number): Observable<ElectronicDocumentResponse[]> {
+    return this.list({ saleId }).pipe(
+      switchMap((rows) => {
+        const matches = this.filterBySaleId(rows, saleId);
+        if (matches.length > 0) {
+          return of(matches);
+        }
+
+        return this.list().pipe(
+          map((allRows) => this.filterBySaleId(allRows, saleId)),
+        );
+      }),
+    );
   }
 
   getById(id: number): Observable<ElectronicDocumentResponse> {
@@ -90,5 +107,42 @@ export class ElectronicDocumentService {
     return this.http.get<ElectronicDocumentHistoryResponse[]>(
       `${this.endpoint}/${id}/history`,
     );
+  }
+
+  private normalizeListResponse(payload: unknown): ElectronicDocumentResponse[] {
+    if (Array.isArray(payload)) {
+      return payload as ElectronicDocumentResponse[];
+    }
+
+    if (!payload || typeof payload !== "object") {
+      return [];
+    }
+
+    const wrapper = payload as {
+      content?: unknown;
+      items?: unknown;
+      data?: unknown;
+    };
+
+    if (Array.isArray(wrapper.content)) {
+      return wrapper.content as ElectronicDocumentResponse[];
+    }
+
+    if (Array.isArray(wrapper.items)) {
+      return wrapper.items as ElectronicDocumentResponse[];
+    }
+
+    if (Array.isArray(wrapper.data)) {
+      return wrapper.data as ElectronicDocumentResponse[];
+    }
+
+    return [];
+  }
+
+  private filterBySaleId(
+    rows: ElectronicDocumentResponse[],
+    saleId: number,
+  ): ElectronicDocumentResponse[] {
+    return rows.filter((row) => Number(row.saleId) === saleId);
   }
 }

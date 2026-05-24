@@ -5,8 +5,10 @@ import com.erppos.backend.erp.billing.domain.model.BillingSaleSnapshot;
 import com.erppos.backend.erp.billing.domain.port.BillingSaleReadPort;
 import com.erppos.backend.erp.sales.application.usecase.SalesUseCase;
 import com.erppos.backend.erp.sales.domain.exception.SalesNotFoundException;
+import com.erppos.backend.erp.sales.domain.model.PosProductSnapshot;
 import com.erppos.backend.erp.sales.domain.model.Sale;
 import com.erppos.backend.erp.sales.domain.model.SaleItem;
+import com.erppos.backend.erp.sales.domain.port.CatalogReadPort;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
@@ -15,9 +17,11 @@ import java.util.Optional;
 public class SalesBillingReadAdapter implements BillingSaleReadPort {
 
     private final SalesUseCase salesUseCase;
+    private final CatalogReadPort catalogReadPort;
 
-    public SalesBillingReadAdapter(SalesUseCase salesUseCase) {
+    public SalesBillingReadAdapter(SalesUseCase salesUseCase, CatalogReadPort catalogReadPort) {
         this.salesUseCase = salesUseCase;
+        this.catalogReadPort = catalogReadPort;
     }
 
     @Override
@@ -42,9 +46,12 @@ public class SalesBillingReadAdapter implements BillingSaleReadPort {
     }
 
     private BillingSaleItemSnapshot toSnapshotItem(SaleItem item) {
+        PosProductSnapshot product = catalogReadPort.findById(item.productId()).orElse(null);
         return new BillingSaleItemSnapshot(
                 item.productId(),
-                null,
+                product != null ? product.name() : null,
+                product != null ? product.sku() : null,
+                product != null ? product.barcode() : null,
                 item.quantity(),
                 item.unitPrice(),
                 item.discountAmount(),

@@ -587,7 +587,19 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [x] `docker compose up --build -d` y `docker compose ps` exitosos.
 - [x] Backend, DB, Flyway, endpoints, servicios Angular, modelos, rutas, guards, AuthService, JWT/interceptor y payload sin cambios.
 
-## Sidebar avanzado InkToy (2026-05-05)
+### Facturacion - Detalle comprobante electronico e items enriquecidos (2026-05-24)
+
+- [ ] Detalle: validar que el comprobante muestra nombre real del producto en la tabla de items.
+- [ ] Detalle: validar que se muestra SKU como dato secundario.
+- [ ] Detalle: validar que no se muestra ID tecnico como dato operativo.
+- [ ] Detalle: validar producto con barcode y sin barcode si aplica.
+- [ ] Detalle: validar historial de estados ordenado por fecha descendente.
+- [ ] Detalle: validar XML tecnico colapsable.
+- [ ] Detalle: validar generacion/firma/envio sin regresion.
+- [ ] Detalle: validar que POS, listado de comprobantes y emision pendiente siguen funcionando.
+- [ ] Sin cambios en DB/Flyway, endpoints principales, POS ni contratos de payload.
+
+### Sidebar avanzado InkToy (2026-05-05)
 
 - [x] Build frontend (`npm run build`) exitoso tras cambios del sidebar.
 - [x] `docker compose up --build -d` y `docker compose ps` exitosos.

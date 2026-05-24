@@ -65,6 +65,9 @@ export interface CreateElectronicDocumentFromSaleRequest {
 export interface ElectronicDocumentItemResponse {
   id: number;
   productId: number;
+  productName?: string | null;
+  sku?: string | null;
+  barcode?: string | null;
   description: string;
   quantity: number;
   unitPrice: number;

@@ -13,6 +13,8 @@ import com.erppos.backend.erp.billing.domain.model.ElectronicDocumentItem;
 import com.erppos.backend.erp.billing.domain.model.ElectronicDocumentStatus;
 import com.erppos.backend.erp.billing.domain.model.ElectronicDocumentStatusHistory;
 import com.erppos.backend.erp.billing.domain.model.ElectronicDocumentType;
+import com.erppos.backend.erp.sales.domain.model.PosProductSnapshot;
+import com.erppos.backend.erp.sales.domain.port.CatalogReadPort;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -34,9 +36,11 @@ import java.util.List;
 public class ElectronicDocumentController {
 
     private final ElectronicDocumentUseCase documentUseCase;
+    private final CatalogReadPort catalogReadPort;
 
-    public ElectronicDocumentController(ElectronicDocumentUseCase documentUseCase) {
+    public ElectronicDocumentController(ElectronicDocumentUseCase documentUseCase, CatalogReadPort catalogReadPort) {
         this.documentUseCase = documentUseCase;
+        this.catalogReadPort = catalogReadPort;
     }
 
     @PostMapping("/from-sale/{saleId}")
@@ -139,9 +143,13 @@ public class ElectronicDocumentController {
     }
 
     private ElectronicDocumentItemResponse toItem(ElectronicDocumentItem item) {
+        PosProductSnapshot product = catalogReadPort.findById(item.productId()).orElse(null);
         return new ElectronicDocumentItemResponse(
                 item.id(),
                 item.productId(),
+                product != null ? product.name() : item.description(),
+                product != null ? product.sku() : null,
+                product != null ? product.barcode() : null,
                 item.description(),
                 item.quantity(),
                 item.unitPrice(),

@@ -65,8 +65,8 @@ public class ElectronicDocumentPersistenceAdapter implements ElectronicDocumentR
     }
 
     @Override
-    public boolean existsBySaleIdAndDocumentType(Long saleId, ElectronicDocumentType type) {
-        return documentJpaRepository.existsBySaleIdAndDocumentType(saleId, type);
+    public boolean existsBySaleId(Long saleId) {
+        return documentJpaRepository.existsBySaleId(saleId);
     }
 }
 

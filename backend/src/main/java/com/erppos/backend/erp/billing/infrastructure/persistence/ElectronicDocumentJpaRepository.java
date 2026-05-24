@@ -31,9 +31,7 @@ public interface ElectronicDocumentJpaRepository extends JpaRepository<Electroni
             select count(d) > 0
             from ElectronicDocumentEntity d
             where d.saleId = :saleId
-              and d.documentType = :documentType
-              and d.status <> com.erppos.backend.erp.billing.domain.model.ElectronicDocumentStatus.CANCELLED
             """)
-    boolean existsBySaleIdAndDocumentType(Long saleId, ElectronicDocumentType documentType);
+    boolean existsBySaleId(Long saleId);
 }
 

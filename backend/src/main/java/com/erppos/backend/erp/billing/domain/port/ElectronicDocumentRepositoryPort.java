@@ -12,6 +12,6 @@ public interface ElectronicDocumentRepositoryPort {
     ElectronicDocument save(ElectronicDocument document);
     Optional<ElectronicDocument> findById(Long id);
     List<ElectronicDocument> findByFilters(ElectronicDocumentStatus status, ElectronicDocumentType type, Long saleId, LocalDate from, LocalDate to);
-    boolean existsBySaleIdAndDocumentType(Long saleId, ElectronicDocumentType type);
+    boolean existsBySaleId(Long saleId);
 }
 

@@ -238,6 +238,23 @@ class BillingApplicationServiceTest {
     }
 
     @Test
+    void shouldRejectSecondDocumentForSameSaleEvenWithDifferentType() {
+        documentService.createFromSale(1L, new CreateElectronicDocumentFromSaleCommand(
+                ElectronicDocumentType.RECEIPT,
+                1L,
+                null,
+                null
+        ));
+
+        assertThrows(BillingConflictException.class, () -> documentService.createFromSale(1L, new CreateElectronicDocumentFromSaleCommand(
+                ElectronicDocumentType.INVOICE,
+                2L,
+                "Cliente Factura",
+                "10456789012"
+        )));
+    }
+
+    @Test
     void shouldIncrementCorrelative() {
         ElectronicDocument first = documentService.createFromSale(1L, new CreateElectronicDocumentFromSaleCommand(
                 ElectronicDocumentType.RECEIPT,
@@ -341,7 +358,7 @@ class BillingApplicationServiceTest {
                 BigDecimal.valueOf(20),
                 Instant.now(),
                 "cajero",
-                List.of(new BillingSaleItemSnapshot(1L, "Producto " + id, BigDecimal.valueOf(2), BigDecimal.TEN, BigDecimal.ZERO, BigDecimal.valueOf(20)))
+                List.of(new BillingSaleItemSnapshot(1L, "Producto " + id, "SKU-" + id, null, BigDecimal.valueOf(2), BigDecimal.TEN, BigDecimal.ZERO, BigDecimal.valueOf(20)))
         );
     }
 
@@ -356,7 +373,7 @@ class BillingApplicationServiceTest {
                 BigDecimal.valueOf(20),
                 Instant.now(),
                 "cajero",
-                List.of(new BillingSaleItemSnapshot(1L, "Producto " + id, BigDecimal.valueOf(2), BigDecimal.TEN, BigDecimal.ZERO, BigDecimal.valueOf(20)))
+                List.of(new BillingSaleItemSnapshot(1L, "Producto " + id, "SKU-" + id, null, BigDecimal.valueOf(2), BigDecimal.TEN, BigDecimal.ZERO, BigDecimal.valueOf(20)))
         );
     }
 
@@ -491,11 +508,8 @@ class BillingApplicationServiceTest {
         }
 
         @Override
-        public boolean existsBySaleIdAndDocumentType(Long saleId, ElectronicDocumentType type) {
-            return storage.values().stream().anyMatch(d -> d.saleId().equals(saleId)
-                    && d.documentType() == type
-                    && d.status() != ElectronicDocumentStatus.CANCELLED
-            );
+        public boolean existsBySaleId(Long saleId) {
+            return storage.values().stream().anyMatch(d -> d.saleId().equals(saleId));
         }
     }
 

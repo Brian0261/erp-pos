@@ -1,4 +1,5 @@
 import { CommonModule } from "@angular/common";
+import { HttpErrorResponse } from "@angular/common/http";
 import { Component, OnInit } from "@angular/core";
 import { FormBuilder, ReactiveFormsModule } from "@angular/forms";
 import { Router, RouterLink } from "@angular/router";
@@ -13,6 +14,7 @@ import {
 } from "./data/billing.models";
 import { ElectronicDocumentService } from "./data/electronic-document.service";
 import { toHttpErrorMessage } from "./data/http-error-message";
+import { SalesService } from "../sales/data/sales.service";
 
 @Component({
   selector: "app-billing-documents-page",
@@ -41,16 +43,17 @@ import { toHttpErrorMessage } from "./data/http-error-message";
         {{ successMessage }}
       </p>
 
-      <section class="issue-action-section">
+      <section class="issue-action-section" [formGroup]="filtersForm">
         <header class="section-head">
-          <h2>Nueva emision desde venta</h2>
+          <h2>Emitir comprobante pendiente</h2>
           <p class="section-help">
-            Genera un comprobante electronico usando una venta ya registrada.
+            Usa esta opcion solo si una venta ya registrada quedo sin comprobante
+            o requiere reintento de emision. Para ventas nuevas, emite desde POS.
           </p>
         </header>
         <div class="issue-action-row">
           <label class="field issue-field">
-            <span>ID de venta</span>
+            <span>Venta existente</span>
             <input
               type="text"
               inputmode="numeric"
@@ -66,8 +69,19 @@ import { toHttpErrorMessage } from "./data/http-error-message";
             (click)="goToIssue()"
             [disabled]="loading || !canView"
           >
-            Generar comprobante
+            Continuar emision
           </button>
+          <a class="ui-button ui-button--secondary" [routerLink]="['/pos']">
+            Ir al POS
+          </a>
+        </div>
+        <div class="issue-action-row" *ngIf="existingDocumentId">
+          <a
+            class="ui-button ui-button--secondary"
+            [routerLink]="['/facturacion/comprobantes', existingDocumentId]"
+          >
+            Ver comprobante
+          </a>
         </div>
       </section>
 
@@ -536,12 +550,14 @@ export class BillingDocumentsPageComponent implements OnInit {
   permissionMessage = "";
   errorMessage = "";
   successMessage = "";
+  existingDocumentId: number | null = null;
 
   constructor(
     private readonly formBuilder: FormBuilder,
     private readonly authService: AuthService,
     private readonly router: Router,
     private readonly electronicDocumentService: ElectronicDocumentService,
+    private readonly salesService: SalesService,
   ) {}
 
   ngOnInit(): void {
@@ -585,13 +601,53 @@ export class BillingDocumentsPageComponent implements OnInit {
   }
 
   goToIssue(): void {
+    this.errorMessage = "";
+    this.successMessage = "";
+    this.existingDocumentId = null;
     const saleId = Number(this.filtersForm.controls.emitSaleId.value);
     if (!Number.isFinite(saleId) || saleId <= 0) {
-      this.errorMessage = "Ingresa un saleId valido para emitir comprobante.";
+      this.errorMessage = "Ingresa el ID de una venta existente.";
       return;
     }
 
-    this.router.navigate(["/facturacion/emitir", saleId]);
+    this.salesService
+      .getById(saleId)
+      .subscribe({
+        next: (sale) => {
+          if (sale.status !== "COMPLETED") {
+            this.errorMessage =
+              "Solo se pueden emitir comprobantes para ventas completadas.";
+            return;
+          }
+
+          this.electronicDocumentService
+            .listBySaleId(saleId)
+            .subscribe({
+              next: (rows) => {
+                if (rows.length > 0) {
+                  this.existingDocumentId = rows[0]?.id ?? null;
+                  this.errorMessage = "Esta venta ya tiene comprobante asociado.";
+                  return;
+                }
+                this.router.navigate(["/facturacion/emitir", saleId]);
+              },
+              error: () => {
+                this.errorMessage =
+                  "No pudimos validar si la venta ya tiene comprobante. Intentalo nuevamente.";
+              },
+            });
+        },
+        error: (error: unknown) => {
+          if (error instanceof HttpErrorResponse && error.status === 404) {
+            this.errorMessage = "No encontramos la venta indicada.";
+            return;
+          }
+          this.errorMessage = toHttpErrorMessage(
+            error,
+            "No se pudo validar la venta indicada. Intentalo nuevamente.",
+          );
+        },
+      });
   }
 
   onSaleIdInput(controlName: "saleId" | "emitSaleId"): void {

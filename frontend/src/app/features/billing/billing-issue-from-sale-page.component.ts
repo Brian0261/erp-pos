@@ -33,6 +33,9 @@ import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.servic
             Venta {{ sale.saleNumber }} (ID de venta {{ sale.id }}): define tipo, serie
             y datos de cliente para emitir sin alterar reglas tributarias.
           </p>
+          <p class="ui-page-description">
+            Este flujo se usa para emitir o reintentar comprobantes de ventas ya registradas.
+          </p>
         </div>
         <a
           class="ui-button ui-button--secondary"
@@ -51,6 +54,24 @@ import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.servic
       <p class="ui-alert ui-alert--success" *ngIf="successMessage">
         {{ successMessage }}
       </p>
+      <div class="form-actions" *ngIf="hasExistingDocument">
+        <p class="ui-alert ui-alert--error">
+          Esta venta ya tiene comprobante asociado.
+        </p>
+        <a
+          class="ui-button ui-button--secondary"
+          *ngIf="existingDocumentId"
+          [routerLink]="['/facturacion/comprobantes', existingDocumentId]"
+        >
+          Ver comprobante
+        </a>
+        <a class="ui-button ui-button--secondary" [routerLink]="['/facturacion/comprobantes']">
+          Volver a Comprobantes
+        </a>
+        <a class="ui-button ui-button--secondary" [routerLink]="['/ventas', sale.id]">
+          Volver a Venta
+        </a>
+      </div>
 
       <section class="steps-strip">
         <span class="ui-badge step-badge">Paso 1: Venta</span>
@@ -125,7 +146,12 @@ import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.servic
         </article>
       </section>
 
-      <form [formGroup]="form" class="form-layout" (ngSubmit)="submit()">
+      <form
+        *ngIf="!hasExistingDocument"
+        [formGroup]="form"
+        class="form-layout"
+        (ngSubmit)="submit()"
+      >
         <section class="form-section">
           <header class="section-head">
             <h2>Paso 2: Tipo y serie</h2>
@@ -414,6 +440,8 @@ export class BillingIssueFromSalePageComponent implements OnInit {
   permissionMessage = "";
   errorMessage = "";
   successMessage = "";
+  hasExistingDocument = false;
+  existingDocumentId: number | null = null;
 
   constructor(
     private readonly route: ActivatedRoute,
@@ -429,7 +457,7 @@ export class BillingIssueFromSalePageComponent implements OnInit {
   ngOnInit(): void {
     const id = Number(this.route.snapshot.paramMap.get("saleId"));
     if (!Number.isFinite(id) || id <= 0) {
-      this.errorMessage = "saleId invalido.";
+      this.errorMessage = "Ingresa una venta valida para continuar.";
       return;
     }
 
@@ -545,11 +573,38 @@ export class BillingIssueFromSalePageComponent implements OnInit {
     this.successMessage = "";
 
     if (this.sale.status !== "COMPLETED") {
-      this.errorMessage = "Solo ventas COMPLETED pueden emitir comprobantes.";
+      this.errorMessage = "Solo se pueden emitir comprobantes para ventas completadas.";
+      return;
+    }
+
+    this.submitting = true;
+    this.electronicDocumentService.listBySaleId(this.sale.id).subscribe({
+      next: async (rows) => {
+        if (rows.length > 0) {
+          this.submitting = false;
+          this.hasExistingDocument = true;
+          this.existingDocumentId = rows[0]?.id ?? null;
+          this.errorMessage = "Esta venta ya tiene comprobante asociado.";
+          return;
+        }
+        this.submitWithValidatedSale();
+      },
+      error: () => {
+        this.submitting = false;
+        this.errorMessage =
+          "No pudimos validar si la venta ya tiene comprobante. Intentalo nuevamente.";
+      },
+    });
+  }
+
+  private async submitWithValidatedSale(): Promise<void> {
+    if (!this.sale) {
+      this.submitting = false;
       return;
     }
 
     if (this.form.invalid) {
+      this.submitting = false;
       this.form.markAllAsTouched();
       return;
     }
@@ -560,8 +615,8 @@ export class BillingIssueFromSalePageComponent implements OnInit {
     const customerDocument = this.normalizeOptional(raw.customerDocument);
 
     if (documentType === "INVOICE" && (!customerName || !customerDocument)) {
-      this.errorMessage =
-        "Para FACTURA debes completar customerName y customerDocument.";
+      this.submitting = false;
+      this.errorMessage = "Para Factura debes completar nombre y documento del cliente.";
       return;
     }
 
@@ -574,6 +629,7 @@ export class BillingIssueFromSalePageComponent implements OnInit {
     });
 
     if (!confirmed) {
+      this.submitting = false;
       return;
     }
 
@@ -583,8 +639,6 @@ export class BillingIssueFromSalePageComponent implements OnInit {
       customerName,
       customerDocument,
     };
-
-    this.submitting = true;
 
     this.electronicDocumentService
       .createFromSale(this.sale.id, payload)
@@ -608,9 +662,17 @@ export class BillingIssueFromSalePageComponent implements OnInit {
     forkJoin({
       sale: this.salesService.getById(this.saleId),
       seriesRows: this.billingSeriesService.list(),
+      documents: this.electronicDocumentService.listBySaleId(this.saleId),
     }).subscribe({
-      next: ({ sale, seriesRows }) => {
+      next: ({ sale, seriesRows, documents }) => {
         this.sale = sale;
+        this.hasExistingDocument = documents.length > 0;
+        this.existingDocumentId = documents[0]?.id ?? null;
+        if (this.hasExistingDocument) {
+          this.form.disable();
+          this.errorMessage = "Esta venta ya tiene comprobante asociado.";
+          return;
+        }
         this.seriesRows = seriesRows.filter((series) => series.active);
         this.filterSeries();
       },

@@ -97,8 +97,8 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
         if (!"COMPLETED".equalsIgnoreCase(sale.status())) {
             throw new BillingBusinessRuleException("Only COMPLETED sales can be billed");
         }
-        if (documentRepositoryPort.existsBySaleIdAndDocumentType(saleId, command.documentType())) {
-            throw new BillingConflictException("Electronic document already exists for sale and documentType");
+        if (documentRepositoryPort.existsBySaleId(saleId)) {
+            throw new BillingConflictException("La venta ya tiene un comprobante asociado.");
         }
         if (sale.totalAmount() == null || sale.totalAmount().compareTo(ZERO) <= 0) {
             throw new BillingBusinessRuleException("Sale total must be > 0");
