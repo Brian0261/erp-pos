@@ -14,8 +14,16 @@ import { PosDraftState, PosStateService } from "./data/pos-state.service";
 import { SalesService } from "./data/sales.service";
 import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.service";
 import {
+  BillingSeriesResponse,
+  CreateElectronicDocumentFromSaleRequest,
+  ElectronicDocumentType,
+} from "../billing/data/billing.models";
+import { BillingSeriesService } from "../billing/data/billing-series.service";
+import { ElectronicDocumentService } from "../billing/data/electronic-document.service";
+import {
   CashRegisterResponse,
   CreateSaleRequest,
+  SaleResponse,
   PaymentMethod,
   PosProductResponse,
 } from "./data/sales.models";
@@ -36,6 +44,8 @@ interface PaymentLine {
   amount: number;
   reference: string;
 }
+
+type PosReceiptType = "TICKET" | "RECEIPT" | "INVOICE";
 
 @Component({
   selector: "app-pos-page",
@@ -152,9 +162,12 @@ interface PaymentLine {
             </section>
           </form>
 
-          <div class="message-stack" *ngIf="errorMessage || successMessage">
+          <div class="message-stack" *ngIf="errorMessage || warningMessage || successMessage">
             <p class="ui-alert ui-alert--error" *ngIf="errorMessage">
               {{ errorMessage }}
+            </p>
+            <p class="ui-alert ui-alert--info" *ngIf="warningMessage">
+              {{ warningMessage }}
             </p>
             <p class="ui-alert ui-alert--success" *ngIf="successMessage">
               {{ successMessage }}
@@ -414,6 +427,156 @@ interface PaymentLine {
             </div>
           </section>
 
+          <section class="receipt-panel">
+            <header class="panel-head panel-head--compact">
+              <div>
+                <p class="panel-kicker">Comprobante</p>
+                <h2>Tipo de documento</h2>
+              </div>
+            </header>
+
+            <div class="receipt-type-list">
+              <button
+                type="button"
+                class="receipt-segment"
+                [class.is-active]="receiptType === 'TICKET'"
+                (click)="setReceiptType('TICKET')"
+              >
+                Ticket interno
+              </button>
+              <button
+                type="button"
+                class="receipt-segment"
+                [class.is-active]="receiptType === 'RECEIPT'"
+                (click)="setReceiptType('RECEIPT')"
+              >
+                Boleta
+              </button>
+              <button
+                type="button"
+                class="receipt-segment"
+                [class.is-active]="receiptType === 'INVOICE'"
+                (click)="setReceiptType('INVOICE')"
+              >
+                Factura
+              </button>
+            </div>
+
+            <div class="receipt-customer-grid" *ngIf="receiptType !== 'TICKET'">
+              <label class="mini-field mini-field--wide">
+                <span>Serie de comprobante *</span>
+                <select
+                  [value]="receiptSeriesId"
+                  (change)="setReceiptSeriesId($any($event.target).value)"
+                >
+                  <option value="">Selecciona serie</option>
+                  <option *ngFor="let row of filteredBillingSeries" [value]="row.id">
+                    {{ row.series }}
+                  </option>
+                </select>
+                <small class="field-inline-error" *ngIf="receiptSeriesInvalid">
+                  Debes seleccionar una serie para emitir el comprobante.
+                </small>
+              </label>
+            </div>
+
+            <div class="receipt-no-series" *ngIf="showNoSeriesMessage">
+              <p class="field-inline-error">
+                {{ noSeriesMessage }}
+              </p>
+              <a
+                class="ui-button ui-button--secondary pos-button pos-button--quiet receipt-series-link"
+                [routerLink]="['/facturacion/series']"
+              >
+                Ir a series
+              </a>
+            </div>
+
+            <div class="receipt-customer-grid" *ngIf="receiptType === 'RECEIPT'">
+              <label class="mini-field">
+                <span>Documento (DNI)</span>
+                <input
+                  type="text"
+                  inputmode="numeric"
+                  [value]="receiptCustomerDocument"
+                  maxlength="8"
+                  (input)="setReceiptCustomerDocument($any($event.target).value)"
+                  (keydown)="blockInvalidNumericKeys($event)"
+                  placeholder="Opcional"
+                />
+                <small class="field-inline-error" *ngIf="boletaDniInvalid">
+                  El DNI debe tener exactamente 8 dígitos.
+                </small>
+              </label>
+              <label class="mini-field mini-field--wide">
+                <span>Nombre del cliente</span>
+                <input
+                  type="text"
+                  [value]="receiptCustomerName"
+                  maxlength="180"
+                  (input)="setReceiptCustomerName($any($event.target).value)"
+                  placeholder="Opcional"
+                />
+              </label>
+            </div>
+
+            <div class="receipt-customer-grid" *ngIf="receiptType === 'INVOICE'">
+              <label class="mini-field">
+                <span>RUC *</span>
+                <input
+                  type="text"
+                  inputmode="numeric"
+                  [value]="receiptCustomerDocument"
+                  maxlength="11"
+                  (input)="setReceiptCustomerDocument($any($event.target).value)"
+                  (keydown)="blockInvalidNumericKeys($event)"
+                  placeholder="11 dígitos"
+                />
+                <small class="field-inline-error" *ngIf="invoiceRucInvalid">
+                  El RUC debe tener exactamente 11 dígitos.
+                </small>
+              </label>
+              <label class="mini-field mini-field--wide">
+                <span>Razón social *</span>
+                <input
+                  type="text"
+                  [value]="receiptCustomerName"
+                  maxlength="180"
+                  (input)="setReceiptCustomerName($any($event.target).value)"
+                  placeholder="Requerido para factura"
+                />
+                <small class="field-inline-error" *ngIf="invoiceBusinessNameInvalid">
+                  La razón social es obligatoria.
+                </small>
+              </label>
+            </div>
+
+            <div class="receipt-extra" *ngIf="receiptType === 'INVOICE'">
+              <button
+                type="button"
+                class="ui-button ui-button--secondary pos-button pos-button--quiet receipt-extra-toggle"
+                (click)="toggleFiscalDetails()"
+              >
+                {{ showFiscalDetails ? "Ocultar" : "Mostrar" }} datos fiscales adicionales
+              </button>
+
+              <label class="mini-field" *ngIf="showFiscalDetails">
+                <span>Dirección fiscal</span>
+                <input
+                  type="text"
+                  [value]="receiptCustomerAddress"
+                  maxlength="240"
+                  (input)="setReceiptCustomerAddress($any($event.target).value)"
+                  placeholder="Opcional en esta fase"
+                />
+              </label>
+            </div>
+
+            <small class="field-inline-error" *ngIf="receiptValidationError">
+              {{ receiptValidationError }}
+            </small>
+          </section>
+
           <section class="total-board" aria-label="Totales de venta">
             <article class="total-main">
               <span>Total a cobrar</span>
@@ -445,9 +608,9 @@ interface PaymentLine {
               type="button"
               class="ui-button ui-button--primary checkout-button"
               (click)="finalizeSale()"
-              [disabled]="submitting"
+              [disabled]="submitting || !!receiptValidationError"
             >
-              {{ submitting ? "Cobrando..." : "COBRAR" }}
+              {{ submitting ? "Cobrando..." : checkoutButtonLabel }}
             </button>
             <a
               *ngIf="lastSaleId"
@@ -455,6 +618,13 @@ interface PaymentLine {
               [routerLink]="['/ventas', lastSaleId]"
             >
               Ver venta #{{ lastSaleId }}
+            </a>
+            <a
+              *ngIf="showGoToBillingAction"
+              class="ui-button ui-button--secondary pos-button sale-link"
+              [routerLink]="['/facturacion/comprobantes']"
+            >
+              Ir a Comprobantes
             </a>
           </footer>
         </aside>
@@ -749,6 +919,7 @@ interface PaymentLine {
       .results-panel,
       .cart-panel,
       .payment-panel,
+      .receipt-panel,
       .total-board {
         border: 1px solid var(--color-border-default);
         border-radius: var(--radius-lg);
@@ -954,6 +1125,7 @@ interface PaymentLine {
       .results-panel,
       .cart-panel,
       .payment-panel,
+      .receipt-panel,
       .total-board {
         padding: var(--space-2);
         display: grid;
@@ -976,6 +1148,10 @@ interface PaymentLine {
         align-items: stretch;
         min-height: 5rem;
         padding: 0.4rem;
+      }
+
+      .receipt-panel {
+        grid-template-columns: 1fr;
       }
 
       .panel-head {
@@ -1402,6 +1578,70 @@ interface PaymentLine {
       .payment-line .pos-button--small {
         min-height: 2.05rem;
         padding-inline: var(--space-2);
+      }
+
+      .receipt-type-list {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(120px, 1fr));
+        gap: var(--space-2);
+      }
+
+      .receipt-segment {
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-sm);
+        padding: 0.48rem 0.58rem;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background: var(--color-bg-soft);
+        cursor: pointer;
+        font-size: var(--font-size-sm);
+        font-weight: 700;
+        min-height: 2.15rem;
+      }
+
+      .receipt-segment.is-active {
+        border-color: var(--color-brand-primary);
+        box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-brand-primary) 35%, transparent);
+        background: color-mix(in srgb, var(--color-brand-primary) 8%, var(--color-bg-soft));
+      }
+
+      .receipt-customer-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(180px, 1fr));
+        gap: var(--space-2);
+      }
+
+      .receipt-extra {
+        display: grid;
+        gap: var(--space-2);
+      }
+
+      .receipt-no-series {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-2);
+        flex-wrap: wrap;
+      }
+
+      .receipt-series-link {
+        min-height: 2rem;
+        padding: 0.34rem var(--space-2);
+        font-size: var(--font-size-sm);
+      }
+
+      .receipt-extra-toggle {
+        min-height: 2rem;
+        padding: 0.34rem var(--space-2);
+        font-size: var(--font-size-sm);
+      }
+
+      .field-inline-error {
+        margin: 0;
+        color: var(--color-danger);
+        font-size: var(--font-size-xs);
+        font-weight: 700;
       }
 
       .empty-cart {
@@ -1838,6 +2078,11 @@ interface PaymentLine {
         .payment-list {
           max-height: 18rem;
         }
+
+        .receipt-type-list,
+        .receipt-customer-grid {
+          grid-template-columns: 1fr;
+        }
       }
 
       @media (max-width: 760px) {
@@ -1951,6 +2196,13 @@ export class PosPageComponent implements OnInit, OnDestroy {
   payments: PaymentLine[] = [
     { paymentMethod: "CASH", amount: 0, reference: "" },
   ];
+  receiptType: PosReceiptType = "TICKET";
+  receiptSeriesId = "";
+  receiptCustomerDocument = "";
+  receiptCustomerName = "";
+  receiptCustomerAddress = "";
+  showFiscalDetails = false;
+  billingSeriesRows: BillingSeriesResponse[] = [];
 
   loadingLookup = false;
   loadingSearch = false;
@@ -1958,8 +2210,10 @@ export class PosPageComponent implements OnInit, OnDestroy {
   isFullCartOpen = false;
 
   errorMessage = "";
+  warningMessage = "";
   successMessage = "";
   lastSaleId: number | null = null;
+  showGoToBillingAction = false;
 
   private readonly subscriptions = new Subscription();
   private warehousesLoaded = false;
@@ -1977,6 +2231,8 @@ export class PosPageComponent implements OnInit, OnDestroy {
     private readonly posStateService: PosStateService,
     private readonly confirmDialog: ConfirmDialogService,
     private readonly salesService: SalesService,
+    private readonly billingSeriesService: BillingSeriesService,
+    private readonly electronicDocumentService: ElectronicDocumentService,
   ) {}
 
   ngOnInit(): void {
@@ -1984,6 +2240,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
     this.loadCurrentUser();
     this.loadWarehouses();
     this.refreshCashSession();
+    this.loadBillingSeries();
   }
 
   ngOnDestroy(): void {
@@ -2102,6 +2359,12 @@ export class PosPageComponent implements OnInit, OnDestroy {
         ? draft.payments.map((payment) => ({ ...payment }))
         : [{ paymentMethod: "CASH", amount: 0, reference: "" }];
     this.lastSaleId = draft.lastSaleId;
+    this.receiptType = "TICKET";
+    this.receiptSeriesId = "";
+    this.receiptCustomerDocument = "";
+    this.receiptCustomerName = "";
+    this.receiptCustomerAddress = "";
+    this.showFiscalDetails = false;
     this.loadingLookup = false;
     this.loadingSearch = false;
     this.submitting = false;
@@ -2130,6 +2393,12 @@ export class PosPageComponent implements OnInit, OnDestroy {
     this.cart = [];
     this.payments = [{ paymentMethod: "CASH", amount: 0, reference: "" }];
     this.lastSaleId = null;
+    this.receiptType = "TICKET";
+    this.receiptSeriesId = "";
+    this.receiptCustomerDocument = "";
+    this.receiptCustomerName = "";
+    this.receiptCustomerAddress = "";
+    this.showFiscalDetails = false;
     this.loadingLookup = false;
     this.loadingSearch = false;
     this.submitting = false;
@@ -2197,13 +2466,21 @@ export class PosPageComponent implements OnInit, OnDestroy {
     if (!preserveLastSaleId) {
       this.lastSaleId = null;
     }
+    this.receiptType = "TICKET";
+    this.receiptSeriesId = "";
+    this.receiptCustomerDocument = "";
+    this.receiptCustomerName = "";
+    this.receiptCustomerAddress = "";
+    this.showFiscalDetails = false;
     this.loadingLookup = false;
     this.loadingSearch = false;
     this.submitting = false;
     this.isFullCartOpen = false;
     this.errorMessage = "";
+    this.warningMessage = "";
     if (!preserveLastSaleId) {
       this.successMessage = "";
+      this.showGoToBillingAction = false;
     }
     this.isHydratingDraft = false;
 
@@ -2274,9 +2551,22 @@ export class PosPageComponent implements OnInit, OnDestroy {
   }
 
   private buildFinalizeConfirmationMessage(): string {
+    const customerLines =
+      this.receiptType === "TICKET"
+        ? []
+        : [
+            `Cliente: ${this.receiptCustomerName.trim() || "No especificado"}`,
+            `Documento: ${this.receiptCustomerDocument.trim() || "No especificado"}`,
+          ];
+
     return [
       "Estas a punto de registrar una venta real.",
       "",
+      this.receiptType === "TICKET"
+        ? "Se registrará una venta interna."
+        : "Se registrará la venta y se generará el comprobante.",
+      `Comprobante: ${this.receiptTypeLabel}`,
+      ...customerLines,
       `Cantidad de items: ${this.cart.length}`,
       `Total: S/ ${this.total.toFixed(2)}`,
       `Monto pagado: S/ ${this.paidTotal.toFixed(2)}`,
@@ -2598,6 +2888,137 @@ export class PosPageComponent implements OnInit, OnDestroy {
     this.persistDraftState();
   }
 
+  setReceiptType(type: PosReceiptType): void {
+    this.receiptType = type;
+    this.receiptSeriesId = "";
+    this.receiptCustomerDocument = "";
+    this.receiptCustomerName = "";
+    this.receiptCustomerAddress = "";
+    this.showFiscalDetails = false;
+
+    const firstSeries = this.filteredBillingSeries[0];
+    if (firstSeries) {
+      this.receiptSeriesId = String(firstSeries.id);
+    }
+  }
+
+  setReceiptSeriesId(rawValue: string): void {
+    this.receiptSeriesId = String(rawValue || "");
+  }
+
+  toggleFiscalDetails(): void {
+    this.showFiscalDetails = !this.showFiscalDetails;
+  }
+
+  setReceiptCustomerDocument(rawValue: string): void {
+    const maxLength = this.receiptType === "INVOICE" ? 11 : 8;
+    this.receiptCustomerDocument = rawValue.replace(/\D/g, "").slice(0, maxLength);
+  }
+
+  setReceiptCustomerName(rawValue: string): void {
+    this.receiptCustomerName = rawValue;
+  }
+
+  setReceiptCustomerAddress(rawValue: string): void {
+    this.receiptCustomerAddress = rawValue;
+  }
+
+  blockInvalidNumericKeys(event: KeyboardEvent): void {
+    if (["e", "E", "+", "-", ",", "."].includes(event.key)) {
+      event.preventDefault();
+    }
+  }
+
+  get receiptTypeLabel(): string {
+    switch (this.receiptType) {
+      case "RECEIPT":
+        return "Boleta";
+      case "INVOICE":
+        return "Factura";
+      default:
+        return "Ticket interno";
+    }
+  }
+
+  get checkoutButtonLabel(): string {
+    return this.receiptType === "TICKET" ? "COBRAR" : "COBRAR Y EMITIR";
+  }
+
+  get filteredBillingSeries(): BillingSeriesResponse[] {
+    if (this.receiptType === "TICKET") {
+      return [];
+    }
+    const targetType: ElectronicDocumentType =
+      this.receiptType === "INVOICE" ? "INVOICE" : "RECEIPT";
+    return this.billingSeriesRows.filter(
+      (row) => row.active && row.documentType === targetType,
+    );
+  }
+
+  get receiptSeriesInvalid(): boolean {
+    if (this.receiptType === "TICKET") {
+      return false;
+    }
+    return !this.receiptSeriesId;
+  }
+
+  get showNoSeriesMessage(): boolean {
+    return this.receiptType !== "TICKET" && this.filteredBillingSeries.length === 0;
+  }
+
+  get noSeriesMessage(): string {
+    if (this.receiptType === "INVOICE") {
+      return "No hay series activas para Factura. Configúralas en Facturación → Series y correlativos.";
+    }
+    if (this.receiptType === "RECEIPT") {
+      return "No hay series activas para Boleta. Configúralas en Facturación → Series y correlativos.";
+    }
+    return "";
+  }
+
+  get boletaDniInvalid(): boolean {
+    if (this.receiptType !== "RECEIPT") {
+      return false;
+    }
+    const dni = this.receiptCustomerDocument.trim();
+    return dni.length > 0 && dni.length !== 8;
+  }
+
+  get invoiceRucInvalid(): boolean {
+    if (this.receiptType !== "INVOICE") {
+      return false;
+    }
+    return this.receiptCustomerDocument.trim().length !== 11;
+  }
+
+  get invoiceBusinessNameInvalid(): boolean {
+    if (this.receiptType !== "INVOICE") {
+      return false;
+    }
+    return !this.receiptCustomerName.trim();
+  }
+
+  get receiptValidationError(): string {
+    if (this.showNoSeriesMessage) {
+      return this.noSeriesMessage;
+    }
+    if (this.receiptSeriesInvalid) {
+      return "Selecciona una serie de comprobante para continuar.";
+    }
+    if (this.receiptType === "RECEIPT" && this.boletaDniInvalid) {
+      return "El DNI de boleta debe tener 8 dígitos si se informa.";
+    }
+    if (this.receiptType === "INVOICE") {
+      if (this.invoiceRucInvalid) {
+        return "Para Factura, el RUC debe tener 11 dígitos.";
+      }
+      if (this.invoiceBusinessNameInvalid) {
+        return "Para Factura, la razón social es obligatoria.";
+      }
+    }
+    return "";
+  }
+
   refreshCashSession(): void {
     this.cashRegisterService.current().subscribe({
       next: (session) => {
@@ -2615,8 +3036,10 @@ export class PosPageComponent implements OnInit, OnDestroy {
 
   finalizeSale(): void {
     this.errorMessage = "";
+    this.warningMessage = "";
     this.successMessage = "";
     this.lastSaleId = null;
+    this.showGoToBillingAction = false;
 
     const validationError = this.validateSaleBeforeSubmit();
     if (validationError) {
@@ -2658,10 +3081,16 @@ export class PosPageComponent implements OnInit, OnDestroy {
 
       this.salesService.create(payload).subscribe({
         next: (sale) => {
-          this.submitting = false;
-          this.successMessage = `Venta ${sale.saleNumber} registrada correctamente.`;
-          this.lastSaleId = sale.id;
-          this.resetDraftAfterCheckout(true);
+          if (this.receiptType === "TICKET") {
+            this.submitting = false;
+            this.successMessage = `Venta ${sale.saleNumber} registrada correctamente.`;
+            this.warningMessage = "";
+            this.lastSaleId = sale.id;
+            this.resetDraftAfterCheckout(true);
+            return;
+          }
+
+          this.issueElectronicDocumentFromSale(sale);
         },
         error: (error: unknown) => {
           this.submitting = false;
@@ -2690,6 +3119,75 @@ export class PosPageComponent implements OnInit, OnDestroy {
         this.maybeRestoreDraft();
       },
     });
+  }
+
+  private loadBillingSeries(): void {
+    this.billingSeriesService.list().subscribe({
+      next: (rows) => {
+        this.billingSeriesRows = rows.filter((row) => row.active);
+      },
+      error: () => {
+        this.billingSeriesRows = [];
+      },
+    });
+  }
+
+  private issueElectronicDocumentFromSale(sale: SaleResponse): void {
+    const payload = this.buildElectronicDocumentPayload();
+    if (!payload) {
+      this.submitting = false;
+      this.lastSaleId = sale.id;
+      this.successMessage = "";
+      this.warningMessage =
+        "Venta registrada, pero el comprobante quedó pendiente de emisión. Puedes reintentarlo desde Comprobantes.";
+      this.showGoToBillingAction = true;
+      this.resetDraftAfterCheckout(true);
+      return;
+    }
+
+    this.electronicDocumentService.createFromSale(sale.id, payload).subscribe({
+      next: (document) => {
+        this.submitting = false;
+        this.warningMessage = "";
+        this.showGoToBillingAction = false;
+        this.successMessage = `Venta ${sale.saleNumber} registrada y comprobante ${document.fullNumber} generado.`;
+        this.lastSaleId = sale.id;
+        this.resetDraftAfterCheckout(true);
+      },
+      error: () => {
+        this.submitting = false;
+        this.successMessage = "";
+        this.warningMessage =
+          "Venta registrada, pero el comprobante quedó pendiente de emisión. Puedes reintentarlo desde Comprobantes.";
+        this.showGoToBillingAction = true;
+        this.lastSaleId = sale.id;
+        this.resetDraftAfterCheckout(true);
+      },
+    });
+  }
+
+  private buildElectronicDocumentPayload(): CreateElectronicDocumentFromSaleRequest | null {
+    if (this.receiptType === "TICKET") {
+      return null;
+    }
+
+    const seriesId = Number(this.receiptSeriesId);
+    if (!Number.isFinite(seriesId) || seriesId <= 0) {
+      return null;
+    }
+
+    const documentType: ElectronicDocumentType =
+      this.receiptType === "INVOICE" ? "INVOICE" : "RECEIPT";
+
+    const customerName = this.receiptCustomerName.trim() || null;
+    const customerDocument = this.receiptCustomerDocument.trim() || null;
+
+    return {
+      documentType,
+      billingSeriesId: seriesId,
+      customerName,
+      customerDocument,
+    };
   }
 
   private validateSaleBeforeSubmit(): string {
@@ -2732,6 +3230,10 @@ export class PosPageComponent implements OnInit, OnDestroy {
 
     if (this.paidTotal < this.total) {
       return "El total pagado debe ser mayor o igual al total de la venta.";
+    }
+
+    if (this.receiptValidationError) {
+      return this.receiptValidationError;
     }
 
     return "";

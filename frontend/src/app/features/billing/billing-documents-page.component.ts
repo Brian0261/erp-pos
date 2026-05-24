@@ -41,6 +41,36 @@ import { toHttpErrorMessage } from "./data/http-error-message";
         {{ successMessage }}
       </p>
 
+      <section class="issue-action-section">
+        <header class="section-head">
+          <h2>Nueva emision desde venta</h2>
+          <p class="section-help">
+            Genera un comprobante electronico usando una venta ya registrada.
+          </p>
+        </header>
+        <div class="issue-action-row">
+          <label class="field issue-field">
+            <span>ID de venta</span>
+            <input
+              type="text"
+              inputmode="numeric"
+              formControlName="emitSaleId"
+              placeholder="Ejemplo: 15"
+              (input)="onSaleIdInput('emitSaleId')"
+              (keydown)="blockInvalidNumericKeys($event)"
+            />
+          </label>
+          <button
+            type="button"
+            class="ui-button ui-button--secondary"
+            (click)="goToIssue()"
+            [disabled]="loading || !canView"
+          >
+            Generar comprobante
+          </button>
+        </div>
+      </section>
+
       <section class="filter-section">
         <header class="section-head">
           <h2>Filtros de comprobantes</h2>
@@ -51,7 +81,7 @@ import { toHttpErrorMessage } from "./data/http-error-message";
           class="filters-grid"
           (ngSubmit)="applyFilters()"
         >
-          <label class="field">
+          <label class="field field--type">
             <span>Tipo</span>
             <select formControlName="type">
               <option value="">Todos</option>
@@ -59,71 +89,66 @@ import { toHttpErrorMessage } from "./data/http-error-message";
                 {{ typeLabel(type) }}
               </option>
             </select>
+            <small class="field-help" aria-hidden="true">&nbsp;</small>
           </label>
 
-          <label class="field">
+          <label class="field field--status">
             <span>Estado</span>
             <select formControlName="status">
               <option value="">Todos</option>
               <option *ngFor="let status of statuses" [value]="status">
-                {{ status }}
+                {{ statusLabel(status) }}
               </option>
             </select>
+            <small class="field-help" aria-hidden="true">&nbsp;</small>
           </label>
 
-          <label class="field">
+          <label class="field field--series">
             <span>Serie</span>
             <input
               type="text"
               maxlength="4"
               formControlName="series"
               placeholder="F001 / B001"
+              (input)="onSeriesInput()"
             />
+            <small class="field-help" aria-hidden="true">&nbsp;</small>
           </label>
 
-          <label class="field">
-            <span>Numero</span>
+          <label class="field field--number">
+            <span>Numero de comprobante</span>
             <input
               type="text"
               maxlength="30"
               formControlName="number"
               placeholder="00000001 o F001-00000001"
+              (input)="onNumberInput()"
             />
+            <small class="field-help">
+              Busca dentro de los resultados cargados.
+            </small>
           </label>
 
-          <label class="field">
+          <label class="field field--from">
             <span>Desde</span>
             <input type="date" formControlName="from" />
           </label>
 
-          <label class="field">
+          <label class="field field--to">
             <span>Hasta</span>
             <input type="date" formControlName="to" />
           </label>
 
-          <label class="field">
-            <span>Venta (saleId)</span>
-            <input type="number" min="1" step="1" formControlName="saleId" />
-          </label>
-
-          <label class="field">
-            <span>Emitir desde venta</span>
-            <div class="inline-group">
-              <input
-                type="number"
-                min="1"
-                step="1"
-                formControlName="emitSaleId"
-              />
-              <button
-                type="button"
-                class="ui-button ui-button--secondary quick-btn"
-                (click)="goToIssue()"
-                [disabled]="loading"
-              >
-                Ir
-              </button>
-            </div>
+          <label class="field field--sale">
+            <span>Venta asociada</span>
+            <input
+              type="text"
+              inputmode="numeric"
+              formControlName="saleId"
+              placeholder="Ejemplo: 15"
+              (input)="onSaleIdInput('saleId')"
+              (keydown)="blockInvalidNumericKeys($event)"
+            />
           </label>
 
           <div class="filter-actions">
@@ -192,16 +217,18 @@ import { toHttpErrorMessage } from "./data/http-error-message";
                     {{ document.customerDocument || "Sin documento" }}
                   </div>
                 </td>
-                <td>{{ document.totalAmount | number: "1.2-2" }}</td>
+                <td>
+                  <span class="cell-total">{{ formatCurrency(document.totalAmount) }}</span>
+                </td>
                 <td>
                   <span
                     class="ui-badge status-badge"
                     [ngClass]="statusClass(document.status)"
                   >
-                    {{ document.status }}
+                    {{ statusLabel(document.status) }}
                   </span>
                 </td>
-                <td>{{ document.createdAt | date: "yyyy-MM-dd HH:mm" }}</td>
+                <td>{{ formatDate(document.createdAt) }}</td>
                 <td class="row-actions">
                   <a
                     class="ui-button ui-button--secondary action-btn"
@@ -258,15 +285,37 @@ import { toHttpErrorMessage } from "./data/http-error-message";
         padding-bottom: var(--space-2);
       }
 
+      .section-help {
+        margin: var(--space-1) 0 0;
+        color: var(--color-text-secondary);
+        font-size: var(--font-size-sm);
+      }
+
       .filters-grid {
         display: grid;
         grid-template-columns: repeat(4, minmax(180px, 1fr));
+        grid-template-areas:
+          "type status series number"
+          "from to sale sale"
+          "actions actions actions actions";
         gap: var(--space-3);
       }
+
+      .field--type { grid-area: type; }
+      .field--status { grid-area: status; }
+      .field--series { grid-area: series; }
+      .field--number { grid-area: number; }
+      .field--from { grid-area: from; }
+      .field--to { grid-area: to; }
+      .field--sale { grid-area: sale; }
 
       .field {
         display: grid;
         gap: var(--space-1);
+      }
+
+      .field > :is(input, select) {
+        min-height: 2.75rem;
       }
 
       .field > span {
@@ -289,12 +338,40 @@ import { toHttpErrorMessage } from "./data/http-error-message";
         gap: var(--space-2);
       }
 
+      .issue-action-section {
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-md);
+        background: var(--color-bg-surface);
+        padding: var(--space-3);
+        display: grid;
+        gap: var(--space-3);
+      }
+
+      .issue-action-row {
+        display: flex;
+        gap: var(--space-2);
+        align-items: flex-end;
+        flex-wrap: wrap;
+      }
+
+      .issue-field {
+        min-width: 220px;
+      }
+
+      .field-help {
+        color: var(--color-text-secondary);
+        font-size: var(--font-size-xs);
+        min-height: 1rem;
+        line-height: 1rem;
+      }
+
       .quick-btn {
         padding: 0.45rem 0.7rem;
         font-size: var(--font-size-xs);
       }
 
       .filter-actions {
+        grid-area: actions;
         grid-column: 1 / -1;
         display: flex;
         justify-content: flex-end;
@@ -367,6 +444,10 @@ import { toHttpErrorMessage } from "./data/http-error-message";
         gap: var(--space-2);
       }
 
+      .cell-total {
+        font-weight: 700;
+      }
+
       .action-btn {
         width: 100%;
         padding: 0.45rem 0.7rem;
@@ -385,12 +466,32 @@ import { toHttpErrorMessage } from "./data/http-error-message";
 
         .filters-grid {
           grid-template-columns: 1fr 1fr;
+          grid-template-areas:
+            "type status"
+            "series number"
+            "from to"
+            "sale sale"
+            "actions actions";
         }
       }
 
       @media (max-width: 640px) {
         .filters-grid {
           grid-template-columns: 1fr;
+          grid-template-areas:
+            "type"
+            "status"
+            "series"
+            "number"
+            "from"
+            "to"
+            "sale"
+            "actions";
+        }
+
+        .issue-action-row {
+          flex-direction: column;
+          align-items: stretch;
         }
 
         .filter-actions {
@@ -403,6 +504,18 @@ import { toHttpErrorMessage } from "./data/http-error-message";
 export class BillingDocumentsPageComponent implements OnInit {
   readonly documentTypes = ELECTRONIC_DOCUMENT_TYPES;
   readonly statuses = ELECTRONIC_DOCUMENT_STATUSES;
+  private readonly dateFormatter = new Intl.DateTimeFormat("es-PE", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  private readonly currencyFormatter = new Intl.NumberFormat("es-PE", {
+    style: "currency",
+    currency: "PEN",
+  });
 
   readonly filtersForm = this.formBuilder.group({
     type: [""],
@@ -481,8 +594,77 @@ export class BillingDocumentsPageComponent implements OnInit {
     this.router.navigate(["/facturacion/emitir", saleId]);
   }
 
+  onSaleIdInput(controlName: "saleId" | "emitSaleId"): void {
+    const control = this.filtersForm.controls[controlName];
+    const rawValue = String(control.value ?? "");
+    const digitsOnly = rawValue.replace(/\D/g, "");
+    const normalized = digitsOnly.replace(/^0+(?=\d)/, "");
+    if (rawValue !== normalized) {
+      control.setValue(normalized, { emitEvent: false });
+    }
+  }
+
+  onNumberInput(): void {
+    const control = this.filtersForm.controls.number;
+    const rawValue = String(control.value ?? "");
+    const normalized = rawValue.toUpperCase().replace(/[^FB0-9-]/g, "");
+    if (rawValue !== normalized) {
+      control.setValue(normalized, { emitEvent: false });
+    }
+  }
+
+  onSeriesInput(): void {
+    const control = this.filtersForm.controls.series;
+    const rawValue = String(control.value ?? "");
+    const normalized = rawValue.toUpperCase().replace(/[^FB0-9]/g, "");
+    if (rawValue !== normalized) {
+      control.setValue(normalized, { emitEvent: false });
+    }
+  }
+
+  blockInvalidNumericKeys(event: KeyboardEvent): void {
+    if (["e", "E", "+", "-", ",", "."].includes(event.key)) {
+      event.preventDefault();
+    }
+  }
+
   typeLabel(type: ElectronicDocumentType): string {
-    return type === "INVOICE" ? "FACTURA" : "BOLETA";
+    return type === "INVOICE" ? "Factura" : "Boleta";
+  }
+
+  statusLabel(status: ElectronicDocumentStatus): string {
+    switch (status) {
+      case "DRAFT":
+        return "Borrador";
+      case "GENERATED":
+        return "Generado";
+      case "SIGNED":
+        return "Firmado";
+      case "SENT":
+        return "Enviado";
+      case "ACCEPTED":
+        return "Aceptado";
+      case "REJECTED":
+        return "Rechazado";
+      case "ERROR":
+        return "Error";
+      case "CANCELLED":
+        return "Anulado";
+      default:
+        return status;
+    }
+  }
+
+  formatDate(value: string): string {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return "-";
+    }
+    return this.dateFormatter.format(date);
+  }
+
+  formatCurrency(amount: number): string {
+    return this.currencyFormatter.format(amount ?? 0);
   }
 
   statusClass(status: ElectronicDocumentStatus): string {
@@ -564,6 +746,8 @@ export class BillingDocumentsPageComponent implements OnInit {
       }
 
       if (number) {
+        // NOTE: backend list contract does not support number/fullNumber filters.
+        // This filter is intentionally client-side over loaded rows.
         const fullNumber = row.fullNumber.toUpperCase();
         const numberAsText = String(row.number);
         if (!fullNumber.includes(number) && !numberAsText.includes(number)) {

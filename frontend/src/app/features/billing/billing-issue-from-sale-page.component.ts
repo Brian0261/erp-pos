@@ -9,6 +9,7 @@ import { SaleResponse } from "../sales/data/sales.models";
 import { SalesService } from "../sales/data/sales.service";
 import {
   BillingSeriesResponse,
+  BillingEnvironment,
   CreateElectronicDocumentFromSaleRequest,
   ELECTRONIC_DOCUMENT_TYPES,
   ElectronicDocumentType,
@@ -16,6 +17,7 @@ import {
 import { BillingSeriesService } from "./data/billing-series.service";
 import { ElectronicDocumentService } from "./data/electronic-document.service";
 import { toHttpErrorMessage } from "./data/http-error-message";
+import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.service";
 
 @Component({
   selector: "app-billing-issue-from-sale-page",
@@ -28,7 +30,7 @@ import { toHttpErrorMessage } from "./data/http-error-message";
           <p class="ui-page-kicker">Facturacion electronica MVP</p>
           <h1 class="ui-page-title">Emitir comprobante desde venta</h1>
           <p class="ui-page-description">
-            Venta {{ sale.saleNumber }} (ID #{{ sale.id }}): define tipo, serie
+            Venta {{ sale.saleNumber }} (ID de venta {{ sale.id }}): define tipo, serie
             y datos de cliente para emitir sin alterar reglas tributarias.
           </p>
         </div>
@@ -59,18 +61,34 @@ import { toHttpErrorMessage } from "./data/http-error-message";
 
       <section class="summary-grid">
         <article class="summary-card">
-          <h2>Resumen de venta</h2>
+          <h2>Venta</h2>
           <p>
-            <span class="label">Estado venta</span>
-            <strong>{{ sale.status }}</strong>
+            <span class="label">Estado</span>
+            <strong>{{ saleStatusLabel(sale.status) }}</strong>
           </p>
           <p>
             <span class="label">Total</span>
-            <strong>{{ sale.totalAmount | number: "1.2-2" }}</strong>
+            <strong>{{ formatCurrency(sale.totalAmount) }}</strong>
           </p>
           <p>
             <span class="label">Fecha</span>
-            <strong>{{ sale.soldAt | date: "yyyy-MM-dd HH:mm" }}</strong>
+            <strong>{{ formatDate(sale.soldAt) }}</strong>
+          </p>
+        </article>
+
+        <article class="summary-card">
+          <h2>Cliente</h2>
+          <p>
+            <span class="label">Nombre</span>
+            <strong>{{ sale.createdBy || "-" }}</strong>
+          </p>
+          <p>
+            <span class="label">Referencia de venta</span>
+            <strong>{{ sale.saleNumber }}</strong>
+          </p>
+          <p>
+            <span class="label">Comprobante asociado</span>
+            <strong>ID de venta {{ sale.id }}</strong>
           </p>
         </article>
 
@@ -78,15 +96,31 @@ import { toHttpErrorMessage } from "./data/http-error-message";
           <h2>Operacion</h2>
           <p>
             <span class="label">Caja</span>
-            <strong>#{{ sale.cashRegisterSessionId }}</strong>
+            <strong>Sesion {{ sale.cashRegisterSessionId }}</strong>
           </p>
           <p>
             <span class="label">Almacen</span>
-            <strong>#{{ sale.warehouseId }}</strong>
+            <strong>Almacen {{ sale.warehouseId }}</strong>
           </p>
           <p>
             <span class="label">Usuario</span>
             <strong>{{ sale.createdBy }}</strong>
+          </p>
+        </article>
+
+        <article class="summary-card">
+          <h2>Comprobante a emitir</h2>
+          <p>
+            <span class="label">Tipo</span>
+            <strong>{{ typeLabel(form.controls.documentType.value || "RECEIPT") }}</strong>
+          </p>
+          <p>
+            <span class="label">Serie</span>
+            <strong>{{ selectedSeriesLabel() }}</strong>
+          </p>
+          <p>
+            <span class="label">Total de referencia</span>
+            <strong>{{ formatCurrency(sale.totalAmount) }}</strong>
           </p>
         </article>
       </section>
@@ -115,7 +149,7 @@ import { toHttpErrorMessage } from "./data/http-error-message";
                   *ngFor="let series of filteredSeries"
                   [ngValue]="series.id"
                 >
-                  {{ series.series }} ({{ series.environment }})
+                  {{ series.series }} - {{ environmentLabel(series.environment) }}
                 </option>
               </select>
               <small class="field-error" *ngIf="isInvalid('billingSeriesId')">
@@ -160,7 +194,7 @@ import { toHttpErrorMessage } from "./data/http-error-message";
             class="ui-alert ui-alert--info"
             *ngIf="form.controls.documentType.value === 'RECEIPT'"
           >
-            BOLETA permite consumidor final si no se completa cliente.
+            Boleta permite consumidor final si no se completa cliente.
           </p>
         </section>
 
@@ -349,6 +383,18 @@ import { toHttpErrorMessage } from "./data/http-error-message";
 })
 export class BillingIssueFromSalePageComponent implements OnInit {
   readonly documentTypes = ELECTRONIC_DOCUMENT_TYPES;
+  private readonly dateFormatter = new Intl.DateTimeFormat("es-PE", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  private readonly currencyFormatter = new Intl.NumberFormat("es-PE", {
+    style: "currency",
+    currency: "PEN",
+  });
 
   readonly form = this.formBuilder.group({
     documentType: ["RECEIPT" as ElectronicDocumentType, Validators.required],
@@ -377,6 +423,7 @@ export class BillingIssueFromSalePageComponent implements OnInit {
     private readonly salesService: SalesService,
     private readonly billingSeriesService: BillingSeriesService,
     private readonly electronicDocumentService: ElectronicDocumentService,
+    private readonly confirmDialogService: ConfirmDialogService,
   ) {}
 
   ngOnInit(): void {
@@ -439,10 +486,57 @@ export class BillingIssueFromSalePageComponent implements OnInit {
   }
 
   typeLabel(type: ElectronicDocumentType): string {
-    return type === "INVOICE" ? "FACTURA" : "BOLETA";
+    return type === "INVOICE" ? "Factura" : "Boleta";
   }
 
-  submit(): void {
+  environmentLabel(environment: BillingEnvironment): string {
+    switch (environment) {
+      case "LOCAL":
+        return "Local";
+      case "BETA":
+        return "Beta";
+      case "PROD":
+        return "Produccion";
+      default:
+        return environment;
+    }
+  }
+
+  saleStatusLabel(status: string | null | undefined): string {
+    if (status === "COMPLETED") {
+      return "Completada";
+    }
+    if (status === "VOIDED") {
+      return "Anulada";
+    }
+    return status || "-";
+  }
+
+  formatDate(value: string | null | undefined): string {
+    if (!value) {
+      return "-";
+    }
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return "-";
+    }
+    return this.dateFormatter.format(date);
+  }
+
+  formatCurrency(amount: number | null | undefined): string {
+    return this.currencyFormatter.format(amount ?? 0);
+  }
+
+  selectedSeriesLabel(): string {
+    const selectedId = Number(this.form.controls.billingSeriesId.value);
+    if (!Number.isFinite(selectedId) || selectedId <= 0) {
+      return "Sin seleccionar";
+    }
+    const selected = this.filteredSeries.find((row) => row.id === selectedId);
+    return selected ? selected.series : "Sin seleccionar";
+  }
+
+  async submit(): Promise<void> {
     if (!this.canIssue || !this.sale) {
       return;
     }
@@ -468,6 +562,18 @@ export class BillingIssueFromSalePageComponent implements OnInit {
     if (documentType === "INVOICE" && (!customerName || !customerDocument)) {
       this.errorMessage =
         "Para FACTURA debes completar customerName y customerDocument.";
+      return;
+    }
+
+    const confirmed = await this.confirmDialogService.confirm({
+      title: "Emitir comprobante",
+      description: this.buildIssueConfirmationMessage(documentType),
+      confirmText: "Emitir",
+      cancelText: "Volver",
+      variant: "info",
+    });
+
+    if (!confirmed) {
       return;
     }
 
@@ -532,5 +638,12 @@ export class BillingIssueFromSalePageComponent implements OnInit {
   private normalizeOptional(value: unknown): string | null {
     const text = String(value ?? "").trim();
     return text ? text : null;
+  }
+
+  private buildIssueConfirmationMessage(documentType: ElectronicDocumentType): string {
+    const typeLabel = this.typeLabel(documentType);
+    const series = this.selectedSeriesLabel();
+    const amount = this.sale ? this.formatCurrency(this.sale.totalAmount) : "-";
+    return `Se emitira ${typeLabel} para la venta ${this.sale?.saleNumber} con serie ${series} por ${amount}.`;
   }
 }
