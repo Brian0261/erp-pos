@@ -587,6 +587,25 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [x] `docker compose up --build -d` y `docker compose ps` exitosos.
 - [x] Backend, DB, Flyway, endpoints, servicios Angular, modelos, rutas, guards, AuthService, JWT/interceptor y payload sin cambios.
 
+### Facturacion - Emitir comprobante pendiente rediseño empresarial (2026-05-24)
+
+- [ ] Abrir /facturacion/emitir/:saleId con venta completada sin comprobante y validar carga correcta.
+- [ ] Confirmar eliminacion de textos `MVP` y copy tecnico innecesario.
+- [ ] Confirmar header operativo con meta-line `Venta: S-... · ID interno: ...`.
+- [ ] Confirmar cards key-value compactas (Venta, Referencia de venta, Operacion, Comprobante a emitir).
+- [ ] Confirmar que no se llama `Cliente` a `createdBy`; se usa `Referencia de venta` y `Registrado por`.
+- [ ] Confirmar que Tipo comprobante y Serie estan alineados y con mismo alto visual.
+- [ ] Confirmar que mensaje `Debes seleccionar una serie` no desalinea el layout.
+- [ ] Confirmar copy contextual: Boleta (consumidor final) y Factura (obligatoriedad).
+- [ ] Confirmar que items muestran nombre real del producto + SKU + codigo si existe.
+- [ ] Confirmar que no aparece `#6` ni ID tecnico como dato operativo.
+- [ ] Confirmar que `Total linea` cambio a `Importe`.
+- [ ] Confirmar montos con formato `S/ 0.50` usando Intl.NumberFormat.
+- [ ] Emitir comprobante exitoso y validar redireccion al detalle.
+- [ ] Validar bloqueo si la venta ya tiene comprobante asociado.
+- [ ] Validar que POS, listado de Comprobantes y Detalle de comprobante no fueron afectados.
+- [ ] Sin cambios en DB/Flyway, endpoints principales, POS ni contratos de payload.
+
 ### Facturacion - Detalle comprobante electronico e items enriquecidos (2026-05-24)
 
 - [ ] Detalle: validar que el comprobante muestra nombre real del producto en la tabla de items.

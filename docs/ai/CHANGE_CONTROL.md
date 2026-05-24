@@ -22,6 +22,7 @@ Estandarizar cambios tecnicos para reducir regresiones y mantener trazabilidad e
 14. En Compras, documentar el rediseño completo de Órdenes de compra en 5 fases cuando el flujo pase de listado → nueva → edición → detalle → recepción con tablas operativas, ProductAutocompleteComponent, sanitización de cantidades/costos, ConfirmDialogService y formateo local Intl sin tocar backend, endpoints ni contratos.
  15. En Cotizaciones, documentar el rediseño completo en 5 fases cuando el flujo pase de listado → nueva → edición → detalle → conversión con tabla compacta, ProductAutocompleteComponent, `syncSelectedToInput` opt-in en edición, sanitización de cantidades/descuentos, ConfirmDialogService y formateo local Intl sin tocar backend, endpoints ni contratos.
  16. En Facturacion, documentar la mejora empresarial del Detalle de comprobante electronico cuando se muestren nombre real + SKU + codigo de barras en la tabla de items, historial descendente, XML colapsable y cards key-value, sin ProductService lookup frontend, sin DB/Flyway, sin cambios de endpoints ni POS.
+ 17. En Facturacion, documentar el rediseño empresarial de Emitir comprobante pendiente cuando la pantalla pase a header operativo sin MVP, cards key-value compactas, Tipo/Serie alineados con helper persistente, copy contextual por tipo, tabla de items con nombre real + SKU, montos PEN y sin ID tecnico visible, sin alterar reglas tributarias ni contratos.
 
 ## Tipos de commit sugeridos (cuando se autorice commit)
 

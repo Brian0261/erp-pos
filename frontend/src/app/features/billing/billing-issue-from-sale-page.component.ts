@@ -27,14 +27,15 @@ import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.servic
     <section class="ui-card billing-issue-page" *ngIf="sale">
       <header class="ui-page-head">
         <div>
-          <p class="ui-page-kicker">Facturacion electronica MVP</p>
-          <h1 class="ui-page-title">Emitir comprobante desde venta</h1>
+          <h1 class="ui-page-title">Emitir comprobante pendiente</h1>
           <p class="ui-page-description">
-            Venta {{ sale.saleNumber }} (ID de venta {{ sale.id }}): define tipo, serie
-            y datos de cliente para emitir sin alterar reglas tributarias.
+            Emite el comprobante de una venta ya registrada.
           </p>
           <p class="ui-page-description">
-            Este flujo se usa para emitir o reintentar comprobantes de ventas ya registradas.
+            Revisa la venta, selecciona la serie y completa los datos del cliente si corresponde.
+          </p>
+          <p class="ui-page-description ui-page-description--meta">
+            Venta: {{ sale.saleNumber }} · ID interno: {{ sale.id }}
           </p>
         </div>
         <a
@@ -83,66 +84,30 @@ import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.servic
       <section class="summary-grid">
         <article class="summary-card">
           <h2>Venta</h2>
-          <p>
-            <span class="label">Estado</span>
-            <strong>{{ saleStatusLabel(sale.status) }}</strong>
-          </p>
-          <p>
-            <span class="label">Total</span>
-            <strong>{{ formatCurrency(sale.totalAmount) }}</strong>
-          </p>
-          <p>
-            <span class="label">Fecha</span>
-            <strong>{{ formatDate(sale.soldAt) }}</strong>
-          </p>
+          <div class="kv-row"><span class="label">Estado</span><strong>{{ saleStatusLabel(sale.status) }}</strong></div>
+          <div class="kv-row"><span class="label">Total</span><strong>{{ formatCurrency(sale.totalAmount) }}</strong></div>
+          <div class="kv-row"><span class="label">Fecha</span><strong>{{ formatDate(sale.soldAt) }}</strong></div>
         </article>
 
         <article class="summary-card">
-          <h2>Cliente</h2>
-          <p>
-            <span class="label">Nombre</span>
-            <strong>{{ sale.createdBy || "-" }}</strong>
-          </p>
-          <p>
-            <span class="label">Referencia de venta</span>
-            <strong>{{ sale.saleNumber }}</strong>
-          </p>
-          <p>
-            <span class="label">Comprobante asociado</span>
-            <strong>ID de venta {{ sale.id }}</strong>
-          </p>
+          <h2>Referencia de venta</h2>
+          <div class="kv-row"><span class="label">Referencia</span><strong>{{ sale.saleNumber }}</strong></div>
+          <div class="kv-row"><span class="label">ID interno</span><strong>{{ sale.id }}</strong></div>
+          <div class="kv-row"><span class="label">Registrado por</span><strong>{{ sale.createdBy || "-" }}</strong></div>
         </article>
 
         <article class="summary-card">
-          <h2>Operacion</h2>
-          <p>
-            <span class="label">Caja</span>
-            <strong>Sesion {{ sale.cashRegisterSessionId }}</strong>
-          </p>
-          <p>
-            <span class="label">Almacen</span>
-            <strong>Almacen {{ sale.warehouseId }}</strong>
-          </p>
-          <p>
-            <span class="label">Usuario</span>
-            <strong>{{ sale.createdBy }}</strong>
-          </p>
+          <h2>Operación</h2>
+          <div class="kv-row"><span class="label">Caja</span><strong>Sesión {{ sale.cashRegisterSessionId }}</strong></div>
+          <div class="kv-row"><span class="label">Almacén</span><strong>Almacén {{ sale.warehouseId }}</strong></div>
+          <div class="kv-row"><span class="label">Usuario</span><strong>{{ sale.createdBy }}</strong></div>
         </article>
 
         <article class="summary-card">
           <h2>Comprobante a emitir</h2>
-          <p>
-            <span class="label">Tipo</span>
-            <strong>{{ typeLabel(form.controls.documentType.value || "RECEIPT") }}</strong>
-          </p>
-          <p>
-            <span class="label">Serie</span>
-            <strong>{{ selectedSeriesLabel() }}</strong>
-          </p>
-          <p>
-            <span class="label">Total de referencia</span>
-            <strong>{{ formatCurrency(sale.totalAmount) }}</strong>
-          </p>
+          <div class="kv-row"><span class="label">Tipo</span><strong>{{ typeLabel(form.controls.documentType.value || "RECEIPT") }}</strong></div>
+          <div class="kv-row"><span class="label">Serie</span><strong>{{ selectedSeriesLabel() }}</strong></div>
+          <div class="kv-row"><span class="label">Total de referencia</span><strong>{{ formatCurrency(sale.totalAmount) }}</strong></div>
         </article>
       </section>
 
@@ -165,6 +130,7 @@ import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.servic
                   {{ typeLabel(type) }}
                 </option>
               </select>
+              <small class="field-help" aria-hidden="true">&nbsp;</small>
             </label>
 
             <label class="field">
@@ -178,8 +144,11 @@ import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.servic
                   {{ series.series }} - {{ environmentLabel(series.environment) }}
                 </option>
               </select>
-              <small class="field-error" *ngIf="isInvalid('billingSeriesId')">
-                Debes seleccionar una serie.
+              <small
+                class="field-help"
+                [ngClass]="{ 'field-help--error': isInvalid('billingSeriesId') }"
+              >
+                {{ isInvalid("billingSeriesId") ? "Debes seleccionar una serie." : " " }}
               </small>
             </label>
           </div>
@@ -216,11 +185,11 @@ import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.servic
             </label>
           </div>
 
-          <p
-            class="ui-alert ui-alert--info"
-            *ngIf="form.controls.documentType.value === 'RECEIPT'"
-          >
-            Boleta permite consumidor final si no se completa cliente.
+          <p class="ui-alert ui-alert--info" *ngIf="form.controls.documentType.value === 'RECEIPT'">
+            Puedes emitir como consumidor final. Si necesitas identificar al cliente, completa nombre y documento.
+          </p>
+          <p class="ui-alert ui-alert--warning" *ngIf="form.controls.documentType.value === 'INVOICE'">
+            Para factura, completa razon social/RUC o los datos requeridos segun el formulario actual.
           </p>
         </section>
 
@@ -245,19 +214,23 @@ import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.servic
             <thead>
               <tr>
                 <th>Producto</th>
-                <th>Cantidad</th>
-                <th>Precio unitario</th>
+                <th>Cant.</th>
+                <th>P. unitario</th>
                 <th>Descuento</th>
-                <th>Total linea</th>
+                <th>Importe</th>
               </tr>
             </thead>
             <tbody>
               <tr *ngFor="let item of sale.items">
-                <td>#{{ item.productId }}</td>
+                <td>
+                  <div class="item-primary">{{ productPrimaryLabel(item.productName) }}</div>
+                  <div class="item-secondary">SKU: {{ item.sku || "Sin SKU" }}</div>
+                  <div class="item-secondary" *ngIf="item.barcode">Codigo: {{ item.barcode }}</div>
+                </td>
                 <td>{{ item.quantity | number: "1.0-3" }}</td>
-                <td>{{ item.unitPrice | number: "1.2-2" }}</td>
-                <td>{{ item.discountAmount | number: "1.2-2" }}</td>
-                <td>{{ item.lineTotal | number: "1.2-2" }}</td>
+                <td>{{ formatCurrency(item.unitPrice) }}</td>
+                <td>{{ formatCurrency(item.discountAmount) }}</td>
+                <td>{{ formatCurrency(item.lineTotal) }}</td>
               </tr>
             </tbody>
           </table>
@@ -305,10 +278,15 @@ import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.servic
         gap: var(--space-2);
       }
 
-      .summary-card p {
-        margin: 0;
+      .kv-row {
         display: grid;
-        gap: 0.1rem;
+        grid-template-columns: minmax(108px, 0.42fr) minmax(0, 1fr);
+        gap: var(--space-2);
+        align-items: center;
+      }
+
+      .ui-page-description--meta {
+        font-weight: 700;
       }
 
       .summary-card .label {
@@ -374,6 +352,18 @@ import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.servic
         font-weight: 700;
       }
 
+      .field-help {
+        margin: 0;
+        min-height: 1.1rem;
+        font-size: var(--font-size-xs);
+        color: var(--color-text-secondary);
+      }
+
+      .field-help--error {
+        color: var(--color-danger);
+        font-weight: 700;
+      }
+
       .form-actions {
         display: flex;
         justify-content: flex-end;
@@ -383,6 +373,26 @@ import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.servic
 
       .issue-table {
         min-width: 820px;
+      }
+
+      .issue-table td:nth-child(2),
+      .issue-table td:nth-child(3),
+      .issue-table td:nth-child(4),
+      .issue-table td:nth-child(5),
+      .issue-table th:nth-child(2),
+      .issue-table th:nth-child(3),
+      .issue-table th:nth-child(4),
+      .issue-table th:nth-child(5) {
+        text-align: right;
+      }
+
+      .item-primary {
+        font-weight: 700;
+      }
+
+      .item-secondary {
+        color: var(--color-text-secondary);
+        font-size: var(--font-size-xs);
       }
 
       .ui-button[disabled] {
@@ -707,5 +717,13 @@ export class BillingIssueFromSalePageComponent implements OnInit {
     const series = this.selectedSeriesLabel();
     const amount = this.sale ? this.formatCurrency(this.sale.totalAmount) : "-";
     return `Se emitira ${typeLabel} para la venta ${this.sale?.saleNumber} con serie ${series} por ${amount}.`;
+  }
+
+  productPrimaryLabel(productName: string | null | undefined): string {
+    const normalized = String(productName ?? "").trim();
+    if (normalized) {
+      return normalized;
+    }
+    return "Producto sin nombre registrado";
   }
 }
