@@ -317,6 +317,111 @@ class BillingApplicationServiceTest {
     }
 
     @Test
+    void shouldBlockSigningInProdWhenRealSignatureIsNotAvailable() {
+        profileService.create(new CreateCompanyBillingProfileCommand(
+                "20999999991",
+                "INKTOY PROD SAC",
+                "AV. PROD 100",
+                BillingEnvironment.PROD,
+                null,
+                null
+        ));
+        BillingSeries prodSeries = seriesService.create(new CreateBillingSeriesCommand(
+                ElectronicDocumentType.RECEIPT,
+                "B101",
+                1L,
+                BillingEnvironment.PROD
+        ));
+        saleReadPort.sales.put(8L, completedSale(8L));
+
+        ElectronicDocument doc = documentService.createFromSale(8L, new CreateElectronicDocumentFromSaleCommand(
+                ElectronicDocumentType.RECEIPT,
+                prodSeries.id(),
+                null,
+                null
+        ));
+        documentService.generateXml(doc.id());
+
+        BillingConflictException ex = assertThrows(BillingConflictException.class, () -> documentService.sign(doc.id()));
+        assertEquals("La firma en produccion requiere un certificado digital valido y firma XML real.", ex.getMessage());
+
+        ElectronicDocument persisted = documentRepository.findById(doc.id()).orElseThrow();
+        assertEquals(ElectronicDocumentStatus.GENERATED, persisted.status());
+    }
+
+    @Test
+    void shouldBlockProdSendWhenProviderIsMockWithoutChangingStatus() {
+        profileService.create(new CreateCompanyBillingProfileCommand(
+                "20999999992",
+                "INKTOY PROD SAC 2",
+                "AV. PROD 200",
+                BillingEnvironment.PROD,
+                null,
+                null
+        ));
+        BillingSeries prodSeries = seriesService.create(new CreateBillingSeriesCommand(
+                ElectronicDocumentType.RECEIPT,
+                "B102",
+                1L,
+                BillingEnvironment.PROD
+        ));
+        saleReadPort.sales.put(9L, completedSale(9L));
+
+        ElectronicDocument created = documentService.createFromSale(9L, new CreateElectronicDocumentFromSaleCommand(
+                ElectronicDocumentType.RECEIPT,
+                prodSeries.id(),
+                null,
+                null
+        ));
+        ElectronicDocument generated = documentService.generateXml(created.id());
+
+        ElectronicDocument signed = documentRepository.save(new ElectronicDocument(
+                generated.id(),
+                generated.saleId(),
+                generated.billingSeriesId(),
+                generated.documentType(),
+                ElectronicDocumentStatus.SIGNED,
+                generated.environment(),
+                generated.series(),
+                generated.number(),
+                generated.fullNumber(),
+                generated.customerName(),
+                generated.customerDocument(),
+                generated.currencyCode(),
+                generated.subtotalAmount(),
+                generated.taxAmount(),
+                generated.totalAmount(),
+                generated.xmlGeneratedAt(),
+                Instant.now(),
+                null,
+                generated.providerTicket(),
+                generated.providerMessage(),
+                generated.createdAt(),
+                generated.updatedAt(),
+                generated.createdBy(),
+                generated.updatedBy()
+        ));
+        xmlRepository.save(new BillingXmlFile(
+                null,
+                signed.id(),
+                BillingXmlFileType.SIGNED,
+                signed.fullNumber() + "-signed.xml",
+                "<xml>signed</xml>",
+                "application/xml",
+                null,
+                "tester"
+        ));
+
+        BillingConflictException ex = assertThrows(BillingConflictException.class, () -> documentService.send(signed.id()));
+        assertEquals("El envio en produccion esta bloqueado porque no hay proveedor tributario real configurado.", ex.getMessage());
+
+        ElectronicDocument persisted = documentRepository.findById(signed.id()).orElseThrow();
+        assertEquals(ElectronicDocumentStatus.SIGNED, persisted.status());
+        assertNull(persisted.sentAt());
+        assertFalse(historyRepository.findByElectronicDocumentId(signed.id()).stream().anyMatch(h -> h.newStatus() == ElectronicDocumentStatus.SENT));
+    }
+
+    @Test
     void shouldConfigureControllerToForbidAlmacenero() throws NoSuchMethodException {
         Method method = ElectronicDocumentController.class.getMethod("createFromSale", Long.class,
                 com.erppos.backend.erp.billing.adapter.dto.CreateElectronicDocumentFromSaleRequest.class);

@@ -10,11 +10,16 @@ import org.springframework.stereotype.Component;
 public class MockElectronicBillingProviderAdapter implements ElectronicBillingProviderPort {
 
     @Override
+    public boolean supportsProduction() {
+        return false;
+    }
+
+    @Override
     public ProviderSendResult send(ElectronicDocument document, String signedXml) {
         if (document.customerName() != null && document.customerName().toUpperCase().contains("REJECT")) {
-            return new ProviderSendResult(ElectronicDocumentStatus.REJECTED, "MOCK-REJ-" + document.id(), "Rejected by mock validation rule");
+            return new ProviderSendResult(ElectronicDocumentStatus.REJECTED, "MOCK-REJ-" + document.id(), "Respuesta simulada de sandbox: rechazado.");
         }
-        return new ProviderSendResult(ElectronicDocumentStatus.ACCEPTED, "MOCK-ACC-" + document.id(), "Accepted by mock provider");
+        return new ProviderSendResult(ElectronicDocumentStatus.ACCEPTED, "MOCK-ACC-" + document.id(), "Respuesta simulada de sandbox: aceptado.");
     }
 }
 

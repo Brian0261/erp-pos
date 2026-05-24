@@ -17,6 +17,7 @@ import com.erppos.backend.erp.billing.domain.model.ElectronicDocumentStatus;
 import com.erppos.backend.erp.billing.domain.model.ElectronicDocumentStatusHistory;
 import com.erppos.backend.erp.billing.domain.model.ElectronicDocumentType;
 import com.erppos.backend.erp.billing.domain.model.ProviderSendResult;
+import com.erppos.backend.erp.billing.domain.model.BillingEnvironment;
 import com.erppos.backend.erp.billing.domain.port.BillingSaleReadPort;
 import com.erppos.backend.erp.billing.domain.port.BillingSeriesRepositoryPort;
 import com.erppos.backend.erp.billing.domain.port.BillingXmlFileRepositoryPort;
@@ -194,7 +195,7 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
     public ElectronicDocument generateXml(Long id) {
         ElectronicDocument current = getById(id);
         if (current.status() != ElectronicDocumentStatus.DRAFT && current.status() != ElectronicDocumentStatus.GENERATED) {
-            throw new BillingConflictException("Only DRAFT or GENERATED documents can generate XML");
+            throw new BillingConflictException("El estado actual no permite generar XML.");
         }
 
         CompanyBillingProfile profile = profileRepositoryPort.findActiveByEnvironment(current.environment())
@@ -221,12 +222,15 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
     @Transactional
     public ElectronicDocument sign(Long id) {
         ElectronicDocument current = getById(id);
+        if (current.environment() == BillingEnvironment.PROD) {
+            throw new BillingConflictException("La firma en produccion requiere un certificado digital valido y firma XML real.");
+        }
         if (current.status() != ElectronicDocumentStatus.GENERATED && current.status() != ElectronicDocumentStatus.SIGNED) {
-            throw new BillingConflictException("Only GENERATED or SIGNED documents can be signed");
+            throw new BillingConflictException("El estado actual no permite firmar el XML.");
         }
 
         BillingXmlFile generated = xmlFileRepositoryPort.findByElectronicDocumentIdAndFileType(id, BillingXmlFileType.GENERATED)
-                .orElseThrow(() -> new BillingNotFoundException("Generated XML file not found"));
+                .orElseThrow(() -> new BillingNotFoundException("XML generado no disponible. Genera el XML antes de firmar."));
         CompanyBillingProfile profile = profileRepositoryPort.findActiveByEnvironment(current.environment())
                 .orElseThrow(() -> new BillingNotFoundException("Billing profile not found for document environment"));
 
@@ -250,14 +254,17 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
     @Transactional
     public ElectronicDocument send(Long id) {
         ElectronicDocument current = getById(id);
+        if (current.environment() == BillingEnvironment.PROD && !billingProviderPort.supportsProduction()) {
+            throw new BillingConflictException("El envio en produccion esta bloqueado porque no hay proveedor tributario real configurado.");
+        }
         if (current.status() != ElectronicDocumentStatus.SIGNED) {
-            throw new BillingConflictException("Only SIGNED documents can be sent");
+            throw new BillingConflictException("El estado actual no permite enviar el comprobante.");
         }
 
         BillingXmlFile signed = xmlFileRepositoryPort.findByElectronicDocumentIdAndFileType(id, BillingXmlFileType.SIGNED)
-                .orElseThrow(() -> new BillingNotFoundException("Signed XML file not found"));
+                .orElseThrow(() -> new BillingNotFoundException("XML firmado no disponible. Firma el XML antes de enviar."));
 
-        ElectronicDocument sent = updateStatus(current, ElectronicDocumentStatus.SENT, "Document sent to mock provider");
+        ElectronicDocument sent = updateStatus(current, ElectronicDocumentStatus.SENT, sendTrackingMessage(current.environment()));
         sent = documentRepositoryPort.save(sent);
 
         ProviderSendResult result = billingProviderPort.send(sent, signed.content());
@@ -372,6 +379,16 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
                 normalize(saleItem.discountAmount()),
                 normalize(saleItem.lineTotal())
         );
+    }
+
+    private String sendTrackingMessage(BillingEnvironment environment) {
+        if (environment == BillingEnvironment.LOCAL) {
+            return "Envio simulado en entorno local.";
+        }
+        if (environment == BillingEnvironment.BETA) {
+            return "Envio simulado en entorno sandbox.";
+        }
+        return "Comprobante enviado.";
     }
 
     private BigDecimal normalize(BigDecimal value) {

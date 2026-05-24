@@ -23,6 +23,9 @@ Estandarizar cambios tecnicos para reducir regresiones y mantener trazabilidad e
  15. En Cotizaciones, documentar el rediseño completo en 5 fases cuando el flujo pase de listado → nueva → edición → detalle → conversión con tabla compacta, ProductAutocompleteComponent, `syncSelectedToInput` opt-in en edición, sanitización de cantidades/descuentos, ConfirmDialogService y formateo local Intl sin tocar backend, endpoints ni contratos.
  16. En Facturacion, documentar la mejora empresarial del Detalle de comprobante electronico cuando se muestren nombre real + SKU + codigo de barras en la tabla de items, historial descendente, XML colapsable y cards key-value, sin ProductService lookup frontend, sin DB/Flyway, sin cambios de endpoints ni POS.
  17. En Facturacion, documentar el rediseño empresarial de Emitir comprobante pendiente cuando la pantalla pase a header operativo sin MVP, cards key-value compactas, Tipo/Serie alineados con helper persistente, copy contextual por tipo, tabla de items con nombre real + SKU, montos PEN y sin ID tecnico visible, sin alterar reglas tributarias ni contratos.
+18. En Facturacion, documentar hardening por ambiente cuando LOCAL/BETA sigan como simulacion controlada y PROD quede bloqueado para firma/envio sin proveedor tributario real ni firma XML real, evitando aceptaciones mock en produccion.
+  19. En Facturacion, documentar configuracion tributaria como consola por ambiente cuando se muestre estado LOCAL/BETA/PROD (perfil/series/readiness), validaciones operativas (RUC 11, ubigeo 6), advertencias preventivas perfil-serie y CTA a Series sin cambiar contratos backend.
+  20. En Facturacion, documentar correccion de layout shift en Configuracion tributaria cuando se aplique field-help persistente con altura reservada en RUC/Razon social, Ubigeo/Departamento y Provincia/Distrito para evitar desalineacion visual entre campos hermanos de la misma fila.
 
 ## Tipos de commit sugeridos (cuando se autorice commit)
 

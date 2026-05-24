@@ -127,6 +127,12 @@ import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.servic
         <p class="ui-alert ui-alert--warning" *ngIf="isSpecialTerminalStatus()">
           Estado actual: {{ formatStatus(document.status) }}. Revisa historial y mensaje del proveedor.
         </p>
+        <p class="ui-alert ui-alert--info" *ngIf="isSimulationEnvironment()">
+          {{ simulationEnvironmentMessage() }}
+        </p>
+        <p class="ui-alert ui-alert--warning" *ngIf="isProdSendBlocked()">
+          Produccion bloqueada: falta proveedor tributario real.
+        </p>
       </section>
 
       <section class="workflow-actions">
@@ -620,6 +626,24 @@ export class BillingDocumentDetailPageComponent implements OnInit {
     if (message === "Document sent to mock provider") {
       return "Comprobante enviado al proveedor";
     }
+    if (message === "Envio simulado en entorno local.") {
+      return "Envio simulado en entorno local.";
+    }
+    if (message === "Envio simulado en entorno sandbox.") {
+      return "Envio simulado en entorno sandbox.";
+    }
+    if (message === "Respuesta simulada de sandbox: aceptado.") {
+      return "Respuesta simulada de sandbox: aceptado.";
+    }
+    if (message === "Respuesta simulada de sandbox: rechazado.") {
+      return "Respuesta simulada de sandbox: rechazado.";
+    }
+    if (
+      message ===
+      "El envio en produccion esta bloqueado porque no hay proveedor tributario real configurado."
+    ) {
+      return "Envio bloqueado en produccion: no hay proveedor tributario real configurado.";
+    }
     return message;
   }
 
@@ -703,6 +727,10 @@ export class BillingDocumentDetailPageComponent implements OnInit {
       return false;
     }
 
+    if (this.isProdSendBlocked()) {
+      return false;
+    }
+
     if (!this.document.xmlGeneratedAt) {
       return false;
     }
@@ -746,6 +774,30 @@ export class BillingDocumentDetailPageComponent implements OnInit {
       return false;
     }
     return ["REJECTED", "ERROR", "CANCELLED"].includes(this.document.status);
+  }
+
+  isSimulationEnvironment(): boolean {
+    if (!this.document) {
+      return false;
+    }
+    return this.document.environment === "LOCAL" || this.document.environment === "BETA";
+  }
+
+  simulationEnvironmentMessage(): string {
+    if (!this.document) {
+      return "";
+    }
+    if (this.document.environment === "LOCAL") {
+      return "Simulacion local: el envio y la respuesta del proveedor son de prueba.";
+    }
+    return "Sandbox: el envio y la respuesta del proveedor son simulados de prueba.";
+  }
+
+  isProdSendBlocked(): boolean {
+    if (!this.document) {
+      return false;
+    }
+    return this.document.environment === "PROD";
   }
 
   async generateXml(): Promise<void> {

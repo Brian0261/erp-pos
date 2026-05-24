@@ -606,6 +606,56 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [ ] Validar que POS, listado de Comprobantes y Detalle de comprobante no fueron afectados.
 - [ ] Sin cambios en DB/Flyway, endpoints principales, POS ni contratos de payload.
 
+### Facturacion - Configuracion tributaria como consola preventiva (2026-05-24)
+
+- [ ] Abrir /facturacion/configuracion y confirmar que ya no muestra texto MVP.
+- [ ] Confirmar header operativo con datos fiscales por ambiente y perfil activo + series compatibles.
+- [ ] Confirmar cards LOCAL/BETA/PROD con perfil, series activas, firma, proveedor y estado.
+- [ ] LOCAL: verificar card con perfil/series/estado y warning de simulacion local.
+- [ ] BETA: verificar card con perfil/series/estado y warning de sandbox/mock.
+- [ ] PROD: verificar card con perfil/series/estado y bloqueo de produccion (no avanza como emision real).
+- [ ] Serie activa sin perfil activo: verificar advertencia de perfil no configurado.
+- [ ] RUC valido (11 digitos): acepta y guarda sin error.
+- [ ] RUC invalido (<11 o >11 digitos): rechaza con mensaje controlado.
+- [ ] Ubigeo valido (6 digitos si se informa): acepta sin error.
+- [ ] Ubigeo invalido (no 6 digitos): rechaza con mensaje controlado.
+- [ ] Razon social obligatoria: rechaza si esta vacia.
+- [ ] Direccion fiscal obligatoria: rechaza si esta vacia.
+- [ ] Sin layout shift en RUC/Razon social al mostrar/ocultar errores.
+- [ ] Sin layout shift en Ubigeo/Departamento al mostrar/ocultar errores.
+- [ ] Sin layout shift en Provincia/Distrito al mostrar/ocultar errores.
+- [ ] Cambiar de ambiente (LOCAL -> BETA -> PROD) no genera layout shift.
+- [ ] Guardar/actualizar perfil funciona en LOCAL y BETA.
+- [ ] PROD muestra bloqueo de produccion y no permite avance como emision real.
+- [ ] Navegacion a Series desde CTA funciona correctamente.
+- [ ] POS, Series y Comprobantes no fueron afectados por los cambios.
+- [ ] Backend/POS/endpoints/DB/Flyway intactos.
+
+### Facturacion - Hardening envio/firma por ambiente (2026-05-24)
+
+- [ ] LOCAL: generar XML, firmar y enviar; flujo permitido como simulacion local.
+- [ ] BETA: generar XML, firmar y enviar; flujo permitido como sandbox simulado.
+- [ ] PROD: validar bloqueo de envio con mensaje `El envio en produccion esta bloqueado porque no hay proveedor tributario real configurado.`
+- [ ] PROD: validar que no cambia estado a `SENT` ni `ACCEPTED` cuando el envio se bloquea.
+- [ ] PROD: validar bloqueo de firma con mensaje `La firma en produccion requiere un certificado digital valido y firma XML real.`
+- [ ] Validar que el boton de envio no se muestra/permanece bloqueado en detalle cuando el ambiente es PROD.
+- [ ] Validar alertas visibles en detalle: simulacion local/sandbox para LOCAL/BETA y advertencia de bloqueo para PROD.
+- [ ] Validar que historial no registra eventos falsos de envio en PROD bloqueado.
+- [ ] Validar mensajes operativos para XML no generado/XML firmado no disponible y estado no permitido.
+- [ ] Validar que POS, listado de comprobantes, emitir pendiente y detalle mantienen comportamiento sin regresion.
+
+### Facturacion - Configuracion tributaria por ambiente (2026-05-24)
+
+- [ ] Configuracion tributaria: header operativo sin texto MVP y con relacion perfil-serie por ambiente.
+- [ ] Configuracion tributaria: cards LOCAL/BETA/PROD visibles con perfil, series activas, firma, proveedor y estado final.
+- [ ] Configuracion tributaria: detectar perfil faltante con series activas y mostrar warning preventivo.
+- [ ] Configuracion tributaria: crear perfil BETA activo y validar cambio de estado a listo para pruebas.
+- [ ] Configuracion tributaria: PROD visible como bloqueado para envio productivo real en esta fase.
+- [ ] Configuracion tributaria: RUC valida exactamente 11 digitos.
+- [ ] Configuracion tributaria: ubigeo valida 6 digitos si se informa.
+- [ ] Configuracion tributaria: boton `Ver series de este ambiente` navega a `/facturacion/series`.
+- [ ] Reintentar emision con serie BETA tras crear perfil BETA y validar que no falla por perfil faltante.
+
 ### Facturacion - Detalle comprobante electronico e items enriquecidos (2026-05-24)
 
 - [ ] Detalle: validar que el comprobante muestra nombre real del producto en la tabla de items.
