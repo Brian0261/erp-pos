@@ -6,7 +6,10 @@ import com.erppos.backend.erp.sales.adapter.dto.CreateSaleRequest;
 import com.erppos.backend.erp.sales.adapter.dto.SaleItemResponse;
 import com.erppos.backend.erp.sales.adapter.dto.SalePaymentResponse;
 import com.erppos.backend.erp.sales.adapter.dto.SaleResponse;
+import com.erppos.backend.erp.sales.adapter.dto.BillingSummaryResponse;
+import com.erppos.backend.erp.sales.adapter.dto.SalesListItemResponse;
 import com.erppos.backend.erp.sales.adapter.dto.VoidSaleRequest;
+import com.erppos.backend.erp.sales.application.usecase.SalesListItemResult;
 import com.erppos.backend.erp.sales.application.usecase.CreateSaleCommand;
 import com.erppos.backend.erp.sales.application.usecase.CreateSaleItemCommand;
 import com.erppos.backend.erp.sales.application.usecase.CreateSalePaymentCommand;
@@ -69,6 +72,23 @@ public class SalesController {
         return ResponseEntity.ok(salesUseCase.list(from, to, cashRegisterSessionId, status, createdBy).stream().map(sale -> toResponse(sale, false)).toList());
     }
 
+    @GetMapping("/list-items")
+    @PreAuthorize("hasAnyRole('CAJERO','ADMIN','SUPERVISOR')")
+    public ResponseEntity<List<SalesListItemResponse>> listItems(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) Long cashRegisterSessionId,
+            @RequestParam(required = false) SaleStatus status,
+            @RequestParam(required = false) String createdBy
+    ) {
+        return ResponseEntity.ok(
+                salesUseCase.listItems(from, to, cashRegisterSessionId, status, createdBy)
+                        .stream()
+                        .map(this::toListItemResponse)
+                        .toList()
+        );
+    }
+
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('CAJERO','ADMIN','SUPERVISOR')")
     public ResponseEntity<SaleResponse> getById(@PathVariable Long id) {
@@ -112,6 +132,26 @@ public class SalesController {
                 sale.createdBy(),
                 sale.items().stream().map(item -> toItemResponse(item, enrichItems)).toList(),
                 sale.payments().stream().map(this::toPaymentResponse).toList()
+        );
+    }
+
+    private SalesListItemResponse toListItemResponse(SalesListItemResult item) {
+        return new SalesListItemResponse(
+                item.id(),
+                item.saleNumber(),
+                item.soldAt(),
+                item.status(),
+                item.totalAmount(),
+                item.createdBy(),
+                item.cashRegisterSessionId(),
+                new BillingSummaryResponse(
+                        item.billingSummary().hasElectronicDocument(),
+                        item.billingSummary().documentId(),
+                        item.billingSummary().documentType(),
+                        item.billingSummary().fullNumber(),
+                        item.billingSummary().status(),
+                        item.billingSummary().environment()
+                )
         );
     }
 

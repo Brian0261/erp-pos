@@ -9,6 +9,7 @@ import com.erppos.backend.erp.sales.application.usecase.CreateSaleCommand;
 import com.erppos.backend.erp.sales.application.usecase.CreateSaleItemCommand;
 import com.erppos.backend.erp.sales.application.usecase.CreateSalePaymentCommand;
 import com.erppos.backend.erp.sales.application.usecase.OpenCashRegisterCommand;
+import com.erppos.backend.erp.sales.application.usecase.SalesListItemResult;
 import com.erppos.backend.erp.sales.application.usecase.VoidSaleCommand;
 import com.erppos.backend.erp.sales.domain.exception.SalesBusinessRuleException;
 import com.erppos.backend.erp.sales.domain.exception.SalesConflictException;
@@ -17,6 +18,7 @@ import com.erppos.backend.erp.sales.domain.model.CashRegisterStatus;
 import com.erppos.backend.erp.sales.domain.model.PaymentMethod;
 import com.erppos.backend.erp.sales.domain.model.PosProductSnapshot;
 import com.erppos.backend.erp.sales.domain.model.Sale;
+import com.erppos.backend.erp.sales.domain.model.SaleBillingSummary;
 import com.erppos.backend.erp.sales.domain.model.SaleItem;
 import com.erppos.backend.erp.sales.domain.model.SalePayment;
 import com.erppos.backend.erp.sales.domain.model.SaleStatus;
@@ -24,6 +26,7 @@ import com.erppos.backend.erp.sales.domain.port.CashRegisterRepositoryPort;
 import com.erppos.backend.erp.sales.domain.port.CatalogReadPort;
 import com.erppos.backend.erp.sales.domain.port.InventorySalesPort;
 import com.erppos.backend.erp.sales.domain.port.SaleRepositoryPort;
+import com.erppos.backend.erp.sales.domain.port.SalesBillingSummaryReadPort;
 import com.erppos.backend.erp.sales.domain.port.WarehouseReadPort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -52,6 +55,7 @@ class SalesApplicationServiceTest {
     private InMemoryCatalogReadPort catalogReadPort;
     private InMemoryWarehouseReadPort warehouseReadPort;
     private InMemoryInventorySalesPort inventoryPort;
+    private InMemorySalesBillingSummaryReadPort salesBillingSummaryReadPort;
     private TestAuditUserProvider auditUserProvider;
 
     private CashRegisterApplicationService cashService;
@@ -64,10 +68,11 @@ class SalesApplicationServiceTest {
         catalogReadPort = new InMemoryCatalogReadPort();
         warehouseReadPort = new InMemoryWarehouseReadPort();
         inventoryPort = new InMemoryInventorySalesPort();
+        salesBillingSummaryReadPort = new InMemorySalesBillingSummaryReadPort();
 
         auditUserProvider = new TestAuditUserProvider();
         cashService = new CashRegisterApplicationService(cashRepo, auditUserProvider);
-        salesService = new SalesApplicationService(saleRepo, cashRepo, catalogReadPort, warehouseReadPort, inventoryPort, auditUserProvider);
+        salesService = new SalesApplicationService(saleRepo, cashRepo, catalogReadPort, warehouseReadPort, inventoryPort, salesBillingSummaryReadPort, auditUserProvider);
 
         warehouseReadPort.activeWarehouses.put(1L, true);
         catalogReadPort.products.put(1L, new PosProductSnapshot(1L, "SKU-1", "EAN-1", "Producto 1", BigDecimal.valueOf(5), true));
@@ -228,6 +233,85 @@ class SalesApplicationServiceTest {
         Sale sale = salesService.create(validSaleCommand());
         salesService.voidSale(sale.id(), new VoidSaleCommand("Error caja"));
         assertThrows(SalesConflictException.class, () -> salesService.voidSale(sale.id(), new VoidSaleCommand("Duplicado")));
+    }
+
+    @Test
+    void listItemsShouldReturnPendingBillingSummaryWhenNoElectronicDocument() {
+        cashService.open(new OpenCashRegisterCommand(BigDecimal.ZERO, null));
+        Sale sale = salesService.create(validSaleCommand());
+
+        List<SalesListItemResult> rows = salesService.listItems(null, null, null, null, null);
+
+        assertEquals(1, rows.size());
+        SalesListItemResult item = rows.get(0);
+        assertEquals(sale.id(), item.id());
+        assertFalse(item.billingSummary().hasElectronicDocument());
+        assertNull(item.billingSummary().documentId());
+        assertNull(item.billingSummary().fullNumber());
+    }
+
+    @Test
+    void listItemsShouldReturnBillingSummaryWhenElectronicDocumentExists() {
+        cashService.open(new OpenCashRegisterCommand(BigDecimal.ZERO, null));
+        Sale sale = salesService.create(validSaleCommand());
+        salesBillingSummaryReadPort.put(
+                sale.id(),
+                new SaleBillingSummary(true, 99L, "INVOICE", "F001-00000099", "ACCEPTED", "PROD")
+        );
+
+        List<SalesListItemResult> rows = salesService.listItems(null, null, null, null, null);
+
+        assertEquals(1, rows.size());
+        SalesListItemResult item = rows.get(0);
+        assertTrue(item.billingSummary().hasElectronicDocument());
+        assertEquals(99L, item.billingSummary().documentId());
+        assertEquals("F001-00000099", item.billingSummary().fullNumber());
+        assertEquals("ACCEPTED", item.billingSummary().status());
+        assertEquals("PROD", item.billingSummary().environment());
+    }
+
+    @Test
+    void listItemsShouldUseLatestBillingSummaryWhenMultipleDocumentsExist() {
+        cashService.open(new OpenCashRegisterCommand(BigDecimal.ZERO, null));
+        Sale sale = salesService.create(validSaleCommand());
+        salesBillingSummaryReadPort.put(
+                sale.id(),
+                new SaleBillingSummary(true, 120L, "RECEIPT", "B001-00000120", "SENT", "BETA")
+        );
+        salesBillingSummaryReadPort.put(
+                sale.id(),
+                new SaleBillingSummary(true, 121L, "RECEIPT", "B001-00000121", "ACCEPTED", "BETA")
+        );
+
+        List<SalesListItemResult> rows = salesService.listItems(null, null, null, null, null);
+
+        assertEquals(1, rows.size());
+        SalesListItemResult item = rows.get(0);
+        assertEquals(121L, item.billingSummary().documentId());
+        assertEquals("B001-00000121", item.billingSummary().fullNumber());
+        assertEquals("ACCEPTED", item.billingSummary().status());
+    }
+
+    @Test
+    void listItemsShouldRespectSalesFilters() {
+        cashService.open(new OpenCashRegisterCommand(BigDecimal.ZERO, null));
+        Sale completed = salesService.create(validSaleCommand());
+        Sale second = salesService.create(validSaleCommand());
+        salesService.voidSale(second.id(), new VoidSaleCommand("Anulacion de prueba"));
+
+        List<SalesListItemResult> rows = salesService.listItems(null, null, null, SaleStatus.VOIDED, null);
+
+        assertEquals(1, rows.size());
+        assertEquals(second.id(), rows.get(0).id());
+        assertNotEquals(completed.id(), rows.get(0).id());
+    }
+
+    @Test
+    void listItemsShouldNotInvokeBillingPortWhenNoSales() {
+        List<SalesListItemResult> rows = salesService.listItems(null, null, null, null, null);
+
+        assertTrue(rows.isEmpty());
+        assertEquals(0, salesBillingSummaryReadPort.callCount);
     }
 
     @Test
@@ -444,6 +528,29 @@ class SalesApplicationServiceTest {
             String key = key(productId, warehouseId);
             stockByProductWarehouse.put(key, stockAvailable(productId, warehouseId).add(quantity));
             saleVoidMovements++;
+        }
+    }
+
+    static class InMemorySalesBillingSummaryReadPort implements SalesBillingSummaryReadPort {
+        private final Map<Long, List<SaleBillingSummary>> storage = new HashMap<>();
+        private int callCount = 0;
+
+        void put(Long saleId, SaleBillingSummary summary) {
+            storage.computeIfAbsent(saleId, key -> new ArrayList<>()).add(summary);
+        }
+
+        @Override
+        public Map<Long, SaleBillingSummary> findLatestBySaleIds(java.util.Collection<Long> saleIds) {
+            callCount++;
+            Map<Long, SaleBillingSummary> result = new HashMap<>();
+            for (Long saleId : saleIds) {
+                List<SaleBillingSummary> candidates = storage.get(saleId);
+                if (candidates == null || candidates.isEmpty()) {
+                    continue;
+                }
+                result.put(saleId, candidates.get(candidates.size() - 1));
+            }
+            return result;
         }
     }
 }

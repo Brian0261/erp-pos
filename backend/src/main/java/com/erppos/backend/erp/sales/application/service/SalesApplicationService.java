@@ -4,6 +4,7 @@ import com.erppos.backend.erp.security.domain.RoleName;
 import com.erppos.backend.erp.sales.application.usecase.CreateSaleCommand;
 import com.erppos.backend.erp.sales.application.usecase.CreateSaleItemCommand;
 import com.erppos.backend.erp.sales.application.usecase.CreateSalePaymentCommand;
+import com.erppos.backend.erp.sales.application.usecase.SalesListItemResult;
 import com.erppos.backend.erp.sales.application.usecase.SalesUseCase;
 import com.erppos.backend.erp.sales.application.usecase.VoidSaleCommand;
 import com.erppos.backend.erp.sales.domain.exception.SalesBusinessRuleException;
@@ -14,6 +15,7 @@ import com.erppos.backend.erp.sales.domain.model.CashRegisterStatus;
 import com.erppos.backend.erp.sales.domain.model.PaymentMethod;
 import com.erppos.backend.erp.sales.domain.model.PosProductSnapshot;
 import com.erppos.backend.erp.sales.domain.model.Sale;
+import com.erppos.backend.erp.sales.domain.model.SaleBillingSummary;
 import com.erppos.backend.erp.sales.domain.model.SaleItem;
 import com.erppos.backend.erp.sales.domain.model.SalePayment;
 import com.erppos.backend.erp.sales.domain.model.SaleStatus;
@@ -21,6 +23,7 @@ import com.erppos.backend.erp.sales.domain.port.CashRegisterRepositoryPort;
 import com.erppos.backend.erp.sales.domain.port.CatalogReadPort;
 import com.erppos.backend.erp.sales.domain.port.InventorySalesPort;
 import com.erppos.backend.erp.sales.domain.port.SaleRepositoryPort;
+import com.erppos.backend.erp.sales.domain.port.SalesBillingSummaryReadPort;
 import com.erppos.backend.erp.sales.domain.port.WarehouseReadPort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,9 +32,11 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -44,6 +49,7 @@ public class SalesApplicationService implements SalesUseCase {
     private final CatalogReadPort catalogReadPort;
     private final WarehouseReadPort warehouseReadPort;
     private final InventorySalesPort inventorySalesPort;
+    private final SalesBillingSummaryReadPort salesBillingSummaryReadPort;
     private final AuditUserProvider auditUserProvider;
 
     public SalesApplicationService(
@@ -52,6 +58,7 @@ public class SalesApplicationService implements SalesUseCase {
             CatalogReadPort catalogReadPort,
             WarehouseReadPort warehouseReadPort,
             InventorySalesPort inventorySalesPort,
+            SalesBillingSummaryReadPort salesBillingSummaryReadPort,
             AuditUserProvider auditUserProvider
     ) {
         this.saleRepositoryPort = saleRepositoryPort;
@@ -59,6 +66,7 @@ public class SalesApplicationService implements SalesUseCase {
         this.catalogReadPort = catalogReadPort;
         this.warehouseReadPort = warehouseReadPort;
         this.inventorySalesPort = inventorySalesPort;
+        this.salesBillingSummaryReadPort = salesBillingSummaryReadPort;
         this.auditUserProvider = auditUserProvider;
     }
 
@@ -206,6 +214,41 @@ public class SalesApplicationService implements SalesUseCase {
             createdBy = auditUserProvider.currentUsername();
         }
         return saleRepositoryPort.findByFilters(from, to, cashRegisterSessionId, status, createdBy);
+    }
+
+    @Override
+    public List<SalesListItemResult> listItems(
+            LocalDate from,
+            LocalDate to,
+            Long cashRegisterSessionId,
+            SaleStatus status,
+            String createdByFilter
+    ) {
+        List<Sale> sales = list(from, to, cashRegisterSessionId, status, createdByFilter);
+        if (sales.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> saleIds = sales.stream()
+                .map(Sale::id)
+                .filter(Objects::nonNull)
+                .toList();
+        Map<Long, SaleBillingSummary> summaries = saleIds.isEmpty()
+                ? Collections.emptyMap()
+                : salesBillingSummaryReadPort.findLatestBySaleIds(saleIds);
+
+        return sales.stream()
+                .map(sale -> new SalesListItemResult(
+                        sale.id(),
+                        sale.saleNumber(),
+                        sale.soldAt(),
+                        sale.status(),
+                        sale.totalAmount(),
+                        sale.createdBy(),
+                        sale.cashRegisterSessionId(),
+                        summaries.getOrDefault(sale.id(), SaleBillingSummary.empty())
+                ))
+                .toList();
     }
 
     @Override

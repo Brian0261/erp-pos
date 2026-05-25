@@ -4,8 +4,10 @@ import com.erppos.backend.erp.billing.domain.model.ElectronicDocumentStatus;
 import com.erppos.backend.erp.billing.domain.model.ElectronicDocumentType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 
 public interface ElectronicDocumentJpaRepository extends JpaRepository<ElectronicDocumentEntity, Long> {
@@ -40,5 +42,19 @@ public interface ElectronicDocumentJpaRepository extends JpaRepository<Electroni
             where d.billingSeries.id = :billingSeriesId
             """)
     Long findMaxNumberByBillingSeriesId(Long billingSeriesId);
+
+    @Query("""
+            select d.saleId as saleId,
+                   d.id as documentId,
+                   d.documentType as documentType,
+                   d.fullNumber as fullNumber,
+                   d.status as status,
+                   d.environment as environment,
+                   d.createdAt as createdAt
+            from ElectronicDocumentEntity d
+            where d.saleId in :saleIds
+            order by d.saleId asc, d.createdAt desc, d.id desc
+            """)
+    List<ElectronicDocumentSalesSummaryProjection> findSalesSummariesBySaleIds(@Param("saleIds") Collection<Long> saleIds);
 }
 
