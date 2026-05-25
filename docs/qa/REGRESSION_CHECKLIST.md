@@ -677,6 +677,29 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [ ] No se modificaron datos automaticamente; riesgo residual de datos historicos inconsistentes documentado.
 - [ ] POS, frontend, endpoints publicos y DB/Flyway (excepto V16) intactos.
 
+### Facturacion - Rediseño Series y numeracion tributaria frontend (2026-05-24)
+
+- [ ] Pantalla inicia con formulario cerrado (no abierto por defecto).
+- [ ] Boton Nueva serie visible y funcional; abre formulario para creacion.
+- [ ] Editar serie existente abre formulario en modo edicion con contexto "Editando serie X / ambiente Y".
+- [ ] Boton Cancelar cierra formulario sin guardar cambios.
+- [ ] Filtro por Tipo de comprobante filtra correctamente la tabla.
+- [ ] Filtro por Ambiente filtra correctamente la tabla.
+- [ ] Filtro por Estado filtra correctamente la tabla.
+- [ ] Separacion visual entre Series vigentes (activas) y Series historicas (inactivas).
+- [ ] Boton Mostrar/Ocultar en Series historicas alterna visibilidad de tabla colapsable.
+- [ ] Copy en historicas: "Una serie inactiva conserva la trazabilidad de comprobantes emitidos."
+- [ ] Confirmacion al desactivar serie con ConfirmDialogService (variante danger).
+- [ ] Confirmacion al activar serie historica con ConfirmDialogService (variante warning).
+- [ ] Confirmacion al crear/editar serie activa con advertencia de conflicto.
+- [ ] Mensaje claro ante serie activa duplicada (409): conflicto operativo descriptivo.
+- [ ] Mensaje claro ante proximo correlativo invalido (409): debe ser mayor al ultimo emitido.
+- [ ] Chips LOCAL/BETA/PROD sobrios, compactos, legibles con estilo dark-tinted.
+- [ ] Badge ACTIVA con verde sobrio corporativo; badge INACTIVA con gris neutro (no rojo ni blanco).
+- [ ] Sin layout shift en errores de formulario (field-help persistente con min-height).
+- [ ] Build frontend OK sin errores de compilacion.
+- [ ] Sin cambios en backend, POS, endpoints publicos, DB/Flyway.
+
 ### Facturacion - Configuracion tributaria por ambiente (2026-05-24)
 
 - [ ] Configuracion tributaria: header operativo sin texto MVP y con relacion perfil-serie por ambiente.
