@@ -1,3 +1,4 @@
+import { HttpErrorResponse } from "@angular/common/http";
 import { CommonModule } from "@angular/common";
 import { Component, OnInit } from "@angular/core";
 import { FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
@@ -65,6 +66,10 @@ import { SaleResponse } from "./data/sales.models";
           <p>
             Esta accion anulara la venta y puede afectar stock, caja y pagos
             asociados. Verifica caja, montos y autorizacion antes de confirmar.
+          </p>
+          <p class="warning-panel__secondary">
+            Si la venta tiene un comprobante electronico activo, no se puede
+            anular internamente y requiere gestion desde Facturacion.
           </p>
         </article>
 
@@ -150,6 +155,11 @@ import { SaleResponse } from "./data/sales.models";
       .warning-panel p {
         margin: 0;
         font-weight: 700;
+      }
+
+      .warning-panel__secondary {
+        margin-top: var(--space-2);
+        font-weight: 600;
       }
 
       .void-form {
@@ -343,10 +353,7 @@ export class SaleVoidPageComponent implements OnInit {
       },
       error: (error: unknown) => {
         this.submitting = false;
-        this.errorMessage = toHttpErrorMessage(
-          error,
-          "No se pudo anular la venta.",
-        );
+        this.errorMessage = this.toVoidErrorMessage(error);
       },
     });
   }
@@ -375,5 +382,16 @@ export class SaleVoidPageComponent implements OnInit {
         );
       },
     });
+  }
+
+  private toVoidErrorMessage(error: unknown): string {
+    if (error instanceof HttpErrorResponse && error.status === 409) {
+      return toHttpErrorMessage(
+        error,
+        "No se puede anular internamente. Requiere gestion desde Facturacion.",
+      );
+    }
+
+    return toHttpErrorMessage(error, "No se pudo anular la venta.");
   }
 }

@@ -132,13 +132,13 @@ import {
               <td>
                 <div class="cell-billing">
                   <span
-                    class="ui-badge billing-badge"
+                    class="billing-token"
                     [ngClass]="billingBadgeClass(sale.billingSummary)"
                   >
                     {{ billingPrimaryLabel(sale.billingSummary) }}
                   </span>
                   <span
-                    class="cell-code__secondary"
+                    class="billing-secondary"
                     *ngIf="billingSecondaryLabel(sale.billingSummary) as secondary"
                   >
                     {{ secondary }}
@@ -235,7 +235,7 @@ import {
 
       .cell-billing {
         display: grid;
-        gap: 0.18rem;
+        gap: 0.22rem;
         min-width: 0;
       }
 
@@ -249,46 +249,78 @@ import {
         text-align: right;
       }
 
-      .billing-badge {
+      .billing-token {
         width: fit-content;
         font-weight: 700;
+        font-size: 0.75rem;
+        line-height: 1.1;
+        border-radius: 999px;
+        padding: 0.3rem 0.55rem;
+        border: 1px solid transparent;
+        max-width: 100%;
+      }
+
+      .billing-secondary {
+        color: var(--color-text-secondary);
+        font-size: var(--font-size-xs);
+        line-height: 1.2;
       }
 
       .billing-badge--pending {
-        background: #e5e7eb;
-        color: #4b5563;
+        background: rgba(107, 114, 128, 0.08);
+        color: #6b7280;
+        border-color: rgba(107, 114, 128, 0.18);
       }
 
       .billing-badge--draft {
-        background: #dbeafe;
-        color: #1d4ed8;
+        background: rgba(59, 130, 246, 0.08);
+        color: #375a91;
+        border-color: rgba(59, 130, 246, 0.18);
       }
 
       .billing-badge--generated {
-        background: #ede9fe;
-        color: #6d28d9;
+        background: rgba(109, 40, 217, 0.08);
+        color: #6b46c1;
+        border-color: rgba(109, 40, 217, 0.18);
       }
 
       .billing-badge--signed {
-        background: #cffafe;
-        color: #0e7490;
+        background: rgba(14, 116, 144, 0.09);
+        color: #155e75;
+        border-color: rgba(14, 116, 144, 0.18);
       }
 
       .billing-badge--sent {
-        background: #fef3c7;
-        color: #92400e;
+        background: rgba(245, 158, 11, 0.1);
+        color: #9a6700;
+        border-color: rgba(245, 158, 11, 0.18);
       }
 
       .billing-badge--accepted {
-        background: #dcfce7;
+        background: rgba(34, 197, 94, 0.09);
         color: #166534;
+        border-color: rgba(34, 197, 94, 0.18);
       }
 
       .billing-badge--rejected,
-      .billing-badge--error,
+      .billing-badge--error {
+        background: rgba(220, 38, 38, 0.1);
+        color: #991b1b;
+        border-color: rgba(220, 38, 38, 0.18);
+      }
+
       .billing-badge--cancelled {
-        background: #fee2e2;
-        color: #b91c1c;
+        background: rgba(107, 114, 128, 0.1);
+        color: #4b5563;
+        border-color: rgba(107, 114, 128, 0.2);
+      }
+
+      :host-context(body[data-theme="dark"]) .billing-token {
+        color: rgba(226, 232, 240, 0.9);
+      }
+
+      :host-context(body[data-theme="dark"]) .billing-secondary {
+        color: rgba(226, 232, 240, 0.7);
       }
 
       .ui-button {

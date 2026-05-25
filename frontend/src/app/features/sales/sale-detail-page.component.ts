@@ -84,10 +84,10 @@ import { SaleResponse } from "./data/sales.models";
           </header>
 
           <p class="ui-page-description">
-            Consulta si esta venta ya tiene un comprobante asociado o emite uno pendiente.
+            Seguimiento del comprobante asociado.
           </p>
           <p class="ui-page-description billing-note">
-            La emision y seguimiento del comprobante se gestionan desde Facturacion.
+            Gestion desde Facturacion.
           </p>
 
           <p class="ui-alert ui-alert--info" *ngIf="billingLoading">
@@ -98,32 +98,52 @@ import { SaleResponse } from "./data/sales.models";
           </p>
 
           <ng-container *ngIf="!billingLoading">
-            <div class="billing-grid" *ngIf="billingDocument; else pendingDocument">
-              <div class="kv-row"><span class="label">Tipo</span><strong>{{ billingDocumentTypeLabel(billingDocument.documentType) }}</strong></div>
-              <div class="kv-row"><span class="label">Numero</span><strong>{{ billingDocument.fullNumber || "-" }}</strong></div>
-              <div class="kv-row">
-                <span class="label">Estado</span>
-                <strong class="ui-badge billing-status" [ngClass]="billingStatusClass(billingDocument.status)">
-                  {{ billingStatusLabel(billingDocument.status) }}
-                </strong>
+            <div class="billing-summary-scroll" *ngIf="billingDocument; else pendingDocument">
+              <div class="billing-summary-grid">
+                <div class="billing-kv">
+                  <span class="billing-kv__label">Tipo</span>
+                  <strong class="billing-kv__value">{{ billingDocumentTypeLabel(billingDocument.documentType) }}</strong>
+                </div>
+                <div class="billing-kv">
+                  <span class="billing-kv__label">Numero</span>
+                  <strong class="billing-kv__value billing-kv__value--number">{{ billingDocument.fullNumber || "-" }}</strong>
+                </div>
+                <div class="billing-kv">
+                  <span class="billing-kv__label">Estado</span>
+                  <strong class="billing-status-chip" [ngClass]="billingStatusClass(billingDocument.status)">
+                    {{ billingStatusLabel(billingDocument.status) }}
+                  </strong>
+                </div>
+                <div class="billing-kv">
+                  <span class="billing-kv__label">Ambiente</span>
+                  <strong class="billing-kv__value">{{ billingEnvironmentLabel(billingDocument.environment) }}</strong>
+                </div>
               </div>
-              <div class="kv-row"><span class="label">Ambiente</span><strong>{{ billingEnvironmentLabel(billingDocument.environment) }}</strong></div>
             </div>
 
+            <p
+              class="billing-warning-note"
+              *ngIf="billingDocument && hasBlockingBillingDocument()"
+            >
+              {{ blockingBillingMessage() }}
+            </p>
+
             <ng-template #pendingDocument>
-              <div class="billing-grid">
-                <div class="kv-row">
-                  <span class="label">Estado</span>
-                  <strong class="ui-badge billing-status billing-status--pending">PENDIENTE</strong>
-                </div>
-                <div class="kv-row">
-                  <span class="label">Comprobante</span>
-                  <strong>Sin comprobante emitido</strong>
+              <div class="billing-summary-scroll">
+                <div class="billing-summary-grid billing-summary-grid--pending">
+                  <div class="billing-kv">
+                    <span class="billing-kv__label">Estado</span>
+                    <strong class="billing-status-chip billing-status--pending">PENDIENTE</strong>
+                  </div>
+                  <div class="billing-kv">
+                    <span class="billing-kv__label">Comprobante</span>
+                    <strong class="billing-kv__value">Sin comprobante emitido</strong>
+                  </div>
                 </div>
               </div>
             </ng-template>
 
-            <div class="actions">
+            <div class="actions billing-actions">
               <a
                 *ngIf="billingDocument"
                 class="ui-button ui-button--secondary"
@@ -255,13 +275,28 @@ import { SaleResponse } from "./data/sales.models";
 
         <footer class="actions">
           <a
-            *ngIf="canVoidSale()"
+            *ngIf="canVoidSale() && !hasBlockingBillingDocument()"
             class="ui-button ui-button--danger"
             [routerLink]="['/ventas', sale.id, 'anular']"
           >
             Anular venta
           </a>
+          <button
+            *ngIf="canVoidSale() && hasBlockingBillingDocument()"
+            type="button"
+            class="ui-button ui-button--danger ui-button--disabled"
+            [disabled]="true"
+            [title]="blockingBillingButtonHint()"
+          >
+            Anular venta
+          </button>
         </footer>
+        <p
+          class="ui-page-description action-note"
+          *ngIf="canVoidSale() && hasBlockingBillingDocument()"
+        >
+          {{ blockingBillingButtonHint() }}
+        </p>
       </ng-container>
     </section>
   `,
@@ -365,56 +400,141 @@ import { SaleResponse } from "./data/sales.models";
         gap: var(--space-2);
       }
 
-      .billing-grid {
+      .billing-summary-scroll {
+        overflow-x: auto;
+        padding-bottom: 0.1rem;
+      }
+
+      .billing-summary-grid {
         display: grid;
+        grid-template-columns: repeat(4, minmax(150px, 1fr));
+        gap: var(--space-2);
+        min-width: 720px;
+      }
+
+      .billing-summary-grid--pending {
         grid-template-columns: repeat(2, minmax(220px, 1fr));
-        gap: var(--space-2) var(--space-4);
+        min-width: 420px;
+      }
+
+      .billing-kv {
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-sm);
+        background: rgba(15, 23, 42, 0.02);
+        padding: 0.72rem 0.8rem;
+        display: grid;
+        gap: 0.42rem;
+        align-content: start;
+        min-width: 0;
+      }
+
+      .billing-kv__label {
+        font-size: 0.68rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--color-text-secondary);
+        font-weight: 800;
+      }
+
+      .billing-kv__value {
+        display: block;
+        font-size: 0.96rem;
+        line-height: 1.2;
+        color: var(--color-text-primary);
+      }
+
+      .billing-kv__value--number {
+        font-variant-numeric: tabular-nums;
       }
 
       .billing-note {
         color: var(--color-text-secondary);
-        font-size: var(--font-size-sm);
+        font-size: var(--font-size-xs);
       }
 
-      .billing-status {
+      .billing-warning-note {
+        margin: 0;
+        font-size: var(--font-size-sm);
+        color: #8a5a00;
+      }
+
+      .billing-actions {
+        justify-content: flex-start;
+      }
+
+      .billing-status-chip {
+        width: fit-content;
         font-weight: 700;
+        font-size: 0.75rem;
+        line-height: 1.1;
+        border-radius: 999px;
+        padding: 0.32rem 0.56rem;
+        border: 1px solid transparent;
       }
 
       .billing-status--pending {
-        background: #e5e7eb;
-        color: #4b5563;
+        background: rgba(107, 114, 128, 0.08);
+        color: #6b7280;
+        border-color: rgba(107, 114, 128, 0.18);
       }
 
       .billing-status--draft {
-        background: #dbeafe;
-        color: #1d4ed8;
+        background: rgba(59, 130, 246, 0.08);
+        color: #375a91;
+        border-color: rgba(59, 130, 246, 0.18);
       }
 
       .billing-status--generated {
-        background: #ede9fe;
-        color: #6d28d9;
+        background: rgba(109, 40, 217, 0.08);
+        color: #6b46c1;
+        border-color: rgba(109, 40, 217, 0.18);
       }
 
       .billing-status--signed {
-        background: #cffafe;
-        color: #0e7490;
+        background: rgba(14, 116, 144, 0.09);
+        color: #155e75;
+        border-color: rgba(14, 116, 144, 0.18);
       }
 
       .billing-status--sent {
-        background: #fef3c7;
-        color: #92400e;
+        background: rgba(245, 158, 11, 0.1);
+        color: #9a6700;
+        border-color: rgba(245, 158, 11, 0.18);
       }
 
       .billing-status--accepted {
-        background: #dcfce7;
+        background: rgba(34, 197, 94, 0.09);
         color: #166534;
+        border-color: rgba(34, 197, 94, 0.18);
       }
 
       .billing-status--rejected,
-      .billing-status--error,
+      .billing-status--error {
+        background: rgba(220, 38, 38, 0.1);
+        color: #991b1b;
+        border-color: rgba(220, 38, 38, 0.18);
+      }
+
       .billing-status--cancelled {
-        background: #fee2e2;
-        color: #b91c1c;
+        background: rgba(107, 114, 128, 0.1);
+        color: #4b5563;
+        border-color: rgba(107, 114, 128, 0.2);
+      }
+
+      :host-context(body[data-theme="dark"]) .billing-kv {
+        background: rgba(15, 23, 42, 0.72);
+        border-color: rgba(148, 163, 184, 0.16);
+      }
+
+      :host-context(body[data-theme="dark"]) .billing-kv__label,
+      :host-context(body[data-theme="dark"]) .billing-note,
+      :host-context(body[data-theme="dark"]) .billing-warning-note {
+        color: rgba(226, 232, 240, 0.72);
+      }
+
+      :host-context(body[data-theme="dark"]) .billing-kv__value,
+      :host-context(body[data-theme="dark"]) .billing-kv__value {
+        color: rgba(248, 250, 252, 0.94);
       }
 
       .totals-panel {
@@ -525,13 +645,21 @@ import { SaleResponse } from "./data/sales.models";
         white-space: nowrap;
       }
 
+      .ui-button--disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+
+      .action-note {
+        margin: 0;
+      }
+
       @media (max-width: 900px) {
         .sale-detail-page {
           padding: var(--space-4);
         }
 
         .summary-grid,
-        .billing-grid,
         .totals-panel {
           grid-template-columns: 1fr;
         }
@@ -544,6 +672,20 @@ import { SaleResponse } from "./data/sales.models";
   ],
 })
 export class SaleDetailPageComponent implements OnInit {
+  private readonly blockingBillingStatuses = new Set([
+    "DRAFT",
+    "GENERATED",
+    "SIGNED",
+    "SENT",
+    "ACCEPTED",
+  ]);
+
+  private readonly taxManagementBillingStatuses = new Set([
+    "SIGNED",
+    "SENT",
+    "ACCEPTED",
+  ]);
+
   private readonly currencyFormatter = new Intl.NumberFormat("es-PE", {
     style: "currency",
     currency: "PEN",
@@ -698,6 +840,27 @@ export class SaleDetailPageComponent implements OnInit {
     }
   }
 
+  hasBlockingBillingDocument(): boolean {
+    const status = this.billingDocument?.status;
+    return typeof status === "string" && this.blockingBillingStatuses.has(status);
+  }
+
+  blockingBillingMessage(): string {
+    if (this.requiresTaxManagement()) {
+      return "Esta venta tiene un comprobante electronico activo. La anulacion interna esta bloqueada; requiere gestion tributaria desde Facturacion.";
+    }
+
+    return "Esta venta tiene un comprobante electronico activo. La anulacion interna esta bloqueada; gestiona el caso desde Facturacion.";
+  }
+
+  blockingBillingButtonHint(): string {
+    if (this.requiresTaxManagement()) {
+      return "No se puede anular internamente. Requiere gestion tributaria desde Facturacion.";
+    }
+
+    return "No se puede anular internamente. Requiere gestion desde Facturacion.";
+  }
+
   settlementLabel(sale: SaleResponse): string {
     if (this.hasCashPayment(sale)) {
       return "Vuelto";
@@ -729,6 +892,11 @@ export class SaleDetailPageComponent implements OnInit {
 
   private hasCashPayment(sale: SaleResponse): boolean {
     return sale.payments.some((payment) => payment.paymentMethod === "CASH");
+  }
+
+  private requiresTaxManagement(): boolean {
+    const status = this.billingDocument?.status;
+    return typeof status === "string" && this.taxManagementBillingStatuses.has(status);
   }
 
   formatCurrency(value: number | null | undefined): string {
