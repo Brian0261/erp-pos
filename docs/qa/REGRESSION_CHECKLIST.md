@@ -606,6 +606,64 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [ ] Validar que POS, listado de Comprobantes y Detalle de comprobante no fueron afectados.
 - [ ] Sin cambios en DB/Flyway, endpoints principales, POS ni contratos de payload.
 
+### Ventas - Integracion con comprobantes electronicos Fases 1-2C + refinamiento visual (2026-05-25)
+
+#### Listado de Ventas
+- [ ] Muestra columna `Comprobante` con datos del read-model.
+- [ ] Venta sin comprobante muestra `Pendiente` / `Sin comprobante`.
+- [ ] Venta con comprobante muestra numero, estado traducido y ambiente.
+- [ ] Estados se traducen correctamente:
+  - DRAFT -> BORRADOR
+  - GENERATED -> XML GENERADO
+  - SIGNED -> FIRMADO
+  - SENT -> ENVIADO
+  - ACCEPTED -> ACEPTADO
+  - REJECTED -> RECHAZADO
+  - ERROR -> ERROR
+  - CANCELLED -> ANULADO
+- [ ] No hay consultas por fila a billing (sin N+1).
+- [ ] Formato monetario PEN correcto (Intl.NumberFormat es-PE).
+- [ ] Fecha/hora con Intl.DateTimeFormat es-PE.
+- [ ] Chips de comprobante sobrios, no invasivos (dark-tinted, borde tenue).
+- [ ] Pendiente se ve neutral, no como alerta fuerte.
+- [ ] La columna Comprobante no compite con Venta, Estado y Total.
+
+#### Detalle de Venta
+- [ ] Muestra bloque `Comprobante electronico` con copy `Seguimiento del comprobante asociado.`
+- [ ] Sin comprobante muestra `Emitir comprobante`.
+- [ ] Con comprobante muestra `Ver comprobante`.
+- [ ] No se muestran ambos CTA al mismo tiempo.
+- [ ] Layout horizontal compacto de 4 columnas para comprobante: Tipo, Numero, Estado, Ambiente.
+- [ ] Labels arriba y valores debajo; separacion clara entre label y value.
+- [ ] No aparecen textos pegados como `TipoBoleta`, `EstadoBORRADOR`, `AmbienteSUNAT Beta`.
+- [ ] Advertencia de anulacion bloqueada aparece solo cuando corresponde y como nota compacta.
+- [ ] Boton `Ver comprobante` debajo del bloque, alineado a la izquierda.
+- [ ] Caso sin comprobante mantiene patron compacto horizontal.
+
+#### Anulacion de Venta
+- [ ] Venta sin comprobante permite anular.
+- [ ] Venta con DRAFT bloquea anulacion.
+- [ ] Venta con GENERATED bloquea anulacion.
+- [ ] Venta con SIGNED bloquea anulacion.
+- [ ] Venta con SENT bloquea anulacion.
+- [ ] Venta con ACCEPTED bloquea anulacion.
+- [ ] Venta con REJECTED permite anulacion.
+- [ ] Venta con ERROR permite anulacion.
+- [ ] Venta con CANCELLED permite anulacion.
+- [ ] Cuando bloquea, venta sigue COMPLETED.
+- [ ] Cuando bloquea, stock no se restaura.
+- [ ] Cuando bloquea, pagos no se modifican.
+- [ ] Cuando bloquea, caja no cambia por estado VOIDED.
+- [ ] Frontend muestra mensaje 409 claro con copy operativo.
+- [ ] ConfirmDialogService sigue activo para anulacion permitida.
+- [ ] Pantalla de anulacion muestra advertencia preventiva sobre comprobante activo.
+
+#### Validaciones tecnicas
+- [ ] `cd backend; .\mvnw.cmd -Dtest=SalesApplicationServiceTest test` -> 32 OK.
+- [ ] `cd backend; .\mvnw.cmd -Dtest=BillingApplicationServiceTest test` -> OK.
+- [ ] `cd backend; .\mvnw.cmd -DskipTests package` -> BUILD SUCCESS.
+- [ ] `cd frontend; npm run build` -> BUILD SUCCESS.
+
 ### Facturacion - Configuracion tributaria como consola preventiva (2026-05-24)
 
 - [ ] Abrir /facturacion/configuracion y confirmar que ya no muestra texto MVP.
