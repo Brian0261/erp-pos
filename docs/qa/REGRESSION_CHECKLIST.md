@@ -631,6 +631,21 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [ ] POS, Series y Comprobantes no fueron afectados por los cambios.
 - [ ] Backend/POS/endpoints/DB/Flyway intactos.
 
+### Facturacion - Configuracion tributaria loading gate + loader neutral (2026-05-24)
+
+- [ ] F5 repetido en /facturacion/configuracion: no debe aparecer formulario vacio, cards incompletas ni skeleton con cuadros vacios.
+- [ ] Navegacion interna hacia /facturacion/configuracion: no debe haber parpadeo visual ni flash de contenido parcial.
+- [ ] Carga rapida: debe aparecer directamente la pantalla real con datos de LOCAL/BETA/PROD sin transicion intermedia.
+- [ ] Carga lenta (throttling Slow 3G): debe aparecer loader neutral con texto "Cargando configuracion tributaria..." y mensaje operativo.
+- [ ] Loader neutral no debe mostrar maquetas vacias ni placeholders graficos.
+- [ ] Si la carga falla antes de 280 ms: debe aparecer error operativo con boton Recargar.
+- [ ] Si la carga falla despues de 280 ms: debe reemplazar loader neutral por error operativo con boton Recargar.
+- [ ] Cambio entre LOCAL, BETA y PROD: cards y formulario se actualizan sin flicker.
+- [ ] Crear perfil en LOCAL/BETA: funciona correctamente y recarga datos.
+- [ ] Actualizar perfil en LOCAL/BETA: funciona correctamente y mantiene datos.
+- [ ] PROD muestra bloqueo de produccion y no permite avance como emision real.
+- [ ] Sin cambios en backend, POS, endpoints, DB/Flyway ni servicios Angular.
+
 ### Facturacion - Hardening envio/firma por ambiente (2026-05-24)
 
 - [ ] LOCAL: generar XML, firmar y enviar; flujo permitido como simulacion local.

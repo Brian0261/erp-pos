@@ -1,5 +1,5 @@
 import { CommonModule } from "@angular/common";
-import { Component, OnInit } from "@angular/core";
+import { Component, OnDestroy, OnInit } from "@angular/core";
 import { FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
 import { RouterLink } from "@angular/router";
 import { catchError, forkJoin, of } from "rxjs";
@@ -29,212 +29,243 @@ interface BillingProfileExtras {
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, RouterLink],
   template: `
-    <section class="ui-card billing-config-page">
-      <header class="ui-page-head">
-        <div>
-          <h1 class="ui-page-title">Configuracion tributaria</h1>
-          <p class="ui-page-description">
-            Configura los datos fiscales usados para emitir comprobantes electronicos por ambiente.
+    <ng-container *ngIf="!initialLoading || showInitialLoader">
+      <section class="ui-card billing-config-page">
+        <ng-container *ngIf="initialLoading && showInitialLoader">
+          <div class="initial-loader">
+            <h2 class="ui-page-title">Configuracion tributaria</h2>
+            <p class="ui-page-description">
+              Cargando configuracion tributaria...
+            </p>
+            <p class="ui-page-description ui-muted">
+              Estamos validando perfiles y series por ambiente.
+            </p>
+          </div>
+        </ng-container>
+
+        <ng-container *ngIf="!initialLoading && !initialLoaded">
+          <p class="ui-alert ui-alert--error" *ngIf="initialLoadError">
+            {{ initialLoadError }}
           </p>
-          <p class="ui-page-description">
-            Cada ambiente requiere un perfil activo y series compatibles.
-          </p>
-        </div>
-        <span class="ui-badge env-badge">
-          {{ form.controls.environment.value || "LOCAL" }}
-        </span>
-      </header>
+          <div class="form-actions form-actions--start">
+            <button
+              type="button"
+              class="ui-button ui-button--secondary"
+              (click)="retryInitialLoad()"
+            >
+              Recargar
+            </button>
+          </div>
+        </ng-container>
 
-      <section class="summary-grid">
-        <article class="summary-card" *ngFor="let env of environments">
-          <h2>{{ env }}</h2>
-          <div class="kv-row"><span class="label">Perfil</span><strong>{{ profileStatusLabel(env) }}</strong></div>
-          <div class="kv-row"><span class="label">Series activas</span><strong>{{ activeSeriesCount(env) }}</strong></div>
-          <div class="kv-row"><span class="label">Firma</span><strong>{{ signatureStatusLabel(env) }}</strong></div>
-          <div class="kv-row"><span class="label">Proveedor</span><strong>{{ providerStatusLabel(env) }}</strong></div>
-          <div class="kv-row"><span class="label">Estado</span><strong>{{ environmentReadinessLabel(env) }}</strong></div>
-        </article>
-      </section>
-
-      <p class="ui-alert ui-alert--error" *ngIf="permissionMessage">
-        {{ permissionMessage }}
-      </p>
-      <p class="ui-alert ui-alert--error" *ngIf="errorMessage">
-        {{ errorMessage }}
-      </p>
-      <p class="ui-alert ui-alert--success" *ngIf="successMessage">
-        {{ successMessage }}
-      </p>
-
-      <form [formGroup]="form" class="form-layout" (ngSubmit)="submit()">
-        <section class="form-section">
-          <header class="section-head">
-            <h2>Ambiente y estado</h2>
+        <ng-container *ngIf="initialLoaded">
+          <header class="ui-page-head">
+            <div>
+              <h1 class="ui-page-title">Configuracion tributaria</h1>
+              <p class="ui-page-description">
+                Configura los datos fiscales usados para emitir comprobantes electronicos por ambiente.
+              </p>
+              <p class="ui-page-description">
+                Cada ambiente requiere un perfil activo y series compatibles.
+              </p>
+            </div>
+            <span class="ui-badge env-badge">
+              {{ form.controls.environment.value || "LOCAL" }}
+            </span>
           </header>
 
-          <div class="form-grid form-grid--two">
-            <label class="field">
-              <span>Ambiente *</span>
-              <select
-                formControlName="environment"
-                (change)="onEnvironmentChanged()"
+          <section class="summary-grid">
+            <article class="summary-card" *ngFor="let env of environments">
+              <h2>{{ env }}</h2>
+              <div class="kv-row"><span class="label">Perfil</span><strong>{{ profileStatusLabel(env) }}</strong></div>
+              <div class="kv-row"><span class="label">Series activas</span><strong>{{ activeSeriesCount(env) }}</strong></div>
+              <div class="kv-row"><span class="label">Firma</span><strong>{{ signatureStatusLabel(env) }}</strong></div>
+              <div class="kv-row"><span class="label">Proveedor</span><strong>{{ providerStatusLabel(env) }}</strong></div>
+              <div class="kv-row"><span class="label">Estado</span><strong>{{ environmentReadinessLabel(env) }}</strong></div>
+            </article>
+          </section>
+
+          <p class="ui-alert ui-alert--error" *ngIf="permissionMessage">
+            {{ permissionMessage }}
+          </p>
+          <p class="ui-alert ui-alert--error" *ngIf="errorMessage">
+            {{ errorMessage }}
+          </p>
+          <p class="ui-alert ui-alert--success" *ngIf="successMessage">
+            {{ successMessage }}
+          </p>
+
+          <form [formGroup]="form" class="form-layout" (ngSubmit)="submit()">
+            <section class="form-section">
+              <header class="section-head">
+                <h2>Ambiente y estado</h2>
+              </header>
+
+              <div class="form-grid form-grid--two">
+                <label class="field">
+                  <span>Ambiente *</span>
+                  <select
+                    formControlName="environment"
+                    (change)="onEnvironmentChanged()"
+                  >
+                    <option *ngFor="let env of environments" [value]="env">
+                      {{ env }}
+                    </option>
+                  </select>
+                </label>
+
+                <label class="field field--inline">
+                  <input type="checkbox" formControlName="active" />
+                  <span>Perfil activo</span>
+                </label>
+              </div>
+
+              <p class="ui-alert ui-alert--info" *ngIf="selectedEnvironment === 'LOCAL'">
+                Este perfil se usara para comprobantes emitidos con series LOCAL. El envio es simulado y no representa transmision tributaria real.
+              </p>
+              <p class="ui-alert ui-alert--info" *ngIf="selectedEnvironment === 'BETA'">
+                Este perfil se usara para comprobantes emitidos con series BETA. Usalo para pruebas controladas/sandbox.
+              </p>
+              <p class="ui-alert ui-alert--warning" *ngIf="selectedEnvironment === 'PROD'">
+                Produccion esta bloqueada hasta configurar firma XML real y proveedor tributario real. No se enviaran comprobantes reales en esta fase.
+              </p>
+              <p class="ui-alert ui-alert--warning" *ngIf="hasActiveSeriesWithoutProfile(selectedEnvironment)">
+                Hay series activas en este ambiente, pero falta un perfil tributario activo. La emision fallara hasta crear o activar el perfil.
+              </p>
+            </section>
+
+            <section class="form-section">
+              <header class="section-head">
+                <h2>Datos de empresa</h2>
+              </header>
+
+              <div class="form-grid form-grid--two">
+                <label class="field">
+                  <span>RUC de empresa *</span>
+                  <input type="text" maxlength="11" formControlName="ruc" (input)="digitsOnly('ruc', 11)" />
+                  <small class="field-help" [ngClass]="{ 'field-help--error': isInvalid('ruc') }">
+                    {{ isInvalid("ruc") ? "El RUC debe tener 11 digitos." : " " }}
+                  </small>
+                </label>
+
+                <label class="field">
+                  <span>Razon social *</span>
+                  <input type="text" maxlength="180" formControlName="legalName" />
+                  <small class="field-help" [ngClass]="{ 'field-help--error': isInvalid('legalName') }">
+                    {{ isInvalid("legalName") ? "Completa la razon social." : " " }}
+                  </small>
+                </label>
+
+                <label class="field full">
+                  <span>Nombre comercial</span>
+                  <input type="text" maxlength="180" formControlName="tradeName" />
+                </label>
+              </div>
+            </section>
+
+            <section class="form-section">
+              <header class="section-head">
+                <h2>Direccion fiscal</h2>
+              </header>
+
+              <div class="form-grid form-grid--two">
+                <label class="field full">
+                  <span>Direccion fiscal *</span>
+                  <input
+                    type="text"
+                    maxlength="240"
+                    formControlName="fiscalAddress"
+                  />
+                  <small class="field-help" [ngClass]="{ 'field-help--error': isInvalid('fiscalAddress') }">
+                    {{ isInvalid("fiscalAddress") ? "Completa la direccion fiscal." : " " }}
+                  </small>
+                </label>
+
+                <label class="field">
+                  <span>Ubigeo</span>
+                  <input type="text" maxlength="6" formControlName="ubigeo" (input)="digitsOnly('ubigeo', 6)" />
+                  <small class="field-help" [ngClass]="{ 'field-help--error': isInvalid('ubigeo') }">
+                    {{ isInvalid("ubigeo") ? "El ubigeo debe tener 6 digitos." : " " }}
+                  </small>
+                </label>
+
+                <label class="field">
+                  <span>Departamento</span>
+                  <input type="text" maxlength="120" formControlName="department" />
+                  <small class="field-help" aria-hidden="true">&nbsp;</small>
+                </label>
+
+                <label class="field">
+                  <span>Provincia</span>
+                  <input type="text" maxlength="120" formControlName="province" />
+                  <small class="field-help" aria-hidden="true">&nbsp;</small>
+                </label>
+
+                <label class="field">
+                  <span>Distrito</span>
+                  <input type="text" maxlength="120" formControlName="district" />
+                  <small class="field-help" aria-hidden="true">&nbsp;</small>
+                </label>
+              </div>
+            </section>
+
+            <section class="form-section">
+              <header class="section-head">
+                <h2>Certificado</h2>
+              </header>
+
+              <div class="form-grid">
+                <label class="field full">
+                  <span>Ruta o alias del certificado</span>
+                  <input
+                    type="text"
+                    maxlength="240"
+                    formControlName="certificatePath"
+                  />
+                </label>
+
+                <label class="field full">
+                  <span>Contrasena del certificado</span>
+                  <input
+                    type="password"
+                    maxlength="120"
+                    formControlName="certificatePassword"
+                  />
+                </label>
+              </div>
+
+              <p class="ui-alert ui-alert--info" *ngIf="selectedEnvironment === 'LOCAL' || selectedEnvironment === 'BETA'">
+                En Local/Beta puedes trabajar con simulacion. El certificado puede quedar vacio si no se realizara firma real.
+              </p>
+              <p class="ui-alert ui-alert--warning" *ngIf="selectedEnvironment === 'PROD'">
+                En Produccion se requiere certificado digital valido y proveedor tributario real. Actualmente el envio productivo esta bloqueado.
+              </p>
+            </section>
+
+            <div class="form-actions">
+              <button
+                type="button"
+                class="ui-button ui-button--secondary"
+                (click)="loadProfile()"
+                [disabled]="loading || !canEdit"
               >
-                <option *ngFor="let env of environments" [value]="env">
-                  {{ env }}
-                </option>
-              </select>
-            </label>
-
-            <label class="field field--inline">
-              <input type="checkbox" formControlName="active" />
-              <span>Perfil activo</span>
-            </label>
-          </div>
-
-          <p class="ui-alert ui-alert--info" *ngIf="selectedEnvironment === 'LOCAL'">
-            Este perfil se usara para comprobantes emitidos con series LOCAL. El envio es simulado y no representa transmision tributaria real.
-          </p>
-          <p class="ui-alert ui-alert--info" *ngIf="selectedEnvironment === 'BETA'">
-            Este perfil se usara para comprobantes emitidos con series BETA. Usalo para pruebas controladas/sandbox.
-          </p>
-          <p class="ui-alert ui-alert--warning" *ngIf="selectedEnvironment === 'PROD'">
-            Produccion esta bloqueada hasta configurar firma XML real y proveedor tributario real. No se enviaran comprobantes reales en esta fase.
-          </p>
-          <p class="ui-alert ui-alert--warning" *ngIf="hasActiveSeriesWithoutProfile(selectedEnvironment)">
-            Hay series activas en este ambiente, pero falta un perfil tributario activo. La emision fallara hasta crear o activar el perfil.
-          </p>
-        </section>
-
-        <section class="form-section">
-          <header class="section-head">
-            <h2>Datos de empresa</h2>
-          </header>
-
-          <div class="form-grid form-grid--two">
-            <label class="field">
-              <span>RUC de empresa *</span>
-              <input type="text" maxlength="11" formControlName="ruc" (input)="digitsOnly('ruc', 11)" />
-              <small class="field-help" [ngClass]="{ 'field-help--error': isInvalid('ruc') }">
-                {{ isInvalid("ruc") ? "El RUC debe tener 11 digitos." : " " }}
-              </small>
-            </label>
-
-            <label class="field">
-              <span>Razon social *</span>
-              <input type="text" maxlength="180" formControlName="legalName" />
-              <small class="field-help" [ngClass]="{ 'field-help--error': isInvalid('legalName') }">
-                {{ isInvalid("legalName") ? "Completa la razon social." : " " }}
-              </small>
-            </label>
-
-            <label class="field full">
-              <span>Nombre comercial</span>
-              <input type="text" maxlength="180" formControlName="tradeName" />
-            </label>
-          </div>
-        </section>
-
-        <section class="form-section">
-          <header class="section-head">
-            <h2>Direccion fiscal</h2>
-          </header>
-
-          <div class="form-grid form-grid--two">
-            <label class="field full">
-              <span>Direccion fiscal *</span>
-              <input
-                type="text"
-                maxlength="240"
-                formControlName="fiscalAddress"
-              />
-              <small class="field-help" [ngClass]="{ 'field-help--error': isInvalid('fiscalAddress') }">
-                {{ isInvalid("fiscalAddress") ? "Completa la direccion fiscal." : " " }}
-              </small>
-            </label>
-
-            <label class="field">
-              <span>Ubigeo</span>
-              <input type="text" maxlength="6" formControlName="ubigeo" (input)="digitsOnly('ubigeo', 6)" />
-              <small class="field-help" [ngClass]="{ 'field-help--error': isInvalid('ubigeo') }">
-                {{ isInvalid("ubigeo") ? "El ubigeo debe tener 6 digitos." : " " }}
-              </small>
-            </label>
-
-            <label class="field">
-              <span>Departamento</span>
-              <input type="text" maxlength="120" formControlName="department" />
-              <small class="field-help" aria-hidden="true">&nbsp;</small>
-            </label>
-
-            <label class="field">
-              <span>Provincia</span>
-              <input type="text" maxlength="120" formControlName="province" />
-              <small class="field-help" aria-hidden="true">&nbsp;</small>
-            </label>
-
-            <label class="field">
-              <span>Distrito</span>
-              <input type="text" maxlength="120" formControlName="district" />
-              <small class="field-help" aria-hidden="true">&nbsp;</small>
-            </label>
-          </div>
-        </section>
-
-        <section class="form-section">
-          <header class="section-head">
-            <h2>Certificado</h2>
-          </header>
-
-          <div class="form-grid">
-            <label class="field full">
-              <span>Ruta o alias del certificado</span>
-              <input
-                type="text"
-                maxlength="240"
-                formControlName="certificatePath"
-              />
-            </label>
-
-            <label class="field full">
-              <span>Contrasena del certificado</span>
-              <input
-                type="password"
-                maxlength="120"
-                formControlName="certificatePassword"
-              />
-            </label>
-          </div>
-
-          <p class="ui-alert ui-alert--info" *ngIf="selectedEnvironment === 'LOCAL' || selectedEnvironment === 'BETA'">
-            En Local/Beta puedes trabajar con simulacion. El certificado puede quedar vacio si no se realizara firma real.
-          </p>
-          <p class="ui-alert ui-alert--warning" *ngIf="selectedEnvironment === 'PROD'">
-            En Produccion se requiere certificado digital valido y proveedor tributario real. Actualmente el envio productivo esta bloqueado.
-          </p>
-        </section>
-
-        <div class="form-actions">
-          <button
-            type="button"
-            class="ui-button ui-button--secondary"
-            (click)="loadProfile()"
-            [disabled]="loading || !canEdit"
-          >
-            Recargar
-          </button>
-          <a class="ui-button ui-button--secondary" [routerLink]="['/facturacion/series']">
-            Ver series de este ambiente
-          </a>
-          <button
-            type="submit"
-            class="ui-button ui-button--primary"
-            [disabled]="loading || !canEdit"
-          >
-            {{ loading ? "Guardando..." : saveButtonLabel }}
-          </button>
-        </div>
-      </form>
-    </section>
+                Recargar
+              </button>
+              <a class="ui-button ui-button--secondary" [routerLink]="['/facturacion/series']">
+                Ver series de este ambiente
+              </a>
+              <button
+                type="submit"
+                class="ui-button ui-button--primary"
+                [disabled]="loading || !canEdit"
+              >
+                {{ loading ? "Guardando..." : saveButtonLabel }}
+              </button>
+            </div>
+          </form>
+        </ng-container>
+      </section>
+    </ng-container>
   `,
   styles: [
     `
@@ -253,6 +284,14 @@ interface BillingProfileExtras {
         background: #ede9fe;
         color: #6d28d9;
         font-weight: 700;
+      }
+
+      .initial-loader {
+        padding: var(--space-6) var(--space-4);
+        text-align: center;
+        display: grid;
+        gap: var(--space-2);
+        justify-items: center;
       }
 
       .summary-grid {
@@ -377,6 +416,10 @@ interface BillingProfileExtras {
         flex-wrap: wrap;
       }
 
+      .form-actions--start {
+        justify-content: flex-start;
+      }
+
       .ui-button[disabled] {
         opacity: 0.55;
         cursor: not-allowed;
@@ -402,7 +445,7 @@ interface BillingProfileExtras {
     `,
   ],
 })
-export class BillingConfigPageComponent implements OnInit {
+export class BillingConfigPageComponent implements OnInit, OnDestroy {
   readonly environments = BILLING_ENVIRONMENTS;
 
   readonly form = this.formBuilder.group({
@@ -422,6 +465,10 @@ export class BillingConfigPageComponent implements OnInit {
 
   canEdit = false;
   loading = false;
+  initialLoading = true;
+  initialLoaded = false;
+  initialLoadError = "";
+  showInitialLoader = false;
 
   private currentProfile: CompanyBillingProfileResponse | null = null;
   private readonly profilesByEnvironment: Record<
@@ -433,6 +480,7 @@ export class BillingConfigPageComponent implements OnInit {
     PROD: null,
   };
   private seriesRows: BillingSeriesResponse[] = [];
+  private initialLoaderTimer: number | null = null;
 
   permissionMessage = "";
   errorMessage = "";
@@ -446,6 +494,34 @@ export class BillingConfigPageComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
+    this.startInitialLoad();
+  }
+
+  ngOnDestroy(): void {
+    if (this.initialLoaderTimer) {
+      window.clearTimeout(this.initialLoaderTimer);
+      this.initialLoaderTimer = null;
+    }
+  }
+
+  private startInitialLoad(): void {
+    this.form.disable();
+    this.initialLoading = true;
+    this.initialLoaded = false;
+    this.initialLoadError = "";
+    this.showInitialLoader = false;
+
+    if (this.initialLoaderTimer) {
+      window.clearTimeout(this.initialLoaderTimer);
+      this.initialLoaderTimer = null;
+    }
+
+    this.initialLoaderTimer = window.setTimeout(() => {
+      if (this.initialLoading) {
+        this.showInitialLoader = true;
+      }
+    }, 280);
+
     this.authService.me().subscribe({
       next: (user) => {
         this.canEdit = user.roles.includes("ADMIN");
@@ -454,15 +530,23 @@ export class BillingConfigPageComponent implements OnInit {
           this.permissionMessage =
             "Solo ADMIN puede editar configuracion tributaria.";
           this.form.disable();
+          this.finishInitialLoad();
           return;
         }
 
         this.form.enable();
-        this.loadProfile();
+        this.loadProfile(true);
       },
       error: () => {
-        this.permissionMessage = "No se pudo validar permisos del usuario.";
+        this.initialLoadError = "No se pudo validar permisos del usuario.";
         this.form.disable();
+        this.initialLoading = false;
+        this.initialLoaded = false;
+        this.showInitialLoader = false;
+        if (this.initialLoaderTimer) {
+          window.clearTimeout(this.initialLoaderTimer);
+          this.initialLoaderTimer = null;
+        }
       },
     });
   }
@@ -485,12 +569,16 @@ export class BillingConfigPageComponent implements OnInit {
     this.syncCurrentEnvironmentProfile();
   }
 
-  loadProfile(): void {
+  loadProfile(isInitial = false): void {
     if (!this.canEdit) {
       return;
     }
 
-    this.loadConfigurationSummary();
+    this.loadConfigurationSummary(isInitial);
+  }
+
+  retryInitialLoad(): void {
+    this.startInitialLoad();
   }
 
   get selectedEnvironment(): BillingEnvironment {
@@ -558,9 +646,15 @@ export class BillingConfigPageComponent implements OnInit {
     }
   }
 
-  private loadConfigurationSummary(): void {
+  private loadConfigurationSummary(isInitial = false): void {
     this.loading = true;
     this.errorMessage = "";
+    if (isInitial) {
+      this.initialLoadError = "";
+      this.initialLoading = true;
+      this.initialLoaded = false;
+      this.showInitialLoader = false;
+    }
 
     forkJoin({
       localProfile: this.profileService
@@ -581,15 +675,41 @@ export class BillingConfigPageComponent implements OnInit {
         this.profilesByEnvironment.PROD = prodProfile;
         this.seriesRows = seriesRows;
         this.syncCurrentEnvironmentProfile();
+        if (isInitial) {
+          this.finishInitialLoad();
+        }
       },
       error: (error: unknown) => {
         this.loading = false;
-        this.errorMessage = toHttpErrorMessage(
+        const message = toHttpErrorMessage(
           error,
           "No se pudo cargar la configuracion tributaria por ambiente.",
         );
+        if (isInitial) {
+          this.initialLoadError = message;
+          this.initialLoading = false;
+          this.initialLoaded = false;
+          this.showInitialLoader = false;
+          if (this.initialLoaderTimer) {
+            window.clearTimeout(this.initialLoaderTimer);
+            this.initialLoaderTimer = null;
+          }
+          return;
+        }
+        this.errorMessage = message;
       },
     });
+  }
+
+  private finishInitialLoad(): void {
+    this.initialLoading = false;
+    this.initialLoaded = true;
+    this.initialLoadError = "";
+    this.showInitialLoader = false;
+    if (this.initialLoaderTimer) {
+      window.clearTimeout(this.initialLoaderTimer);
+      this.initialLoaderTimer = null;
+    }
   }
 
   private syncCurrentEnvironmentProfile(): void {
