@@ -13,5 +13,6 @@ public interface BillingSeriesRepositoryPort {
     Optional<BillingSeries> findByIdForUpdate(Long id);
     List<BillingSeries> findAll();
     boolean existsByDocumentTypeAndSeriesAndEnvironment(ElectronicDocumentType type, String series, BillingEnvironment environment, Long excludeId);
+    boolean existsActiveByDocumentTypeAndEnvironment(ElectronicDocumentType type, BillingEnvironment environment, Long excludeId);
 }
 

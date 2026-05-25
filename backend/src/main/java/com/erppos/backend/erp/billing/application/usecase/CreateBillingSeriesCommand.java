@@ -7,7 +7,17 @@ public record CreateBillingSeriesCommand(
         ElectronicDocumentType documentType,
         String series,
         Long currentNumber,
-        BillingEnvironment environment
+        BillingEnvironment environment,
+        Boolean active
 ) {
+
+    public CreateBillingSeriesCommand(
+            ElectronicDocumentType documentType,
+            String series,
+            Long currentNumber,
+            BillingEnvironment environment
+    ) {
+        this(documentType, series, currentNumber, environment, null);
+    }
 }
 

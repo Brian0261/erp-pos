@@ -6,9 +6,11 @@ import com.erppos.backend.erp.billing.application.usecase.UpdateBillingSeriesCom
 import com.erppos.backend.erp.billing.domain.exception.BillingBusinessRuleException;
 import com.erppos.backend.erp.billing.domain.exception.BillingConflictException;
 import com.erppos.backend.erp.billing.domain.exception.BillingNotFoundException;
+import com.erppos.backend.erp.billing.domain.model.BillingEnvironment;
 import com.erppos.backend.erp.billing.domain.model.BillingSeries;
 import com.erppos.backend.erp.billing.domain.model.ElectronicDocumentType;
 import com.erppos.backend.erp.billing.domain.port.BillingSeriesRepositoryPort;
+import com.erppos.backend.erp.billing.domain.port.ElectronicDocumentRepositoryPort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,13 +21,16 @@ import java.util.Locale;
 public class BillingSeriesApplicationService implements BillingSeriesUseCase {
 
     private final BillingSeriesRepositoryPort seriesRepositoryPort;
+    private final ElectronicDocumentRepositoryPort documentRepositoryPort;
     private final AuditUserProvider auditUserProvider;
 
     public BillingSeriesApplicationService(
             BillingSeriesRepositoryPort seriesRepositoryPort,
+            ElectronicDocumentRepositoryPort documentRepositoryPort,
             AuditUserProvider auditUserProvider
     ) {
         this.seriesRepositoryPort = seriesRepositoryPort;
+        this.documentRepositoryPort = documentRepositoryPort;
         this.auditUserProvider = auditUserProvider;
     }
 
@@ -40,6 +45,9 @@ public class BillingSeriesApplicationService implements BillingSeriesUseCase {
             throw new BillingConflictException("Billing series already exists for type and environment");
         }
 
+        boolean active = command.active() == null || command.active();
+        validateSingleActiveSeries(command.documentType(), command.environment(), active, null);
+
         String actor = auditUserProvider.currentUsername();
         return seriesRepositoryPort.save(new BillingSeries(
                 null,
@@ -47,7 +55,7 @@ public class BillingSeriesApplicationService implements BillingSeriesUseCase {
                 normalizedSeries,
                 command.currentNumber(),
                 command.environment(),
-                true,
+                active,
                 null,
                 null,
                 actor,
@@ -79,13 +87,20 @@ public class BillingSeriesApplicationService implements BillingSeriesUseCase {
             throw new BillingConflictException("Billing series already exists for type and environment");
         }
 
+        if (isCorrelativeNotGreaterThanIssued(current.id(), command.currentNumber())) {
+            throw new BillingConflictException("El proximo correlativo debe ser mayor al ultimo comprobante emitido para esta serie.");
+        }
+
+        boolean nextActive = command.active() == null ? current.active() : command.active();
+        validateSingleActiveSeries(command.documentType(), command.environment(), nextActive, current.id());
+
         return seriesRepositoryPort.save(new BillingSeries(
                 current.id(),
                 command.documentType(),
                 normalizedSeries,
                 command.currentNumber(),
                 command.environment(),
-                command.active() == null || command.active(),
+                nextActive,
                 current.createdAt(),
                 current.updatedAt(),
                 current.createdBy(),
@@ -138,6 +153,26 @@ public class BillingSeriesApplicationService implements BillingSeriesUseCase {
 
     private String normalizeSeries(String value) {
         return value.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private void validateSingleActiveSeries(
+            ElectronicDocumentType documentType,
+            BillingEnvironment environment,
+            boolean shouldBeActive,
+            Long excludeId
+    ) {
+        if (!shouldBeActive) {
+            return;
+        }
+        if (seriesRepositoryPort.existsActiveByDocumentTypeAndEnvironment(documentType, environment, excludeId)) {
+            throw new BillingConflictException("Ya existe una serie activa para este tipo de comprobante y ambiente.");
+        }
+    }
+
+    private boolean isCorrelativeNotGreaterThanIssued(Long seriesId, Long proposedCurrentNumber) {
+        return documentRepositoryPort.findMaxIssuedNumberByBillingSeriesId(seriesId)
+                .map(lastIssuedNumber -> proposedCurrentNumber <= lastIssuedNumber)
+                .orElse(false);
     }
 }
 

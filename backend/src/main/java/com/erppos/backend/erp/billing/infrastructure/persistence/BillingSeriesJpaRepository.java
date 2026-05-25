@@ -24,5 +24,15 @@ public interface BillingSeriesJpaRepository extends JpaRepository<BillingSeriesE
               and (:excludeId is null or s.id <> :excludeId)
             """)
     boolean existsByTypeSeriesEnvironment(ElectronicDocumentType type, String series, BillingEnvironment environment, Long excludeId);
+
+    @Query("""
+            select count(s) > 0
+            from BillingSeriesEntity s
+            where s.documentType = :type
+              and s.environment = :environment
+              and s.active = true
+              and (:excludeId is null or s.id <> :excludeId)
+            """)
+    boolean existsActiveByTypeAndEnvironment(ElectronicDocumentType type, BillingEnvironment environment, Long excludeId);
 }
 

@@ -50,5 +50,10 @@ public class BillingSeriesPersistenceAdapter implements BillingSeriesRepositoryP
     public boolean existsByDocumentTypeAndSeriesAndEnvironment(ElectronicDocumentType type, String series, BillingEnvironment environment, Long excludeId) {
         return seriesJpaRepository.existsByTypeSeriesEnvironment(type, series, environment, excludeId);
     }
+
+    @Override
+    public boolean existsActiveByDocumentTypeAndEnvironment(ElectronicDocumentType type, BillingEnvironment environment, Long excludeId) {
+        return seriesJpaRepository.existsActiveByTypeAndEnvironment(type, environment, excludeId);
+    }
 }
 

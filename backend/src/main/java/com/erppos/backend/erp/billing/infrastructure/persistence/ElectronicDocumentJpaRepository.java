@@ -33,5 +33,12 @@ public interface ElectronicDocumentJpaRepository extends JpaRepository<Electroni
             where d.saleId = :saleId
             """)
     boolean existsBySaleId(Long saleId);
+
+    @Query("""
+            select max(d.number)
+            from ElectronicDocumentEntity d
+            where d.billingSeries.id = :billingSeriesId
+            """)
+    Long findMaxNumberByBillingSeriesId(Long billingSeriesId);
 }
 

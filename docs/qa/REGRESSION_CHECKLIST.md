@@ -659,6 +659,23 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [ ] Validar mensajes operativos para XML no generado/XML firmado no disponible y estado no permitido.
 - [ ] Validar que POS, listado de comprobantes, emitir pendiente y detalle mantienen comportamiento sin regresion.
 
+### Facturacion - Hardening series y correlativos (2026-05-24)
+
+- [ ] Crear serie activa duplicada mismo documentType+environment: debe fallar con 409.
+- [ ] Crear serie activa distinto environment mismo documentType: debe pasar sin error.
+- [ ] Activar segunda serie activa mismo documentType+environment: debe fallar con 409.
+- [ ] Bajar correlativo (currentNumber) por debajo o igual al ultimo emitido (maxIssuedNumber): debe fallar con 409.
+- [ ] Subir correlativo (currentNumber) mayor al ultimo emitido (maxIssuedNumber): debe pasar sin error.
+- [ ] Emision createFromSale() bloquea si serie tiene currentNumber <= maxIssuedNumber: debe fallar con 409 antes de crear documento o incrementar correlativo.
+- [ ] Emision createFromSale() permite emitir si currentNumber > maxIssuedNumber: debe crear documento e incrementar correlativo.
+- [ ] Emision sin comprobantes emitidos previos: debe pasar sin bloqueo por maxIssuedNumber.
+- [ ] Serie historica desactivada conserva trazabilidad: comprobantes antiguos mantienen billingSeriesId/series/fullNumber intactos.
+- [ ] Migracion Flyway V16 aplicada: indice unico parcial uq_billing_series_doc_type_environment_active existe y aborta si hay duplicados activos preexistentes.
+- [ ] Mensaje de negocio para correlativo invalido: "El correlativo de la serie no es valido. Debe ser mayor al ultimo comprobante emitido."
+- [ ] Runbook operativo: si serie queda con currentNumber <= maxIssuedNumber, corregir manualmente a maxIssuedNumber + 1 antes de volver a usar.
+- [ ] No se modificaron datos automaticamente; riesgo residual de datos historicos inconsistentes documentado.
+- [ ] POS, frontend, endpoints publicos y DB/Flyway (excepto V16) intactos.
+
 ### Facturacion - Configuracion tributaria por ambiente (2026-05-24)
 
 - [ ] Configuracion tributaria: header operativo sin texto MVP y con relacion perfil-serie por ambiente.

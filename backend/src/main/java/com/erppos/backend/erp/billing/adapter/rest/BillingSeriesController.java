@@ -38,7 +38,8 @@ public class BillingSeriesController {
                 request.documentType(),
                 request.series(),
                 request.currentNumber(),
-                request.environment()
+                request.environment(),
+                request.active()
         ));
         return ResponseEntity.created(URI.create("/api/v1/billing/series/" + created.id())).body(toResponse(created));
     }

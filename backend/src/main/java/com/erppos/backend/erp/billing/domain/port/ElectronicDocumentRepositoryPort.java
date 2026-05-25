@@ -13,5 +13,6 @@ public interface ElectronicDocumentRepositoryPort {
     Optional<ElectronicDocument> findById(Long id);
     List<ElectronicDocument> findByFilters(ElectronicDocumentStatus status, ElectronicDocumentType type, Long saleId, LocalDate from, LocalDate to);
     boolean existsBySaleId(Long saleId);
+    Optional<Long> findMaxIssuedNumberByBillingSeriesId(Long billingSeriesId);
 }
 

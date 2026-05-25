@@ -27,6 +27,18 @@ Estandarizar cambios tecnicos para reducir regresiones y mantener trazabilidad e
   19. En Facturacion, documentar configuracion tributaria como consola por ambiente cuando se muestre estado LOCAL/BETA/PROD (perfil/series/readiness), validaciones operativas (RUC 11, ubigeo 6), advertencias preventivas perfil-serie y CTA a Series sin cambiar contratos backend.
   20. En Facturacion, documentar correccion de layout shift en Configuracion tributaria cuando se aplique field-help persistente con altura reservada en RUC/Razon social, Ubigeo/Departamento y Provincia/Distrito para evitar desalineacion visual entre campos hermanos de la misma fila.
   21. En Facturacion, documentar loading gate + loader neutral con delay en Configuracion tributaria cuando se elimine skeleton estructural con cuadros vacios y se implemente estado de carga con retardo de 280 ms: si la carga termina antes no se muestra nada intermedio; si tarda aparece loader compacto con texto operativo; sin formulario vacio, cards incompletas ni flash visual al presionar F5.
+  22. En Facturacion, documentar hardening de series y correlativos cuando se aplique: unica serie activa por documentType+environment (409 si duplica); currentNumber como proximo correlativo (bloquea si <= maxIssuedNumber); validacion defensiva en createFromSale() antes de crear documento/incrementar; migracion Flyway V16 con indice unico parcial active=true; runbook operativo para correccion manual de series inconsistentes (currentNumber = maxIssuedNumber + 1); riesgo residual de datos historicos inconsistentes documentado; sin modificacion automatica de datos; sin cambios en frontend/POS/endpoints publicos.
+
+## Runbook operativo - Series inconsistentes
+
+1. Identificar series con current_number <= max_issued_number:
+   `SELECT id, document_type, series, environment, current_number, max_issued_number FROM billing_series WHERE current_number <= max_issued_number AND active = TRUE;`
+2. Para cada serie inconsistente, corregir manualmente a max_issued_number + 1:
+   `UPDATE billing_series SET current_number = max_issued_number + 1, updated_at = NOW() WHERE id = <series_id>;`
+3. Validar que current_number > max_issued_number tras la correccion.
+4. No modificar datos automaticamente sin aprobacion explicita del responsable.
+5. Validar antes de usar en POS o emision pendiente que la serie este consistente.
+6. Riesgo residual: datos historicos inconsistentes deben sanearse controladamente; la emision bloquea hasta correccion.
 
 ## Tipos de commit sugeridos (cuando se autorice commit)
 

@@ -9,6 +9,7 @@ import com.erppos.backend.erp.billing.application.service.ElectronicDocumentAppl
 import com.erppos.backend.erp.billing.application.usecase.CreateBillingSeriesCommand;
 import com.erppos.backend.erp.billing.application.usecase.CreateCompanyBillingProfileCommand;
 import com.erppos.backend.erp.billing.application.usecase.CreateElectronicDocumentFromSaleCommand;
+import com.erppos.backend.erp.billing.application.usecase.UpdateBillingSeriesCommand;
 import com.erppos.backend.erp.billing.domain.exception.BillingBusinessRuleException;
 import com.erppos.backend.erp.billing.domain.exception.BillingConflictException;
 import com.erppos.backend.erp.billing.domain.exception.BillingNotFoundException;
@@ -84,7 +85,7 @@ class BillingApplicationServiceTest {
 
         AuditUserProvider auditUserProvider = new AuditUserProvider();
         profileService = new CompanyBillingProfileApplicationService(profileRepository, auditUserProvider);
-        seriesService = new BillingSeriesApplicationService(seriesRepository, auditUserProvider);
+        seriesService = new BillingSeriesApplicationService(seriesRepository, documentRepository, auditUserProvider);
         documentService = new ElectronicDocumentApplicationService(
                 documentRepository,
                 itemRepository,
@@ -184,6 +185,89 @@ class BillingApplicationServiceTest {
     }
 
     @Test
+    void shouldRejectCreatingActiveSeriesWhenAnotherActiveExistsForSameTypeAndEnvironment() {
+        BillingConflictException ex = assertThrows(BillingConflictException.class, () -> seriesService.create(new CreateBillingSeriesCommand(
+                ElectronicDocumentType.RECEIPT,
+                "B002",
+                1L,
+                BillingEnvironment.LOCAL,
+                true
+        )));
+        assertEquals("Ya existe una serie activa para este tipo de comprobante y ambiente.", ex.getMessage());
+    }
+
+    @Test
+    void shouldAllowCreatingActiveSeriesForDifferentEnvironment() {
+        BillingSeries created = seriesService.create(new CreateBillingSeriesCommand(
+                ElectronicDocumentType.RECEIPT,
+                "B002",
+                1L,
+                BillingEnvironment.BETA,
+                true
+        ));
+
+        assertNotNull(created.id());
+        assertTrue(created.active());
+        assertEquals(BillingEnvironment.BETA, created.environment());
+    }
+
+    @Test
+    void shouldAllowCreatingActiveSeriesForDifferentTypeInSameEnvironment() {
+        BillingSeries betaReceipt = seriesService.create(new CreateBillingSeriesCommand(
+                ElectronicDocumentType.RECEIPT,
+                "B010",
+                1L,
+                BillingEnvironment.BETA,
+                true
+        ));
+
+        BillingSeries betaInvoice = seriesService.create(new CreateBillingSeriesCommand(
+                ElectronicDocumentType.INVOICE,
+                "F010",
+                1L,
+                BillingEnvironment.BETA,
+                true
+        ));
+
+        assertNotNull(betaReceipt.id());
+        assertNotNull(betaInvoice.id());
+        assertEquals(ElectronicDocumentType.RECEIPT, betaReceipt.documentType());
+        assertEquals(ElectronicDocumentType.INVOICE, betaInvoice.documentType());
+    }
+
+    @Test
+    void shouldRejectActivatingSeriesWhenAnotherActiveExistsForSameTypeAndEnvironment() {
+        BillingSeries activeSeries = seriesService.create(new CreateBillingSeriesCommand(
+                ElectronicDocumentType.RECEIPT,
+                "B010",
+                1L,
+                BillingEnvironment.BETA,
+                true
+        ));
+        BillingSeries inactiveSeries = seriesService.create(new CreateBillingSeriesCommand(
+                ElectronicDocumentType.RECEIPT,
+                "B011",
+                1L,
+                BillingEnvironment.BETA,
+                false
+        ));
+
+        BillingConflictException ex = assertThrows(BillingConflictException.class, () -> seriesService.update(
+                inactiveSeries.id(),
+                new UpdateBillingSeriesCommand(
+                        inactiveSeries.documentType(),
+                        inactiveSeries.series(),
+                        inactiveSeries.currentNumber(),
+                        inactiveSeries.environment(),
+                        true
+                )
+        ));
+
+        assertNotNull(activeSeries.id());
+        assertEquals("Ya existe una serie activa para este tipo de comprobante y ambiente.", ex.getMessage());
+    }
+
+    @Test
     void shouldCreateReceiptFromCompletedSale() {
         ElectronicDocument doc = documentService.createFromSale(1L, new CreateElectronicDocumentFromSaleCommand(
                 ElectronicDocumentType.RECEIPT,
@@ -272,6 +356,230 @@ class BillingApplicationServiceTest {
         ));
 
         assertEquals(first.number() + 1, second.number());
+    }
+
+    @Test
+    void shouldBlockCreateFromSaleWhenSeriesCurrentNumberEqualsLastIssuedNumber() {
+        documentService.createFromSale(1L, new CreateElectronicDocumentFromSaleCommand(
+                ElectronicDocumentType.RECEIPT,
+                1L,
+                null,
+                null
+        ));
+        forceSeriesCurrentNumber(1L, 1L);
+        saleReadPort.sales.put(10L, completedSale(10L));
+
+        int documentsBefore = documentRepository.storage.size();
+
+        BillingConflictException ex = assertThrows(BillingConflictException.class, () -> documentService.createFromSale(10L, new CreateElectronicDocumentFromSaleCommand(
+                ElectronicDocumentType.RECEIPT,
+                1L,
+                null,
+                null
+        )));
+
+        assertEquals("El correlativo de la serie no es valido. Debe ser mayor al ultimo comprobante emitido.", ex.getMessage());
+        assertFalse(documentRepository.existsBySaleId(10L));
+        assertEquals(documentsBefore, documentRepository.storage.size());
+        assertEquals(1L, seriesRepository.findById(1L).orElseThrow().currentNumber());
+    }
+
+    @Test
+    void shouldBlockCreateFromSaleWhenSeriesCurrentNumberIsBelowLastIssuedNumber() {
+        documentService.createFromSale(1L, new CreateElectronicDocumentFromSaleCommand(
+                ElectronicDocumentType.RECEIPT,
+                1L,
+                null,
+                null
+        ));
+        saleReadPort.sales.put(3L, completedSale(3L));
+        documentService.createFromSale(3L, new CreateElectronicDocumentFromSaleCommand(
+                ElectronicDocumentType.RECEIPT,
+                1L,
+                null,
+                null
+        ));
+        forceSeriesCurrentNumber(1L, 1L);
+        saleReadPort.sales.put(11L, completedSale(11L));
+
+        int documentsBefore = documentRepository.storage.size();
+
+        BillingConflictException ex = assertThrows(BillingConflictException.class, () -> documentService.createFromSale(11L, new CreateElectronicDocumentFromSaleCommand(
+                ElectronicDocumentType.RECEIPT,
+                1L,
+                null,
+                null
+        )));
+
+        assertEquals("El correlativo de la serie no es valido. Debe ser mayor al ultimo comprobante emitido.", ex.getMessage());
+        assertFalse(documentRepository.existsBySaleId(11L));
+        assertEquals(documentsBefore, documentRepository.storage.size());
+        assertEquals(1L, seriesRepository.findById(1L).orElseThrow().currentNumber());
+    }
+
+    @Test
+    void shouldAllowCreateFromSaleWhenSeriesCurrentNumberIsAboveLastIssuedNumber() {
+        documentService.createFromSale(1L, new CreateElectronicDocumentFromSaleCommand(
+                ElectronicDocumentType.RECEIPT,
+                1L,
+                null,
+                null
+        ));
+        saleReadPort.sales.put(3L, completedSale(3L));
+        documentService.createFromSale(3L, new CreateElectronicDocumentFromSaleCommand(
+                ElectronicDocumentType.RECEIPT,
+                1L,
+                null,
+                null
+        ));
+        forceSeriesCurrentNumber(1L, 5L);
+        saleReadPort.sales.put(12L, completedSale(12L));
+
+        ElectronicDocument created = documentService.createFromSale(12L, new CreateElectronicDocumentFromSaleCommand(
+                ElectronicDocumentType.RECEIPT,
+                1L,
+                null,
+                null
+        ));
+
+        assertEquals(5L, created.number());
+        assertEquals("B001-00000005", created.fullNumber());
+        assertEquals(6L, seriesRepository.findById(1L).orElseThrow().currentNumber());
+    }
+
+    @Test
+    void shouldRejectReducingCurrentNumberBelowLastIssuedNumber() {
+        documentService.createFromSale(1L, new CreateElectronicDocumentFromSaleCommand(
+                ElectronicDocumentType.RECEIPT,
+                1L,
+                null,
+                null
+        ));
+        saleReadPort.sales.put(3L, completedSale(3L));
+        documentService.createFromSale(3L, new CreateElectronicDocumentFromSaleCommand(
+                ElectronicDocumentType.RECEIPT,
+                1L,
+                null,
+                null
+        ));
+
+        BillingConflictException ex = assertThrows(BillingConflictException.class, () -> seriesService.update(
+                1L,
+                new UpdateBillingSeriesCommand(
+                        ElectronicDocumentType.RECEIPT,
+                        "B001",
+                        1L,
+                        BillingEnvironment.LOCAL,
+                        true
+                )
+        ));
+
+        assertEquals("El proximo correlativo debe ser mayor al ultimo comprobante emitido para esta serie.", ex.getMessage());
+    }
+
+    @Test
+    void shouldRejectCurrentNumberEqualToLastIssuedNumber() {
+        documentService.createFromSale(1L, new CreateElectronicDocumentFromSaleCommand(
+                ElectronicDocumentType.RECEIPT,
+                1L,
+                null,
+                null
+        ));
+        saleReadPort.sales.put(3L, completedSale(3L));
+        documentService.createFromSale(3L, new CreateElectronicDocumentFromSaleCommand(
+                ElectronicDocumentType.RECEIPT,
+                1L,
+                null,
+                null
+        ));
+
+        BillingConflictException ex = assertThrows(BillingConflictException.class, () -> seriesService.update(
+                1L,
+                new UpdateBillingSeriesCommand(
+                        ElectronicDocumentType.RECEIPT,
+                        "B001",
+                        2L,
+                        BillingEnvironment.LOCAL,
+                        true
+                )
+        ));
+
+        assertEquals("El proximo correlativo debe ser mayor al ultimo comprobante emitido para esta serie.", ex.getMessage());
+    }
+
+    @Test
+    void shouldAllowIncreasingCurrentNumberAboveLastIssuedNumber() {
+        documentService.createFromSale(1L, new CreateElectronicDocumentFromSaleCommand(
+                ElectronicDocumentType.RECEIPT,
+                1L,
+                null,
+                null
+        ));
+        saleReadPort.sales.put(3L, completedSale(3L));
+        documentService.createFromSale(3L, new CreateElectronicDocumentFromSaleCommand(
+                ElectronicDocumentType.RECEIPT,
+                1L,
+                null,
+                null
+        ));
+
+        BillingSeries updated = seriesService.update(
+                1L,
+                new UpdateBillingSeriesCommand(
+                        ElectronicDocumentType.RECEIPT,
+                        "B001",
+                        10L,
+                        BillingEnvironment.LOCAL,
+                        true
+                )
+        );
+
+        assertEquals(10L, updated.currentNumber());
+    }
+
+    @Test
+    void shouldAllowUpdatingCurrentNumberWhenSeriesHasNoIssuedDocuments() {
+        BillingSeries created = seriesService.create(new CreateBillingSeriesCommand(
+                ElectronicDocumentType.RECEIPT,
+                "B200",
+                1L,
+                BillingEnvironment.BETA,
+                false
+        ));
+
+        BillingSeries updated = seriesService.update(
+                created.id(),
+                new UpdateBillingSeriesCommand(
+                        ElectronicDocumentType.RECEIPT,
+                        "B200",
+                        1L,
+                        BillingEnvironment.BETA,
+                        true
+                )
+        );
+
+        assertTrue(updated.active());
+        assertEquals(1L, updated.currentNumber());
+    }
+
+    @Test
+    void shouldAllowDeactivatingHistoricallyUsedSeriesWithoutBreakingTraceability() {
+        ElectronicDocument created = documentService.createFromSale(1L, new CreateElectronicDocumentFromSaleCommand(
+                ElectronicDocumentType.RECEIPT,
+                1L,
+                null,
+                null
+        ));
+
+        seriesService.deactivate(1L);
+
+        BillingSeries disabledSeries = seriesService.getById(1L);
+        ElectronicDocument persisted = documentRepository.findById(created.id()).orElseThrow();
+
+        assertFalse(disabledSeries.active());
+        assertEquals(1L, persisted.billingSeriesId());
+        assertEquals("B001", persisted.series());
+        assertEquals("B001-00000001", persisted.fullNumber());
     }
 
     @Test
@@ -452,6 +760,22 @@ class BillingApplicationServiceTest {
         ));
     }
 
+    private void forceSeriesCurrentNumber(Long seriesId, long currentNumber) {
+        BillingSeries current = seriesRepository.findById(seriesId).orElseThrow();
+        seriesRepository.save(new BillingSeries(
+                current.id(),
+                current.documentType(),
+                current.series(),
+                currentNumber,
+                current.environment(),
+                current.active(),
+                current.createdAt(),
+                current.updatedAt(),
+                current.createdBy(),
+                current.updatedBy()
+        ));
+    }
+
     private BillingSaleSnapshot completedSale(Long id) {
         return new BillingSaleSnapshot(
                 id,
@@ -559,6 +883,15 @@ class BillingApplicationServiceTest {
                     && (excludeId == null || !s.id().equals(excludeId))
             );
         }
+
+        @Override
+        public boolean existsActiveByDocumentTypeAndEnvironment(ElectronicDocumentType type, BillingEnvironment environment, Long excludeId) {
+            return storage.values().stream().anyMatch(s -> s.documentType() == type
+                    && s.environment() == environment
+                    && s.active()
+                    && (excludeId == null || !s.id().equals(excludeId))
+            );
+        }
     }
 
     static class InMemoryElectronicDocumentRepository implements ElectronicDocumentRepositoryPort {
@@ -615,6 +948,14 @@ class BillingApplicationServiceTest {
         @Override
         public boolean existsBySaleId(Long saleId) {
             return storage.values().stream().anyMatch(d -> d.saleId().equals(saleId));
+        }
+
+        @Override
+        public Optional<Long> findMaxIssuedNumberByBillingSeriesId(Long billingSeriesId) {
+            return storage.values().stream()
+                    .filter(d -> d.billingSeriesId().equals(billingSeriesId))
+                    .map(ElectronicDocument::number)
+                    .max(Long::compareTo);
         }
     }
 

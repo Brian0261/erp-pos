@@ -113,6 +113,12 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
         if (series.documentType() != command.documentType()) {
             throw new BillingBusinessRuleException("Billing series is incompatible with document type");
         }
+        documentRepositoryPort.findMaxIssuedNumberByBillingSeriesId(series.id())
+                .ifPresent(lastIssuedNumber -> {
+                    if (series.currentNumber() <= lastIssuedNumber) {
+                        throw new BillingConflictException("El correlativo de la serie no es valido. Debe ser mayor al ultimo comprobante emitido.");
+                    }
+                });
 
         CompanyBillingProfile profile = profileRepositoryPort.findActiveByEnvironment(series.environment())
                 .orElseThrow(() -> new BillingNotFoundException("Billing profile not found for series environment"));

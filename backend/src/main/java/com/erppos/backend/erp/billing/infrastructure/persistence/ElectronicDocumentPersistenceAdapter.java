@@ -68,5 +68,10 @@ public class ElectronicDocumentPersistenceAdapter implements ElectronicDocumentR
     public boolean existsBySaleId(Long saleId) {
         return documentJpaRepository.existsBySaleId(saleId);
     }
+
+    @Override
+    public Optional<Long> findMaxIssuedNumberByBillingSeriesId(Long billingSeriesId) {
+        return Optional.ofNullable(documentJpaRepository.findMaxNumberByBillingSeriesId(billingSeriesId));
+    }
 }
 
