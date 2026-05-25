@@ -4,6 +4,13 @@ import { ActivatedRoute, RouterLink } from "@angular/router";
 
 import { AuthService } from "../../core/auth/auth.service";
 import { UserProfile } from "../../core/auth/auth.models";
+import {
+  BillingEnvironment,
+  ElectronicDocumentResponse,
+  ElectronicDocumentStatus,
+  ElectronicDocumentType,
+} from "../billing/data/billing.models";
+import { ElectronicDocumentService } from "../billing/data/electronic-document.service";
 import { toHttpErrorMessage } from "./data/http-error-message";
 import { SalesService } from "./data/sales.service";
 import { SaleResponse } from "./data/sales.models";
@@ -69,6 +76,70 @@ import { SaleResponse } from "./data/sales.models";
               </p>
             </ng-container>
           </div>
+        </article>
+
+        <article class="panel billing-panel">
+          <header class="panel-head">
+            <h2>Comprobante electronico</h2>
+          </header>
+
+          <p class="ui-page-description">
+            Consulta si esta venta ya tiene un comprobante asociado o emite uno pendiente.
+          </p>
+          <p class="ui-page-description billing-note">
+            La emision y seguimiento del comprobante se gestionan desde Facturacion.
+          </p>
+
+          <p class="ui-alert ui-alert--info" *ngIf="billingLoading">
+            Cargando comprobante asociado...
+          </p>
+          <p class="ui-alert ui-alert--error" *ngIf="!billingLoading && billingErrorMessage">
+            {{ billingErrorMessage }}
+          </p>
+
+          <ng-container *ngIf="!billingLoading">
+            <div class="billing-grid" *ngIf="billingDocument; else pendingDocument">
+              <div class="kv-row"><span class="label">Tipo</span><strong>{{ billingDocumentTypeLabel(billingDocument.documentType) }}</strong></div>
+              <div class="kv-row"><span class="label">Numero</span><strong>{{ billingDocument.fullNumber || "-" }}</strong></div>
+              <div class="kv-row">
+                <span class="label">Estado</span>
+                <strong class="ui-badge billing-status" [ngClass]="billingStatusClass(billingDocument.status)">
+                  {{ billingStatusLabel(billingDocument.status) }}
+                </strong>
+              </div>
+              <div class="kv-row"><span class="label">Ambiente</span><strong>{{ billingEnvironmentLabel(billingDocument.environment) }}</strong></div>
+            </div>
+
+            <ng-template #pendingDocument>
+              <div class="billing-grid">
+                <div class="kv-row">
+                  <span class="label">Estado</span>
+                  <strong class="ui-badge billing-status billing-status--pending">PENDIENTE</strong>
+                </div>
+                <div class="kv-row">
+                  <span class="label">Comprobante</span>
+                  <strong>Sin comprobante emitido</strong>
+                </div>
+              </div>
+            </ng-template>
+
+            <div class="actions">
+              <a
+                *ngIf="billingDocument"
+                class="ui-button ui-button--secondary"
+                [routerLink]="['/facturacion/comprobantes', billingDocument.id]"
+              >
+                Ver comprobante
+              </a>
+              <a
+                *ngIf="!billingDocument"
+                class="ui-button ui-button--primary"
+                [routerLink]="['/facturacion/emitir', sale.id]"
+              >
+                Emitir comprobante
+              </a>
+            </div>
+          </ng-container>
         </article>
 
         <article class="panel">
@@ -290,6 +361,62 @@ import { SaleResponse } from "./data/sales.models";
         font-size: var(--font-size-xs);
       }
 
+      .billing-panel {
+        gap: var(--space-2);
+      }
+
+      .billing-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(220px, 1fr));
+        gap: var(--space-2) var(--space-4);
+      }
+
+      .billing-note {
+        color: var(--color-text-secondary);
+        font-size: var(--font-size-sm);
+      }
+
+      .billing-status {
+        font-weight: 700;
+      }
+
+      .billing-status--pending {
+        background: #e5e7eb;
+        color: #4b5563;
+      }
+
+      .billing-status--draft {
+        background: #dbeafe;
+        color: #1d4ed8;
+      }
+
+      .billing-status--generated {
+        background: #ede9fe;
+        color: #6d28d9;
+      }
+
+      .billing-status--signed {
+        background: #cffafe;
+        color: #0e7490;
+      }
+
+      .billing-status--sent {
+        background: #fef3c7;
+        color: #92400e;
+      }
+
+      .billing-status--accepted {
+        background: #dcfce7;
+        color: #166534;
+      }
+
+      .billing-status--rejected,
+      .billing-status--error,
+      .billing-status--cancelled {
+        background: #fee2e2;
+        color: #b91c1c;
+      }
+
       .totals-panel {
         display: grid;
         grid-template-columns: repeat(5, minmax(130px, 1fr));
@@ -404,6 +531,7 @@ import { SaleResponse } from "./data/sales.models";
         }
 
         .summary-grid,
+        .billing-grid,
         .totals-panel {
           grid-template-columns: 1fr;
         }
@@ -433,15 +561,19 @@ export class SaleDetailPageComponent implements OnInit {
   });
 
   sale: SaleResponse | null = null;
+  billingDocument: ElectronicDocumentResponse | null = null;
   currentUser: UserProfile | null = null;
 
   loading = true;
+  billingLoading = false;
   errorMessage = "";
+  billingErrorMessage = "";
   successMessage = "";
 
   constructor(
     private readonly route: ActivatedRoute,
     private readonly salesService: SalesService,
+    private readonly electronicDocumentService: ElectronicDocumentService,
     private readonly authService: AuthService,
   ) {}
 
@@ -500,6 +632,69 @@ export class SaleDetailPageComponent implements OnInit {
         return "Transferencia";
       default:
         return method;
+    }
+  }
+
+  billingDocumentTypeLabel(type: ElectronicDocumentType): string {
+    return type === "INVOICE" ? "Factura" : "Boleta";
+  }
+
+  billingStatusLabel(status: ElectronicDocumentStatus): string {
+    switch (status) {
+      case "DRAFT":
+        return "BORRADOR";
+      case "GENERATED":
+        return "XML GENERADO";
+      case "SIGNED":
+        return "FIRMADO";
+      case "SENT":
+        return "ENVIADO";
+      case "ACCEPTED":
+        return "ACEPTADO";
+      case "REJECTED":
+        return "RECHAZADO";
+      case "ERROR":
+        return "ERROR";
+      case "CANCELLED":
+        return "ANULADO";
+      default:
+        return status;
+    }
+  }
+
+  billingStatusClass(status: ElectronicDocumentStatus): string {
+    switch (status) {
+      case "DRAFT":
+        return "billing-status--draft";
+      case "GENERATED":
+        return "billing-status--generated";
+      case "SIGNED":
+        return "billing-status--signed";
+      case "SENT":
+        return "billing-status--sent";
+      case "ACCEPTED":
+        return "billing-status--accepted";
+      case "REJECTED":
+        return "billing-status--rejected";
+      case "ERROR":
+        return "billing-status--error";
+      case "CANCELLED":
+        return "billing-status--cancelled";
+      default:
+        return "";
+    }
+  }
+
+  billingEnvironmentLabel(environment: BillingEnvironment): string {
+    switch (environment) {
+      case "LOCAL":
+        return "Local";
+      case "BETA":
+        return "SUNAT Beta";
+      case "PROD":
+        return "SUNAT";
+      default:
+        return environment;
     }
   }
 
@@ -573,12 +768,33 @@ export class SaleDetailPageComponent implements OnInit {
       next: (sale) => {
         this.loading = false;
         this.sale = sale;
+        this.loadBillingDocument(sale.id);
       },
       error: (error: unknown) => {
         this.loading = false;
         this.errorMessage = toHttpErrorMessage(
           error,
           "No se pudo cargar el detalle de la venta.",
+        );
+      },
+    });
+  }
+
+  private loadBillingDocument(saleId: number): void {
+    this.billingLoading = true;
+    this.billingErrorMessage = "";
+    this.billingDocument = null;
+
+    this.electronicDocumentService.listBySaleId(saleId).subscribe({
+      next: (rows) => {
+        this.billingLoading = false;
+        this.billingDocument = rows.length > 0 ? rows[0] : null;
+      },
+      error: (error: unknown) => {
+        this.billingLoading = false;
+        this.billingErrorMessage = toHttpErrorMessage(
+          error,
+          "No se pudo consultar el comprobante asociado.",
         );
       },
     });

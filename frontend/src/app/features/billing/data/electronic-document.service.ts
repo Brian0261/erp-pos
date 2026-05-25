@@ -1,6 +1,6 @@
 import { HttpClient, HttpParams } from "@angular/common/http";
 import { Injectable } from "@angular/core";
-import { map, Observable, of, switchMap } from "rxjs";
+import { map, Observable } from "rxjs";
 
 import { environment } from "../../../../environments/environment";
 import {
@@ -61,16 +61,7 @@ export class ElectronicDocumentService {
 
   listBySaleId(saleId: number): Observable<ElectronicDocumentResponse[]> {
     return this.list({ saleId }).pipe(
-      switchMap((rows) => {
-        const matches = this.filterBySaleId(rows, saleId);
-        if (matches.length > 0) {
-          return of(matches);
-        }
-
-        return this.list().pipe(
-          map((allRows) => this.filterBySaleId(allRows, saleId)),
-        );
-      }),
+      map((rows) => this.filterBySaleId(rows, saleId)),
     );
   }
 
