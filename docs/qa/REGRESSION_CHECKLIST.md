@@ -673,6 +673,7 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [ ] Migracion Flyway V16 aplicada: indice unico parcial uq_billing_series_doc_type_environment_active existe y aborta si hay duplicados activos preexistentes.
 - [ ] Mensaje de negocio para correlativo invalido: "El correlativo de la serie no es valido. Debe ser mayor al ultimo comprobante emitido."
 - [ ] Runbook operativo: si serie queda con currentNumber <= maxIssuedNumber, corregir manualmente a maxIssuedNumber + 1 antes de volver a usar.
+- [ ] Correccion manual aplicada: B001/LOCAL tenia current_number=1 y max_issued=2, se corrigio desde UI Series a currentNumber=3 (proximo correlativo > ultimo emitido); serie quedo INACTIVA; trazabilidad historica preservada; validacion previa a reactivacion de serie historica confirmada.
 - [ ] No se modificaron datos automaticamente; riesgo residual de datos historicos inconsistentes documentado.
 - [ ] POS, frontend, endpoints publicos y DB/Flyway (excepto V16) intactos.
 
