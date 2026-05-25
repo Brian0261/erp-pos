@@ -35,14 +35,28 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
 public class SalesApplicationService implements SalesUseCase {
 
     private static final BigDecimal ZERO = BigDecimal.ZERO;
+    private static final Set<String> BLOCKING_VOID_BILLING_STATUSES = Set.of(
+            "DRAFT",
+            "GENERATED",
+            "SIGNED",
+            "SENT",
+            "ACCEPTED"
+    );
+    private static final Set<String> ALLOWED_VOID_BILLING_STATUSES = Set.of(
+            "REJECTED",
+            "ERROR",
+            "CANCELLED"
+    );
 
     private final SaleRepositoryPort saleRepositoryPort;
     private final CashRegisterRepositoryPort cashRegisterRepositoryPort;
@@ -280,6 +294,10 @@ public class SalesApplicationService implements SalesUseCase {
             throw new SalesBusinessRuleException("Cannot void sale from CLOSED cash register session");
         }
 
+        Map<Long, SaleBillingSummary> summaries = salesBillingSummaryReadPort.findLatestBySaleIds(List.of(id));
+        SaleBillingSummary summary = summaries.get(id);
+        validateVoidAgainstBillingStatus(summary);
+
         for (SaleItem item : current.items()) {
             inventorySalesPort.registerSaleVoidIn(
                     item.productId(),
@@ -313,6 +331,32 @@ public class SalesApplicationService implements SalesUseCase {
                 current.payments()
         );
         return saleRepositoryPort.save(voided);
+    }
+
+    private void validateVoidAgainstBillingStatus(SaleBillingSummary summary) {
+        if (summary == null || !summary.hasElectronicDocument()) {
+            return;
+        }
+
+        String status = trimToNull(summary.status());
+        String normalizedStatus = status == null ? null : status.toUpperCase(Locale.ROOT);
+
+        if (normalizedStatus != null && ALLOWED_VOID_BILLING_STATUSES.contains(normalizedStatus)) {
+            return;
+        }
+
+        if (normalizedStatus != null && !BLOCKING_VOID_BILLING_STATUSES.contains(normalizedStatus)) {
+            throw new SalesConflictException(
+                    "La venta tiene un comprobante electronico en estado " + normalizedStatus
+                            + ". No se puede anular internamente; requiere gestion desde Facturacion."
+            );
+        }
+
+        throw new SalesConflictException(
+                "La venta tiene un comprobante electronico"
+                        + (normalizedStatus == null ? " activo" : " en estado " + normalizedStatus)
+                        + ". No se puede anular internamente; requiere gestion desde Facturacion."
+        );
     }
 
     private BigDecimal defaultZero(BigDecimal value) {

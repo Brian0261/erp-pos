@@ -236,6 +236,46 @@ class SalesApplicationServiceTest {
     }
 
     @Test
+    void shouldBlockVoidWhenBillingStatusIsDraft() {
+        assertVoidBlockedByBillingStatus("DRAFT");
+    }
+
+    @Test
+    void shouldBlockVoidWhenBillingStatusIsGenerated() {
+        assertVoidBlockedByBillingStatus("GENERATED");
+    }
+
+    @Test
+    void shouldBlockVoidWhenBillingStatusIsSigned() {
+        assertVoidBlockedByBillingStatus("SIGNED");
+    }
+
+    @Test
+    void shouldBlockVoidWhenBillingStatusIsSent() {
+        assertVoidBlockedByBillingStatus("SENT");
+    }
+
+    @Test
+    void shouldBlockVoidWhenBillingStatusIsAcceptedAndKeepStockUntouched() {
+        assertVoidBlockedByBillingStatus("ACCEPTED");
+    }
+
+    @Test
+    void shouldAllowVoidWhenBillingStatusIsRejected() {
+        assertVoidAllowedByBillingStatus("REJECTED");
+    }
+
+    @Test
+    void shouldAllowVoidWhenBillingStatusIsError() {
+        assertVoidAllowedByBillingStatus("ERROR");
+    }
+
+    @Test
+    void shouldAllowVoidWhenBillingStatusIsCancelled() {
+        assertVoidAllowedByBillingStatus("CANCELLED");
+    }
+
+    @Test
     void listItemsShouldReturnPendingBillingSummaryWhenNoElectronicDocument() {
         cashService.open(new OpenCashRegisterCommand(BigDecimal.ZERO, null));
         Sale sale = salesService.create(validSaleCommand());
@@ -331,6 +371,42 @@ class SalesApplicationServiceTest {
                 List.of(new CreateSaleItemCommand(1L, BigDecimal.valueOf(2), BigDecimal.ZERO)),
                 validPayments()
         );
+    }
+
+    private void assertVoidBlockedByBillingStatus(String status) {
+        cashService.open(new OpenCashRegisterCommand(BigDecimal.ZERO, null));
+        Sale sale = salesService.create(validSaleCommand());
+        salesBillingSummaryReadPort.put(
+                sale.id(),
+                new SaleBillingSummary(true, 200L, "INVOICE", "F001-00000200", status, "PROD")
+        );
+
+        SalesConflictException exception = assertThrows(
+                SalesConflictException.class,
+                () -> salesService.voidSale(sale.id(), new VoidSaleCommand("Error caja"))
+        );
+
+        assertTrue(exception.getMessage().contains("No se puede anular internamente"));
+        assertEquals(0, inventoryPort.stockByProductWarehouse.get(key(1L, 1L)).compareTo(BigDecimal.valueOf(18)));
+        assertEquals(0, inventoryPort.saleVoidMovements);
+
+        Sale persisted = salesService.getById(sale.id());
+        assertEquals(SaleStatus.COMPLETED, persisted.status());
+    }
+
+    private void assertVoidAllowedByBillingStatus(String status) {
+        cashService.open(new OpenCashRegisterCommand(BigDecimal.ZERO, null));
+        Sale sale = salesService.create(validSaleCommand());
+        salesBillingSummaryReadPort.put(
+                sale.id(),
+                new SaleBillingSummary(true, 201L, "INVOICE", "F001-00000201", status, "PROD")
+        );
+
+        Sale voided = salesService.voidSale(sale.id(), new VoidSaleCommand("Error caja"));
+
+        assertEquals(SaleStatus.VOIDED, voided.status());
+        assertEquals(0, inventoryPort.stockByProductWarehouse.get(key(1L, 1L)).compareTo(BigDecimal.valueOf(20)));
+        assertEquals(1, inventoryPort.saleVoidMovements);
     }
 
     private List<CreateSalePaymentCommand> validPayments() {
