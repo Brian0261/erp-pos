@@ -41,15 +41,15 @@ import { SaleResponse, SaleStatus } from "./data/sales.models";
           <input type="date" formControlName="to" />
         </label>
 
-          <label class="field">
-            <span>Estado</span>
-            <select formControlName="status">
-              <option value="">Todos</option>
-              <option *ngFor="let status of statuses" [value]="status">
-                {{ saleStatusLabel(status) }}
-              </option>
-            </select>
-          </label>
+        <label class="field">
+          <span>Estado</span>
+          <select formControlName="status">
+            <option value="">Todos</option>
+            <option *ngFor="let status of statuses" [value]="status">
+              {{ saleStatusLabel(status) }}
+            </option>
+          </select>
+        </label>
 
         <label class="field">
           <span>Caja</span>
@@ -95,8 +95,7 @@ import { SaleResponse, SaleStatus } from "./data/sales.models";
         <table class="ui-table sales-table">
           <thead>
             <tr>
-              <th>ID</th>
-              <th>Nro venta</th>
+              <th>Venta</th>
               <th>Fecha</th>
               <th>Estado</th>
               <th class="cell-number">Total</th>
@@ -107,14 +106,13 @@ import { SaleResponse, SaleStatus } from "./data/sales.models";
           </thead>
           <tbody>
             <tr *ngFor="let sale of sales">
-              <td class="cell-id">#{{ sale.id }}</td>
               <td class="cell-code">
-                <strong>Venta #{{ sale.id }}</strong>
+                <strong>{{ sale.saleNumber }}</strong>
                 <span class="cell-code__secondary">
-                  Código interno: {{ sale.saleNumber }}
+                  ID interno #{{ sale.id }}
                 </span>
               </td>
-              <td>{{ sale.soldAt | date: "dd/MM/yyyy HH:mm" }}</td>
+              <td>{{ formatDate(sale.soldAt) }}</td>
               <td>
                 <span
                   class="ui-badge"
@@ -125,7 +123,7 @@ import { SaleResponse, SaleStatus } from "./data/sales.models";
                 </span>
               </td>
               <td class="cell-number">
-                {{ sale.totalAmount | number: "1.2-2" }}
+                {{ formatCurrency(sale.totalAmount) }}
               </td>
               <td>{{ sale.createdBy }}</td>
               <td>#{{ sale.cashRegisterSessionId }}</td>
@@ -138,7 +136,7 @@ import { SaleResponse, SaleStatus } from "./data/sales.models";
               </td>
             </tr>
             <tr *ngIf="sales.length === 0">
-              <td colspan="8" class="ui-table__empty">
+              <td colspan="7" class="ui-table__empty">
                 <div class="ui-empty-state">
                   No hay ventas para los filtros aplicados.
                 </div>
@@ -256,6 +254,22 @@ import { SaleResponse, SaleStatus } from "./data/sales.models";
 export class SalesPageComponent implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
 
+  private readonly currencyFormatter = new Intl.NumberFormat("es-PE", {
+    style: "currency",
+    currency: "PEN",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
+  private readonly dateFormatter = new Intl.DateTimeFormat("es-PE", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+
   readonly filterForm = this.formBuilder.group({
     from: [""],
     to: [""],
@@ -298,6 +312,21 @@ export class SalesPageComponent implements OnInit {
       default:
         return status;
     }
+  }
+
+  formatCurrency(value: number | null | undefined): string {
+    return this.currencyFormatter.format(value ?? 0);
+  }
+
+  formatDate(value: string | null | undefined): string {
+    if (!value) {
+      return "-";
+    }
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return "-";
+    }
+    return this.dateFormatter.format(date);
   }
 
   applyFilters(): void {

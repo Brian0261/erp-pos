@@ -5,6 +5,7 @@ import { ActivatedRoute, Router, RouterLink } from "@angular/router";
 
 import { AuthService } from "../../core/auth/auth.service";
 import { UserProfile } from "../../core/auth/auth.models";
+import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.service";
 import { toHttpErrorMessage } from "./data/http-error-message";
 import { SalesService } from "./data/sales.service";
 import { SaleResponse } from "./data/sales.models";
@@ -17,7 +18,6 @@ import { SaleResponse } from "./data/sales.models";
     <section class="ui-card sale-void-page">
       <header class="ui-page-head">
         <div>
-          <p class="ui-page-kicker">Operacion Comercial InkToy</p>
           <h1 class="ui-page-title">Anular venta</h1>
           <p class="ui-page-description">
             Registra el motivo y confirma la anulacion para devolver stock y
@@ -43,7 +43,7 @@ import { SaleResponse } from "./data/sales.models";
               [class.ui-badge--success]="sale.status === 'COMPLETED'"
               [class.ui-badge--danger]="sale.status !== 'COMPLETED'"
             >
-              {{ sale.status }}
+              {{ saleStatusLabel(sale.status) }}
             </span>
           </div>
 
@@ -52,19 +52,19 @@ import { SaleResponse } from "./data/sales.models";
               <strong>Venta:</strong> {{ sale.saleNumber }} (#{{ sale.id }})
             </p>
             <p>
-              <strong>Total:</strong> {{ sale.totalAmount | number: "1.2-2" }}
+              <strong>Total:</strong> {{ formatCurrency(sale.totalAmount) }}
             </p>
             <p>
               <strong>Fecha:</strong>
-              {{ sale.soldAt | date: "yyyy-MM-dd HH:mm" }}
+              {{ formatDateTime(sale.soldAt) }}
             </p>
           </div>
         </article>
 
         <article class="warning-panel">
           <p>
-            Esta accion es irreversible en la operacion diaria. Verifica caja,
-            montos y autorizacion antes de confirmar.
+            Esta accion anulara la venta y puede afectar stock, caja y pagos
+            asociados. Verifica caja, montos y autorizacion antes de confirmar.
           </p>
         </article>
 
@@ -205,6 +205,22 @@ import { SaleResponse } from "./data/sales.models";
   ],
 })
 export class SaleVoidPageComponent implements OnInit {
+  private readonly currencyFormatter = new Intl.NumberFormat("es-PE", {
+    style: "currency",
+    currency: "PEN",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
+  private readonly dateTimeFormatter = new Intl.DateTimeFormat("es-PE", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+
   readonly voidForm = this.formBuilder.group({
     reason: ["", [Validators.required, Validators.maxLength(400)]],
   });
@@ -224,6 +240,7 @@ export class SaleVoidPageComponent implements OnInit {
     private readonly router: Router,
     private readonly salesService: SalesService,
     private readonly authService: AuthService,
+    private readonly confirmDialogService: ConfirmDialogService,
   ) {}
 
   ngOnInit(): void {
@@ -251,7 +268,33 @@ export class SaleVoidPageComponent implements OnInit {
     return allowedRole && this.sale.status === "COMPLETED";
   }
 
-  voidSale(): void {
+  saleStatusLabel(status: string): string {
+    switch (status) {
+      case "COMPLETED":
+        return "Completada";
+      case "VOIDED":
+        return "Anulada";
+      default:
+        return status;
+    }
+  }
+
+  formatCurrency(value: number | null | undefined): string {
+    return this.currencyFormatter.format(value ?? 0);
+  }
+
+  formatDateTime(value: string | null | undefined): string {
+    if (!value) {
+      return "-";
+    }
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return "-";
+    }
+    return this.dateTimeFormatter.format(date);
+  }
+
+  async voidSale(): Promise<void> {
     if (!this.sale) {
       return;
     }
@@ -274,11 +317,16 @@ export class SaleVoidPageComponent implements OnInit {
       return;
     }
 
-    if (
-      !window.confirm(
-        `Confirmar anulacion de la venta ${this.sale.saleNumber}?`,
-      )
-    ) {
+    const confirmed = await this.confirmDialogService.confirm({
+      title: "Anular venta",
+      description:
+        `Se anulara la venta ${this.sale.saleNumber}. Esta accion afecta stock, caja y pagos asociados.`,
+      confirmText: "Anular",
+      cancelText: "Cancelar",
+      variant: "danger",
+    });
+
+    if (!confirmed) {
       return;
     }
 

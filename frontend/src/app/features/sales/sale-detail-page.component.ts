@@ -17,9 +17,11 @@ import { SaleResponse } from "./data/sales.models";
       <header class="ui-page-head">
           <div>
             <h1 class="ui-page-title">
-              {{ sale ? "Venta #" + sale.id : "Detalle de venta" }}
+              {{ sale ? sale.saleNumber : "Detalle de venta" }}
             </h1>
-            <p class="ui-page-description">Consulta de items, pagos y estado.</p>
+            <p class="ui-page-description" *ngIf="sale">
+              ID interno #{{ sale.id }} · Consulta de items, pagos y estado.
+            </p>
           </div>
 
         <a class="ui-button ui-button--secondary" [routerLink]="['/ventas']"
@@ -48,11 +50,11 @@ import { SaleResponse } from "./data/sales.models";
           </div>
 
           <div class="summary-grid">
-            <p><strong>ID:</strong> #{{ sale.id }}</p>
-            <p><strong>Código interno:</strong> {{ sale.saleNumber }}</p>
+            <p><strong>Venta:</strong> {{ sale.saleNumber }}</p>
+            <p><strong>ID interno:</strong> #{{ sale.id }}</p>
             <p>
               <strong>Fecha:</strong>
-              {{ sale.soldAt | date: "dd/MM/yyyy HH:mm" }}
+              {{ formatDateTime(sale.soldAt) }}
             </p>
             <p><strong>Usuario:</strong> {{ sale.createdBy }}</p>
             <p><strong>Caja:</strong> #{{ sale.cashRegisterSessionId }}</p>
@@ -60,11 +62,7 @@ import { SaleResponse } from "./data/sales.models";
             <ng-container *ngIf="sale.status === 'VOIDED'">
               <p>
                 <strong>Anulada en:</strong>
-                {{
-                  sale.voidedAt
-                    ? (sale.voidedAt | date: "dd/MM/yyyy HH:mm")
-                    : "-"
-                }}
+                {{ sale.voidedAt ? formatDateTime(sale.voidedAt) : "-" }}
               </p>
               <p class="full-width">
                 <strong>Motivo anulación:</strong> {{ sale.voidReason || "-" }}
@@ -86,7 +84,7 @@ import { SaleResponse } from "./data/sales.models";
                   <th class="cell-number">Cantidad</th>
                   <th class="cell-number">Precio unitario</th>
                   <th class="cell-number">Descuento</th>
-                  <th class="cell-number">Total linea</th>
+                  <th class="cell-number">Importe</th>
                 </tr>
               </thead>
               <tbody>
@@ -107,16 +105,16 @@ import { SaleResponse } from "./data/sales.models";
                     </div>
                   </td>
                   <td class="cell-number">
-                    {{ item.quantity | number: "1.0-3" }}
+                    {{ formatNumber(item.quantity) }}
                   </td>
                   <td class="cell-number">
-                    {{ item.unitPrice | number: "1.2-2" }}
+                    {{ formatCurrency(item.unitPrice) }}
                   </td>
                   <td class="cell-number">
-                    {{ item.discountAmount | number: "1.2-2" }}
+                    {{ formatCurrency(item.discountAmount) }}
                   </td>
                   <td class="cell-number">
-                    {{ item.lineTotal | number: "1.2-2" }}
+                    {{ formatCurrency(item.lineTotal) }}
                   </td>
                 </tr>
               </tbody>
@@ -143,10 +141,10 @@ import { SaleResponse } from "./data/sales.models";
                 <tr *ngFor="let payment of sale.payments">
                   <td>{{ paymentMethodLabel(payment.paymentMethod) }}</td>
                   <td class="cell-number">
-                    {{ payment.amount | number: "1.2-2" }}
+                    {{ formatCurrency(payment.amount) }}
                   </td>
                   <td>{{ payment.reference || "-" }}</td>
-                  <td>{{ payment.createdAt | date: "dd/MM/yyyy HH:mm" }}</td>
+                  <td>{{ formatDateTime(payment.createdAt) }}</td>
                 </tr>
               </tbody>
             </table>
@@ -156,19 +154,19 @@ import { SaleResponse } from "./data/sales.models";
         <article class="totals-panel">
           <div class="total-item">
             <p class="label">Subtotal</p>
-            <p class="value">{{ sale.subtotalAmount | number: "1.2-2" }}</p>
+            <p class="value">{{ formatCurrency(sale.subtotalAmount) }}</p>
           </div>
           <div class="total-item">
             <p class="label">Descuento</p>
-            <p class="value">{{ sale.discountAmount | number: "1.2-2" }}</p>
+            <p class="value">{{ formatCurrency(sale.discountAmount) }}</p>
           </div>
           <div class="total-item total-item--strong">
             <p class="label">Total</p>
-            <p class="value">{{ sale.totalAmount | number: "1.2-2" }}</p>
+            <p class="value">{{ formatCurrency(sale.totalAmount) }}</p>
           </div>
           <div class="total-item">
             <p class="label">Pagado</p>
-            <p class="value">{{ sale.paidAmount | number: "1.2-2" }}</p>
+            <p class="value">{{ formatCurrency(sale.paidAmount) }}</p>
           </div>
           <div
             class="total-item"
@@ -176,7 +174,7 @@ import { SaleResponse } from "./data/sales.models";
           >
             <p class="label">{{ settlementLabel(sale) }}</p>
             <p class="value" *ngIf="settlementDisplayAmount(sale) !== null; else settlementNotApplicable">
-              {{ settlementDisplayAmount(sale) | number: "1.2-2" }}
+              {{ formatCurrency(settlementDisplayAmount(sale)) }}
             </p>
             <ng-template #settlementNotApplicable>
               <p class="value value--muted">No aplica</p>
@@ -418,6 +416,22 @@ import { SaleResponse } from "./data/sales.models";
   ],
 })
 export class SaleDetailPageComponent implements OnInit {
+  private readonly currencyFormatter = new Intl.NumberFormat("es-PE", {
+    style: "currency",
+    currency: "PEN",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
+  private readonly dateTimeFormatter = new Intl.DateTimeFormat("es-PE", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+
   sale: SaleResponse | null = null;
   currentUser: UserProfile | null = null;
 
@@ -520,6 +534,28 @@ export class SaleDetailPageComponent implements OnInit {
 
   private hasCashPayment(sale: SaleResponse): boolean {
     return sale.payments.some((payment) => payment.paymentMethod === "CASH");
+  }
+
+  formatCurrency(value: number | null | undefined): string {
+    return this.currencyFormatter.format(value ?? 0);
+  }
+
+  formatDateTime(value: string | null | undefined): string {
+    if (!value) {
+      return "-";
+    }
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return "-";
+    }
+    return this.dateTimeFormatter.format(date);
+  }
+
+  formatNumber(value: number | null | undefined): string {
+    return new Intl.NumberFormat("es-PE", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 3,
+    }).format(value ?? 0);
   }
 
   private loadSale(): void {
