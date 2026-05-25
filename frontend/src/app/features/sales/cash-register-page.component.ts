@@ -2,6 +2,7 @@ import { CommonModule } from "@angular/common";
 import { Component, OnInit } from "@angular/core";
 import { FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
 
+import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.service";
 import { toHttpErrorMessage } from "./data/http-error-message";
 import { CashRegisterService } from "./data/cash-register.service";
 import { CashRegisterResponse } from "./data/sales.models";
@@ -14,28 +15,26 @@ import { CashRegisterResponse } from "./data/sales.models";
     <section class="ui-card cash-page">
       <header class="ui-page-head">
         <div>
-          <p class="ui-page-kicker">Operacion Comercial InkToy</p>
           <h1 class="ui-page-title">Caja</h1>
           <p class="ui-page-description">
-            Gestiona apertura, consulta y cierre de caja manteniendo
-            trazabilidad de montos operativos.
+            Consola operativa para apertura, seguimiento y cierre de caja.
           </p>
         </div>
 
         <div class="head-actions">
           <span
-            class="ui-badge"
-            [class.ui-badge--success]="hasOpenSession"
-            [class.ui-badge--warning]="!hasOpenSession"
+            class="ui-badge session-badge"
+            [ngClass]="sessionBadgeClass()"
           >
-            {{ hasOpenSession ? "Sesion OPEN" : "Sin sesion OPEN" }}
+            {{ sessionBadgeLabel() }}
           </span>
           <button
             type="button"
             class="ui-button ui-button--secondary"
             (click)="loadCurrentSession()"
+            [disabled]="loadingCurrent"
           >
-            Refrescar caja actual
+            {{ loadingCurrent ? "Actualizando..." : "Actualizar" }}
           </button>
         </div>
       </header>
@@ -47,79 +46,145 @@ import { CashRegisterResponse } from "./data/sales.models";
         {{ successMessage }}
       </p>
 
-      <article class="panel">
+      <article class="panel current-session-panel">
         <header class="block-head">
-          <h2>Caja actual</h2>
-        </header>
-
-        <ng-container *ngIf="currentSession; else noCurrentSession">
-          <div class="session-grid">
-            <p><strong>ID:</strong> #{{ currentSession.id }}</p>
-            <p>
-              <strong>Estado:</strong>
-              <span
-                class="ui-badge"
-                [class.ui-badge--success]="currentSession.status === 'OPEN'"
-                [class.ui-badge--danger]="currentSession.status !== 'OPEN'"
-              >
-                {{ currentSession.status }}
-              </span>
-            </p>
-            <p>
-              <strong>Apertura:</strong>
-              {{ currentSession.openedAt | date: "yyyy-MM-dd HH:mm" }}
-            </p>
-            <p>
-              <strong>Cierre:</strong>
-              {{
-                currentSession.closedAt
-                  ? (currentSession.closedAt | date: "yyyy-MM-dd HH:mm")
-                  : "-"
-              }}
-            </p>
-            <p>
-              <strong>Monto inicial:</strong>
-              {{ currentSession.openingAmount | number: "1.2-2" }}
-            </p>
-            <p>
-              <strong>Monto contado:</strong>
-              {{
-                currentSession.countedAmount !== null
-                  ? (currentSession.countedAmount | number: "1.2-2")
-                  : "-"
-              }}
-            </p>
-            <p>
-              <strong>Efectivo esperado:</strong>
-              {{
-                currentSession.expectedCashAmount !== null
-                  ? (currentSession.expectedCashAmount | number: "1.2-2")
-                  : "-"
-              }}
-            </p>
-            <p>
-              <strong>Diferencia:</strong>
-              {{
-                currentSession.differenceAmount !== null
-                  ? (currentSession.differenceAmount | number: "1.2-2")
-                  : "-"
-              }}
-            </p>
-            <p class="full-width">
-              <strong>Notas:</strong> {{ currentSession.notes || "-" }}
+          <div class="summary-copy">
+            <h2>{{ currentSessionTitle() }}</h2>
+            <p class="summary-copy__secondary" *ngIf="currentSession">
+              {{ currentSessionSubtitle() }}
             </p>
           </div>
+        </header>
+
+        <p class="ui-alert ui-alert--info" *ngIf="loadingCurrent">
+          Cargando caja...
+        </p>
+
+        <ng-container *ngIf="currentSession && !loadingCurrent; else noCurrentSession">
+          <div class="session-grid session-grid--summary">
+            <article class="session-kv">
+              <span class="session-kv__label">Estado</span>
+              <strong>
+                <span class="ui-badge session-status-badge" [ngClass]="statusBadgeClass(currentSession.status)">
+                  {{ statusLabel(currentSession.status) }}
+                </span>
+              </strong>
+            </article>
+            <article class="session-kv">
+              <span class="session-kv__label">Apertura</span>
+              <strong class="session-kv__value">{{ formatDateTime(currentSession.openedAt) }}</strong>
+            </article>
+            <article class="session-kv">
+              <span class="session-kv__label">Cierre</span>
+              <strong class="session-kv__value">{{ closingLabel(currentSession.closedAt) }}</strong>
+            </article>
+            <article class="session-kv">
+              <span class="session-kv__label">Saldo inicial</span>
+              <strong class="session-kv__value">{{ formatMoney(currentSession.openingAmount) }}</strong>
+            </article>
+            <article class="session-kv">
+              <span class="session-kv__label">Efectivo esperado en caja</span>
+              <strong class="session-kv__value">{{ moneyOrPending(currentSession.expectedCashAmount) }}</strong>
+            </article>
+            <article class="session-kv">
+              <span class="session-kv__label">Efectivo contado</span>
+              <strong class="session-kv__value">{{ moneyOrPending(currentSession.countedAmount) }}</strong>
+            </article>
+            <article class="session-kv">
+              <span class="session-kv__label">Diferencia de cierre</span>
+              <strong class="session-kv__value">{{ moneyOrPending(currentSession.differenceAmount) }}</strong>
+            </article>
+            <article class="session-kv session-kv--full">
+              <span class="session-kv__label">Notas</span>
+              <strong class="session-kv__value">{{ notesLabel(currentSession.notes) }}</strong>
+            </article>
+          </div>
+
+          <details class="technical-details">
+            <summary class="technical-details__summary">Datos tecnicos</summary>
+            <div class="technical-grid">
+              <article class="session-kv">
+                <span class="session-kv__label">ID interno</span>
+                <strong class="session-kv__value">#{{ currentSession.id }}</strong>
+              </article>
+              <article class="session-kv">
+                <span class="session-kv__label">Usuario apertura ID</span>
+                <strong class="session-kv__value session-kv__value--mono">{{ currentSession.openedByUserId }}</strong>
+              </article>
+            </div>
+          </details>
         </ng-container>
         <ng-template #noCurrentSession>
           <p class="ui-empty-state">
-            No hay caja abierta para el usuario actual.
+            Sin caja abierta. Registra el saldo inicial para comenzar una nueva sesion.
           </p>
         </ng-template>
       </article>
 
-      <article class="panel">
+      <article class="panel panel--emphasis" *ngIf="hasOpenSession">
         <header class="block-head">
-          <h2>Abrir caja</h2>
+          <div class="summary-copy">
+            <h2>Cerrar caja actual</h2>
+            <p class="summary-copy__secondary">
+              Registra el efectivo contado para finalizar la sesion operativa.
+            </p>
+          </div>
+        </header>
+
+        <p class="ui-page-description close-note">
+          La diferencia final se calculara al cerrar la caja.
+        </p>
+
+        <form
+          [formGroup]="closeForm"
+          (ngSubmit)="closeCashRegister()"
+          class="form-grid"
+        >
+          <label class="field">
+            <span>Efectivo contado *</span>
+            <input
+              type="number"
+              formControlName="countedAmount"
+              min="0"
+              step="0.01"
+            />
+          </label>
+
+          <label class="field">
+            <span>Notas de cierre</span>
+            <textarea formControlName="notes" maxlength="400"></textarea>
+          </label>
+
+          <button
+            type="submit"
+            class="ui-button ui-button--danger"
+            [disabled]="closing"
+          >
+            {{ closing ? "Cerrando..." : "Cerrar caja" }}
+          </button>
+        </form>
+      </article>
+
+      <article class="panel panel--compact" *ngIf="hasOpenSession">
+        <header class="block-head">
+          <div class="summary-copy">
+            <h2>Abrir caja</h2>
+          </div>
+        </header>
+
+        <p class="ui-page-description compact-note">
+          Ya existe una caja abierta. Cierra la caja actual antes de abrir otra.
+        </p>
+      </article>
+
+      <article class="panel panel--emphasis" *ngIf="!hasOpenSession">
+        <header class="block-head">
+          <div class="summary-copy">
+            <h2>Abrir caja</h2>
+            <p class="summary-copy__secondary">
+              Registra el saldo inicial para iniciar una nueva sesion de caja.
+            </p>
+          </div>
         </header>
 
         <form
@@ -128,7 +193,7 @@ import { CashRegisterResponse } from "./data/sales.models";
           class="form-grid"
         >
           <label class="field">
-            <span>Monto inicial *</span>
+            <span>Saldo inicial *</span>
             <input
               type="number"
               formControlName="openingAmount"
@@ -145,56 +210,18 @@ import { CashRegisterResponse } from "./data/sales.models";
           <button
             type="submit"
             class="ui-button ui-button--primary"
-            [disabled]="opening || hasOpenSession"
+            [disabled]="opening"
           >
-            Abrir caja
-          </button>
-        </form>
-
-        <p class="ui-alert ui-alert--info" *ngIf="hasOpenSession">
-          Ya existe una caja abierta. Cierra la caja actual antes de abrir otra.
-        </p>
-      </article>
-
-      <article class="panel" *ngIf="hasOpenSession">
-        <header class="block-head">
-          <h2>Cerrar caja</h2>
-        </header>
-
-        <form
-          [formGroup]="closeForm"
-          (ngSubmit)="closeCashRegister()"
-          class="form-grid"
-        >
-          <label class="field">
-            <span>Monto contado *</span>
-            <input
-              type="number"
-              formControlName="countedAmount"
-              min="0"
-              step="0.01"
-            />
-          </label>
-
-          <label class="field">
-            <span>Notas</span>
-            <textarea formControlName="notes" maxlength="400"></textarea>
-          </label>
-
-          <button
-            type="submit"
-            class="ui-button ui-button--danger"
-            [disabled]="closing"
-          >
-            Cerrar caja
+            {{ opening ? "Abriendo..." : "Abrir caja" }}
           </button>
         </form>
       </article>
 
-      <article class="panel">
-        <header class="block-head">
-          <h2>Consultar caja por ID</h2>
-        </header>
+      <details class="panel panel--secondary lookup-panel">
+        <summary class="lookup-panel__summary">
+          <span>Consultar caja por ID</span>
+          <span class="lookup-panel__summary-note">Accion secundaria</span>
+        </summary>
 
         <form
           [formGroup]="lookupForm"
@@ -213,59 +240,58 @@ import { CashRegisterResponse } from "./data/sales.models";
         </form>
 
         <div *ngIf="lookupSession" class="session-grid lookup-grid">
-          <p><strong>ID:</strong> #{{ lookupSession.id }}</p>
-          <p>
-            <strong>Estado:</strong>
-            <span
-              class="ui-badge"
-              [class.ui-badge--success]="lookupSession.status === 'OPEN'"
-              [class.ui-badge--danger]="lookupSession.status !== 'OPEN'"
-            >
-              {{ lookupSession.status }}
-            </span>
-          </p>
-          <p>
-            <strong>Apertura:</strong>
-            {{ lookupSession.openedAt | date: "yyyy-MM-dd HH:mm" }}
-          </p>
-          <p>
-            <strong>Cierre:</strong>
-            {{
-              lookupSession.closedAt
-                ? (lookupSession.closedAt | date: "yyyy-MM-dd HH:mm")
-                : "-"
-            }}
-          </p>
-          <p>
-            <strong>Monto inicial:</strong>
-            {{ lookupSession.openingAmount | number: "1.2-2" }}
-          </p>
-          <p>
-            <strong>Monto contado:</strong>
-            {{
-              lookupSession.countedAmount !== null
-                ? (lookupSession.countedAmount | number: "1.2-2")
-                : "-"
-            }}
-          </p>
-          <p>
-            <strong>Efectivo esperado:</strong>
-            {{
-              lookupSession.expectedCashAmount !== null
-                ? (lookupSession.expectedCashAmount | number: "1.2-2")
-                : "-"
-            }}
-          </p>
-          <p>
-            <strong>Diferencia:</strong>
-            {{
-              lookupSession.differenceAmount !== null
-                ? (lookupSession.differenceAmount | number: "1.2-2")
-                : "-"
-            }}
-          </p>
+          <article class="session-kv">
+            <span class="session-kv__label">Caja</span>
+            <strong class="session-kv__value">Caja #{{ lookupSession.id }}</strong>
+          </article>
+          <article class="session-kv">
+            <span class="session-kv__label">Estado</span>
+            <strong>
+              <span class="ui-badge session-status-badge" [ngClass]="statusBadgeClass(lookupSession.status)">
+                {{ statusLabel(lookupSession.status) }}
+              </span>
+            </strong>
+          </article>
+          <article class="session-kv">
+            <span class="session-kv__label">Apertura</span>
+            <strong class="session-kv__value">{{ formatDateTime(lookupSession.openedAt) }}</strong>
+          </article>
+          <article class="session-kv">
+            <span class="session-kv__label">Cierre</span>
+            <strong class="session-kv__value">{{ closingLabel(lookupSession.closedAt) }}</strong>
+          </article>
+          <article class="session-kv">
+            <span class="session-kv__label">Saldo inicial</span>
+            <strong class="session-kv__value">{{ formatMoney(lookupSession.openingAmount) }}</strong>
+          </article>
+          <article class="session-kv">
+            <span class="session-kv__label">Efectivo contado</span>
+            <strong class="session-kv__value">{{ moneyOrPending(lookupSession.countedAmount) }}</strong>
+          </article>
+          <article class="session-kv">
+            <span class="session-kv__label">Efectivo esperado en caja</span>
+            <strong class="session-kv__value">{{ moneyOrPending(lookupSession.expectedCashAmount) }}</strong>
+          </article>
+          <article class="session-kv">
+            <span class="session-kv__label">Diferencia de cierre</span>
+            <strong class="session-kv__value">{{ moneyOrPending(lookupSession.differenceAmount) }}</strong>
+          </article>
         </div>
-      </article>
+
+        <details class="technical-details" *ngIf="lookupSession">
+          <summary class="technical-details__summary">Datos tecnicos</summary>
+          <div class="technical-grid">
+            <article class="session-kv">
+              <span class="session-kv__label">ID interno</span>
+              <strong class="session-kv__value">#{{ lookupSession.id }}</strong>
+            </article>
+            <article class="session-kv">
+              <span class="session-kv__label">Usuario apertura ID</span>
+              <strong class="session-kv__value session-kv__value--mono">{{ lookupSession.openedByUserId }}</strong>
+            </article>
+          </div>
+        </details>
+      </details>
     </section>
   `,
   styles: [
@@ -276,6 +302,11 @@ import { CashRegisterResponse } from "./data/sales.models";
         gap: var(--space-4);
       }
 
+      .current-session-panel,
+      .panel--emphasis {
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+      }
+
       .head-actions {
         display: flex;
         gap: var(--space-2);
@@ -283,9 +314,45 @@ import { CashRegisterResponse } from "./data/sales.models";
         flex-wrap: wrap;
       }
 
+      .session-badge {
+        font-weight: 700;
+        border-width: 1px;
+        border-style: solid;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+      }
+
+      .session-badge--open {
+        background: rgba(34, 197, 94, 0.16);
+        color: #14532d;
+        border-color: rgba(34, 197, 94, 0.3);
+      }
+
+      .session-badge--closed {
+        background: rgba(107, 114, 128, 0.14);
+        color: #374151;
+        border-color: rgba(107, 114, 128, 0.28);
+      }
+
+      .session-badge--idle {
+        background: rgba(245, 158, 11, 0.14);
+        color: #8a5a00;
+        border-color: rgba(245, 158, 11, 0.28);
+      }
+
       h1,
       h2 {
         margin: 0;
+      }
+
+      .summary-copy {
+        display: grid;
+        gap: 0.18rem;
+      }
+
+      .summary-copy__secondary {
+        margin: 0;
+        color: var(--color-text-secondary);
+        font-size: var(--font-size-sm);
       }
 
       .panel {
@@ -295,6 +362,22 @@ import { CashRegisterResponse } from "./data/sales.models";
         background: var(--color-bg-surface);
         display: grid;
         gap: var(--space-3);
+      }
+
+      .panel--emphasis {
+        background: linear-gradient(
+          180deg,
+          rgba(18, 23, 184, 0.03),
+          rgba(56, 189, 248, 0.02)
+        );
+      }
+
+      .panel--compact {
+        gap: var(--space-2);
+      }
+
+      .panel--secondary {
+        background: rgba(15, 23, 42, 0.015);
       }
 
       .block-head {
@@ -308,6 +391,11 @@ import { CashRegisterResponse } from "./data/sales.models";
       .form-grid {
         display: grid;
         gap: var(--space-3);
+      }
+
+      .close-note,
+      .compact-note {
+        margin: 0;
       }
 
       .field {
@@ -356,6 +444,82 @@ import { CashRegisterResponse } from "./data/sales.models";
         gap: var(--space-2) var(--space-4);
       }
 
+      .session-grid--summary {
+        grid-template-columns: repeat(4, minmax(160px, 1fr));
+      }
+
+      .session-kv {
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-sm);
+        background: rgba(15, 23, 42, 0.02);
+        padding: 0.75rem 0.82rem;
+        display: grid;
+        gap: 0.35rem;
+        min-width: 0;
+      }
+
+      .session-kv__label {
+        font-size: 0.68rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--color-text-secondary);
+        font-weight: 800;
+      }
+
+      .session-kv__value {
+        display: block;
+        line-height: 1.25;
+        font-size: 0.96rem;
+      }
+
+      .session-kv__value--mono {
+        font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+        font-size: 0.82rem;
+        overflow-wrap: anywhere;
+      }
+
+      .session-kv--full {
+        grid-column: 1 / -1;
+      }
+
+      .session-status-badge {
+        font-weight: 700;
+        border-width: 1px;
+        border-style: solid;
+      }
+
+      .session-status-badge--open {
+        background: rgba(34, 197, 94, 0.12);
+        color: #166534;
+        border-color: rgba(34, 197, 94, 0.24);
+      }
+
+      .session-status-badge--closed {
+        background: rgba(107, 114, 128, 0.12);
+        color: #4b5563;
+        border-color: rgba(107, 114, 128, 0.24);
+      }
+
+      .technical-details {
+        display: grid;
+        gap: var(--space-2);
+        border-top: 1px dashed var(--color-border-default);
+        padding-top: var(--space-2);
+      }
+
+      .technical-details__summary {
+        cursor: pointer;
+        color: var(--color-text-secondary);
+        font-size: var(--font-size-sm);
+        font-weight: 700;
+      }
+
+      .technical-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(180px, 1fr));
+        gap: var(--space-2) var(--space-4);
+      }
+
       .session-grid p {
         margin: 0;
       }
@@ -369,9 +533,81 @@ import { CashRegisterResponse } from "./data/sales.models";
         padding-top: var(--space-3);
       }
 
+      .lookup-panel__summary {
+        width: 100%;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: var(--space-2);
+        cursor: pointer;
+        list-style: none;
+        font-weight: 700;
+      }
+
+      .lookup-panel__summary::-webkit-details-marker {
+        display: none;
+      }
+
+      .lookup-panel__summary-note {
+        color: var(--color-text-secondary);
+        font-size: var(--font-size-xs);
+        font-weight: 600;
+      }
+
       .ui-empty-state {
         text-align: left;
         padding: 0;
+      }
+
+      :host-context(body[data-theme="dark"]) .panel--secondary,
+      :host-context(body[data-theme="dark"]) .session-kv {
+        background: rgba(15, 23, 42, 0.72);
+        border-color: rgba(148, 163, 184, 0.16);
+      }
+
+      :host-context(body[data-theme="dark"]) .panel--emphasis {
+        background: linear-gradient(
+          180deg,
+          rgba(18, 23, 184, 0.18),
+          rgba(56, 189, 248, 0.08)
+        );
+      }
+
+      :host-context(body[data-theme="dark"]) .summary-copy__secondary,
+      :host-context(body[data-theme="dark"]) .session-kv__label,
+      :host-context(body[data-theme="dark"]) .lookup-panel__summary-note,
+      :host-context(body[data-theme="dark"]) .technical-details__summary {
+        color: rgba(226, 232, 240, 0.72);
+      }
+
+      :host-context(body[data-theme="dark"]) .session-badge--open {
+        background: rgba(34, 197, 94, 0.22);
+        color: #bbf7d0;
+        border-color: rgba(34, 197, 94, 0.34);
+      }
+
+      :host-context(body[data-theme="dark"]) .session-badge--closed {
+        background: rgba(148, 163, 184, 0.18);
+        color: #e2e8f0;
+        border-color: rgba(148, 163, 184, 0.28);
+      }
+
+      :host-context(body[data-theme="dark"]) .session-badge--idle {
+        background: rgba(245, 158, 11, 0.2);
+        color: #fcd34d;
+        border-color: rgba(245, 158, 11, 0.32);
+      }
+
+      :host-context(body[data-theme="dark"]) .session-status-badge--open {
+        background: rgba(34, 197, 94, 0.16);
+        color: #bbf7d0;
+        border-color: rgba(34, 197, 94, 0.28);
+      }
+
+      :host-context(body[data-theme="dark"]) .session-status-badge--closed {
+        background: rgba(148, 163, 184, 0.14);
+        color: #e2e8f0;
+        border-color: rgba(148, 163, 184, 0.24);
       }
 
       @media (max-width: 800px) {
@@ -379,7 +615,9 @@ import { CashRegisterResponse } from "./data/sales.models";
           padding: var(--space-4);
         }
 
-        .session-grid {
+        .session-grid,
+        .session-grid--summary,
+        .technical-grid {
           grid-template-columns: 1fr;
         }
 
@@ -396,6 +634,22 @@ import { CashRegisterResponse } from "./data/sales.models";
   ],
 })
 export class CashRegisterPageComponent implements OnInit {
+  private readonly currencyFormatter = new Intl.NumberFormat("es-PE", {
+    style: "currency",
+    currency: "PEN",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
+  private readonly dateTimeFormatter = new Intl.DateTimeFormat("es-PE", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+
   readonly openForm = this.formBuilder.group({
     openingAmount: [0, [Validators.required, Validators.min(0)]],
     notes: [""],
@@ -412,7 +666,9 @@ export class CashRegisterPageComponent implements OnInit {
 
   currentSession: CashRegisterResponse | null = null;
   lookupSession: CashRegisterResponse | null = null;
+  lastClosedSession: CashRegisterResponse | null = null;
 
+  loadingCurrent = false;
   opening = false;
   closing = false;
 
@@ -426,6 +682,7 @@ export class CashRegisterPageComponent implements OnInit {
   constructor(
     private readonly formBuilder: FormBuilder,
     private readonly cashRegisterService: CashRegisterService,
+    private readonly confirmDialogService: ConfirmDialogService,
   ) {}
 
   ngOnInit(): void {
@@ -433,21 +690,25 @@ export class CashRegisterPageComponent implements OnInit {
   }
 
   loadCurrentSession(): void {
+    this.loadingCurrent = true;
     this.errorMessage = "";
     this.successMessage = "";
 
     this.cashRegisterService.current().subscribe({
       next: (session) => {
+        this.loadingCurrent = false;
         this.currentSession = session;
+        this.lastClosedSession = session.status === "CLOSED" ? session : null;
       },
       error: (error: unknown) => {
-        this.currentSession = null;
-        const message = toHttpErrorMessage(
+        this.loadingCurrent = false;
+        const message = this.humanizeErrorMessage(toHttpErrorMessage(
           error,
           "No se pudo consultar la caja actual.",
-        );
+        ));
 
         if (message.startsWith("No encontrado:")) {
+          this.currentSession = this.lastClosedSession;
           return;
         }
 
@@ -466,7 +727,7 @@ export class CashRegisterPageComponent implements OnInit {
     if (this.openForm.invalid) {
       this.openForm.markAllAsTouched();
       this.errorMessage =
-        "openingAmount es requerido y debe ser mayor o igual a 0.";
+        "El saldo inicial es obligatorio y debe ser mayor o igual a 0.";
       return;
     }
 
@@ -484,19 +745,21 @@ export class CashRegisterPageComponent implements OnInit {
         next: (session) => {
           this.opening = false;
           this.currentSession = session;
+          this.lastClosedSession = null;
           this.successMessage = `Caja #${session.id} abierta correctamente.`;
+          this.openForm.reset({ openingAmount: 0, notes: "" });
         },
         error: (error: unknown) => {
           this.opening = false;
-          this.errorMessage = toHttpErrorMessage(
+          this.errorMessage = this.humanizeErrorMessage(toHttpErrorMessage(
             error,
             "No se pudo abrir la caja.",
-          );
+          ));
         },
       });
   }
 
-  closeCashRegister(): void {
+  async closeCashRegister(): Promise<void> {
     if (!this.currentSession || !this.hasOpenSession) {
       this.errorMessage = "No hay caja abierta para cerrar.";
       return;
@@ -505,7 +768,20 @@ export class CashRegisterPageComponent implements OnInit {
     if (this.closeForm.invalid) {
       this.closeForm.markAllAsTouched();
       this.errorMessage =
-        "countedAmount es requerido y debe ser mayor o igual a 0.";
+        "El efectivo contado es obligatorio y debe ser mayor o igual a 0.";
+      return;
+    }
+
+    const confirmed = await this.confirmDialogService.confirm({
+      title: "Cerrar caja actual",
+      description:
+        "Se registrara el efectivo contado y se finalizara la sesion de caja. Verifica el monto antes de confirmar.",
+      confirmText: "Cerrar caja",
+      cancelText: "Cancelar",
+      variant: "danger",
+    });
+
+    if (!confirmed) {
       return;
     }
 
@@ -524,15 +800,16 @@ export class CashRegisterPageComponent implements OnInit {
         next: (session) => {
           this.closing = false;
           this.currentSession = session;
+          this.lastClosedSession = session;
           this.successMessage = `Caja #${session.id} cerrada correctamente.`;
-          this.loadCurrentSession();
+          this.closeForm.reset({ countedAmount: 0, notes: "" });
         },
         error: (error: unknown) => {
           this.closing = false;
-          this.errorMessage = toHttpErrorMessage(
+          this.errorMessage = this.humanizeErrorMessage(toHttpErrorMessage(
             error,
             "No se pudo cerrar la caja.",
-          );
+          ));
         },
       });
   }
@@ -550,15 +827,106 @@ export class CashRegisterPageComponent implements OnInit {
     const id = Number(this.lookupForm.value.id);
     this.cashRegisterService.getById(id).subscribe({
       next: (session) => {
-        this.lookupSession = session;
+      this.lookupSession = session;
       },
       error: (error: unknown) => {
         this.lookupSession = null;
-        this.errorMessage = toHttpErrorMessage(
+        this.errorMessage = this.humanizeErrorMessage(toHttpErrorMessage(
           error,
           "No se pudo obtener la caja solicitada.",
-        );
+        ));
       },
     });
+  }
+
+  formatMoney(value: number | null | undefined): string {
+    return this.currencyFormatter.format(value ?? 0);
+  }
+
+  formatDateTime(value: string | null | undefined): string {
+    if (!value) {
+      return "Pendiente";
+    }
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return "Pendiente";
+    }
+
+    return this.dateTimeFormatter.format(date);
+  }
+
+  statusLabel(status: string | null | undefined): string {
+    switch (status) {
+      case "OPEN":
+        return "Abierta";
+      case "CLOSED":
+        return "Cerrada";
+      default:
+        return status || "-";
+    }
+  }
+
+  sessionBadgeLabel(): string {
+    if (this.currentSession?.status === "OPEN") {
+      return "Sesion abierta";
+    }
+    if (this.currentSession?.status === "CLOSED") {
+      return "Sesion cerrada";
+    }
+    return "Sin caja abierta";
+  }
+
+  sessionBadgeClass(): string {
+    if (this.currentSession?.status === "OPEN") {
+      return "session-badge--open";
+    }
+    if (this.currentSession?.status === "CLOSED") {
+      return "session-badge--closed";
+    }
+    return "session-badge--idle";
+  }
+
+  statusBadgeClass(status: string | null | undefined): string {
+    return status === "OPEN"
+      ? "session-status-badge--open"
+      : "session-status-badge--closed";
+  }
+
+  currentSessionTitle(): string {
+    if (!this.currentSession) {
+      return "Caja actual";
+    }
+    return `Caja #${this.currentSession.id}`;
+  }
+
+  currentSessionSubtitle(): string {
+    if (!this.currentSession) {
+      return "";
+    }
+
+    return `ID interno #${this.currentSession.id}`;
+  }
+
+  closingLabel(value: string | null | undefined): string {
+    return value ? this.formatDateTime(value) : "Pendiente";
+  }
+
+  moneyOrPending(value: number | null | undefined): string {
+    return value === null || value === undefined
+      ? "Pendiente"
+      : this.formatMoney(value);
+  }
+
+  notesLabel(value: string | null | undefined): string {
+    return value?.trim() ? value.trim() : "Sin notas";
+  }
+
+  private humanizeErrorMessage(message: string): string {
+    return message
+      .replace(/openingAmount/g, "saldo inicial")
+      .replace(/countedAmount/g, "efectivo contado")
+      .replace(/No OPEN cash register session for current user/g, "No hay caja abierta para el usuario actual")
+      .replace(/Only OPEN cash register sessions can be closed/g, "Solo se puede cerrar una caja abierta");
   }
 }
