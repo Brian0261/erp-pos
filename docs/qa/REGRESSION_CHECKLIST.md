@@ -606,6 +606,41 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [ ] Validar que POS, listado de Comprobantes y Detalle de comprobante no fueron afectados.
 - [ ] Sin cambios en DB/Flyway, endpoints principales, POS ni contratos de payload.
 
+### Caja - UX operativa frontend-only (2026-05-25)
+
+- [ ] Estados `OPEN` y `CLOSED` se muestran como `Abierta` y `Cerrada`.
+- [ ] Badge superior muestra `Sesion abierta`, `Sesion cerrada` o `Sin caja abierta`.
+- [ ] Badges de Caja son visibles pero no invasivos.
+- [ ] Montos se muestran con formato `PEN` usando `Intl.NumberFormat`.
+- [ ] Fechas se muestran como `dd/MM/yyyy HH:mm` con `Intl.DateTimeFormat`.
+- [ ] `ID interno` no domina la card principal.
+- [ ] `Usuario apertura ID` no aparece en la grilla principal.
+- [ ] `Datos tecnicos` colapsable conserva `ID interno` y `Usuario apertura ID`.
+- [ ] Con caja abierta, `Caja actual` se muestra como resumen principal.
+- [ ] Con caja abierta, `Cerrar caja actual` aparece inmediatamente despues del resumen.
+- [ ] Con caja abierta, `Abrir caja` no muestra el formulario completo.
+- [ ] Con caja abierta, se muestra una nota compacta indicando que ya existe una caja abierta.
+- [ ] `Consultar caja por ID` queda como bloque secundario al final.
+- [ ] Sin caja abierta, se muestra `Sin caja abierta`.
+- [ ] Sin caja abierta, `Abrir caja` queda como accion principal.
+- [ ] Sin caja abierta, `Cerrar caja` no se muestra.
+- [ ] La apertura con saldo inicial valido funciona.
+- [ ] Errores de saldo inicial muestran copy operativo.
+- [ ] `ConfirmDialogService` aparece antes de cerrar caja.
+- [ ] Cancelar la confirmacion no cierra caja.
+- [ ] Confirmar ejecuta el cierre.
+- [ ] Tras cerrar, se conserva visible el resumen de la sesion cerrada.
+- [ ] La diferencia final se muestra desde la respuesta backend.
+- [ ] Errores de efectivo contado muestran copy operativo.
+- [ ] La consulta por ID sigue funcionando en bloque secundario colapsable.
+- [ ] No se usa `/reports/cash-registers/{id}` en la pantalla principal de Caja.
+- [ ] No se muestran consultas nuevas fuera del flujo existente.
+
+#### Validaciones
+- [ ] `cd frontend; npm run build` -> BUILD SUCCESS.
+- [ ] Smoke manual con ADMIN, CAJERO y SUPERVISOR cuando haya usuarios disponibles.
+- [ ] Confirmar que POS, Ventas y Facturacion no se afectaron.
+
 ### Ventas - Integracion con comprobantes electronicos Fases 1-2C + refinamiento visual (2026-05-25)
 
 #### Listado de Ventas
