@@ -6,7 +6,13 @@ import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 
 import { toHttpErrorMessage } from "./data/http-error-message";
 import { SalesService } from "./data/sales.service";
-import { SaleResponse, SaleStatus } from "./data/sales.models";
+import {
+  BillingDocumentStatus,
+  BillingEnvironment,
+  BillingSummary,
+  SalesListItem,
+  SaleStatus,
+} from "./data/sales.models";
 
 @Component({
   selector: "app-sales-page",
@@ -98,6 +104,7 @@ import { SaleResponse, SaleStatus } from "./data/sales.models";
               <th>Venta</th>
               <th>Fecha</th>
               <th>Estado</th>
+              <th>Comprobante</th>
               <th class="cell-number">Total</th>
               <th>Usuario</th>
               <th>Caja</th>
@@ -122,6 +129,22 @@ import { SaleResponse, SaleStatus } from "./data/sales.models";
                   {{ saleStatusLabel(sale.status) }}
                 </span>
               </td>
+              <td>
+                <div class="cell-billing">
+                  <span
+                    class="ui-badge billing-badge"
+                    [ngClass]="billingBadgeClass(sale.billingSummary)"
+                  >
+                    {{ billingPrimaryLabel(sale.billingSummary) }}
+                  </span>
+                  <span
+                    class="cell-code__secondary"
+                    *ngIf="billingSecondaryLabel(sale.billingSummary) as secondary"
+                  >
+                    {{ secondary }}
+                  </span>
+                </div>
+              </td>
               <td class="cell-number">
                 {{ formatCurrency(sale.totalAmount) }}
               </td>
@@ -136,7 +159,7 @@ import { SaleResponse, SaleStatus } from "./data/sales.models";
               </td>
             </tr>
             <tr *ngIf="sales.length === 0">
-              <td colspan="7" class="ui-table__empty">
+              <td colspan="8" class="ui-table__empty">
                 <div class="ui-empty-state">
                   No hay ventas para los filtros aplicados.
                 </div>
@@ -210,6 +233,12 @@ import { SaleResponse, SaleStatus } from "./data/sales.models";
         gap: 0.12rem;
       }
 
+      .cell-billing {
+        display: grid;
+        gap: 0.18rem;
+        min-width: 0;
+      }
+
       .cell-code__secondary {
         color: var(--color-text-secondary);
         font-size: var(--font-size-xs);
@@ -218,6 +247,48 @@ import { SaleResponse, SaleStatus } from "./data/sales.models";
 
       .cell-number {
         text-align: right;
+      }
+
+      .billing-badge {
+        width: fit-content;
+        font-weight: 700;
+      }
+
+      .billing-badge--pending {
+        background: #e5e7eb;
+        color: #4b5563;
+      }
+
+      .billing-badge--draft {
+        background: #dbeafe;
+        color: #1d4ed8;
+      }
+
+      .billing-badge--generated {
+        background: #ede9fe;
+        color: #6d28d9;
+      }
+
+      .billing-badge--signed {
+        background: #cffafe;
+        color: #0e7490;
+      }
+
+      .billing-badge--sent {
+        background: #fef3c7;
+        color: #92400e;
+      }
+
+      .billing-badge--accepted {
+        background: #dcfce7;
+        color: #166534;
+      }
+
+      .billing-badge--rejected,
+      .billing-badge--error,
+      .billing-badge--cancelled {
+        background: #fee2e2;
+        color: #b91c1c;
       }
 
       .ui-button {
@@ -280,7 +351,7 @@ export class SalesPageComponent implements OnInit {
 
   readonly statuses: SaleStatus[] = ["COMPLETED", "VOIDED"];
 
-  sales: SaleResponse[] = [];
+  sales: SalesListItem[] = [];
   loading = false;
   errorMessage = "";
 
@@ -311,6 +382,90 @@ export class SalesPageComponent implements OnInit {
         return "Cancelada";
       default:
         return status;
+    }
+  }
+
+  billingPrimaryLabel(summary: BillingSummary | null | undefined): string {
+    if (!summary?.hasElectronicDocument) {
+      return "Pendiente";
+    }
+
+    return summary.fullNumber || this.billingStatusLabel(summary.status);
+  }
+
+  billingSecondaryLabel(summary: BillingSummary | null | undefined): string {
+    if (!summary?.hasElectronicDocument) {
+      return "Sin comprobante";
+    }
+
+    const parts = [
+      this.billingStatusLabel(summary.status),
+      this.billingEnvironmentLabel(summary.environment),
+    ].filter(Boolean);
+
+    return parts.join(" · ");
+  }
+
+  billingBadgeClass(summary: BillingSummary | null | undefined): string {
+    if (!summary?.hasElectronicDocument) {
+      return "billing-badge--pending";
+    }
+
+    switch (summary.status) {
+      case "DRAFT":
+        return "billing-badge--draft";
+      case "GENERATED":
+        return "billing-badge--generated";
+      case "SIGNED":
+        return "billing-badge--signed";
+      case "SENT":
+        return "billing-badge--sent";
+      case "ACCEPTED":
+        return "billing-badge--accepted";
+      case "REJECTED":
+        return "billing-badge--rejected";
+      case "ERROR":
+        return "billing-badge--error";
+      case "CANCELLED":
+        return "billing-badge--cancelled";
+      default:
+        return "billing-badge--pending";
+    }
+  }
+
+  billingStatusLabel(status: BillingDocumentStatus | null | undefined): string {
+    switch (status) {
+      case "DRAFT":
+        return "BORRADOR";
+      case "GENERATED":
+        return "XML GENERADO";
+      case "SIGNED":
+        return "FIRMADO";
+      case "SENT":
+        return "ENVIADO";
+      case "ACCEPTED":
+        return "ACEPTADO";
+      case "REJECTED":
+        return "RECHAZADO";
+      case "ERROR":
+        return "ERROR";
+      case "CANCELLED":
+        return "ANULADO";
+      default:
+        return "-";
+    }
+  }
+
+  billingEnvironmentLabel(environment: BillingEnvironment | null | undefined): string {
+    switch (environment) {
+      case "LOCAL":
+        return "Local";
+      case "BETA":
+        return "Beta";
+      case "PROD":
+        return "Producción";
+      default:
+        return "";
     }
   }
 
@@ -404,7 +559,9 @@ export class SalesPageComponent implements OnInit {
     this.errorMessage = "";
 
     this.salesService
-      .list({
+      .listItems({
+        from,
+        to,
         status: (value.status as SaleStatus | "") || undefined,
         cashRegisterSessionId,
         createdBy: value.createdBy?.trim() ? value.createdBy.trim() : undefined,
@@ -438,10 +595,10 @@ export class SalesPageComponent implements OnInit {
   }
 
   private applyDateRangeFilter(
-    sales: SaleResponse[],
+    sales: SalesListItem[],
     from?: string,
     to?: string,
-  ): SaleResponse[] {
+  ): SalesListItem[] {
     if (!from && !to) {
       return sales;
     }

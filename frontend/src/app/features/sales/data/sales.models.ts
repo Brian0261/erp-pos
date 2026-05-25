@@ -34,6 +34,20 @@ export interface PosProductResponse {
 
 export type SaleStatus = "COMPLETED" | "VOIDED";
 
+export type BillingDocumentType = "INVOICE" | "RECEIPT";
+
+export type BillingDocumentStatus =
+  | "DRAFT"
+  | "GENERATED"
+  | "SIGNED"
+  | "SENT"
+  | "ACCEPTED"
+  | "REJECTED"
+  | "ERROR"
+  | "CANCELLED";
+
+export type BillingEnvironment = "LOCAL" | "BETA" | "PROD";
+
 export type PaymentMethod = "CASH" | "CARD" | "TRANSFER";
 
 export interface SaleItemResponse {
@@ -74,6 +88,26 @@ export interface SaleResponse {
   createdBy: string;
   items: SaleItemResponse[];
   payments: SalePaymentResponse[];
+}
+
+export interface BillingSummary {
+  hasElectronicDocument: boolean;
+  documentId: number | null;
+  documentType: BillingDocumentType | null;
+  fullNumber: string | null;
+  status: BillingDocumentStatus | null;
+  environment: BillingEnvironment | null;
+}
+
+export interface SalesListItem {
+  id: number;
+  saleNumber: string;
+  soldAt: string;
+  status: SaleStatus;
+  totalAmount: number;
+  createdBy: string;
+  cashRegisterSessionId: number;
+  billingSummary: BillingSummary;
 }
 
 export interface CreateSaleItemRequest {
