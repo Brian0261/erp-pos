@@ -933,6 +933,22 @@ export class LayoutComponent implements OnInit, OnDestroy {
           icon: "PO",
           allowedRoles: ROLES_ECOMMERCE_ADMIN,
         },
+        {
+          kind: "link",
+          id: "marcas-online",
+          label: "Marcas",
+          route: "/ecommerce-admin/marcas",
+          icon: "MA",
+          allowedRoles: ROLES_ECOMMERCE_ADMIN,
+        },
+        {
+          kind: "link",
+          id: "categorias-online",
+          label: "Categorías",
+          route: "/ecommerce-admin/categorias",
+          icon: "CO",
+          allowedRoles: ROLES_ECOMMERCE_ADMIN,
+        },
       ],
     },
     {

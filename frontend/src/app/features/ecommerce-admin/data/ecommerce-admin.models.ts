@@ -160,6 +160,16 @@ export interface EcommerceAdminBrandResponse {
   updatedAt: string;
 }
 
+export interface EcommerceAdminBrandRequest {
+  name: string;
+  slug: string | null;
+  description: string | null;
+}
+
+export interface EcommerceAdminBrandStatusRequest {
+  active: boolean;
+}
+
 export interface EcommerceAdminOnlineCategoryResponse {
   id: number;
   parentId: number | null;
@@ -169,4 +179,15 @@ export interface EcommerceAdminOnlineCategoryResponse {
   active: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface EcommerceAdminOnlineCategoryRequest {
+  parentId: number | null;
+  name: string;
+  slug: string | null;
+  description: string | null;
+}
+
+export interface EcommerceAdminOnlineCategoryStatusRequest {
+  active: boolean;
 }

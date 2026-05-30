@@ -4,8 +4,12 @@ import { Observable } from "rxjs";
 
 import { environment } from "../../../../environments/environment";
 import {
+  EcommerceAdminBrandRequest,
   EcommerceAdminBrandResponse,
+  EcommerceAdminBrandStatusRequest,
   EcommerceAdminOnlineCategoryResponse,
+  EcommerceAdminOnlineCategoryRequest,
+  EcommerceAdminOnlineCategoryStatusRequest,
   EcommerceAdminOnlineProfileDetailResponse,
   EcommerceAdminOnlineProfileSummaryResponse,
   EcommerceAdminPageResponse,
@@ -115,6 +119,24 @@ export class EcommerceAdminService {
     return this.http.get<EcommerceAdminBrandResponse>(`${this.endpoint}/brands/${id}`);
   }
 
+  createBrand(payload: EcommerceAdminBrandRequest): Observable<EcommerceAdminBrandResponse> {
+    return this.http.post<EcommerceAdminBrandResponse>(`${this.endpoint}/brands`, payload);
+  }
+
+  updateBrand(id: number, payload: EcommerceAdminBrandRequest): Observable<EcommerceAdminBrandResponse> {
+    return this.http.put<EcommerceAdminBrandResponse>(`${this.endpoint}/brands/${id}`, payload);
+  }
+
+  changeBrandStatus(
+    id: number,
+    payload: EcommerceAdminBrandStatusRequest,
+  ): Observable<EcommerceAdminBrandResponse> {
+    return this.http.patch<EcommerceAdminBrandResponse>(
+      `${this.endpoint}/brands/${id}/status`,
+      payload,
+    );
+  }
+
   listOnlineCategories(): Observable<EcommerceAdminOnlineCategoryResponse[]> {
     return this.http.get<EcommerceAdminOnlineCategoryResponse[]>(
       `${this.endpoint}/online-categories`,
@@ -124,6 +146,35 @@ export class EcommerceAdminService {
   getOnlineCategory(id: number): Observable<EcommerceAdminOnlineCategoryResponse> {
     return this.http.get<EcommerceAdminOnlineCategoryResponse>(
       `${this.endpoint}/online-categories/${id}`,
+    );
+  }
+
+  createOnlineCategory(
+    payload: EcommerceAdminOnlineCategoryRequest,
+  ): Observable<EcommerceAdminOnlineCategoryResponse> {
+    return this.http.post<EcommerceAdminOnlineCategoryResponse>(
+      `${this.endpoint}/online-categories`,
+      payload,
+    );
+  }
+
+  updateOnlineCategory(
+    id: number,
+    payload: EcommerceAdminOnlineCategoryRequest,
+  ): Observable<EcommerceAdminOnlineCategoryResponse> {
+    return this.http.put<EcommerceAdminOnlineCategoryResponse>(
+      `${this.endpoint}/online-categories/${id}`,
+      payload,
+    );
+  }
+
+  changeOnlineCategoryStatus(
+    id: number,
+    payload: EcommerceAdminOnlineCategoryStatusRequest,
+  ): Observable<EcommerceAdminOnlineCategoryResponse> {
+    return this.http.patch<EcommerceAdminOnlineCategoryResponse>(
+      `${this.endpoint}/online-categories/${id}/status`,
+      payload,
     );
   }
 }
