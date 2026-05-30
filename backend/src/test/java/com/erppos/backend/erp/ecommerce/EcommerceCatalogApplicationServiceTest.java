@@ -33,6 +33,9 @@ import com.erppos.backend.erp.ecommerce.domain.port.ProductAssetRepositoryPort;
 import com.erppos.backend.erp.ecommerce.domain.port.ProductOnlineProfileRepositoryPort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -392,6 +395,11 @@ class EcommerceCatalogApplicationServiceTest {
         @Override
         public Optional<ProductOnlineProfile> findById(Long id) {
             return Optional.ofNullable(profiles.get(id));
+        }
+
+        @Override
+        public Page<ProductOnlineProfile> findAll(Pageable pageable) {
+            return new PageImpl<>(profiles.values().stream().toList(), pageable, profiles.size());
         }
 
         @Override

@@ -29,6 +29,8 @@ import com.erppos.backend.erp.ecommerce.domain.port.EcommerceSeoMetadataReposito
 import com.erppos.backend.erp.ecommerce.domain.port.OnlinePriceOverrideRepositoryPort;
 import com.erppos.backend.erp.ecommerce.domain.port.ProductAssetRepositoryPort;
 import com.erppos.backend.erp.ecommerce.domain.port.ProductOnlineProfileRepositoryPort;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -37,6 +39,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 
 @Service
 public class EcommerceCatalogApplicationService implements EcommerceCatalogUseCase {
@@ -104,9 +107,32 @@ public class EcommerceCatalogApplicationService implements EcommerceCatalogUseCa
     }
 
     @Override
+    public Page<ProductOnlineProfile> listOnlineProfiles(Pageable pageable) {
+        return profileRepositoryPort.findAll(pageable);
+    }
+
+    @Override
     public ProductOnlineProfile getProfileByProductId(Long productId) {
         return profileRepositoryPort.findByProductId(productId)
                 .orElseThrow(() -> new EcommerceNotFoundException("Product online profile not found"));
+    }
+
+    @Override
+    public Optional<EcommerceSeoMetadata> getSeoMetadataByProductId(Long productId) {
+        ProductOnlineProfile profile = getProfileByProductId(requireProductId(productId));
+        return seoMetadataRepositoryPort.findByProductOnlineProfileId(profile.id());
+    }
+
+    @Override
+    public Optional<ProductAsset> getPrimaryAssetByProductId(Long productId) {
+        ProductOnlineProfile profile = getProfileByProductId(requireProductId(productId));
+        return productAssetRepositoryPort.findPrimaryActiveByProductOnlineProfileId(profile.id());
+    }
+
+    @Override
+    public Optional<OnlinePriceOverride> getActivePriceOverrideByProductId(Long productId) {
+        ProductOnlineProfile profile = getProfileByProductId(requireProductId(productId));
+        return onlinePriceOverrideRepositoryPort.findActiveByProductOnlineProfileId(profile.id());
     }
 
     @Override

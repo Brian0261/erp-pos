@@ -4,6 +4,8 @@ import com.erppos.backend.erp.ecommerce.domain.exception.EcommerceNotFoundExcept
 import com.erppos.backend.erp.ecommerce.domain.model.ProductOnlineProfile;
 import com.erppos.backend.erp.ecommerce.domain.port.ProductOnlineProfileRepositoryPort;
 import com.erppos.backend.erp.ecommerce.infrastructure.mapper.ProductOnlineProfileMapper;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,6 +30,11 @@ public class ProductOnlineProfilePersistenceAdapter implements ProductOnlineProf
             ProductOnlineProfileMapper.merge(entity, profile);
         }
         return ProductOnlineProfileMapper.toDomain(profileJpaRepository.saveAndFlush(entity));
+    }
+
+    @Override
+    public Page<ProductOnlineProfile> findAll(Pageable pageable) {
+        return profileJpaRepository.findAll(pageable).map(ProductOnlineProfileMapper::toDomain);
     }
 
     @Override
