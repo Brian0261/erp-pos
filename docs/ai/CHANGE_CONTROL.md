@@ -4,6 +4,42 @@
 
 Estandarizar cambios tecnicos para reducir regresiones y mantener trazabilidad en etapa pre-piloto.
 
+## Control ecommerce SEO-first
+
+### Cierre Fase 0 documental ecommerce
+
+- ECOM-ADR-001 al ECOM-ADR-019 estan aprobados como base de arquitectura ecommerce SEO-first.
+- `docs/ecommerce/PRELIMINARY_ECOMMERCE_CONTRACTS.md` queda aprobado como contrato preliminar ecommerce.
+- `docs/qa/PHASE0_ECOMMERCE_VALIDATION_CHECKLIST.md` queda revisado/cerrado mediante evidencia documental.
+- La proxima fase autorizada para preparar es Fase 1 - Catalogo online base en ERP/POS.
+
+### Reglas para Fase 1A
+
+- Fase 1A es documental/tecnica y no funcional.
+- No tocar backend, frontend funcional, DB/Flyway, endpoints, Docker, `.env`, secretos, AWS/staging ni dependencias.
+- No crear tienda Next.js, Storefront API publica, checkout, carrito real, Mercado Pago, facturacion automatica ecommerce, delivery real ni Merchant Center real.
+- No modificar POS, inventario, ventas, caja ni facturacion durante Fase 1A.
+- Cualquier Fase 1B que requiera persistencia, Flyway o endpoints administrativos internos exige aprobacion humana explicita antes de implementar.
+
+### Cierre Fase 1A.2 documental
+
+- Se aprobaron las decisiones humanas pendientes para Fase 1: producto sin marca, categoria online, assets, namespace administrativo, permisos iniciales, Flyway, categoria SEO separada y bloqueo de slug en productos publicados.
+- Se reforzaron lineamientos UX/UI para la administracion ecommerce en Angular interno: tablas, filtros, badges/chips, formularios, confirmaciones, mensajes, estados vacios, errores y responsive.
+- Se reforzo QA documental para evitar N+1 y para confirmar que Angular no duplica logica critica de negocio.
+- No se toco codigo funcional, backend, frontend funcional, DB/Flyway, endpoints, AWS/staging, Docker, dependencias ni secretos.
+- El siguiente paso es preparar commit documental; despues de ese cierre, abrir Fase 1B con aprobacion explicita si el negocio confirma el alcance.
+
+### Decisiones aprobadas para Fase 1
+
+- Producto sin marca: no usar texto libre; permitir solo marca formal o regla explicita auditada tipo `Sin marca`/`Generico`.
+- Categoria online: obligatoria para publicar; no obligatoria para perfiles online en `DRAFT`.
+- Asset formal: el perfil online puede existir en `DRAFT` sin asset, pero la publicacion debe bloquearse hasta tener imagen principal con alt text y derechos confirmados.
+- Namespace administrativo: `/api/v1/ecommerce-admin/...` para administracion interna, separado de la Storefront API publica.
+- Permisos iniciales: `ADMIN` crea, edita, publica y despublica; `SUPERVISOR` solo lectura/revision al inicio.
+- Flyway: no tocar en Fase 1A; Fase 1B futura debe ser aditiva, de bajo riesgo y aprobada explicitamente.
+- Categoria SEO: usar categoria online separada para ecommerce; no reutilizar directamente la categoria interna como categoria publica SEO.
+- Slugs: bloquear cambios de slug en productos ya publicados mientras no exista historial de slugs/redirecciones.
+
 ## Reglas de control de cambios
 
 1. Trabajar por cambios pequenos, verificables y reversibles.
@@ -11,26 +47,27 @@ Estandarizar cambios tecnicos para reducir regresiones y mantener trazabilidad e
 3. No mezclar backend/frontend cuando el requerimiento no lo exige.
 4. No mezclar cambios funcionales con cambios cosmeticos sin acuerdo previo.
 5. Mantener foco en alcance explicitamente solicitado.
-6. En POS, documentar cambios de persistencia frontend, validacion de almacén y ajustes visuales de búsqueda/botones como nota operativa breve cuando impacten la experiencia de caja.
-7. En POS, registrar como mejora UX el reemplazo de confirm nativo por modal propio al cobrar, sin alterar la logica transaccional.
-8. En Inventario, documentar mejoras UX de Ajustes de stock cuando incorporen autocomplete server-side, layout estable, confirmacion propia y reset limpio post-success sin tocar backend.
-9. En Catalogo, documentar cambios de Productos cuando la busqueda multi-token, filtros reorganizados y tabla compacta mejoren la experiencia sin cambiar endpoints.
- 10. En Inventario, documentar la fase 1 del autocomplete compartido cuando se cree `ProductAutocompleteComponent` y se migre primero solo Transferencias, dejando Stock/Stock inicial/Ajustes para fases posteriores.
- 11. En Inventario/Kardex, documentar cambios de auditoria cuando el endpoint se enriquezca con nombres operativos, el frontend use paginacion server-side, un solo Limpiar y tabla alineada sin tocar el contrato base `/api/v1/inventory/kardex`.
-12. En Inventario, documentar la consolidacion del autocomplete compartido cuando `Stock` use `filterMode=true`, `disabled` reactivo y limpieza visual final sin textos redundantes bajo Producto.
-13. En Compras, documentar el rediseño UX/UI de Proveedores cuando la pantalla pase a tabla principal con drawer/modal local para crear/editar y confirmaciones del sistema para estados.
-14. En Compras, documentar el rediseño completo de Órdenes de compra en 5 fases cuando el flujo pase de listado → nueva → edición → detalle → recepción con tablas operativas, ProductAutocompleteComponent, sanitización de cantidades/costos, ConfirmDialogService y formateo local Intl sin tocar backend, endpoints ni contratos.
- 15. En Cotizaciones, documentar el rediseño completo en 5 fases cuando el flujo pase de listado → nueva → edición → detalle → conversión con tabla compacta, ProductAutocompleteComponent, `syncSelectedToInput` opt-in en edición, sanitización de cantidades/descuentos, ConfirmDialogService y formateo local Intl sin tocar backend, endpoints ni contratos.
- 16. En Facturacion, documentar la mejora empresarial del Detalle de comprobante electronico cuando se muestren nombre real + SKU + codigo de barras en la tabla de items, historial descendente, XML colapsable y cards key-value, sin ProductService lookup frontend, sin DB/Flyway, sin cambios de endpoints ni POS.
- 17. En Facturacion, documentar el rediseño empresarial de Emitir comprobante pendiente cuando la pantalla pase a header operativo sin MVP, cards key-value compactas, Tipo/Serie alineados con helper persistente, copy contextual por tipo, tabla de items con nombre real + SKU, montos PEN y sin ID tecnico visible, sin alterar reglas tributarias ni contratos.
-18. En Facturacion, documentar hardening por ambiente cuando LOCAL/BETA sigan como simulacion controlada y PROD quede bloqueado para firma/envio sin proveedor tributario real ni firma XML real, evitando aceptaciones mock en produccion.
-  19. En Facturacion, documentar configuracion tributaria como consola por ambiente cuando se muestre estado LOCAL/BETA/PROD (perfil/series/readiness), validaciones operativas (RUC 11, ubigeo 6), advertencias preventivas perfil-serie y CTA a Series sin cambiar contratos backend.
-  20. En Facturacion, documentar correccion de layout shift en Configuracion tributaria cuando se aplique field-help persistente con altura reservada en RUC/Razon social, Ubigeo/Departamento y Provincia/Distrito para evitar desalineacion visual entre campos hermanos de la misma fila.
-  21. En Facturacion, documentar loading gate + loader neutral con delay en Configuracion tributaria cuando se elimine skeleton estructural con cuadros vacios y se implemente estado de carga con retardo de 280 ms: si la carga termina antes no se muestra nada intermedio; si tarda aparece loader compacto con texto operativo; sin formulario vacio, cards incompletas ni flash visual al presionar F5.
-  22. En Facturacion, documentar hardening de series y correlativos cuando se aplique: unica serie activa por documentType+environment (409 si duplica); currentNumber como proximo correlativo (bloquea si <= maxIssuedNumber); validacion defensiva en createFromSale() antes de crear documento/incrementar; migracion Flyway V16 con indice unico parcial active=true; runbook operativo para correccion manual de series inconsistentes (currentNumber = maxIssuedNumber + 1); riesgo residual de datos historicos inconsistentes documentado; sin modificacion automatica de datos; sin cambios en frontend/POS/endpoints publicos.
-  23. En Facturacion, registrar correccion operativa manual de serie historica inconsistente B001/LOCAL: tenia current_number=1 y max_issued=2 (inconsistente porque currentNumber es proximo correlativo a emitir y debe ser > maxIssuedNumber); se corrigio manualmente desde pantalla Series y correlativos a currentNumber=3; serie quedo INACTIVA; trazabilidad historica de comprobantes antiguos preservada; antes de reactivar serie historica validar que proximo correlativo sea mayor al ultimo emitido; no se modificaron datos automaticamente por script.
-  24. En Facturacion, documentar rediseño frontend de Series y numeracion tributaria: consola operativa empresarial con formulario cerrado por defecto, boton Nueva serie, modo edicion con contexto, Cancelar, Proximo correlativo + helper persistente, field-help anti-layout shift, filtros Tipo/Ambiente/Estado, separacion vigentes/historicas colapsables, confirmaciones activar/desactivar, chips LOCAL/BETA/PROD dark-tinted, badges sobrios, mensajes 409 operativos; sin cambios de backend/endpoints/contratos.
-  25. En Ventas, documentar integracion con comprobantes electronicos en 4 fases + refinamiento visual:
+6. En fases documentales, no introducir cambios de codigo funcional, migraciones, endpoints ni configuracion de despliegue.
+7. En POS, documentar cambios de persistencia frontend, validacion de almacén y ajustes visuales de búsqueda/botones como nota operativa breve cuando impacten la experiencia de caja.
+8. En POS, registrar como mejora UX el reemplazo de confirm nativo por modal propio al cobrar, sin alterar la logica transaccional.
+9. En Inventario, documentar mejoras UX de Ajustes de stock cuando incorporen autocomplete server-side, layout estable, confirmacion propia y reset limpio post-success sin tocar backend.
+10. En Catalogo, documentar cambios de Productos cuando la busqueda multi-token, filtros reorganizados y tabla compacta mejoren la experiencia sin cambiar endpoints.
+11. En Inventario, documentar la fase 1 del autocomplete compartido cuando se cree `ProductAutocompleteComponent` y se migre primero solo Transferencias, dejando Stock/Stock inicial/Ajustes para fases posteriores.
+12. En Inventario/Kardex, documentar cambios de auditoria cuando el endpoint se enriquezca con nombres operativos, el frontend use paginacion server-side, un solo Limpiar y tabla alineada sin tocar el contrato base `/api/v1/inventory/kardex`.
+13. En Inventario, documentar la consolidacion del autocomplete compartido cuando `Stock` use `filterMode=true`, `disabled` reactivo y limpieza visual final sin textos redundantes bajo Producto.
+14. En Compras, documentar el rediseño UX/UI de Proveedores cuando la pantalla pase a tabla principal con drawer/modal local para crear/editar y confirmaciones del sistema para estados.
+15. En Compras, documentar el rediseño completo de Órdenes de compra en 5 fases cuando el flujo pase de listado -> nueva -> edicion -> detalle -> recepcion con tablas operativas, ProductAutocompleteComponent, sanitizacion de cantidades/costos, ConfirmDialogService y formateo local Intl sin tocar backend, endpoints ni contratos.
+16. En Cotizaciones, documentar el rediseño completo en 5 fases cuando el flujo pase de listado -> nueva -> edicion -> detalle -> conversion con tabla compacta, ProductAutocompleteComponent, `syncSelectedToInput` opt-in en edicion, sanitizacion de cantidades/descuentos, ConfirmDialogService y formateo local Intl sin tocar backend, endpoints ni contratos.
+17. En Facturacion, documentar la mejora empresarial del Detalle de comprobante electronico cuando se muestren nombre real + SKU + codigo de barras en la tabla de items, historial descendente, XML colapsable y cards key-value, sin ProductService lookup frontend, sin DB/Flyway, sin cambios de endpoints ni POS.
+18. En Facturacion, documentar el rediseño empresarial de Emitir comprobante pendiente cuando la pantalla pase a header operativo sin MVP, cards key-value compactas, Tipo/Serie alineados con helper persistente, copy contextual por tipo, tabla de items con nombre real + SKU, montos PEN y sin ID tecnico visible, sin alterar reglas tributarias ni contratos.
+19. En Facturacion, documentar hardening por ambiente cuando LOCAL/BETA sigan como simulacion controlada y PROD quede bloqueado para firma/envio sin proveedor tributario real ni firma XML real, evitando aceptaciones mock en produccion.
+20. En Facturacion, documentar configuracion tributaria como consola por ambiente cuando se muestre estado LOCAL/BETA/PROD (perfil/series/readiness), validaciones operativas (RUC 11, ubigeo 6), advertencias preventivas perfil-serie y CTA a Series sin cambiar contratos backend.
+21. En Facturacion, documentar correccion de layout shift en Configuracion tributaria cuando se aplique field-help persistente con altura reservada en RUC/Razon social, Ubigeo/Departamento y Provincia/Distrito para evitar desalineacion visual entre campos hermanos de la misma fila.
+22. En Facturacion, documentar loading gate + loader neutral con delay en Configuracion tributaria cuando se elimine skeleton estructural con cuadros vacios y se implemente estado de carga con retardo de 280 ms: si la carga termina antes no se muestra nada intermedio; si tarda aparece loader compacto con texto operativo; sin formulario vacio, cards incompletas ni flash visual al presionar F5.
+23. En Facturacion, documentar hardening de series y correlativos cuando se aplique: unica serie activa por documentType+environment (409 si duplica); currentNumber como proximo correlativo (bloquea si <= maxIssuedNumber); validacion defensiva en createFromSale() antes de crear documento/incrementar; migracion Flyway V16 con indice unico parcial active=true; runbook operativo para correccion manual de series inconsistentes (currentNumber = maxIssuedNumber + 1); riesgo residual de datos historicos inconsistentes documentado; sin modificacion automatica de datos; sin cambios en frontend/POS/endpoints publicos.
+24. En Facturacion, registrar correccion operativa manual de serie historica inconsistente B001/LOCAL: tenia current_number=1 y max_issued=2 (inconsistente porque currentNumber es proximo correlativo a emitir y debe ser > maxIssuedNumber); se corrigio manualmente desde pantalla Series y correlativos a currentNumber=3; serie quedo INACTIVA; trazabilidad historica de comprobantes antiguos preservada; antes de reactivar serie historica validar que proximo correlativo sea mayor al ultimo emitido; no se modificaron datos automaticamente por script.
+25. En Facturacion, documentar rediseño frontend de Series y numeracion tributaria: consola operativa empresarial con formulario cerrado por defecto, boton Nueva serie, modo edicion con contexto, Cancelar, Proximo correlativo + helper persistente, field-help anti-layout shift, filtros Tipo/Ambiente/Estado, separacion vigentes/historicas colapsables, confirmaciones activar/desactivar, chips LOCAL/BETA/PROD dark-tinted, badges sobrios, mensajes 409 operativos; sin cambios de backend/endpoints/contratos.
+26. En Ventas, documentar integracion con comprobantes electronicos en 4 fases + refinamiento visual:
     - Fase 1 UX: Intl.NumberFormat/DateTimeFormat es-PE, saleNumber como identificador principal, "Total linea" -> "Importe", ConfirmDialogService en anulacion.
     - Fase 2A detalle: listBySaleId() sin fallback a list() global, bloque Comprobante electronico con CTA contextual Emitir/Ver, navegacion a /facturacion/emitir/:saleId y /facturacion/comprobantes/:id.
     - Fase 2B listado: endpoint no rompiente GET /api/v1/sales/list-items con read-model dedicado; evita N+1 con consulta batch de comprobantes por saleIds; GET /api/v1/sales intacto; columna Comprobante con numero/estado/ambiente o Pendiente/Sin comprobante.
@@ -93,6 +130,8 @@ Actualizar docs/qa cuando ocurra al menos uno de estos casos:
 3. Ajuste de seguridad, permisos o rutas protegidas.
 4. Cambio de comportamiento observable en Docker/runtime.
 5. Nuevo protocolo operativo de validacion (ejemplo: anti-cache).
+
+Nota operativa: cambios ecommerce deben actualizar plan/checklist de fase, matrices QA cuando haya endpoints/rutas reales, y mantener separacion entre endpoints administrativos internos y Storefront API publica.
 
 Nota operativa: cambios de catalogo que agregan endpoints nuevos o reglas de reserva deben reflejarse tambien en matrices y decisiones antes de cerrar la tarea.
 Nota operativa: cambios en Stock que alteren el filtro de Producto deben reflejar lookup/autocomplete, criterio de seleccion por `productId` y smoke minimo en matrices/checklist.

@@ -4,6 +4,21 @@
 
 Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones tecnicas/QA documentadas.
 
+## Estado ecommerce SEO-first
+
+- Fase 0 documental ecommerce cerrada a nivel de decisiones: ECOM-ADR-001 al ECOM-ADR-019 existen y estan aprobados para la futura tienda online SEO-first.
+- `docs/ecommerce/PRELIMINARY_ECOMMERCE_CONTRACTS.md` existe y queda como contrato preliminar aprobado para fases posteriores.
+- `docs/qa/PHASE0_ECOMMERCE_VALIDATION_CHECKLIST.md` existe y queda revisado/cerrado mediante seccion de cierre formal, sin validar codigo funcional porque Fase 0 es documental.
+- Proxima fase definida: Fase 1 - Catalogo online base en ERP/POS.
+- Fase 1A es exclusivamente documental/tecnica: no implementa codigo funcional, endpoints, migraciones, Storefront API publica, Next.js, checkout, Mercado Pago, facturacion automatica ecommerce, delivery real ni Merchant Center real.
+- Fase 1A.2 documental quedo cerrada con decisiones humanas aprobadas, lineamientos UX/UI para Angular interno y checklist QA reforzado para catalogo online.
+- Fase 1B futura queda bloqueada hasta aprobacion explicita para tocar Flyway, crear endpoints administrativos internos o introducir cambios persistentes.
+- Siguiente paso recomendado: preparar commit documental de esta fase y, solo despues, abrir el trabajo de Fase 1B.
+- Diagnostico vigente del repo: el backend actual no tiene soporte implementado para marcas, slugs, metadata SEO, assets de producto, publicacion online ni precio online override.
+- Modulos protegidos para Fase 1A y preparacion Fase 1: POS, inventario, ventas, caja y facturacion no deben modificarse.
+- AWS/staging no debe tocarse hasta que exista una fase local estable y validada.
+- Confirmado: no se toco codigo funcional en esta fase documental.
+
 ## Deudas tecnicas cerradas (segun documentacion actual)
 
 - BT-001: una sola caja OPEN por usuario.

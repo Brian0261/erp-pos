@@ -27,9 +27,9 @@ InkToy ERP/POS es un sistema para una tienda fisica de articulos escolares y pap
 - Monolito modular con arquitectura hexagonal (puertos y adaptadores).
 - Modulos por dominio dentro de un backend unico.
 - ADR de referencia:
-  - docs/adr/ADR-0001-monolito-modular-hexagonal.md
-  - docs/adr/ADR-0002-facturacion-electronica-mvp.md
-  - docs/adr/ADR-0003-outbox-eventos-ecommerce-futuro.md
+  - docs/adr/core/CORE-ADR-001-monolito-modular-hexagonal.md
+  - docs/adr/core/CORE-ADR-002-facturacion-electronica-mvp.md
+  - docs/adr/core/CORE-ADR-003-outbox-eventos-ecommerce-futuro.md
 
 ## Modulos implementados
 
@@ -86,6 +86,7 @@ Detalles relevantes:
 - Integracion real e-commerce: fuera de alcance actual.
 - Integracion productiva SUNAT/OSE/PSE: fuera de alcance actual.
 - Publicacion real de eventos con broker: diferida.
+- Fase 1A.2 ecommerce cerrada documentalmente; Angular interno para catalogo online queda preparado por documentacion, sin codigo funcional.
 
 ## Politica de datos
 

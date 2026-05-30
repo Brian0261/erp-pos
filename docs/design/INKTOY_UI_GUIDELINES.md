@@ -71,6 +71,21 @@ Apply visual consistency across the ERP/POS while preserving MVP behavior.
 6. Keep empty, loading, success, and error messages visually consistent with reusable alert styles.
 7. Do not alter routes, guards, interceptors, or service endpoint contracts for catalog modules.
 
+## Ecommerce Administration in Angular Internal
+
+1. Keep the ecommerce administration UI aligned with ERP/POS: sober, dense, professional and operational.
+2. Use table-first layouts for catalog lists, with clear headers, stable row density and actions grouped on the right or in a dedicated actions column.
+3. Use filters as a compact top band or sidebar block; keep primary actions visible and avoid burying publish/edit actions below secondary controls.
+4. Use semantic badges/chips for state, visibility, publication and validation outcomes. Do not rely on color alone.
+5. Keep forms compact and predictable: persistent labels, helper text, inline errors and clear section grouping.
+6. Put technical data, internal IDs, audit traces, sync metadata and advanced SEO details in secondary or collapsible sections.
+7. Confirm critical actions such as publish, unpublish and irreversible changes with explicit modal copy that explains the business impact.
+8. Use clear empty states, loading states, success states and error states that speak in operational language.
+9. Keep responsive behavior intact on tablet and mobile: no clipped actions, readable tables, stable spacing and safe modal sizing.
+10. Do not duplicate backend logic in Angular for price, stock, slug rules, publication eligibility or asset validation; Angular renders the decision, backend owns the decision.
+11. Reuse the same visual language as ERP/POS, but allow slightly richer metadata blocks for ecommerce review screens when needed.
+12. Do not introduce new global visual primitives when existing tokens, cards, buttons, badges and alerts are sufficient.
+
 ## Inventory-Specific Rules (Block E2)
 
 1. Keep inventory workflows unchanged; E2 is visual-only for warehouses, stock, initial stock, adjustments, transfers, and kardex.
