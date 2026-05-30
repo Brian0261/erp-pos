@@ -21,10 +21,10 @@ type PublicationFilter = "ALL" | OnlinePublicationStatus;
     <section class="ui-card ecommerce-page">
       <header class="ui-page-head">
         <div>
-          <p class="ui-page-kicker">Catalogo online</p>
+          <p class="ui-page-kicker">Catálogo online</p>
           <h1 class="ui-page-title">Perfiles online</h1>
           <p class="ui-page-description">
-            Revisa estado de publicacion, SEO y consistencia de perfiles online.
+            Revisa estado de publicación, SEO y consistencia de perfiles online.
           </p>
         </div>
 
@@ -51,7 +51,7 @@ type PublicationFilter = "ALL" | OnlinePublicationStatus;
         (ngSubmit)="applyFilters()"
       >
         <label class="filter-field filter-field--query">
-          <span>Busqueda rapida</span>
+          <span>Búsqueda rápida</span>
           <input
             type="text"
             formControlName="query"
@@ -101,7 +101,7 @@ type PublicationFilter = "ALL" | OnlinePublicationStatus;
               <th>Slug</th>
               <th>Estado</th>
               <th>Marca</th>
-              <th>Categoria</th>
+              <th>Categoría</th>
               <th>Publicado</th>
               <th>Actualizado</th>
               <th>Acciones</th>
@@ -139,7 +139,7 @@ type PublicationFilter = "ALL" | OnlinePublicationStatus;
 
       <footer class="pagination" *ngIf="!loading && canView">
         <p class="ui-muted pagination-copy">
-          Pagina {{ page + 1 }} de {{ totalPages }} - {{ totalItems }} resultados
+          Página {{ page + 1 }} de {{ totalPages }} - {{ totalItems }} resultados
         </p>
 
         <div class="pagination-actions">
@@ -389,7 +389,7 @@ export class OnlineProfilesPageComponent implements OnInit {
       case "INCOMPLETE":
         return "Incompleto";
       case "READY_FOR_REVIEW":
-        return "Listo para revision";
+        return "Listo para revisión";
       case "PUBLISHED":
         return "Publicado";
       case "UNPUBLISHED":

@@ -29,12 +29,12 @@ import { toHttpErrorMessage } from "./data/http-error-message";
       <header class="ui-page-head">
         <div>
           <a class="back-link" routerLink="/ecommerce-admin/perfiles">Volver al listado</a>
-          <p class="ui-page-kicker">Catalogo online</p>
+          <p class="ui-page-kicker">Catálogo online</p>
           <h1 class="ui-page-title">
             Perfil online del producto #{{ productId || "-" }}
           </h1>
           <p class="ui-page-description">
-            Gestiona perfil, SEO, asset principal y override de precio para publicacion.
+            Gestiona perfil, SEO, asset principal y override de precio para publicación.
           </p>
         </div>
 
@@ -106,13 +106,13 @@ import { toHttpErrorMessage } from "./data/http-error-message";
         </div>
 
         <p class="ui-alert ui-alert--info" *ngIf="!canManage && canView">
-          Modo revision: como SUPERVISOR solo puedes consultar. Las acciones de cambio son exclusivas de ADMIN.
+          Modo revisión: como SUPERVISOR solo puedes consultar. Las acciones de cambio son exclusivas de ADMIN.
         </p>
       </section>
 
       <section class="ui-module-section" *ngIf="profile && publicationValidation">
         <header class="section-head">
-          <h2>Checklist de publicacion (backend)</h2>
+          <h2>Checklist de publicación (backend)</h2>
         </header>
 
         <div class="validation-head">
@@ -133,7 +133,7 @@ import { toHttpErrorMessage } from "./data/http-error-message";
           <li *ngFor="let error of publicationValidation.errors">{{ error }}</li>
         </ul>
         <ng-template #noErrors>
-          <p class="ui-muted">Sin bloqueos de publicacion reportados por backend.</p>
+          <p class="ui-muted">Sin bloqueos de publicación reportados por backend.</p>
         </ng-template>
       </section>
 
@@ -153,17 +153,17 @@ import { toHttpErrorMessage } from "./data/http-error-message";
             <span>Nombre online</span>
             <input type="text" formControlName="onlineName" maxlength="180" />
             <small class="field-help" *ngIf="isProfileInvalid('onlineName')">
-              El nombre online excede el maximo permitido.
+              El nombre online excede el máximo permitido.
             </small>
           </label>
 
           <label class="field field--full">
-            <span>Descripcion online</span>
+            <span>Descripción online</span>
             <textarea formControlName="onlineDescription" rows="4" maxlength="2000"></textarea>
           </label>
 
           <label class="field">
-            <span>Categoria online</span>
+            <span>Categoría online</span>
             <select formControlName="onlineCategoryId">
               <option [ngValue]="null">Seleccionar</option>
               <option *ngFor="let category of onlineCategories" [ngValue]="category.id">
@@ -183,7 +183,7 @@ import { toHttpErrorMessage } from "./data/http-error-message";
           </label>
 
           <label class="field">
-            <span>Politica sin marca</span>
+            <span>Política sin marca</span>
             <select formControlName="brandAbsencePolicy">
               <option [ngValue]="null">No aplica</option>
               <option *ngFor="let policy of brandAbsencePolicies" [ngValue]="policy">
@@ -371,12 +371,12 @@ import { toHttpErrorMessage } from "./data/http-error-message";
           </label>
 
           <label class="field">
-            <span>Valido desde</span>
+            <span>Válido desde</span>
             <input type="datetime-local" formControlName="validFrom" />
           </label>
 
           <label class="field">
-            <span>Valido hasta</span>
+            <span>Válido hasta</span>
             <input type="datetime-local" formControlName="validTo" />
           </label>
 
@@ -648,7 +648,7 @@ export class OnlineProfileDetailPageComponent implements OnInit {
   ngOnInit(): void {
     const parsedProductId = Number(this.route.snapshot.paramMap.get("productId"));
     if (!Number.isFinite(parsedProductId) || parsedProductId <= 0) {
-      this.errorMessage = "El productId de la ruta es invalido.";
+      this.errorMessage = "El productId de la ruta es inválido.";
       return;
     }
     this.productId = parsedProductId;
@@ -862,7 +862,7 @@ export class OnlineProfileDetailPageComponent implements OnInit {
     const confirmed = await this.confirmDialogService.confirm({
       title: "Publicar perfil online",
       description:
-        "El producto quedara visible para publicacion online si cumple reglas de negocio. Esta accion puede impactar SEO y visibilidad.",
+        "El producto quedará visible para publicación online si cumple reglas de negocio. Esta acción puede impactar SEO y visibilidad.",
       confirmText: "Publicar",
       cancelText: "Cancelar",
       variant: "warning",
@@ -900,7 +900,7 @@ export class OnlineProfileDetailPageComponent implements OnInit {
     const confirmed = await this.confirmDialogService.confirm({
       title: "Despublicar perfil online",
       description:
-        "El producto dejara de estar publicado online. Esta accion conserva datos de perfil y SEO para futuras revisiones.",
+        "El producto dejará de estar publicado online. Esta acción conserva datos de perfil y SEO para futuras revisiones.",
       confirmText: "Despublicar",
       cancelText: "Cancelar",
       variant: "danger",
@@ -970,7 +970,7 @@ export class OnlineProfileDetailPageComponent implements OnInit {
       case "INCOMPLETE":
         return "Incompleto";
       case "READY_FOR_REVIEW":
-        return "Listo para revision";
+        return "Listo para revisión";
       case "PUBLISHED":
         return "Publicado";
       case "UNPUBLISHED":

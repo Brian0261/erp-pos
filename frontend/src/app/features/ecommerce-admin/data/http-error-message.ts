@@ -9,15 +9,15 @@ export function toHttpErrorMessage(error: unknown, fallbackMessage: string): str
 
   switch (error.status) {
     case 0:
-      return "No hay conexion con el servidor. Verifica la red o el backend.";
+      return "No hay conexión con el servidor. Verifica la red o el backend.";
     case 400:
       return detail
-        ? `Solicitud invalida: ${detail}`
-        : "Solicitud invalida. Revisa los datos ingresados.";
+        ? `Solicitud inválida: ${detail}`
+        : "Solicitud inválida. Revisa los datos ingresados.";
     case 401:
-      return "Sesion expirada o no autenticada. Inicia sesion nuevamente.";
+      return "Sesión expirada o no autenticada. Inicia sesión nuevamente.";
     case 403:
-      return "No tienes permisos para esta accion en catalogo online.";
+      return "No tienes permisos para esta acción en catálogo online.";
     case 404:
       return detail ? `No encontrado: ${detail}` : "El recurso solicitado no existe.";
     case 409:
