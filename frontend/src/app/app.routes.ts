@@ -14,6 +14,8 @@ import { BillingIssueFromSalePageComponent } from "./features/billing/billing-is
 import { BillingSeriesPageComponent } from "./features/billing/billing-series-page.component";
 import { ProductCleanupPreviewPageComponent } from "./features/admin/product-cleanup-preview-page.component";
 import { DashboardComponent } from "./features/dashboard/dashboard.component";
+import { OnlineProfileDetailPageComponent } from "./features/ecommerce-admin/online-profile-detail-page.component";
+import { OnlineProfilesPageComponent } from "./features/ecommerce-admin/online-profiles-page.component";
 import { OutboxEventDetailPageComponent } from "./features/integrations/outbox-event-detail-page.component";
 import { OutboxEventsPageComponent } from "./features/integrations/outbox-events-page.component";
 import { AdjustmentsPageComponent } from "./features/inventory/adjustments-page.component";
@@ -61,6 +63,7 @@ const ROLES_PURCHASES = ["ADMIN", "ALMACENERO", "SUPERVISOR"];
 const ROLES_PURCHASES_MANAGEMENT = ["ADMIN", "ALMACENERO"];
 const ROLES_REPORTS = ["ADMIN", "SUPERVISOR", "ALMACENERO"];
 const ROLES_REPORTS_COMMERCIAL = ["ADMIN", "SUPERVISOR"];
+const ROLES_ECOMMERCE_ADMIN = ["ADMIN", "SUPERVISOR"];
 
 export const routes: Routes = [
   { path: "login", component: LoginComponent },
@@ -136,6 +139,22 @@ export const routes: Routes = [
         path: "catalogo/unidades",
         component: UnitsPageComponent,
         data: { allowedRoles: ROLES_CATALOG },
+      },
+      {
+        path: "ecommerce-admin",
+        pathMatch: "full",
+        redirectTo: "ecommerce-admin/perfiles",
+        data: { allowedRoles: ROLES_ECOMMERCE_ADMIN },
+      },
+      {
+        path: "ecommerce-admin/perfiles",
+        component: OnlineProfilesPageComponent,
+        data: { allowedRoles: ROLES_ECOMMERCE_ADMIN },
+      },
+      {
+        path: "ecommerce-admin/perfiles/:productId",
+        component: OnlineProfileDetailPageComponent,
+        data: { allowedRoles: ROLES_ECOMMERCE_ADMIN },
       },
       {
         path: "inventario",

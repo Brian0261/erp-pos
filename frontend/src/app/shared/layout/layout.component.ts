@@ -49,6 +49,7 @@ const ROLES_SALES: AppRole[] = ["ADMIN", "CAJERO", "SUPERVISOR"];
 const ROLES_PURCHASES: AppRole[] = ["ADMIN", "ALMACENERO", "SUPERVISOR"];
 const ROLES_REPORTS: AppRole[] = ["ADMIN", "SUPERVISOR", "ALMACENERO"];
 const ROLES_CONSULTA_CAJERO: AppRole[] = ["CAJERO"];
+const ROLES_ECOMMERCE_ADMIN: AppRole[] = ["ADMIN", "SUPERVISOR"];
 
 @Component({
   selector: "app-layout",
@@ -829,6 +830,7 @@ export class LayoutComponent implements OnInit, OnDestroy {
     caja: "Caja",
     ventas: "Ventas",
     catalogo: "Catálogo",
+    "ecommerce-admin": "Catalogo online",
     inventario: "Inventario",
     compras: "Compras",
     cotizaciones: "Cotizaciones",
@@ -912,6 +914,24 @@ export class LayoutComponent implements OnInit, OnDestroy {
           route: "/catalogo/unidades",
           icon: "UN",
           allowedRoles: ROLES_CATALOG,
+        },
+      ],
+    },
+    {
+      kind: "group",
+      id: "catalogo-online",
+      label: "Catálogo online",
+      icon: "EO",
+      allowedRoles: ROLES_ECOMMERCE_ADMIN,
+      collapsible: true,
+      items: [
+        {
+          kind: "link",
+          id: "perfiles-online",
+          label: "Perfiles online",
+          route: "/ecommerce-admin/perfiles",
+          icon: "PO",
+          allowedRoles: ROLES_ECOMMERCE_ADMIN,
         },
       ],
     },
