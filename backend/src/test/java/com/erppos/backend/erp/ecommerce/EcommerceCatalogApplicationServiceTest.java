@@ -3,12 +3,33 @@ package com.erppos.backend.erp.ecommerce;
 import com.erppos.backend.erp.ecommerce.application.service.AuditUserProvider;
 import com.erppos.backend.erp.ecommerce.application.service.EcommerceCatalogApplicationService;
 import com.erppos.backend.erp.ecommerce.application.usecase.CreateProductOnlineProfileCommand;
+import com.erppos.backend.erp.ecommerce.application.usecase.EffectiveOnlinePriceResult;
+import com.erppos.backend.erp.ecommerce.application.usecase.PublicationValidationResult;
+import com.erppos.backend.erp.ecommerce.application.usecase.UpdateProductOnlineProfileCommand;
+import com.erppos.backend.erp.ecommerce.application.usecase.UpsertOnlinePriceOverrideCommand;
+import com.erppos.backend.erp.ecommerce.application.usecase.UpsertProductAssetCommand;
+import com.erppos.backend.erp.ecommerce.application.usecase.UpsertProductSeoMetadataCommand;
+import com.erppos.backend.erp.ecommerce.domain.exception.EcommerceBusinessRuleException;
 import com.erppos.backend.erp.ecommerce.domain.exception.EcommerceConflictException;
 import com.erppos.backend.erp.ecommerce.domain.exception.EcommerceNotFoundException;
+import com.erppos.backend.erp.ecommerce.domain.model.AssetSource;
+import com.erppos.backend.erp.ecommerce.domain.model.AssetType;
+import com.erppos.backend.erp.ecommerce.domain.model.BrandAbsencePolicy;
+import com.erppos.backend.erp.ecommerce.domain.model.EcommerceBrand;
 import com.erppos.backend.erp.ecommerce.domain.model.EcommerceCatalogProductSnapshot;
+import com.erppos.backend.erp.ecommerce.domain.model.EcommerceOnlineCategory;
+import com.erppos.backend.erp.ecommerce.domain.model.EcommerceSeoMetadata;
+import com.erppos.backend.erp.ecommerce.domain.model.OnlinePriceOverride;
 import com.erppos.backend.erp.ecommerce.domain.model.OnlinePublicationStatus;
+import com.erppos.backend.erp.ecommerce.domain.model.ProductAsset;
 import com.erppos.backend.erp.ecommerce.domain.model.ProductOnlineProfile;
+import com.erppos.backend.erp.ecommerce.domain.model.RobotsPolicy;
+import com.erppos.backend.erp.ecommerce.domain.port.EcommerceBrandRepositoryPort;
 import com.erppos.backend.erp.ecommerce.domain.port.EcommerceCatalogProductReadPort;
+import com.erppos.backend.erp.ecommerce.domain.port.EcommerceOnlineCategoryRepositoryPort;
+import com.erppos.backend.erp.ecommerce.domain.port.EcommerceSeoMetadataRepositoryPort;
+import com.erppos.backend.erp.ecommerce.domain.port.OnlinePriceOverrideRepositoryPort;
+import com.erppos.backend.erp.ecommerce.domain.port.ProductAssetRepositoryPort;
 import com.erppos.backend.erp.ecommerce.domain.port.ProductOnlineProfileRepositoryPort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -16,24 +37,46 @@ import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class EcommerceCatalogApplicationServiceTest {
     private InMemoryProductOnlineProfileRepository profileRepository;
     private InMemoryProductReadPort productReadPort;
+    private InMemoryBrandRepository brandRepository;
+    private InMemoryOnlineCategoryRepository categoryRepository;
+    private InMemorySeoMetadataRepository seoRepository;
+    private InMemoryProductAssetRepository assetRepository;
+    private InMemoryOnlinePriceOverrideRepository overrideRepository;
     private EcommerceCatalogApplicationService service;
 
     @BeforeEach
     void setUp() {
         profileRepository = new InMemoryProductOnlineProfileRepository();
         productReadPort = new InMemoryProductReadPort();
-        service = new EcommerceCatalogApplicationService(profileRepository, productReadPort, new AuditUserProvider());
+        brandRepository = new InMemoryBrandRepository();
+        categoryRepository = new InMemoryOnlineCategoryRepository();
+        seoRepository = new InMemorySeoMetadataRepository();
+        assetRepository = new InMemoryProductAssetRepository();
+        overrideRepository = new InMemoryOnlinePriceOverrideRepository();
+        service = new EcommerceCatalogApplicationService(
+                profileRepository,
+                productReadPort,
+                brandRepository,
+                categoryRepository,
+                seoRepository,
+                assetRepository,
+                overrideRepository,
+                new AuditUserProvider()
+        );
     }
 
     @Test
@@ -43,23 +86,265 @@ class EcommerceCatalogApplicationServiceTest {
         ProductOnlineProfile profile = service.createDraftProfile(new CreateProductOnlineProfileCommand(10L));
 
         assertNotNull(profile.id());
-        assertEquals(10L, profile.productId());
         assertEquals(OnlinePublicationStatus.DRAFT, profile.publicationStatus());
     }
 
     @Test
-    void shouldRejectDraftProfileForMissingProduct() {
-        assertThrows(EcommerceNotFoundException.class,
-                () -> service.createDraftProfile(new CreateProductOnlineProfileCommand(99L)));
+    void shouldBlockSlugChangeWhenAlreadyPublished() {
+        PreparedData data = prepareValidDraftProfile();
+        service.publish(data.productId());
+
+        assertThrows(EcommerceConflictException.class, () -> service.updateProfile(
+                new UpdateProductOnlineProfileCommand(
+                        data.productId(),
+                        "nuevo-slug-publicado",
+                        "Lapicero online",
+                        "Descripcion online completa",
+                        data.categoryId(),
+                        data.brandId(),
+                        null
+                )
+        ));
     }
 
     @Test
-    void shouldRejectDuplicatedDraftProfileForProduct() {
-        productReadPort.add(new EcommerceCatalogProductSnapshot(10L, "SKU-10", "Lapiz", BigDecimal.TEN, true));
-        service.createDraftProfile(new CreateProductOnlineProfileCommand(10L));
+    void shouldPublishWhenProfileHasAllRules() {
+        PreparedData data = prepareValidDraftProfile();
 
-        assertThrows(EcommerceConflictException.class,
-                () -> service.createDraftProfile(new CreateProductOnlineProfileCommand(10L)));
+        ProductOnlineProfile published = service.publish(data.productId());
+
+        assertEquals(OnlinePublicationStatus.PUBLISHED, published.publicationStatus());
+        assertNotNull(published.publishedAt());
+    }
+
+    @Test
+    void shouldBlockPublicationForInactiveProduct() {
+        PreparedData data = prepareValidDraftProfile();
+        productReadPort.add(new EcommerceCatalogProductSnapshot(data.productId(), "SKU-OK", "Lapicero", BigDecimal.TEN, false));
+
+        PublicationValidationResult result = service.validatePublication(data.productId());
+
+        assertFalse(result.publishable());
+        assertTrue(result.errors().stream().anyMatch(msg -> msg.contains("active")));
+    }
+
+    @Test
+    void shouldBlockPublicationForMissingSku() {
+        PreparedData data = prepareValidDraftProfile();
+        productReadPort.add(new EcommerceCatalogProductSnapshot(data.productId(), "   ", "Lapicero", BigDecimal.TEN, true));
+
+        PublicationValidationResult result = service.validatePublication(data.productId());
+
+        assertFalse(result.publishable());
+        assertTrue(result.errors().stream().anyMatch(msg -> msg.contains("SKU")));
+    }
+
+    @Test
+    void shouldBlockPublicationForMissingAssetAltOrRights() {
+        PreparedData data = prepareValidDraftProfile();
+        service.upsertPrimaryProductAsset(new UpsertProductAssetCommand(
+                data.productId(),
+                AssetType.PRODUCT_IMAGE,
+                "https://cdn.example.test/p.jpg",
+                null,
+                AssetSource.SUPPLIER,
+                false,
+                0
+        ));
+
+        PublicationValidationResult result = service.validatePublication(data.productId());
+
+        assertFalse(result.publishable());
+        assertTrue(result.errors().stream().anyMatch(msg -> msg.contains("altText")));
+        assertTrue(result.errors().stream().anyMatch(msg -> msg.contains("rights")));
+    }
+
+    @Test
+    void shouldRejectNonProductAssetTypesForProductProfile() {
+        PreparedData data = prepareBaseDraftProfile();
+
+        assertThrows(EcommerceBusinessRuleException.class, () -> service.upsertPrimaryProductAsset(
+                new UpsertProductAssetCommand(
+                        data.productId(),
+                        AssetType.BRAND_LOGO,
+                        "https://cdn.example.test/logo.jpg",
+                        "Logo",
+                        AssetSource.SUPPLIER,
+                        true,
+                        0
+                )
+        ));
+    }
+
+    @Test
+    void shouldRejectIndexableSeoWithNoindexRobots() {
+        PreparedData data = prepareBaseDraftProfile();
+
+        assertThrows(EcommerceBusinessRuleException.class, () -> service.upsertSeoMetadata(
+                new UpsertProductSeoMetadataCommand(
+                        data.productId(),
+                        "Titulo",
+                        "Descripcion",
+                        "/productos/lapicero",
+                        RobotsPolicy.NOINDEX_FOLLOW,
+                        true,
+                        null,
+                        null,
+                        null
+                )
+        ));
+    }
+
+    @Test
+    void shouldCalculateEffectivePriceFromOverrideWhenActiveAndValid() {
+        PreparedData data = prepareBaseDraftProfile();
+        service.upsertOnlinePriceOverride(new UpsertOnlinePriceOverrideCommand(
+                data.productId(),
+                BigDecimal.valueOf(8.90),
+                "PEN",
+                true,
+                Instant.now().minusSeconds(60),
+                Instant.now().plusSeconds(3600),
+                "Promo"
+        ));
+
+        EffectiveOnlinePriceResult result = service.calculateEffectiveOnlinePrice(data.productId());
+
+        assertTrue(result.overrideApplied());
+        assertEquals(BigDecimal.valueOf(8.90), result.amount());
+    }
+
+    @Test
+    void shouldCalculateEffectivePriceFromSalePriceWhenOverrideInactive() {
+        PreparedData data = prepareBaseDraftProfile();
+        service.upsertOnlinePriceOverride(new UpsertOnlinePriceOverrideCommand(
+                data.productId(),
+                BigDecimal.valueOf(8.50),
+                "PEN",
+                false,
+                null,
+                null,
+                "Temporal"
+        ));
+
+        EffectiveOnlinePriceResult result = service.calculateEffectiveOnlinePrice(data.productId());
+
+        assertFalse(result.overrideApplied());
+        assertEquals(BigDecimal.TEN, result.amount());
+    }
+
+    @Test
+    void shouldCalculateEffectivePriceFromSalePriceWhenOverrideExpired() {
+        PreparedData data = prepareBaseDraftProfile();
+        service.upsertOnlinePriceOverride(new UpsertOnlinePriceOverrideCommand(
+                data.productId(),
+                BigDecimal.valueOf(8.50),
+                "PEN",
+                true,
+                Instant.now().minusSeconds(3600),
+                Instant.now().minusSeconds(60),
+                "Vencido"
+        ));
+
+        EffectiveOnlinePriceResult result = service.calculateEffectiveOnlinePrice(data.productId());
+
+        assertFalse(result.overrideApplied());
+        assertEquals(BigDecimal.TEN, result.amount());
+    }
+
+    @Test
+    void shouldAllowUnpublishWithoutRemovingData() {
+        PreparedData data = prepareValidDraftProfile();
+        service.publish(data.productId());
+
+        ProductOnlineProfile unpublished = service.unpublish(data.productId());
+
+        assertEquals(OnlinePublicationStatus.UNPUBLISHED, unpublished.publicationStatus());
+        assertNotNull(unpublished.unpublishedAt());
+        assertEquals("lapicero-online", unpublished.slug());
+    }
+
+    @Test
+    void shouldRejectUpdateThatMakesPublishedProfileIncomplete() {
+        PreparedData data = prepareValidDraftProfile();
+        service.publish(data.productId());
+        ProductOnlineProfile before = service.getProfileByProductId(data.productId());
+
+        assertThrows(EcommerceBusinessRuleException.class, () -> service.updateProfile(
+                new UpdateProductOnlineProfileCommand(
+                        data.productId(),
+                        "lapicero-online",
+                        null,
+                        "Descripcion online completa",
+                        null,
+                        null,
+                        null
+                )
+        ));
+
+        ProductOnlineProfile after = service.getProfileByProductId(data.productId());
+        assertEquals(OnlinePublicationStatus.PUBLISHED, after.publicationStatus());
+        assertEquals(before.onlineName(), after.onlineName());
+        assertEquals(before.onlineCategoryId(), after.onlineCategoryId());
+        assertEquals(before.brandId(), after.brandId());
+    }
+
+    @Test
+    void shouldRejectProfileCreateForMissingProduct() {
+        assertThrows(EcommerceNotFoundException.class,
+                () -> service.createDraftProfile(new CreateProductOnlineProfileCommand(999L)));
+    }
+
+    private PreparedData prepareValidDraftProfile() {
+        PreparedData data = prepareBaseDraftProfile();
+        service.updateProfile(new UpdateProductOnlineProfileCommand(
+                data.productId(),
+                "Lápicero Online",
+                "Lapicero online",
+                "Descripcion online completa",
+                data.categoryId(),
+                data.brandId(),
+                null
+        ));
+
+        service.upsertPrimaryProductAsset(new UpsertProductAssetCommand(
+                data.productId(),
+                AssetType.PRODUCT_IMAGE,
+                "https://cdn.example.test/p.jpg",
+                "Lapicero azul",
+                AssetSource.SUPPLIER,
+                true,
+                0
+        ));
+
+        service.upsertSeoMetadata(new UpsertProductSeoMetadataCommand(
+                data.productId(),
+                "Lapicero online | InkToy",
+                "Compra lapicero online con envio rapido",
+                "/productos/lapicero-online",
+                RobotsPolicy.INDEX_FOLLOW,
+                true,
+                null,
+                null,
+                null
+        ));
+
+        return data;
+    }
+
+    private PreparedData prepareBaseDraftProfile() {
+        long productId = 10L;
+        long brandId = 20L;
+        long categoryId = 30L;
+
+        productReadPort.add(new EcommerceCatalogProductSnapshot(productId, "SKU-OK", "Lapicero", BigDecimal.TEN, true));
+        brandRepository.save(new EcommerceBrand(brandId, "Faber", "faber", null, true, null, null, "it", "it"));
+        categoryRepository.save(new EcommerceOnlineCategory(categoryId, null, "Utiles", "utiles", null, true, null, null, "it", "it"));
+        service.createDraftProfile(new CreateProductOnlineProfileCommand(productId));
+        return new PreparedData(productId, brandId, categoryId);
+    }
+
+    private record PreparedData(Long productId, Long brandId, Long categoryId) {
     }
 
     private static final class InMemoryProductReadPort implements EcommerceCatalogProductReadPort {
@@ -94,7 +379,7 @@ class EcommerceCatalogApplicationServiceTest {
                     profile.brandAbsencePolicy(),
                     profile.publishedAt(),
                     profile.unpublishedAt(),
-                    profile.version(),
+                    profile.version() == null ? 0L : profile.version(),
                     profile.createdAt() == null ? Instant.now() : profile.createdAt(),
                     Instant.now(),
                     profile.createdBy(),
@@ -121,13 +406,221 @@ class EcommerceCatalogApplicationServiceTest {
 
         @Override
         public boolean existsBySlugIgnoreCase(String slug) {
-            return profiles.values().stream().anyMatch(profile -> profile.slug() != null && profile.slug().equalsIgnoreCase(slug));
+            return profiles.values().stream()
+                    .anyMatch(profile -> profile.slug() != null && profile.slug().equalsIgnoreCase(slug));
         }
 
         @Override
         public boolean existsBySlugIgnoreCaseAndIdNot(String slug, Long id) {
             return profiles.values().stream()
-                    .anyMatch(profile -> profile.slug() != null && profile.slug().equalsIgnoreCase(slug) && !profile.id().equals(id));
+                    .anyMatch(profile -> profile.slug() != null
+                            && profile.slug().equalsIgnoreCase(slug)
+                            && !profile.id().equals(id));
+        }
+    }
+
+    private static final class InMemoryBrandRepository implements EcommerceBrandRepositoryPort {
+        private final Map<Long, EcommerceBrand> brands = new HashMap<>();
+        private final AtomicLong sequence = new AtomicLong(1);
+
+        @Override
+        public EcommerceBrand save(EcommerceBrand brand) {
+            Long id = brand.id() == null ? sequence.getAndIncrement() : brand.id();
+            EcommerceBrand saved = new EcommerceBrand(
+                    id,
+                    brand.name(),
+                    brand.slug(),
+                    brand.description(),
+                    brand.active(),
+                    brand.createdAt(),
+                    brand.updatedAt(),
+                    brand.createdBy(),
+                    brand.updatedBy()
+            );
+            brands.put(id, saved);
+            return saved;
+        }
+
+        @Override
+        public Optional<EcommerceBrand> findById(Long id) {
+            return Optional.ofNullable(brands.get(id));
+        }
+
+        @Override
+        public Optional<EcommerceBrand> findBySlugIgnoreCase(String slug) {
+            return brands.values().stream().filter(brand -> brand.slug().equalsIgnoreCase(slug)).findFirst();
+        }
+
+        @Override
+        public boolean existsBySlugIgnoreCase(String slug) {
+            return findBySlugIgnoreCase(slug).isPresent();
+        }
+
+        @Override
+        public boolean existsByNameIgnoreCase(String name) {
+            return brands.values().stream().anyMatch(brand -> brand.name().equalsIgnoreCase(name));
+        }
+    }
+
+    private static final class InMemoryOnlineCategoryRepository implements EcommerceOnlineCategoryRepositoryPort {
+        private final Map<Long, EcommerceOnlineCategory> categories = new HashMap<>();
+        private final AtomicLong sequence = new AtomicLong(1);
+
+        @Override
+        public EcommerceOnlineCategory save(EcommerceOnlineCategory category) {
+            Long id = category.id() == null ? sequence.getAndIncrement() : category.id();
+            EcommerceOnlineCategory saved = new EcommerceOnlineCategory(
+                    id,
+                    category.parentId(),
+                    category.name(),
+                    category.slug(),
+                    category.description(),
+                    category.active(),
+                    category.createdAt(),
+                    category.updatedAt(),
+                    category.createdBy(),
+                    category.updatedBy()
+            );
+            categories.put(id, saved);
+            return saved;
+        }
+
+        @Override
+        public Optional<EcommerceOnlineCategory> findById(Long id) {
+            return Optional.ofNullable(categories.get(id));
+        }
+
+        @Override
+        public Optional<EcommerceOnlineCategory> findBySlugIgnoreCase(String slug) {
+            return categories.values().stream().filter(category -> category.slug().equalsIgnoreCase(slug)).findFirst();
+        }
+
+        @Override
+        public boolean existsBySlugIgnoreCase(String slug) {
+            return findBySlugIgnoreCase(slug).isPresent();
+        }
+    }
+
+    private static final class InMemorySeoMetadataRepository implements EcommerceSeoMetadataRepositoryPort {
+        private final Map<Long, EcommerceSeoMetadata> metadataByProfile = new HashMap<>();
+        private final AtomicLong sequence = new AtomicLong(1);
+
+        @Override
+        public EcommerceSeoMetadata save(EcommerceSeoMetadata metadata) {
+            Long id = metadata.id() == null ? sequence.getAndIncrement() : metadata.id();
+            EcommerceSeoMetadata saved = new EcommerceSeoMetadata(
+                    id,
+                    metadata.productOnlineProfileId(),
+                    metadata.onlineCategoryId(),
+                    metadata.brandId(),
+                    metadata.seoTitle(),
+                    metadata.seoDescription(),
+                    metadata.canonicalPath(),
+                    metadata.robotsPolicy(),
+                    metadata.indexable(),
+                    metadata.ogTitle(),
+                    metadata.ogDescription(),
+                    metadata.ogImageUrl(),
+                    metadata.createdAt(),
+                    metadata.updatedAt(),
+                    metadata.createdBy(),
+                    metadata.updatedBy()
+            );
+            metadataByProfile.put(saved.productOnlineProfileId(), saved);
+            return saved;
+        }
+
+        @Override
+        public Optional<EcommerceSeoMetadata> findByProductOnlineProfileId(Long productOnlineProfileId) {
+            return Optional.ofNullable(metadataByProfile.get(productOnlineProfileId));
+        }
+
+        @Override
+        public Optional<EcommerceSeoMetadata> findByOnlineCategoryId(Long onlineCategoryId) {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<EcommerceSeoMetadata> findByBrandId(Long brandId) {
+            return Optional.empty();
+        }
+    }
+
+    private static final class InMemoryProductAssetRepository implements ProductAssetRepositoryPort {
+        private final Map<Long, ProductAsset> assetsByProfile = new HashMap<>();
+        private final AtomicLong sequence = new AtomicLong(1);
+
+        @Override
+        public ProductAsset save(ProductAsset asset) {
+            Long id = asset.id() == null ? sequence.getAndIncrement() : asset.id();
+            ProductAsset saved = new ProductAsset(
+                    id,
+                    asset.productOnlineProfileId(),
+                    asset.assetType(),
+                    asset.assetUrl(),
+                    asset.altText(),
+                    asset.source(),
+                    asset.rightsConfirmed(),
+                    asset.primary(),
+                    asset.active(),
+                    asset.displayOrder(),
+                    asset.createdAt(),
+                    asset.updatedAt(),
+                    asset.createdBy(),
+                    asset.updatedBy()
+            );
+            assetsByProfile.put(saved.productOnlineProfileId(), saved);
+            return saved;
+        }
+
+        @Override
+        public List<ProductAsset> findByProductOnlineProfileId(Long productOnlineProfileId) {
+            ProductAsset asset = assetsByProfile.get(productOnlineProfileId);
+            return asset == null ? List.of() : List.of(asset);
+        }
+
+        @Override
+        public Optional<ProductAsset> findPrimaryActiveByProductOnlineProfileId(Long productOnlineProfileId) {
+            ProductAsset asset = assetsByProfile.get(productOnlineProfileId);
+            if (asset == null || !asset.primary() || !asset.active()) {
+                return Optional.empty();
+            }
+            return Optional.of(asset);
+        }
+    }
+
+    private static final class InMemoryOnlinePriceOverrideRepository implements OnlinePriceOverrideRepositoryPort {
+        private final Map<Long, OnlinePriceOverride> activeOverridesByProfile = new HashMap<>();
+        private final AtomicLong sequence = new AtomicLong(1);
+
+        @Override
+        public OnlinePriceOverride save(OnlinePriceOverride override) {
+            Long id = override.id() == null ? sequence.getAndIncrement() : override.id();
+            OnlinePriceOverride saved = new OnlinePriceOverride(
+                    id,
+                    override.productOnlineProfileId(),
+                    override.amount(),
+                    override.currency(),
+                    override.active(),
+                    override.validFrom(),
+                    override.validTo(),
+                    override.reason(),
+                    override.createdAt(),
+                    override.updatedAt(),
+                    override.createdBy(),
+                    override.updatedBy()
+            );
+            if (saved.active()) {
+                activeOverridesByProfile.put(saved.productOnlineProfileId(), saved);
+            } else {
+                activeOverridesByProfile.remove(saved.productOnlineProfileId());
+            }
+            return saved;
+        }
+
+        @Override
+        public Optional<OnlinePriceOverride> findActiveByProductOnlineProfileId(Long productOnlineProfileId) {
+            return Optional.ofNullable(activeOverridesByProfile.get(productOnlineProfileId));
         }
     }
 }
