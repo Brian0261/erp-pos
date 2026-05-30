@@ -1,10 +1,16 @@
 package com.erppos.backend.erp.ecommerce.application.service;
 
 import com.erppos.backend.erp.ecommerce.application.usecase.CreateProductOnlineProfileCommand;
+import com.erppos.backend.erp.ecommerce.application.usecase.ChangeEcommerceBrandStatusCommand;
+import com.erppos.backend.erp.ecommerce.application.usecase.ChangeEcommerceOnlineCategoryStatusCommand;
+import com.erppos.backend.erp.ecommerce.application.usecase.CreateEcommerceBrandCommand;
+import com.erppos.backend.erp.ecommerce.application.usecase.CreateEcommerceOnlineCategoryCommand;
 import com.erppos.backend.erp.ecommerce.application.usecase.EffectiveOnlinePriceResult;
 import com.erppos.backend.erp.ecommerce.application.usecase.EcommerceCatalogUseCase;
 import com.erppos.backend.erp.ecommerce.application.usecase.PublicationValidationResult;
 import com.erppos.backend.erp.ecommerce.application.usecase.UpdateProductOnlineProfileCommand;
+import com.erppos.backend.erp.ecommerce.application.usecase.UpdateEcommerceBrandCommand;
+import com.erppos.backend.erp.ecommerce.application.usecase.UpdateEcommerceOnlineCategoryCommand;
 import com.erppos.backend.erp.ecommerce.application.usecase.UpsertOnlinePriceOverrideCommand;
 import com.erppos.backend.erp.ecommerce.application.usecase.UpsertProductAssetCommand;
 import com.erppos.backend.erp.ecommerce.application.usecase.UpsertProductSeoMetadataCommand;
@@ -72,6 +78,186 @@ public class EcommerceCatalogApplicationService implements EcommerceCatalogUseCa
         this.productAssetRepositoryPort = productAssetRepositoryPort;
         this.onlinePriceOverrideRepositoryPort = onlinePriceOverrideRepositoryPort;
         this.auditUserProvider = auditUserProvider;
+    }
+
+    @Override
+    public List<EcommerceBrand> listBrands() {
+        return brandRepositoryPort.findAll();
+    }
+
+    @Override
+    public EcommerceBrand getBrandById(Long id) {
+        return brandRepositoryPort.findById(requireEntityId(id, "Brand id is required"))
+                .orElseThrow(() -> new EcommerceNotFoundException("Brand not found"));
+    }
+
+    @Override
+    public EcommerceBrand createBrand(CreateEcommerceBrandCommand command) {
+        String name = requireName(command.name(), "Brand name is required");
+        String normalizedSlug = normalizeSlug(command.slug() == null ? name : command.slug());
+        if (normalizedSlug == null) {
+            throw new EcommerceBusinessRuleException("Brand slug is required");
+        }
+        if (brandRepositoryPort.existsBySlugIgnoreCase(normalizedSlug)) {
+            throw new EcommerceConflictException("Brand slug already exists");
+        }
+
+        String actor = auditUserProvider.currentUsername();
+        EcommerceBrand brand = new EcommerceBrand(
+                null,
+                name,
+                normalizedSlug,
+                trimToNull(command.description()),
+                true,
+                null,
+                null,
+                actor,
+                actor
+        );
+        return brandRepositoryPort.save(brand);
+    }
+
+    @Override
+    public EcommerceBrand updateBrand(Long id, UpdateEcommerceBrandCommand command) {
+        EcommerceBrand current = getBrandById(id);
+        String name = requireName(command.name(), "Brand name is required");
+        String normalizedSlug = normalizeSlug(command.slug() == null ? name : command.slug());
+        if (normalizedSlug == null) {
+            throw new EcommerceBusinessRuleException("Brand slug is required");
+        }
+        if (brandRepositoryPort.existsBySlugIgnoreCaseAndIdNot(normalizedSlug, current.id())) {
+            throw new EcommerceConflictException("Brand slug already exists");
+        }
+
+        EcommerceBrand updated = new EcommerceBrand(
+                current.id(),
+                name,
+                normalizedSlug,
+                trimToNull(command.description()),
+                current.active(),
+                current.createdAt(),
+                current.updatedAt(),
+                current.createdBy(),
+                auditUserProvider.currentUsername()
+        );
+        return brandRepositoryPort.save(updated);
+    }
+
+    @Override
+    public EcommerceBrand changeBrandStatus(Long id, ChangeEcommerceBrandStatusCommand command) {
+        EcommerceBrand current = getBrandById(id);
+        if (!command.active() && profileRepositoryPort.existsByBrandIdAndPublicationStatus(id, OnlinePublicationStatus.PUBLISHED)) {
+            throw new EcommerceConflictException("Cannot deactivate brand used by published online profile");
+        }
+        EcommerceBrand updated = new EcommerceBrand(
+                current.id(),
+                current.name(),
+                current.slug(),
+                current.description(),
+                command.active(),
+                current.createdAt(),
+                current.updatedAt(),
+                current.createdBy(),
+                auditUserProvider.currentUsername()
+        );
+        return brandRepositoryPort.save(updated);
+    }
+
+    @Override
+    public List<EcommerceOnlineCategory> listOnlineCategories() {
+        return onlineCategoryRepositoryPort.findAll();
+    }
+
+    @Override
+    public EcommerceOnlineCategory getOnlineCategoryById(Long id) {
+        return onlineCategoryRepositoryPort.findById(requireEntityId(id, "Online category id is required"))
+                .orElseThrow(() -> new EcommerceNotFoundException("Online category not found"));
+    }
+
+    @Override
+    public EcommerceOnlineCategory createOnlineCategory(CreateEcommerceOnlineCategoryCommand command) {
+        String name = requireName(command.name(), "Online category name is required");
+        String normalizedSlug = normalizeSlug(command.slug() == null ? name : command.slug());
+        if (normalizedSlug == null) {
+            throw new EcommerceBusinessRuleException("Online category slug is required");
+        }
+        if (onlineCategoryRepositoryPort.existsBySlugIgnoreCase(normalizedSlug)) {
+            throw new EcommerceConflictException("Online category slug already exists");
+        }
+        if (command.parentId() != null) {
+            onlineCategoryRepositoryPort.findById(command.parentId())
+                    .orElseThrow(() -> new EcommerceNotFoundException("Parent online category not found"));
+        }
+
+        String actor = auditUserProvider.currentUsername();
+        EcommerceOnlineCategory category = new EcommerceOnlineCategory(
+                null,
+                command.parentId(),
+                name,
+                normalizedSlug,
+                trimToNull(command.description()),
+                true,
+                null,
+                null,
+                actor,
+                actor
+        );
+        return onlineCategoryRepositoryPort.save(category);
+    }
+
+    @Override
+    public EcommerceOnlineCategory updateOnlineCategory(Long id, UpdateEcommerceOnlineCategoryCommand command) {
+        EcommerceOnlineCategory current = getOnlineCategoryById(id);
+        String name = requireName(command.name(), "Online category name is required");
+        String normalizedSlug = normalizeSlug(command.slug() == null ? name : command.slug());
+        if (normalizedSlug == null) {
+            throw new EcommerceBusinessRuleException("Online category slug is required");
+        }
+        if (onlineCategoryRepositoryPort.existsBySlugIgnoreCaseAndIdNot(normalizedSlug, current.id())) {
+            throw new EcommerceConflictException("Online category slug already exists");
+        }
+        if (command.parentId() != null) {
+            if (command.parentId().equals(id)) {
+                throw new EcommerceBusinessRuleException("Online category cannot be its own parent");
+            }
+            onlineCategoryRepositoryPort.findById(command.parentId())
+                    .orElseThrow(() -> new EcommerceNotFoundException("Parent online category not found"));
+        }
+
+        EcommerceOnlineCategory updated = new EcommerceOnlineCategory(
+                current.id(),
+                command.parentId(),
+                name,
+                normalizedSlug,
+                trimToNull(command.description()),
+                current.active(),
+                current.createdAt(),
+                current.updatedAt(),
+                current.createdBy(),
+                auditUserProvider.currentUsername()
+        );
+        return onlineCategoryRepositoryPort.save(updated);
+    }
+
+    @Override
+    public EcommerceOnlineCategory changeOnlineCategoryStatus(Long id, ChangeEcommerceOnlineCategoryStatusCommand command) {
+        EcommerceOnlineCategory current = getOnlineCategoryById(id);
+        if (!command.active() && profileRepositoryPort.existsByOnlineCategoryIdAndPublicationStatus(id, OnlinePublicationStatus.PUBLISHED)) {
+            throw new EcommerceConflictException("Cannot deactivate online category used by published online profile");
+        }
+        EcommerceOnlineCategory updated = new EcommerceOnlineCategory(
+                current.id(),
+                current.parentId(),
+                current.name(),
+                current.slug(),
+                current.description(),
+                command.active(),
+                current.createdAt(),
+                current.updatedAt(),
+                current.createdBy(),
+                auditUserProvider.currentUsername()
+        );
+        return onlineCategoryRepositoryPort.save(updated);
     }
 
     @Override
@@ -534,6 +720,21 @@ public class EcommerceCatalogApplicationService implements EcommerceCatalogUseCa
             throw new EcommerceBusinessRuleException("Product id is required");
         }
         return productId;
+    }
+
+    private Long requireEntityId(Long id, String message) {
+        if (id == null) {
+            throw new EcommerceBusinessRuleException(message);
+        }
+        return id;
+    }
+
+    private String requireName(String value, String message) {
+        String normalized = trimToNull(value);
+        if (normalized == null) {
+            throw new EcommerceBusinessRuleException(message);
+        }
+        return normalized;
     }
 
     private boolean hasSlugChanged(String currentSlug, String newSlug) {

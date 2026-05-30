@@ -7,6 +7,7 @@ import com.erppos.backend.erp.ecommerce.infrastructure.mapper.EcommerceOnlineCat
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Optional;
 
 @Component
@@ -31,6 +32,11 @@ public class EcommerceOnlineCategoryPersistenceAdapter implements EcommerceOnlin
     }
 
     @Override
+    public List<EcommerceOnlineCategory> findAll() {
+        return categoryJpaRepository.findAllByOrderByNameAsc().stream().map(EcommerceOnlineCategoryMapper::toDomain).toList();
+    }
+
+    @Override
     public Optional<EcommerceOnlineCategory> findById(Long id) {
         return categoryJpaRepository.findById(id).map(EcommerceOnlineCategoryMapper::toDomain);
     }
@@ -43,5 +49,10 @@ public class EcommerceOnlineCategoryPersistenceAdapter implements EcommerceOnlin
     @Override
     public boolean existsBySlugIgnoreCase(String slug) {
         return categoryJpaRepository.existsBySlugIgnoreCase(slug);
+    }
+
+    @Override
+    public boolean existsBySlugIgnoreCaseAndIdNot(String slug, Long id) {
+        return categoryJpaRepository.existsBySlugIgnoreCaseAndIdNot(slug, id);
     }
 }

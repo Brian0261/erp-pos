@@ -1,6 +1,12 @@
 package com.erppos.backend.erp.ecommerce.adapter.rest;
 
+import com.erppos.backend.erp.ecommerce.adapter.dto.EcommerceAdminBrandRequest;
+import com.erppos.backend.erp.ecommerce.adapter.dto.EcommerceAdminBrandResponse;
+import com.erppos.backend.erp.ecommerce.adapter.dto.EcommerceAdminBrandStatusRequest;
 import com.erppos.backend.erp.ecommerce.adapter.dto.EcommerceAdminEffectivePriceResponse;
+import com.erppos.backend.erp.ecommerce.adapter.dto.EcommerceAdminOnlineCategoryRequest;
+import com.erppos.backend.erp.ecommerce.adapter.dto.EcommerceAdminOnlineCategoryResponse;
+import com.erppos.backend.erp.ecommerce.adapter.dto.EcommerceAdminOnlineCategoryStatusRequest;
 import com.erppos.backend.erp.ecommerce.adapter.dto.EcommerceAdminOnlineProfileDetailResponse;
 import com.erppos.backend.erp.ecommerce.adapter.dto.EcommerceAdminOnlineProfileSummaryResponse;
 import com.erppos.backend.erp.ecommerce.adapter.dto.EcommerceAdminPriceOverrideResponse;
@@ -11,14 +17,22 @@ import com.erppos.backend.erp.ecommerce.adapter.dto.EcommerceAdminUpdateOnlinePr
 import com.erppos.backend.erp.ecommerce.adapter.dto.EcommerceAdminUpsertPriceOverrideRequest;
 import com.erppos.backend.erp.ecommerce.adapter.dto.EcommerceAdminUpsertPrimaryAssetRequest;
 import com.erppos.backend.erp.ecommerce.adapter.dto.EcommerceAdminUpsertSeoRequest;
+import com.erppos.backend.erp.ecommerce.application.usecase.ChangeEcommerceBrandStatusCommand;
+import com.erppos.backend.erp.ecommerce.application.usecase.ChangeEcommerceOnlineCategoryStatusCommand;
+import com.erppos.backend.erp.ecommerce.application.usecase.CreateEcommerceBrandCommand;
+import com.erppos.backend.erp.ecommerce.application.usecase.CreateEcommerceOnlineCategoryCommand;
 import com.erppos.backend.erp.ecommerce.application.usecase.EcommerceCatalogUseCase;
 import com.erppos.backend.erp.ecommerce.application.usecase.EffectiveOnlinePriceResult;
 import com.erppos.backend.erp.ecommerce.application.usecase.PublicationValidationResult;
+import com.erppos.backend.erp.ecommerce.application.usecase.UpdateEcommerceBrandCommand;
+import com.erppos.backend.erp.ecommerce.application.usecase.UpdateEcommerceOnlineCategoryCommand;
 import com.erppos.backend.erp.ecommerce.application.usecase.UpdateProductOnlineProfileCommand;
 import com.erppos.backend.erp.ecommerce.application.usecase.UpsertOnlinePriceOverrideCommand;
 import com.erppos.backend.erp.ecommerce.application.usecase.UpsertProductAssetCommand;
 import com.erppos.backend.erp.ecommerce.application.usecase.UpsertProductSeoMetadataCommand;
 import com.erppos.backend.erp.ecommerce.domain.exception.EcommerceBusinessRuleException;
+import com.erppos.backend.erp.ecommerce.domain.model.EcommerceBrand;
+import com.erppos.backend.erp.ecommerce.domain.model.EcommerceOnlineCategory;
 import com.erppos.backend.erp.ecommerce.domain.exception.EcommerceNotFoundException;
 import com.erppos.backend.erp.ecommerce.domain.model.EcommerceSeoMetadata;
 import com.erppos.backend.erp.ecommerce.domain.model.OnlinePriceOverride;
@@ -32,6 +46,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -39,6 +54,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.net.URI;
+import java.util.List;
 import java.util.Optional;
 
 @RestController
@@ -49,6 +66,110 @@ public class EcommerceAdminController {
 
     public EcommerceAdminController(EcommerceCatalogUseCase ecommerceCatalogUseCase) {
         this.ecommerceCatalogUseCase = ecommerceCatalogUseCase;
+    }
+
+    @GetMapping("/brands")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR')")
+    public ResponseEntity<List<EcommerceAdminBrandResponse>> listBrands() {
+        return ResponseEntity.ok(ecommerceCatalogUseCase.listBrands().stream().map(this::toBrandResponse).toList());
+    }
+
+    @GetMapping("/brands/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR')")
+    public ResponseEntity<EcommerceAdminBrandResponse> getBrandById(@PathVariable Long id) {
+        return ResponseEntity.ok(toBrandResponse(ecommerceCatalogUseCase.getBrandById(id)));
+    }
+
+    @PostMapping("/brands")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<EcommerceAdminBrandResponse> createBrand(@Valid @RequestBody EcommerceAdminBrandRequest request) {
+        EcommerceBrand created = ecommerceCatalogUseCase.createBrand(new CreateEcommerceBrandCommand(
+                request.name(),
+                request.slug(),
+                request.description()
+        ));
+        return ResponseEntity.created(URI.create("/api/v1/ecommerce-admin/brands/" + created.id())).body(toBrandResponse(created));
+    }
+
+    @PutMapping("/brands/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<EcommerceAdminBrandResponse> updateBrand(
+            @PathVariable Long id,
+            @Valid @RequestBody EcommerceAdminBrandRequest request
+    ) {
+        EcommerceBrand updated = ecommerceCatalogUseCase.updateBrand(id, new UpdateEcommerceBrandCommand(
+                request.name(),
+                request.slug(),
+                request.description()
+        ));
+        return ResponseEntity.ok(toBrandResponse(updated));
+    }
+
+    @PatchMapping("/brands/{id}/status")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<EcommerceAdminBrandResponse> changeBrandStatus(
+            @PathVariable Long id,
+            @Valid @RequestBody EcommerceAdminBrandStatusRequest request
+    ) {
+        EcommerceBrand updated = ecommerceCatalogUseCase.changeBrandStatus(
+                id,
+                new ChangeEcommerceBrandStatusCommand(Boolean.TRUE.equals(request.active()))
+        );
+        return ResponseEntity.ok(toBrandResponse(updated));
+    }
+
+    @GetMapping("/online-categories")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR')")
+    public ResponseEntity<List<EcommerceAdminOnlineCategoryResponse>> listOnlineCategories() {
+        return ResponseEntity.ok(ecommerceCatalogUseCase.listOnlineCategories().stream().map(this::toOnlineCategoryResponse).toList());
+    }
+
+    @GetMapping("/online-categories/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR')")
+    public ResponseEntity<EcommerceAdminOnlineCategoryResponse> getOnlineCategoryById(@PathVariable Long id) {
+        return ResponseEntity.ok(toOnlineCategoryResponse(ecommerceCatalogUseCase.getOnlineCategoryById(id)));
+    }
+
+    @PostMapping("/online-categories")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<EcommerceAdminOnlineCategoryResponse> createOnlineCategory(
+            @Valid @RequestBody EcommerceAdminOnlineCategoryRequest request
+    ) {
+        EcommerceOnlineCategory created = ecommerceCatalogUseCase.createOnlineCategory(new CreateEcommerceOnlineCategoryCommand(
+                request.parentId(),
+                request.name(),
+                request.slug(),
+                request.description()
+        ));
+        return ResponseEntity.created(URI.create("/api/v1/ecommerce-admin/online-categories/" + created.id())).body(toOnlineCategoryResponse(created));
+    }
+
+    @PutMapping("/online-categories/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<EcommerceAdminOnlineCategoryResponse> updateOnlineCategory(
+            @PathVariable Long id,
+            @Valid @RequestBody EcommerceAdminOnlineCategoryRequest request
+    ) {
+        EcommerceOnlineCategory updated = ecommerceCatalogUseCase.updateOnlineCategory(id, new UpdateEcommerceOnlineCategoryCommand(
+                request.parentId(),
+                request.name(),
+                request.slug(),
+                request.description()
+        ));
+        return ResponseEntity.ok(toOnlineCategoryResponse(updated));
+    }
+
+    @PatchMapping("/online-categories/{id}/status")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<EcommerceAdminOnlineCategoryResponse> changeOnlineCategoryStatus(
+            @PathVariable Long id,
+            @Valid @RequestBody EcommerceAdminOnlineCategoryStatusRequest request
+    ) {
+        EcommerceOnlineCategory updated = ecommerceCatalogUseCase.changeOnlineCategoryStatus(
+                id,
+                new ChangeEcommerceOnlineCategoryStatusCommand(Boolean.TRUE.equals(request.active()))
+        );
+        return ResponseEntity.ok(toOnlineCategoryResponse(updated));
     }
 
     @GetMapping("/products/online-profiles")
@@ -260,6 +381,31 @@ public class EcommerceAdminController {
                 validation.errors(),
                 validation.effectivePrice(),
                 validation.currency()
+        );
+    }
+
+    private EcommerceAdminBrandResponse toBrandResponse(EcommerceBrand brand) {
+        return new EcommerceAdminBrandResponse(
+                brand.id(),
+                brand.name(),
+                brand.slug(),
+                brand.description(),
+                brand.active(),
+                brand.createdAt(),
+                brand.updatedAt()
+        );
+    }
+
+    private EcommerceAdminOnlineCategoryResponse toOnlineCategoryResponse(EcommerceOnlineCategory category) {
+        return new EcommerceAdminOnlineCategoryResponse(
+                category.id(),
+                category.parentId(),
+                category.name(),
+                category.slug(),
+                category.description(),
+                category.active(),
+                category.createdAt(),
+                category.updatedAt()
         );
     }
 }

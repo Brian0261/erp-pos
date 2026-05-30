@@ -7,6 +7,7 @@ import com.erppos.backend.erp.ecommerce.infrastructure.mapper.EcommerceBrandMapp
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Optional;
 
 @Component
@@ -31,6 +32,11 @@ public class EcommerceBrandPersistenceAdapter implements EcommerceBrandRepositor
     }
 
     @Override
+    public List<EcommerceBrand> findAll() {
+        return brandJpaRepository.findAllByOrderByNameAsc().stream().map(EcommerceBrandMapper::toDomain).toList();
+    }
+
+    @Override
     public Optional<EcommerceBrand> findById(Long id) {
         return brandJpaRepository.findById(id).map(EcommerceBrandMapper::toDomain);
     }
@@ -43,6 +49,11 @@ public class EcommerceBrandPersistenceAdapter implements EcommerceBrandRepositor
     @Override
     public boolean existsBySlugIgnoreCase(String slug) {
         return brandJpaRepository.existsBySlugIgnoreCase(slug);
+    }
+
+    @Override
+    public boolean existsBySlugIgnoreCaseAndIdNot(String slug, Long id) {
+        return brandJpaRepository.existsBySlugIgnoreCaseAndIdNot(slug, id);
     }
 
     @Override

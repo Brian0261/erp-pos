@@ -1,6 +1,7 @@
 package com.erppos.backend.erp.ecommerce.infrastructure.persistence;
 
 import com.erppos.backend.erp.ecommerce.domain.exception.EcommerceNotFoundException;
+import com.erppos.backend.erp.ecommerce.domain.model.OnlinePublicationStatus;
 import com.erppos.backend.erp.ecommerce.domain.model.ProductOnlineProfile;
 import com.erppos.backend.erp.ecommerce.domain.port.ProductOnlineProfileRepositoryPort;
 import com.erppos.backend.erp.ecommerce.infrastructure.mapper.ProductOnlineProfileMapper;
@@ -60,5 +61,15 @@ public class ProductOnlineProfilePersistenceAdapter implements ProductOnlineProf
     @Override
     public boolean existsBySlugIgnoreCaseAndIdNot(String slug, Long id) {
         return profileJpaRepository.existsBySlugIgnoreCaseAndIdNot(slug, id);
+    }
+
+    @Override
+    public boolean existsByBrandIdAndPublicationStatus(Long brandId, OnlinePublicationStatus publicationStatus) {
+        return profileJpaRepository.existsByBrandIdAndPublicationStatus(brandId, publicationStatus);
+    }
+
+    @Override
+    public boolean existsByOnlineCategoryIdAndPublicationStatus(Long onlineCategoryId, OnlinePublicationStatus publicationStatus) {
+        return profileJpaRepository.existsByOnlineCategoryIdAndPublicationStatus(onlineCategoryId, publicationStatus);
     }
 }

@@ -19,6 +19,7 @@ import com.erppos.backend.erp.ecommerce.domain.model.EcommerceBrand;
 import com.erppos.backend.erp.ecommerce.domain.model.EcommerceCatalogProductSnapshot;
 import com.erppos.backend.erp.ecommerce.domain.model.EcommerceOnlineCategory;
 import com.erppos.backend.erp.ecommerce.domain.model.EcommerceSeoMetadata;
+import com.erppos.backend.erp.ecommerce.domain.model.OnlinePublicationStatus;
 import com.erppos.backend.erp.ecommerce.domain.model.OnlinePriceOverride;
 import com.erppos.backend.erp.ecommerce.domain.model.OnlinePublicationStatus;
 import com.erppos.backend.erp.ecommerce.domain.model.ProductAsset;
@@ -425,6 +426,18 @@ class EcommerceCatalogApplicationServiceTest {
                             && profile.slug().equalsIgnoreCase(slug)
                             && !profile.id().equals(id));
         }
+
+        @Override
+        public boolean existsByBrandIdAndPublicationStatus(Long brandId, OnlinePublicationStatus publicationStatus) {
+            return profiles.values().stream().anyMatch(profile -> brandId.equals(profile.brandId())
+                    && publicationStatus == profile.publicationStatus());
+        }
+
+        @Override
+        public boolean existsByOnlineCategoryIdAndPublicationStatus(Long onlineCategoryId, OnlinePublicationStatus publicationStatus) {
+            return profiles.values().stream().anyMatch(profile -> onlineCategoryId.equals(profile.onlineCategoryId())
+                    && publicationStatus == profile.publicationStatus());
+        }
     }
 
     private static final class InMemoryBrandRepository implements EcommerceBrandRepositoryPort {
@@ -450,6 +463,11 @@ class EcommerceCatalogApplicationServiceTest {
         }
 
         @Override
+        public List<EcommerceBrand> findAll() {
+            return brands.values().stream().toList();
+        }
+
+        @Override
         public Optional<EcommerceBrand> findById(Long id) {
             return Optional.ofNullable(brands.get(id));
         }
@@ -462,6 +480,12 @@ class EcommerceCatalogApplicationServiceTest {
         @Override
         public boolean existsBySlugIgnoreCase(String slug) {
             return findBySlugIgnoreCase(slug).isPresent();
+        }
+
+        @Override
+        public boolean existsBySlugIgnoreCaseAndIdNot(String slug, Long id) {
+            return brands.values().stream().anyMatch(brand -> brand.slug().equalsIgnoreCase(slug)
+                    && !brand.id().equals(id));
         }
 
         @Override
@@ -494,6 +518,11 @@ class EcommerceCatalogApplicationServiceTest {
         }
 
         @Override
+        public List<EcommerceOnlineCategory> findAll() {
+            return categories.values().stream().toList();
+        }
+
+        @Override
         public Optional<EcommerceOnlineCategory> findById(Long id) {
             return Optional.ofNullable(categories.get(id));
         }
@@ -506,6 +535,12 @@ class EcommerceCatalogApplicationServiceTest {
         @Override
         public boolean existsBySlugIgnoreCase(String slug) {
             return findBySlugIgnoreCase(slug).isPresent();
+        }
+
+        @Override
+        public boolean existsBySlugIgnoreCaseAndIdNot(String slug, Long id) {
+            return categories.values().stream().anyMatch(category -> category.slug().equalsIgnoreCase(slug)
+                    && !category.id().equals(id));
         }
     }
 
