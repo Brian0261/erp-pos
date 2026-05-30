@@ -19,7 +19,6 @@ import com.erppos.backend.erp.ecommerce.domain.model.EcommerceBrand;
 import com.erppos.backend.erp.ecommerce.domain.model.EcommerceCatalogProductSnapshot;
 import com.erppos.backend.erp.ecommerce.domain.model.EcommerceOnlineCategory;
 import com.erppos.backend.erp.ecommerce.domain.model.EcommerceSeoMetadata;
-import com.erppos.backend.erp.ecommerce.domain.model.OnlinePublicationStatus;
 import com.erppos.backend.erp.ecommerce.domain.model.OnlinePriceOverride;
 import com.erppos.backend.erp.ecommerce.domain.model.OnlinePublicationStatus;
 import com.erppos.backend.erp.ecommerce.domain.model.ProductAsset;
