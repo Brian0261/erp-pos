@@ -19,7 +19,7 @@ import { toHttpErrorMessage } from "./data/http-error-message";
     <section class="ui-card ecommerce-page">
       <header class="ui-page-head">
         <div>
-          <p class="ui-page-kicker">Catalogo online</p>
+          <p class="ui-page-kicker">Catálogo online</p>
           <h1 class="ui-page-title">Marcas ecommerce</h1>
           <p class="ui-page-description">
             Administra marcas para perfiles online con control de estado y slug.
@@ -78,7 +78,7 @@ import { toHttpErrorMessage } from "./data/http-error-message";
           </label>
 
           <label class="field field--full">
-            <span>Descripcion</span>
+            <span>Descripción</span>
             <textarea formControlName="description" rows="3" maxlength="800"></textarea>
           </label>
 
@@ -103,7 +103,7 @@ import { toHttpErrorMessage } from "./data/http-error-message";
       </section>
 
       <p class="ui-alert ui-alert--info" *ngIf="!canManage && canView">
-        Modo revision: SUPERVISOR puede consultar, pero solo ADMIN puede crear, editar o cambiar estado.
+        Modo revisión: SUPERVISOR puede consultar, pero solo ADMIN puede crear, editar o cambiar estado.
       </p>
 
       <div class="ui-table-wrapper" *ngIf="!loading && canView">
@@ -113,7 +113,7 @@ import { toHttpErrorMessage } from "./data/http-error-message";
               <th>ID</th>
               <th>Nombre</th>
               <th>Slug</th>
-              <th>Descripcion</th>
+              <th>Descripción</th>
               <th>Estado</th>
               <th>Actualizado</th>
               <th>Acciones</th>
@@ -404,8 +404,8 @@ export class EcommerceBrandsPageComponent implements OnInit {
     const confirmed = await this.confirmDialogService.confirm({
       title: nextStatus ? "Activar marca" : "Desactivar marca",
       description: nextStatus
-        ? `La marca ${brand.name} quedara disponible para perfiles online.`
-        : `La marca ${brand.name} dejara de estar disponible para nuevos cambios en perfiles online.`,
+        ? `La marca ${brand.name} quedará disponible para perfiles online.`
+        : `La marca ${brand.name} dejará de estar disponible para nuevos cambios en perfiles online.`,
       confirmText: nextStatus ? "Activar" : "Desactivar",
       cancelText: "Cancelar",
       variant: nextStatus ? "warning" : "danger",

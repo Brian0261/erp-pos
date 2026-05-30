@@ -830,7 +830,7 @@ export class LayoutComponent implements OnInit, OnDestroy {
     caja: "Caja",
     ventas: "Ventas",
     catalogo: "Catálogo",
-    "ecommerce-admin": "Catalogo online",
+    "ecommerce-admin": "Catálogo online",
     inventario: "Inventario",
     compras: "Compras",
     cotizaciones: "Cotizaciones",
