@@ -69,12 +69,15 @@ import { toHttpErrorMessage } from "./data/http-error-message";
             <span>Nombre</span>
             <input type="text" formControlName="name" maxlength="140" />
             <small class="field-help" *ngIf="isInvalid('name')">Nombre requerido.</small>
+            <small class="field-help field-help--placeholder" *ngIf="!isInvalid('name')" aria-hidden="true"
+              >&nbsp;</small
+            >
           </label>
 
           <label class="field">
             <span>Slug</span>
             <input type="text" formControlName="slug" maxlength="180" />
-            <small class="field-help">Si lo dejas vacío, backend lo genera.</small>
+            <small class="field-help">Opcional. Se generará automáticamente si lo dejas vacío.</small>
           </label>
 
           <label class="field field--full">
@@ -236,6 +239,17 @@ import { toHttpErrorMessage } from "./data/http-error-message";
         font-size: 1.05rem;
         font-weight: 700;
         color: var(--color-text-primary);
+      }
+
+      .field-help {
+        display: block;
+        min-height: 1.2em;
+        font-size: var(--font-size-xs);
+        color: var(--color-text-secondary);
+      }
+
+      .field-help--placeholder {
+        visibility: hidden;
       }
 
       .form-actions {
