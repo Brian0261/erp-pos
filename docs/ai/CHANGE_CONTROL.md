@@ -38,6 +38,14 @@ Estandarizar cambios tecnicos para reducir regresiones y mantener trazabilidad e
 - Build frontend exitoso y QA manual ligero sin bloqueantes conocidos.
 - No se modificaron backend, Flyway/DB, endpoints ni modulos protegidos durante el cierre documental.
 
+### Inicio Fase 2A Storefront SEO-first Discovery & Contracts
+
+- Tipo: documentacion y planificacion.
+- Alcance: roadmap ecommerce, backlog inicial, estrategia SEO-first, contratos publicos draft y checklist QA documental.
+- Decisiones cerradas registradas: base path draft `/api/v1/storefront/...`, API publica inicial read-only, DTOs publicos separados de DTOs admin, no reutilizar `/api/v1/ecommerce-admin/...` como contrato publico, ERP/POS como fuente de verdad.
+- Decisiones pendientes documentadas: marcas publicas en MVP o fase posterior, estrategia final SSR/SSG/ISR, politica de productos agotados, sitemap como endpoint JSON o generacion directa, estructura final Next.js, schema.org avanzado y Merchant Center.
+- Restriccion operativa: sin codigo funcional, sin endpoints, sin frontend publico, sin backend, sin DB/Flyway, sin AWS/staging y sin commit/push en esta fase.
+
 ### Decisiones aprobadas para Fase 1
 
 - Producto sin marca: no usar texto libre; permitir solo marca formal o regla explicita auditada tipo `Sin marca`/`Generico`.
