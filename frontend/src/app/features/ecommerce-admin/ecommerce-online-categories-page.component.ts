@@ -173,7 +173,17 @@ import { toHttpErrorMessage } from "./data/http-error-message";
         </table>
 
         <div class="ui-empty-state" *ngIf="categories.length === 0">
-          No existen categorías online registradas.
+          <p class="empty-state-title">Aún no hay categorías online</p>
+          <p class="ui-muted">Las categorías organizan los productos para la navegación y filtros del catálogo online.</p>
+          <button
+            *ngIf="canManage"
+            type="button"
+            class="ui-button ui-button--primary"
+            (click)="openCreateForm()"
+            [disabled]="loading"
+          >
+            Nueva categoría
+          </button>
         </div>
       </div>
     </section>
@@ -222,15 +232,23 @@ import { toHttpErrorMessage } from "./data/http-error-message";
         padding: 0.58rem 0.65rem;
         box-sizing: border-box;
         background: var(--color-bg-surface);
+        color: var(--color-text-primary);
+        transition: border-color 120ms ease-in-out, box-shadow 120ms ease-in-out;
       }
 
-      .field--full {
-        grid-column: 1 / -1;
+      .field input:focus,
+      .field textarea:focus,
+      .field select:focus {
+        border-color: var(--color-brand-primary);
+        outline: 3px solid var(--color-focus-ring);
+        outline-offset: 2px;
       }
 
-      .field-help {
-        font-size: var(--font-size-xs);
-        color: var(--color-text-secondary);
+      .empty-state-title {
+        margin: 0 0 var(--space-1);
+        font-size: 1.05rem;
+        font-weight: 700;
+        color: var(--color-text-primary);
       }
 
       .form-actions {

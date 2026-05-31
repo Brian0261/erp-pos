@@ -133,7 +133,8 @@ type PublicationFilter = "ALL" | OnlinePublicationStatus;
         </table>
 
         <div class="ui-empty-state" *ngIf="filteredProfiles.length === 0">
-          {{ emptyMessage }}
+          <p class="empty-state-title">{{ profiles.length === 0 ? "Aún no hay perfiles online" : "Sin resultados" }}</p>
+          <p class="ui-muted">{{ emptyMessage }}</p>
         </div>
       </div>
 
@@ -243,6 +244,13 @@ type PublicationFilter = "ALL" | OnlinePublicationStatus;
         display: inline-flex;
         gap: var(--space-2);
         flex-wrap: wrap;
+      }
+
+      .empty-state-title {
+        margin: 0 0 var(--space-1);
+        font-size: 1.05rem;
+        font-weight: 700;
+        color: var(--color-text-primary);
       }
 
       @media (max-width: 1100px) {
