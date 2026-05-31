@@ -2,7 +2,7 @@
 
 ## Estado
 
-Preparado en Fase 1A documental/tecnica. No implementa codigo funcional.
+Fase 1C cerrada a nivel de implementacion frontend interna y QA ligero. Sin bloqueantes conocidos.
 
 ## Decisiones humanas aprobadas para Fase 1
 
@@ -26,6 +26,18 @@ Preparado en Fase 1A documental/tecnica. No implementa codigo funcional.
 - Los datos tecnicos, IDs internos, trazas de sincronizacion, reglas avanzadas y metadata secundaria deben ir en secciones secundarias o colapsables.
 - No duplicar en Angular la logica critica de publicacion, precio, stock, slugs o validaciones de negocio; solo mostrar datos calculados por backend.
 - Mantener consistencia visual con ERP/POS usando los mismos tokens, densidad moderada, jerarquia sobria y componentes reutilizables.
+
+## Cierre Fase 1C
+
+- Perfiles online implementados y auditados.
+- Detalle/editor de perfil online implementado con checklist backend y publicacion protegida.
+- Marcas ecommerce implementadas con CRUD y activacion/desactivacion.
+- Categorias online implementadas con CRUD y activacion/desactivacion.
+- RBAC visual ADMIN/SUPERVISOR validado.
+- Errores 400/401/403/404/409/422 manejados con copy operativo.
+- Polish visual y responsive aplicados en formularios y empty states.
+- Build frontend exitoso.
+- QA manual ligero sin bloqueantes conocidos.
 
 ## Objetivo
 

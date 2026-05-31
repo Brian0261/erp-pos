@@ -14,6 +14,8 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
 - Fase 1A.2 documental quedo cerrada con decisiones humanas aprobadas, lineamientos UX/UI para Angular interno y checklist QA reforzado para catalogo online.
 - Fase 1B futura queda bloqueada hasta aprobacion explicita para tocar Flyway, crear endpoints administrativos internos o introducir cambios persistentes.
 - Siguiente paso recomendado: preparar commit documental de esta fase y, solo despues, abrir el trabajo de Fase 1B.
+- Fase 1C del modulo ecommerce admin interno quedo cerrada: perfiles online, detalle/editor, marcas ecommerce y categorias online implementados y auditados; build frontend exitoso; QA manual ligero sin bloqueantes conocidos.
+- El repo permanece alineado con `origin/master` y sin cambios pendientes al momento del cierre documental.
 - Diagnostico vigente del repo: el backend actual no tiene soporte implementado para marcas, slugs, metadata SEO, assets de producto, publicacion online ni precio online override.
 - Modulos protegidos para Fase 1A y preparacion Fase 1: POS, inventario, ventas, caja y facturacion no deben modificarse.
 - AWS/staging no debe tocarse hasta que exista una fase local estable y validada.

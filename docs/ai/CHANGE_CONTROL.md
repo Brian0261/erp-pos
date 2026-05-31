@@ -29,6 +29,15 @@ Estandarizar cambios tecnicos para reducir regresiones y mantener trazabilidad e
 - No se toco codigo funcional, backend, frontend funcional, DB/Flyway, endpoints, AWS/staging, Docker, dependencias ni secretos.
 - El siguiente paso es preparar commit documental; despues de ese cierre, abrir Fase 1B con aprobacion explicita si el negocio confirma el alcance.
 
+### Cierre Fase 1C ecommerce admin interno
+
+- Se completaron y pushearon las subfases Fase 1C.1, Fase 1C.2 y el polish visual final del modulo ecommerce admin interno.
+- Alcance cerrado: perfiles online, detalle/editor de perfil, checklist backend, precio efectivo readonly, publish/unpublish solo ADMIN, marcas ecommerce y categorias online.
+- RBAC ADMIN/SUPERVISOR validado; roles no autorizados sin acceso a navegacion ni rutas protegidas.
+- Manejo de errores 400/401/403/404/409/422 validado en la interfaz.
+- Build frontend exitoso y QA manual ligero sin bloqueantes conocidos.
+- No se modificaron backend, Flyway/DB, endpoints ni modulos protegidos durante el cierre documental.
+
 ### Decisiones aprobadas para Fase 1
 
 - Producto sin marca: no usar texto libre; permitir solo marca formal o regla explicita auditada tipo `Sin marca`/`Generico`.
