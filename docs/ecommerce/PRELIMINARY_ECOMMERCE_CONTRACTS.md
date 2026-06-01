@@ -221,6 +221,11 @@ DTOs públicos conceptuales:
 
 ### Endpoints conceptuales
 
+> **Nota de vigencia — Fase 2B:** Este bloque conserva endpoints conceptuales del análisis Fase 0.
+> La fase 2B (Public Catalog API Design) refinó el namespace MVP vigente para el catálogo público read-only.
+> **Namespace vigente:** `/api/v1/storefront/catalog/...`
+> Rutas como `/api/v1/storefront/products`, `/api/v1/storefront/categories` y `/api/v1/storefront/brands` no deben tomarse como contrato MVP actual.
+
 ```text
 GET /api/v1/storefront/products
 GET /api/v1/storefront/products/{slug}

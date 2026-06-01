@@ -46,6 +46,15 @@ Estandarizar cambios tecnicos para reducir regresiones y mantener trazabilidad e
 - Decisiones pendientes documentadas: marcas publicas en MVP o fase posterior, estrategia final SSR/SSG/ISR, politica de productos agotados, sitemap como endpoint JSON o generacion directa, estructura final Next.js, schema.org avanzado y Merchant Center.
 - Restriccion operativa: sin codigo funcional, sin endpoints, sin frontend publico, sin backend, sin DB/Flyway, sin AWS/staging y sin commit/push en esta fase.
 
+### Inicio Fase 2B Public Catalog API Design
+
+- Tipo: documentacion tecnica y diseno contractual.
+- Base: Fase 2A cerrada con commit `9fc35ca docs: start phase 2a storefront discovery`.
+- Archivos creados: `docs/ecommerce/STOREFRONT_PUBLIC_API_DESIGN.md`, `docs/ecommerce/STOREFRONT_PUBLIC_DTO_DESIGN.md`, `docs/qa/PHASE2_PUBLIC_CATALOG_API_DESIGN_QA_CHECKLIST.md`.
+- Archivos actualizados: `docs/ecommerce/STOREFRONT_PUBLIC_CONTRACTS_DRAFT.md`, `docs/ecommerce/ECOMMERCE_BACKLOG.md`, `docs/ai/CURRENT_STATUS.md`, `docs/ai/CHANGE_CONTROL.md`.
+- Decisiones cerradas: namespace MVP `/api/v1/storefront/catalog/...`, endpoints MVP read-only, sitemap como fuente JSON futura, marcas publicas embebidas/diferidas como paginas, producto agotado no comprable, producto no publicado como 404 seguro, categoria vacia no indexable, cacheabilidad futura sin cache real.
+- Restriccion operativa: sin codigo funcional, sin backend, sin frontend funcional, sin endpoints reales, sin DTOs Java, sin controllers, sin use cases, sin ports, sin repositories, sin SecurityConfig, sin GlobalExceptionHandler, sin DB/Flyway, sin Next.js, sin checkout, sin pagos, sin delivery, sin Merchant Center, sin AWS/staging y sin commit/push automatico.
+
 ### Decisiones aprobadas para Fase 1
 
 - Producto sin marca: no usar texto libre; permitir solo marca formal o regla explicita auditada tipo `Sin marca`/`Generico`.

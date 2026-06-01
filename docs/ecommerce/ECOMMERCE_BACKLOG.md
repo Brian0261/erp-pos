@@ -2,7 +2,7 @@
 
 ## Estado
 
-Backlog inicial de Fase 2A. No autoriza implementacion funcional por si mismo.
+Backlog ecommerce incremental. Fase 2A quedo cerrada documentalmente y Fase 2B agrega diseno tecnico documental de API publica. No autoriza implementacion funcional por si mismo.
 
 ## Epicas iniciales
 
@@ -15,6 +15,8 @@ Backlog inicial de Fase 2A. No autoriza implementacion funcional por si mismo.
 - Contratos publicos read-only.
 - Separacion DTO admin/public.
 - QA SEO tecnico.
+- Diseno API publica read-only.
+- Diseno DTOs publicos.
 
 ## Historias iniciales
 
@@ -213,7 +215,88 @@ Backlog inicial de Fase 2A. No autoriza implementacion funcional por si mismo.
 - Evidencia QA esperada:
   - checklist documental completo y revisable.
 
-## Historias explicitamente fuera de alcance en Fase 2A
+## Historias Fase 2B - Public Catalog API Design
+
+### HIST-2B-001 Namespace publico MVP
+
+- Descripcion breve: cerrar el namespace definitivo del MVP para catalogo publico.
+- Valor de negocio: evita contratos duplicados y reduce riesgo de integracion futura con Storefront.
+- Criterios de aceptacion:
+  - `/api/v1/storefront/catalog/...` queda como namespace MVP;
+  - no se adopta `/api/v1/storefront/products` en el MVP;
+  - la decision queda reflejada en contratos, API design y QA.
+- Restricciones tecnicas:
+  - sin crear endpoints reales;
+  - sin modificar seguridad ni controllers.
+
+### HIST-2B-002 Endpoints MVP read-only
+
+- Descripcion breve: definir endpoints publicos read-only para productos, categorias y sitemap JSON futuro.
+- Valor de negocio: prepara implementacion local de Fase 2C con alcance claro.
+- Criterios de aceptacion:
+  - `GET /api/v1/storefront/catalog/products` definido;
+  - `GET /api/v1/storefront/catalog/products/{slug}` definido;
+  - `GET /api/v1/storefront/catalog/categories` definido;
+  - `GET /api/v1/storefront/catalog/categories/{slug}` definido;
+  - `GET /api/v1/storefront/seo/sitemap` definido como fuente JSON futura.
+- Restricciones tecnicas:
+  - sin `sitemap.xml` real;
+  - sin Next.js;
+  - sin backend funcional.
+
+### HIST-2B-003 DTOs publicos y campos prohibidos
+
+- Descripcion breve: definir DTOs publicos separados de DTOs admin y matriz de campos prohibidos.
+- Valor de negocio: evita fuga de datos internos y acoplamiento al ERP/POS interno.
+- Criterios de aceptacion:
+  - DTOs candidatos publicos documentados;
+  - costos, margenes, proveedores, stock exacto, IDs internos innecesarios, flags admin y auditoria quedan prohibidos;
+  - precio efectivo y disponibilidad quedan como datos calculados server-side.
+- Restricciones tecnicas:
+  - sin crear DTOs Java reales;
+  - sin reusar `EcommerceAdmin...` como contrato publico.
+
+### HIST-2B-004 Reglas publicas de productos y categorias
+
+- Descripcion breve: cerrar comportamiento para producto publicado, agotado, no publicado, slug inexistente, categoria activa, vacia e inactiva.
+- Valor de negocio: evita ambiguedad en SEO, seguridad y UX publica.
+- Criterios de aceptacion:
+  - producto no publicado y slug inexistente responden `404 PUBLIC_RESOURCE_NOT_FOUND`;
+  - producto agotado publicado puede responder `200`, `OUT_OF_STOCK`, `purchasable=false`;
+  - categoria activa vacia puede responder `200`, pero `indexable=false` y queda fuera de sitemap;
+  - categoria inactiva o inexistente responde `404 PUBLIC_RESOURCE_NOT_FOUND`.
+- Restricciones tecnicas:
+  - sin compra, reserva ni checkout;
+  - sin exponer stock exacto.
+
+### HIST-2B-005 Marcas publicas y sitemap
+
+- Descripcion breve: cerrar alcance inicial de marcas publicas y sitemap.
+- Valor de negocio: evita paginas pobres de marca y prepara SEO tecnico progresivo.
+- Criterios de aceptacion:
+  - marca se permite embebida en producto si existe;
+  - `brandSlug` puede documentarse como filtro si hay dato suficiente;
+  - paginas publicas de marca quedan diferidas;
+  - sitemap se disena como endpoint JSON, no como `sitemap.xml` real.
+- Restricciones tecnicas:
+  - sin Merchant Center;
+  - sin robots-policy real;
+  - sin Storefront publico.
+
+### HIST-2B-006 QA documental API publica
+
+- Descripcion breve: crear checklist QA documental para validar el diseno antes de Fase 2C.
+- Valor de negocio: reduce riesgo de implementar un contrato incompleto o inseguro.
+- Criterios de aceptacion:
+  - checklist Fase 2B creado;
+  - separacion admin/public validable;
+  - errores publicos seguros documentados;
+  - criterios de salida hacia Fase 2C definidos.
+- Restricciones tecnicas:
+  - sin smoke runtime;
+  - sin tests automatizados en esta fase.
+
+## Historias explicitamente fuera de alcance en Fase 2A/2B
 
 - Checkout.
 - Mercado Pago.

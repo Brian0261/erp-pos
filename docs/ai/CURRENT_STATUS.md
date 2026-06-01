@@ -11,9 +11,9 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
 - `docs/qa/PHASE0_ECOMMERCE_VALIDATION_CHECKLIST.md` existe y queda revisado/cerrado mediante seccion de cierre formal, sin validar codigo funcional porque Fase 0 es documental.
 - Fase 1C del modulo ecommerce admin interno quedo cerrada funcional y documentalmente: perfiles online, detalle/editor, marcas ecommerce y categorias online implementados y auditados; build frontend exitoso; QA manual ligero sin bloqueantes conocidos.
 - El backend ecommerce admin ya cuenta con soporte interno para perfiles online, marcas, categorias, slugs/metadata/assets/precio online segun alcance Fase 1B/1C.
-- Fase 2A iniciada como fase documental/arquitectonica para Storefront publico SEO-first: roadmap, backlog, estrategia SEO, contratos publicos draft y checklist QA documental.
-- Proximo paso esperado: revisar y aprobar la documentacion de Fase 2A antes de pasar a Fase 2B Public Catalog API Design.
-- Restricciones vigentes en Fase 2A: no backend funcional, no frontend funcional, no Flyway/DB, no endpoints, no Next.js, no checkout, no pagos, no pedidos online, no delivery, no Merchant Center y no AWS/staging.
+- Fase 2A Storefront publico SEO-first Discovery & Contracts quedo cerrada documentalmente con commit `9fc35ca docs: start phase 2a storefront discovery`.
+- Fase 2B iniciada como diseno documental de Public Catalog API: contratos read-only, DTOs publicos, errores seguros, reglas SEO y checklist QA de diseno.
+- Restricciones vigentes en Fase 2B: no backend funcional, no frontend funcional, no Flyway/DB, no endpoints reales, no DTOs Java, no controllers, no use cases, no ports, no repositories, no SecurityConfig, no GlobalExceptionHandler, no Next.js, no checkout, no pagos, no pedidos online, no delivery, no Merchant Center y no AWS/staging.
 - Modulos protegidos para Fase 1A y preparacion Fase 1: POS, inventario, ventas, caja y facturacion no deben modificarse.
 - AWS/staging no debe tocarse hasta que exista una fase local estable y validada.
 - Confirmado: no se toco codigo funcional en esta fase documental.
