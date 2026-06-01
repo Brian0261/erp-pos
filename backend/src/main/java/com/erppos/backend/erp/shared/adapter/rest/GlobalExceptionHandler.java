@@ -36,10 +36,14 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authorization.AuthorizationDeniedException;
+import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -73,8 +77,19 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(ResponseStatusException.class)
-    public ResponseEntity<ApiError> handleResponseStatus(ResponseStatusException ex, HttpServletRequest request) {
+    public ResponseEntity<?> handleResponseStatus(ResponseStatusException ex, HttpServletRequest request) {
         HttpStatus status = HttpStatus.valueOf(ex.getStatusCode().value());
+        if (isStorefrontRequest(request)) {
+            return ResponseEntity.status(status)
+                    .body(new PublicErrorResponse(
+                            Instant.now(),
+                            status.value(),
+                            publicErrorCode(status),
+                            ex.getReason() == null ? defaultPublicMessage(status) : ex.getReason(),
+                            request.getRequestURI(),
+                            traceId(request)
+                    ));
+        }
         return ResponseEntity.status(status)
                 .body(errorResponseFactory.build(request, status, ex.getReason() == null ? status.getReasonPhrase() : ex.getReason()));
     }
@@ -135,8 +150,30 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ApiError> handleGeneric(Exception ex, HttpServletRequest request) {
+    public ResponseEntity<?> handleGeneric(Exception ex, HttpServletRequest request) {
         LOGGER.error("Unhandled exception while processing {} {}", request.getMethod(), request.getRequestURI(), ex);
+        if (isStorefrontRequest(request)) {
+            if (isStorefrontInvalidRequestException(ex)) {
+                return ResponseEntity.badRequest()
+                        .body(new PublicErrorResponse(
+                                Instant.now(),
+                                HttpStatus.BAD_REQUEST.value(),
+                                "PUBLIC_INVALID_REQUEST",
+                                "Invalid public request",
+                                request.getRequestURI(),
+                                traceId(request)
+                        ));
+            }
+            return ResponseEntity.internalServerError()
+                    .body(new PublicErrorResponse(
+                            Instant.now(),
+                            HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                            "PUBLIC_INTERNAL_ERROR",
+                            "Unexpected public error",
+                            request.getRequestURI(),
+                            traceId(request)
+                    ));
+        }
         return ResponseEntity.internalServerError()
                 .body(errorResponseFactory.build(request, HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected error"));
     }
@@ -152,5 +189,38 @@ public class GlobalExceptionHandler {
     private String traceId(HttpServletRequest request) {
         String traceId = (String) request.getAttribute(ErrorResponseFactory.TRACE_ID_ATTRIBUTE);
         return traceId == null ? "N/A" : traceId;
+    }
+
+    private String publicErrorCode(HttpStatus status) {
+        if (status == HttpStatus.BAD_REQUEST) {
+            return "PUBLIC_INVALID_REQUEST";
+        }
+        if (status == HttpStatus.NOT_FOUND) {
+            return "PUBLIC_RESOURCE_NOT_FOUND";
+        }
+        if (status == HttpStatus.UNPROCESSABLE_ENTITY) {
+            return "PUBLIC_UNPROCESSABLE_REQUEST";
+        }
+        return "PUBLIC_INTERNAL_ERROR";
+    }
+
+    private String defaultPublicMessage(HttpStatus status) {
+        if (status == HttpStatus.BAD_REQUEST) {
+            return "Invalid public request";
+        }
+        if (status == HttpStatus.NOT_FOUND) {
+            return "Public resource not found";
+        }
+        if (status == HttpStatus.UNPROCESSABLE_ENTITY) {
+            return "Public request cannot be processed";
+        }
+        return "Unexpected public error";
+    }
+
+    private boolean isStorefrontInvalidRequestException(Exception ex) {
+        return ex instanceof MethodArgumentTypeMismatchException
+                || ex instanceof MissingServletRequestParameterException
+                || ex instanceof BindException
+                || ex instanceof HandlerMethodValidationException;
     }
 }

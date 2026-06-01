@@ -127,12 +127,10 @@ class AuthRbacCorsIntegrationTest extends AbstractHttpIntegrationTest {
     @Test
     void shouldAllowUnauthenticatedGetUnderStorefrontNamespace() throws Exception {
         mockMvc.perform(get("/api/v1/storefront/catalog/products"))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.status").value(404))
-                .andExpect(jsonPath("$.code").value("PUBLIC_RESOURCE_NOT_FOUND"))
-                .andExpect(jsonPath("$.message").value("Public resource not found"))
-                .andExpect(jsonPath("$.path").value("/api/v1/storefront/catalog/products"))
-                .andExpect(jsonPath("$.traceId").isNotEmpty());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items").isArray())
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(20));
     }
 
     @Test
