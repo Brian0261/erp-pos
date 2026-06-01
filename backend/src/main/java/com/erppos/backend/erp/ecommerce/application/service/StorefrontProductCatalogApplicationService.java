@@ -5,9 +5,13 @@ import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontBra
 import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontCategorySummaryResult;
 import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontImageResult;
 import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontPriceResult;
+import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontProductDetailResult;
 import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontProductListItemResult;
 import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontProductPageResult;
+import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontSeoResult;
 import com.erppos.backend.erp.ecommerce.application.usecase.StorefrontProductCatalogUseCase;
+import com.erppos.backend.erp.ecommerce.domain.model.RobotsPolicy;
+import com.erppos.backend.erp.ecommerce.domain.model.StorefrontPublicProductDetailProjection;
 import com.erppos.backend.erp.ecommerce.domain.model.StorefrontPublicProductProjection;
 import com.erppos.backend.erp.ecommerce.domain.port.StorefrontProductReadPort;
 import org.springframework.data.domain.Page;
@@ -18,6 +22,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
+import java.util.List;
+import java.util.Locale;
 
 @Service
 @Transactional(readOnly = true)
@@ -48,6 +54,18 @@ public class StorefrontProductCatalogApplicationService implements StorefrontPro
                 products.getTotalElements(),
                 products.getTotalPages()
         );
+    }
+
+    @Override
+    public StorefrontProductDetailResult getPublishedProductBySlug(String slug) {
+        if (slug == null || slug.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Public resource not found");
+        }
+
+        StorefrontPublicProductDetailProjection detail = storefrontProductReadPort.findPublishedProductDetailBySlug(slug.trim())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Public resource not found"));
+
+        return toPublicDetail(detail);
     }
 
     private StorefrontProductListItemResult toPublicProduct(StorefrontPublicProductProjection item) {
@@ -86,6 +104,92 @@ public class StorefrontProductCatalogApplicationService implements StorefrontPro
                 category,
                 brand
         );
+    }
+
+    private StorefrontProductDetailResult toPublicDetail(StorefrontPublicProductDetailProjection item) {
+        String currency = item.effectivePriceCurrency() == null || item.effectivePriceCurrency().isBlank()
+                ? DEFAULT_CURRENCY
+                : item.effectivePriceCurrency();
+        BigDecimal amount = item.effectivePriceAmount() == null ? BigDecimal.ZERO : item.effectivePriceAmount();
+
+        StorefrontCategorySummaryResult category = null;
+        if (item.categorySlug() != null && !item.categorySlug().isBlank()) {
+            category = new StorefrontCategorySummaryResult(item.categorySlug(), item.categoryName());
+        }
+
+        StorefrontBrandSummaryResult brand = null;
+        if (item.brandSlug() != null && !item.brandSlug().isBlank()) {
+            brand = new StorefrontBrandSummaryResult(item.brandSlug(), item.brandName());
+        }
+
+        StorefrontImageResult primaryImage = null;
+        if (item.primaryImageUrl() != null && !item.primaryImageUrl().isBlank()) {
+            primaryImage = new StorefrontImageResult(
+                    item.primaryImageUrl(),
+                    item.primaryImageAltText(),
+                    item.primaryImageType(),
+                    item.primaryImageDisplayOrder()
+            );
+        }
+
+        boolean indexable = computeIndexable(item);
+
+        StorefrontSeoResult seo = null;
+        if (hasSeoData(item)) {
+            seo = new StorefrontSeoResult(
+                    item.seoTitle(),
+                    item.seoDescription(),
+                    item.canonicalPath(),
+                    item.robotsPolicy(),
+                    item.ogTitle(),
+                    item.ogDescription(),
+                    item.ogImageUrl(),
+                    indexable
+            );
+        }
+
+        return new StorefrontProductDetailResult(
+                item.slug(),
+                item.name(),
+                item.description(),
+                primaryImage,
+                List.of(),
+                new StorefrontPriceResult(amount, currency, currency + " " + amount),
+                new StorefrontAvailabilityResult("NOT_AVAILABLE", "No disponible temporalmente", false),
+                category,
+                brand,
+                seo,
+                item.canonicalPath(),
+                indexable
+        );
+    }
+
+    private boolean hasSeoData(StorefrontPublicProductDetailProjection item) {
+        return notBlank(item.seoTitle())
+                || notBlank(item.seoDescription())
+                || notBlank(item.canonicalPath())
+                || notBlank(item.robotsPolicy())
+                || notBlank(item.ogTitle())
+                || notBlank(item.ogDescription())
+                || notBlank(item.ogImageUrl())
+                || item.seoIndexable() != null;
+    }
+
+    private boolean computeIndexable(StorefrontPublicProductDetailProjection item) {
+        if (!Boolean.TRUE.equals(item.seoIndexable())) {
+            return false;
+        }
+        if (!notBlank(item.seoTitle()) || !notBlank(item.seoDescription()) || !notBlank(item.canonicalPath())) {
+            return false;
+        }
+        if (!notBlank(item.robotsPolicy())) {
+            return false;
+        }
+        return RobotsPolicy.INDEX_FOLLOW.name().equals(item.robotsPolicy().trim().toUpperCase(Locale.ROOT));
+    }
+
+    private boolean notBlank(String value) {
+        return value != null && !value.isBlank();
     }
 
     private void validatePage(int page) {

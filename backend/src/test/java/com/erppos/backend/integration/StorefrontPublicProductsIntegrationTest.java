@@ -48,6 +48,19 @@ class StorefrontPublicProductsIntegrationTest extends AbstractHttpIntegrationTes
     }
 
     @Test
+    void shouldAllowPublicProductDetailGetWithoutToken() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = String.valueOf(System.nanoTime());
+        ProductFixture product = createPublishedProfile(adminToken, suffix, BigDecimal.valueOf(18.25), null);
+
+        mockMvc.perform(get("/api/v1/storefront/catalog/products/{slug}", product.slug()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.slug").value(product.slug()))
+                .andExpect(jsonPath("$.name").isNotEmpty())
+                .andExpect(jsonPath("$.price.amount").value(18.25));
+    }
+
+    @Test
     void shouldListOnlyPublishedAndActiveProducts() throws Exception {
         String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
         String base = String.valueOf(System.nanoTime());
@@ -181,6 +194,98 @@ class StorefrontPublicProductsIntegrationTest extends AbstractHttpIntegrationTes
                 .andExpect(jsonPath("$.items[0].availability.stockQuantity").doesNotExist());
     }
 
+    @Test
+    void shouldReturn404WhenProductSlugDoesNotExist() throws Exception {
+        mockMvc.perform(get("/api/v1/storefront/catalog/products/{slug}", "slug-does-not-exist"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("PUBLIC_RESOURCE_NOT_FOUND"));
+    }
+
+    @Test
+    void shouldReturn404WhenProductIsNotPublished() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = String.valueOf(System.nanoTime());
+        ProductFixture unpublished = createUnpublishedProfile(adminToken, suffix);
+
+        mockMvc.perform(get("/api/v1/storefront/catalog/products/{slug}", unpublished.slug()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("PUBLIC_RESOURCE_NOT_FOUND"));
+    }
+
+    @Test
+    void shouldReturn404WhenProductIsInactive() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = String.valueOf(System.nanoTime());
+        ProductFixture product = createPublishedProfile(adminToken, suffix, BigDecimal.valueOf(25.00), null);
+        deactivateProduct(adminToken, product);
+
+        mockMvc.perform(get("/api/v1/storefront/catalog/products/{slug}", product.slug()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("PUBLIC_RESOURCE_NOT_FOUND"));
+    }
+
+    @Test
+    void shouldNotExposeInternalFieldsInDetailResponse() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = String.valueOf(System.nanoTime());
+        ProductFixture product = createPublishedProfile(adminToken, suffix, BigDecimal.valueOf(29.90), null);
+
+        mockMvc.perform(get("/api/v1/storefront/catalog/products/{slug}", product.slug()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").doesNotExist())
+                .andExpect(jsonPath("$.productId").doesNotExist())
+                .andExpect(jsonPath("$.profileId").doesNotExist())
+                .andExpect(jsonPath("$.categoryId").doesNotExist())
+                .andExpect(jsonPath("$.brandId").doesNotExist())
+                .andExpect(jsonPath("$.publicationStatus").doesNotExist())
+                .andExpect(jsonPath("$.stockQuantity").doesNotExist())
+                .andExpect(jsonPath("$.cost").doesNotExist())
+                .andExpect(jsonPath("$.margin").doesNotExist())
+                .andExpect(jsonPath("$.createdBy").doesNotExist())
+                .andExpect(jsonPath("$.updatedBy").doesNotExist());
+    }
+
+    @Test
+    void shouldCalculateDetailPriceInBackendWithActiveOverride() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = String.valueOf(System.nanoTime());
+        ProductFixture product = createPublishedProfile(adminToken, suffix, BigDecimal.valueOf(90.00), BigDecimal.valueOf(65.50));
+
+        mockMvc.perform(get("/api/v1/storefront/catalog/products/{slug}", product.slug()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.price.amount").value(65.5))
+                .andExpect(jsonPath("$.price.currency").value("PEN"));
+    }
+
+    @Test
+    void shouldExposeConservativeDetailAvailabilityWithoutStockQuantity() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = String.valueOf(System.nanoTime());
+        ProductFixture product = createPublishedProfile(adminToken, suffix, BigDecimal.valueOf(54.00), null);
+
+        mockMvc.perform(get("/api/v1/storefront/catalog/products/{slug}", product.slug()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.availability.status").value("NOT_AVAILABLE"))
+                .andExpect(jsonPath("$.availability.purchasable").value(false))
+                .andExpect(jsonPath("$.availability.stock").doesNotExist())
+                .andExpect(jsonPath("$.availability.stockQuantity").doesNotExist());
+    }
+
+    @Test
+    void shouldReturnPublicSeoMetadataWhenAvailable() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = String.valueOf(System.nanoTime());
+        ProductFixture product = createPublishedProfile(adminToken, suffix, BigDecimal.valueOf(70.00), null);
+
+        mockMvc.perform(get("/api/v1/storefront/catalog/products/{slug}", product.slug()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.seo.title").value("SEO title storefront " + suffix))
+                .andExpect(jsonPath("$.seo.description").value("SEO description storefront " + suffix))
+                .andExpect(jsonPath("$.seo.canonicalUrl").value("/productos/" + product.slug()))
+                .andExpect(jsonPath("$.canonicalUrl").value("/productos/" + product.slug()))
+                .andExpect(jsonPath("$.indexable").value(true));
+    }
+
     private ProductFixture createPublishedProfile(String adminToken, String suffix, BigDecimal salePrice, BigDecimal overrideAmount) throws Exception {
         ProductFixture product = createProductFixture(adminToken, suffix, salePrice);
         ecommerceCatalogUseCase.createDraftProfile(new CreateProductOnlineProfileCommand(product.productId()));
@@ -258,12 +363,13 @@ class StorefrontPublicProductsIntegrationTest extends AbstractHttpIntegrationTes
         ecommerceCatalogUseCase.createDraftProfile(new CreateProductOnlineProfileCommand(product.productId()));
     }
 
-    private void createUnpublishedProfile(String adminToken, String suffix) throws Exception {
+    private ProductFixture createUnpublishedProfile(String adminToken, String suffix) throws Exception {
         ProductFixture product = createPublishedProfile(adminToken, suffix, BigDecimal.valueOf(20.00), null);
         mockMvc.perform(post("/api/v1/ecommerce-admin/products/{productId}/unpublish", product.productId())
                         .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk());
+        return product;
     }
 
     private void createBlockedProfile(String adminToken, String suffix) throws Exception {
