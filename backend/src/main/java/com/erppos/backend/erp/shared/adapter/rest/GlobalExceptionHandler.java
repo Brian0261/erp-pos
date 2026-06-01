@@ -7,6 +7,7 @@ import com.erppos.backend.erp.catalog.domain.exception.CatalogNotFoundException;
 import com.erppos.backend.erp.billing.domain.exception.BillingBusinessRuleException;
 import com.erppos.backend.erp.billing.domain.exception.BillingConflictException;
 import com.erppos.backend.erp.billing.domain.exception.BillingNotFoundException;
+import com.erppos.backend.erp.ecommerce.adapter.dto.storefront.PublicErrorResponse;
 import com.erppos.backend.erp.ecommerce.domain.exception.EcommerceBusinessRuleException;
 import com.erppos.backend.erp.ecommerce.domain.exception.EcommerceConflictException;
 import com.erppos.backend.erp.ecommerce.domain.exception.EcommerceNotFoundException;
@@ -39,8 +40,10 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Instant;
 import java.util.stream.Collectors;
 
 @RestControllerAdvice
@@ -115,6 +118,22 @@ public class GlobalExceptionHandler {
                 .body(errorResponseFactory.build(request, HttpStatus.FORBIDDEN, "Access denied"));
     }
 
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<?> handleNoResourceFound(NoResourceFoundException ex, HttpServletRequest request) {
+        if (isStorefrontRequest(request)) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(new PublicErrorResponse(
+                            Instant.now(),
+                            HttpStatus.NOT_FOUND.value(),
+                            "PUBLIC_RESOURCE_NOT_FOUND",
+                            "Public resource not found",
+                            request.getRequestURI(),
+                            traceId(request)
+                    ));
+        }
+        return handleGeneric(ex, request);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> handleGeneric(Exception ex, HttpServletRequest request) {
         LOGGER.error("Unhandled exception while processing {} {}", request.getMethod(), request.getRequestURI(), ex);
@@ -124,5 +143,14 @@ public class GlobalExceptionHandler {
 
     private String formatFieldError(FieldError fieldError) {
         return fieldError.getField() + " " + fieldError.getDefaultMessage();
+    }
+
+    private boolean isStorefrontRequest(HttpServletRequest request) {
+        return request.getRequestURI().startsWith("/api/v1/storefront/");
+    }
+
+    private String traceId(HttpServletRequest request) {
+        String traceId = (String) request.getAttribute(ErrorResponseFactory.TRACE_ID_ATTRIBUTE);
+        return traceId == null ? "N/A" : traceId;
     }
 }

@@ -8,8 +8,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -118,6 +122,41 @@ class AuthRbacCorsIntegrationTest extends AbstractHttpIntegrationTest {
 
         assertEquals(200, warehousePreflight.getResponse().getStatus());
         assertTrue(warehousePreflight.getResponse().getHeader("Access-Control-Allow-Methods").contains("PATCH"));
+    }
+
+    @Test
+    void shouldAllowUnauthenticatedGetUnderStorefrontNamespace() throws Exception {
+        mockMvc.perform(get("/api/v1/storefront/catalog/products"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.code").value("PUBLIC_RESOURCE_NOT_FOUND"))
+                .andExpect(jsonPath("$.message").value("Public resource not found"))
+                .andExpect(jsonPath("$.path").value("/api/v1/storefront/catalog/products"))
+                .andExpect(jsonPath("$.traceId").isNotEmpty());
+    }
+
+    @Test
+    void shouldBlockUnauthenticatedWritesUnderStorefrontNamespace() throws Exception {
+        mockMvc.perform(post("/api/v1/storefront/catalog/products"))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(put("/api/v1/storefront/catalog/products"))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(patch("/api/v1/storefront/catalog/products"))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(delete("/api/v1/storefront/catalog/products"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void shouldKeepEcommerceAdminAndInternalRoutesProtectedWithoutToken() throws Exception {
+        mockMvc.perform(get("/api/v1/ecommerce-admin/brands"))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(get("/api/v1/integrations/outbox-events"))
+                .andExpect(status().isUnauthorized());
     }
 }
 
