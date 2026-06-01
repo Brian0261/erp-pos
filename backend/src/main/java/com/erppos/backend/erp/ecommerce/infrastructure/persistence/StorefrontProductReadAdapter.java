@@ -1,5 +1,6 @@
 package com.erppos.backend.erp.ecommerce.infrastructure.persistence;
 
+import com.erppos.backend.erp.ecommerce.domain.model.StorefrontPublicCategoryProjection;
 import com.erppos.backend.erp.ecommerce.domain.model.StorefrontPublicProductDetailProjection;
 import com.erppos.backend.erp.ecommerce.domain.model.StorefrontPublicProductProjection;
 import com.erppos.backend.erp.ecommerce.domain.port.StorefrontProductReadPort;
@@ -102,6 +103,36 @@ public class StorefrontProductReadAdapter implements StorefrontProductReadPort {
                 ),
                 Timestamp.from(now),
                 Timestamp.from(now),
+                pageable.getPageSize(),
+                pageable.getOffset()
+        );
+
+        return new PageImpl<>(items, pageable, total);
+    }
+
+    @Override
+    public Page<StorefrontPublicCategoryProjection> findPublicCategories(Pageable pageable) {
+        long total = countPublicCategories();
+        if (total == 0) {
+            return new PageImpl<>(List.of(), pageable, 0);
+        }
+
+        List<StorefrontPublicCategoryProjection> items = jdbcTemplate.query(
+                """
+                        select
+                            c.slug,
+                            c.name,
+                            c.description
+                        from ecommerce_online_categories c
+                        where c.active = true
+                        order by lower(c.name) asc, c.id asc
+                        limit ? offset ?
+                        """,
+                (rs, rowNum) -> new StorefrontPublicCategoryProjection(
+                        rs.getString("slug"),
+                        rs.getString("name"),
+                        rs.getString("description")
+                ),
                 pageable.getPageSize(),
                 pageable.getOffset()
         );
@@ -217,6 +248,18 @@ public class StorefrontProductReadAdapter implements StorefrontProductReadPort {
                         join products p on p.id = pop.product_id
                         where pop.publication_status = 'PUBLISHED'
                           and p.active = true
+                        """,
+                Long.class
+        );
+        return total == null ? 0 : total;
+    }
+
+    private long countPublicCategories() {
+        Long total = jdbcTemplate.queryForObject(
+                """
+                        select count(*)
+                        from ecommerce_online_categories c
+                        where c.active = true
                         """,
                 Long.class
         );

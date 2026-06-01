@@ -2,6 +2,8 @@ package com.erppos.backend.erp.ecommerce.application.service;
 
 import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontAvailabilityResult;
 import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontBrandSummaryResult;
+import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontCategoryListItemResult;
+import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontCategoryPageResult;
 import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontCategorySummaryResult;
 import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontImageResult;
 import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontPriceResult;
@@ -11,6 +13,7 @@ import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontPro
 import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontSeoResult;
 import com.erppos.backend.erp.ecommerce.application.usecase.StorefrontProductCatalogUseCase;
 import com.erppos.backend.erp.ecommerce.domain.model.RobotsPolicy;
+import com.erppos.backend.erp.ecommerce.domain.model.StorefrontPublicCategoryProjection;
 import com.erppos.backend.erp.ecommerce.domain.model.StorefrontPublicProductDetailProjection;
 import com.erppos.backend.erp.ecommerce.domain.model.StorefrontPublicProductProjection;
 import com.erppos.backend.erp.ecommerce.domain.port.StorefrontProductReadPort;
@@ -30,7 +33,8 @@ import java.util.Locale;
 public class StorefrontProductCatalogApplicationService implements StorefrontProductCatalogUseCase {
 
     private static final String SUPPORTED_SORT = "name_asc";
-    private static final int MAX_SIZE = 50;
+    private static final int MAX_PRODUCTS_SIZE = 50;
+    private static final int MAX_CATEGORIES_SIZE = 100;
     private static final String DEFAULT_CURRENCY = "PEN";
 
     private final StorefrontProductReadPort storefrontProductReadPort;
@@ -42,7 +46,7 @@ public class StorefrontProductCatalogApplicationService implements StorefrontPro
     @Override
     public StorefrontProductPageResult listPublishedProducts(int page, int size, String sort) {
         validatePage(page);
-        validateSize(size);
+        validateProductsSize(size);
         validateSort(sort);
 
         Page<StorefrontPublicProductProjection> products = storefrontProductReadPort.findPublishedProducts(PageRequest.of(page, size));
@@ -53,6 +57,23 @@ public class StorefrontProductCatalogApplicationService implements StorefrontPro
                 products.getSize(),
                 products.getTotalElements(),
                 products.getTotalPages()
+        );
+    }
+
+    @Override
+    public StorefrontCategoryPageResult listPublicCategories(int page, int size, String sort) {
+        validatePage(page);
+        validateCategoriesSize(size);
+        validateSort(sort);
+
+        Page<StorefrontPublicCategoryProjection> categories = storefrontProductReadPort.findPublicCategories(PageRequest.of(page, size));
+
+        return new StorefrontCategoryPageResult(
+                categories.getContent().stream().map(this::toPublicCategory).toList(),
+                categories.getNumber(),
+                categories.getSize(),
+                categories.getTotalElements(),
+                categories.getTotalPages()
         );
     }
 
@@ -164,6 +185,14 @@ public class StorefrontProductCatalogApplicationService implements StorefrontPro
         );
     }
 
+    private StorefrontCategoryListItemResult toPublicCategory(StorefrontPublicCategoryProjection category) {
+        return new StorefrontCategoryListItemResult(
+                category.slug(),
+                category.name(),
+                category.description()
+        );
+    }
+
     private boolean hasSeoData(StorefrontPublicProductDetailProjection item) {
         return notBlank(item.seoTitle())
                 || notBlank(item.seoDescription())
@@ -198,9 +227,15 @@ public class StorefrontProductCatalogApplicationService implements StorefrontPro
         }
     }
 
-    private void validateSize(int size) {
-        if (size <= 0 || size > MAX_SIZE) {
+    private void validateProductsSize(int size) {
+        if (size <= 0 || size > MAX_PRODUCTS_SIZE) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid size: must be between 1 and 50");
+        }
+    }
+
+    private void validateCategoriesSize(int size) {
+        if (size <= 0 || size > MAX_CATEGORIES_SIZE) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid size: must be between 1 and 100");
         }
     }
 

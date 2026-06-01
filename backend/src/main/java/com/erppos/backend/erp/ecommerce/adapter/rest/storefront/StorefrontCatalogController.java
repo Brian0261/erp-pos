@@ -2,6 +2,7 @@ package com.erppos.backend.erp.ecommerce.adapter.rest.storefront;
 
 import com.erppos.backend.erp.ecommerce.adapter.dto.storefront.PublicAvailabilityResponse;
 import com.erppos.backend.erp.ecommerce.adapter.dto.storefront.PublicBrandSummaryResponse;
+import com.erppos.backend.erp.ecommerce.adapter.dto.storefront.PublicCategoryListItemResponse;
 import com.erppos.backend.erp.ecommerce.adapter.dto.storefront.PublicCategorySummaryResponse;
 import com.erppos.backend.erp.ecommerce.adapter.dto.storefront.PublicImageResponse;
 import com.erppos.backend.erp.ecommerce.adapter.dto.storefront.PublicPageResponse;
@@ -13,6 +14,8 @@ import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontPro
 import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontImageResult;
 import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontCategorySummaryResult;
 import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontBrandSummaryResult;
+import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontCategoryListItemResult;
+import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontCategoryPageResult;
 import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontProductListItemResult;
 import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontProductPageResult;
 import com.erppos.backend.erp.ecommerce.application.usecase.StorefrontProductCatalogUseCase;
@@ -55,6 +58,23 @@ public class StorefrontCatalogController {
     public PublicProductDetailResponse getProductBySlug(@PathVariable("slug") String slug) {
         StorefrontProductDetailResult detail = storefrontProductCatalogUseCase.getPublishedProductBySlug(slug);
         return toPublicDetail(detail);
+    }
+
+    @GetMapping("/categories")
+    public PublicPageResponse<PublicCategoryListItemResponse> listCategories(
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "50") int size,
+            @RequestParam(name = "sort", defaultValue = "name_asc") String sort
+    ) {
+        StorefrontCategoryPageResult pageResult = storefrontProductCatalogUseCase.listPublicCategories(page, size, sort);
+
+        return new PublicPageResponse<>(
+                pageResult.items().stream().map(this::toPublicCategoryItem).toList(),
+                pageResult.page(),
+                pageResult.size(),
+                pageResult.totalItems(),
+                pageResult.totalPages()
+        );
     }
 
     private PublicProductListItemResponse toPublicItem(StorefrontProductListItemResult item) {
@@ -105,6 +125,14 @@ public class StorefrontCatalogController {
                 seo,
                 detail.canonicalUrl(),
                 detail.indexable()
+        );
+    }
+
+    private PublicCategoryListItemResponse toPublicCategoryItem(StorefrontCategoryListItemResult item) {
+        return new PublicCategoryListItemResponse(
+                item.slug(),
+                item.name(),
+                item.description()
         );
     }
 
