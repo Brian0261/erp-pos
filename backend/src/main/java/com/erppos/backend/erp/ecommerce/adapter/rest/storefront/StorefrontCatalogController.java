@@ -3,6 +3,7 @@ package com.erppos.backend.erp.ecommerce.adapter.rest.storefront;
 import com.erppos.backend.erp.ecommerce.adapter.dto.storefront.PublicAvailabilityResponse;
 import com.erppos.backend.erp.ecommerce.adapter.dto.storefront.PublicBrandSummaryResponse;
 import com.erppos.backend.erp.ecommerce.adapter.dto.storefront.PublicCategoryListItemResponse;
+import com.erppos.backend.erp.ecommerce.adapter.dto.storefront.PublicCategoryDetailResponse;
 import com.erppos.backend.erp.ecommerce.adapter.dto.storefront.PublicCategorySummaryResponse;
 import com.erppos.backend.erp.ecommerce.adapter.dto.storefront.PublicImageResponse;
 import com.erppos.backend.erp.ecommerce.adapter.dto.storefront.PublicPageResponse;
@@ -15,6 +16,7 @@ import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontIma
 import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontCategorySummaryResult;
 import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontBrandSummaryResult;
 import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontCategoryListItemResult;
+import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontCategoryDetailResult;
 import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontCategoryPageResult;
 import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontProductListItemResult;
 import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontProductPageResult;
@@ -77,6 +79,12 @@ public class StorefrontCatalogController {
         );
     }
 
+    @GetMapping("/categories/{slug}")
+    public PublicCategoryDetailResponse getCategoryBySlug(@PathVariable("slug") String slug) {
+        StorefrontCategoryDetailResult detail = storefrontProductCatalogUseCase.getPublicCategoryBySlug(slug);
+        return toPublicCategoryDetail(detail);
+    }
+
     private PublicProductListItemResponse toPublicItem(StorefrontProductListItemResult item) {
         PublicImageResponse image = toPublicImage(item.primaryImage());
         PublicCategorySummaryResponse category = toPublicCategory(item.category());
@@ -133,6 +141,31 @@ public class StorefrontCatalogController {
                 item.slug(),
                 item.name(),
                 item.description()
+        );
+    }
+
+    private PublicCategoryDetailResponse toPublicCategoryDetail(StorefrontCategoryDetailResult detail) {
+        PublicSeoResponse seo = detail.seo() == null
+                ? null
+                : new PublicSeoResponse(
+                detail.seo().title(),
+                detail.seo().description(),
+                detail.seo().canonicalUrl(),
+                detail.seo().robots(),
+                detail.seo().ogTitle(),
+                detail.seo().ogDescription(),
+                detail.seo().ogImageUrl(),
+                detail.seo().indexable()
+        );
+
+        return new PublicCategoryDetailResponse(
+                detail.slug(),
+                detail.name(),
+                detail.description(),
+                detail.productCount(),
+                seo,
+                detail.canonicalUrl(),
+                detail.indexable()
         );
     }
 

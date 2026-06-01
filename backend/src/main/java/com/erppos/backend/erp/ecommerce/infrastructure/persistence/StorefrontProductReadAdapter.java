@@ -1,6 +1,7 @@
 package com.erppos.backend.erp.ecommerce.infrastructure.persistence;
 
 import com.erppos.backend.erp.ecommerce.domain.model.StorefrontPublicCategoryProjection;
+import com.erppos.backend.erp.ecommerce.domain.model.StorefrontPublicCategoryDetailProjection;
 import com.erppos.backend.erp.ecommerce.domain.model.StorefrontPublicProductDetailProjection;
 import com.erppos.backend.erp.ecommerce.domain.model.StorefrontPublicProductProjection;
 import com.erppos.backend.erp.ecommerce.domain.port.StorefrontProductReadPort;
@@ -231,6 +232,60 @@ public class StorefrontProductReadAdapter implements StorefrontProductReadPort {
                 ),
                 Timestamp.from(now),
                 Timestamp.from(now),
+                slug
+        );
+
+        if (items.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(items.get(0));
+    }
+
+    @Override
+    public Optional<StorefrontPublicCategoryDetailProjection> findPublicCategoryDetailBySlug(String slug) {
+        List<StorefrontPublicCategoryDetailProjection> items = jdbcTemplate.query(
+                """
+                        select
+                            c.slug,
+                            c.name,
+                            c.description,
+                            coalesce((
+                                select count(*)
+                                from ecommerce_product_online_profiles pop
+                                join products p on p.id = pop.product_id
+                                where pop.online_category_id = c.id
+                                  and pop.publication_status = 'PUBLISHED'
+                                  and p.active = true
+                            ), 0) as product_count,
+                            sm.seo_title,
+                            sm.seo_description,
+                            sm.canonical_path,
+                            sm.robots_policy,
+                            sm.indexable as seo_indexable,
+                            sm.og_title,
+                            sm.og_description,
+                            sm.og_image_url
+                        from ecommerce_online_categories c
+                        left join ecommerce_seo_metadata sm
+                               on sm.online_category_id = c.id
+                        where c.active = true
+                          and c.slug = ?
+                        limit 1
+                        """,
+                (rs, rowNum) -> new StorefrontPublicCategoryDetailProjection(
+                        rs.getString("slug"),
+                        rs.getString("name"),
+                        rs.getString("description"),
+                        rs.getLong("product_count"),
+                        rs.getString("seo_title"),
+                        rs.getString("seo_description"),
+                        rs.getString("canonical_path"),
+                        rs.getString("robots_policy"),
+                        getNullableBoolean(rs.getObject("seo_indexable")),
+                        rs.getString("og_title"),
+                        rs.getString("og_description"),
+                        rs.getString("og_image_url")
+                ),
                 slug
         );
 

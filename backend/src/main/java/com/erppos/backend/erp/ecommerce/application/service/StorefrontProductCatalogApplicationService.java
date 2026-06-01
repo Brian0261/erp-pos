@@ -3,6 +3,7 @@ package com.erppos.backend.erp.ecommerce.application.service;
 import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontAvailabilityResult;
 import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontBrandSummaryResult;
 import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontCategoryListItemResult;
+import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontCategoryDetailResult;
 import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontCategoryPageResult;
 import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontCategorySummaryResult;
 import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontImageResult;
@@ -14,6 +15,7 @@ import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontSeo
 import com.erppos.backend.erp.ecommerce.application.usecase.StorefrontProductCatalogUseCase;
 import com.erppos.backend.erp.ecommerce.domain.model.RobotsPolicy;
 import com.erppos.backend.erp.ecommerce.domain.model.StorefrontPublicCategoryProjection;
+import com.erppos.backend.erp.ecommerce.domain.model.StorefrontPublicCategoryDetailProjection;
 import com.erppos.backend.erp.ecommerce.domain.model.StorefrontPublicProductDetailProjection;
 import com.erppos.backend.erp.ecommerce.domain.model.StorefrontPublicProductProjection;
 import com.erppos.backend.erp.ecommerce.domain.port.StorefrontProductReadPort;
@@ -87,6 +89,18 @@ public class StorefrontProductCatalogApplicationService implements StorefrontPro
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Public resource not found"));
 
         return toPublicDetail(detail);
+    }
+
+    @Override
+    public StorefrontCategoryDetailResult getPublicCategoryBySlug(String slug) {
+        if (slug == null || slug.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Public resource not found");
+        }
+
+        StorefrontPublicCategoryDetailProjection detail = storefrontProductReadPort.findPublicCategoryDetailBySlug(slug.trim())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Public resource not found"));
+
+        return toPublicCategoryDetail(detail);
     }
 
     private StorefrontProductListItemResult toPublicProduct(StorefrontPublicProductProjection item) {
@@ -193,6 +207,34 @@ public class StorefrontProductCatalogApplicationService implements StorefrontPro
         );
     }
 
+    private StorefrontCategoryDetailResult toPublicCategoryDetail(StorefrontPublicCategoryDetailProjection item) {
+        boolean indexable = computeCategoryIndexable(item);
+
+        StorefrontSeoResult seo = null;
+        if (hasCategorySeoData(item)) {
+            seo = new StorefrontSeoResult(
+                    item.seoTitle(),
+                    item.seoDescription(),
+                    item.canonicalPath(),
+                    item.robotsPolicy(),
+                    item.ogTitle(),
+                    item.ogDescription(),
+                    item.ogImageUrl(),
+                    indexable
+            );
+        }
+
+        return new StorefrontCategoryDetailResult(
+                item.slug(),
+                item.name(),
+                item.description(),
+                item.productCount(),
+                seo,
+                item.canonicalPath(),
+                indexable
+        );
+    }
+
     private boolean hasSeoData(StorefrontPublicProductDetailProjection item) {
         return notBlank(item.seoTitle())
                 || notBlank(item.seoDescription())
@@ -205,6 +247,33 @@ public class StorefrontProductCatalogApplicationService implements StorefrontPro
     }
 
     private boolean computeIndexable(StorefrontPublicProductDetailProjection item) {
+        if (!Boolean.TRUE.equals(item.seoIndexable())) {
+            return false;
+        }
+        if (!notBlank(item.seoTitle()) || !notBlank(item.seoDescription()) || !notBlank(item.canonicalPath())) {
+            return false;
+        }
+        if (!notBlank(item.robotsPolicy())) {
+            return false;
+        }
+        return RobotsPolicy.INDEX_FOLLOW.name().equals(item.robotsPolicy().trim().toUpperCase(Locale.ROOT));
+    }
+
+    private boolean hasCategorySeoData(StorefrontPublicCategoryDetailProjection item) {
+        return notBlank(item.seoTitle())
+                || notBlank(item.seoDescription())
+                || notBlank(item.canonicalPath())
+                || notBlank(item.robotsPolicy())
+                || notBlank(item.ogTitle())
+                || notBlank(item.ogDescription())
+                || notBlank(item.ogImageUrl())
+                || item.seoIndexable() != null;
+    }
+
+    private boolean computeCategoryIndexable(StorefrontPublicCategoryDetailProjection item) {
+        if (item.productCount() <= 0) {
+            return false;
+        }
         if (!Boolean.TRUE.equals(item.seoIndexable())) {
             return false;
         }
