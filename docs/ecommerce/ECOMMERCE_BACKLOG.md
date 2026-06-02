@@ -228,6 +228,7 @@ Backlog ecommerce incremental. Fase 2A quedo cerrada documentalmente y Fase 2B a
 - Restricciones tecnicas:
   - sin crear endpoints reales;
   - sin modificar seguridad ni controllers.
+- **Estado: IMPLEMENTADO (Fase 2C)** — namespace aplicado en controllers y seguridad.
 
 ### HIST-2B-002 Endpoints MVP read-only
 
@@ -243,6 +244,7 @@ Backlog ecommerce incremental. Fase 2A quedo cerrada documentalmente y Fase 2B a
   - sin `sitemap.xml` real;
   - sin Next.js;
   - sin backend funcional.
+- **Estado: IMPLEMENTADO (Fase 2C)** — los 5 endpoints implementados y testeados. `sitemap.xml` real sigue diferido.
 
 ### HIST-2B-003 DTOs publicos y campos prohibidos
 
@@ -255,6 +257,7 @@ Backlog ecommerce incremental. Fase 2A quedo cerrada documentalmente y Fase 2B a
 - Restricciones tecnicas:
   - sin crear DTOs Java reales;
   - sin reusar `EcommerceAdmin...` como contrato publico.
+- **Estado: IMPLEMENTADO (Fase 2C)** — DTOs publicos Java creados y separados de admin. Campos prohibidos respetados.
 
 ### HIST-2B-004 Reglas publicas de productos y categorias
 
@@ -268,6 +271,7 @@ Backlog ecommerce incremental. Fase 2A quedo cerrada documentalmente y Fase 2B a
 - Restricciones tecnicas:
   - sin compra, reserva ni checkout;
   - sin exponer stock exacto.
+- **Estado: IMPLEMENTADO (Fase 2C)** — reglas aplicadas en application service y tests.
 
 ### HIST-2B-005 Marcas publicas y sitemap
 
@@ -282,6 +286,7 @@ Backlog ecommerce incremental. Fase 2A quedo cerrada documentalmente y Fase 2B a
   - sin Merchant Center;
   - sin robots-policy real;
   - sin Storefront publico.
+- **Estado: PARCIALMENTE IMPLEMENTADO (Fase 2C)** — sitemap JSON implementado; marcas publicas y paginas de marca siguen diferidas.
 
 ### HIST-2B-006 QA documental API publica
 
@@ -295,8 +300,9 @@ Backlog ecommerce incremental. Fase 2A quedo cerrada documentalmente y Fase 2B a
 - Restricciones tecnicas:
   - sin smoke runtime;
   - sin tests automatizados en esta fase.
+- **Estado: COMPLETADO (Fase 2C)** — checklist actualizado a Fase 2C, tests focalizados 52/52, BUILD SUCCESS.
 
-## Historias explicitamente fuera de alcance en Fase 2A/2B
+## Historias explicitamente fuera de alcance en Fase 2A/2B/2C
 
 - Checkout.
 - Mercado Pago.
@@ -304,3 +310,14 @@ Backlog ecommerce incremental. Fase 2A quedo cerrada documentalmente y Fase 2B a
 - Delivery.
 - Merchant Center implementado.
 - Next.js funcional.
+- Storefront publica (frontend).
+- `sitemap.xml` real (solo existe fuente JSON).
+- Filtros `categorySlug` en productos publicos.
+- Marcas publicas como paginas independientes.
+
+## Deuda QA pendiente antes de fases mayores
+
+- `mvn test` completo falla por deuda preexistente no relacionada:
+  - `ProductCleanupPreviewIntegrationTest.shouldBlockExecuteWhenElectronicDocumentExistsAndKeepDataUnchanged`
+  - `DuplicateKey` en `billing_series / uq_billing_series_doc_type_environment_active`
+- No corregida en Fase 2C; pendiente prioritaria antes de avanzar a Fase 2D o fases mayores.

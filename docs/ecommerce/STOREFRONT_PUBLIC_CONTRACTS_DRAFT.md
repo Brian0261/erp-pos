@@ -2,7 +2,7 @@
 
 ## Estado
 
-Contratos preliminares refinados en Fase 2B. No representan implementacion ni autorizan crear endpoints reales en esta fase.
+Contratos preliminares refinados en Fase 2B. **Fase 2C implemento backend read-only local para todos los endpoints MVP listados abajo.** Los contratos pasaron de draft a implementacion funcional backend (solo GET publico, read-only, sin token). Este documento mantiene el registro historico del diseno contractual.
 
 ## Principios
 
@@ -126,11 +126,11 @@ Contratos preliminares refinados en Fase 2B. No representan implementacion ni au
 
 ### GET /api/v1/storefront/seo/sitemap
 
-- Proposito: fuente JSON futura para exponer datos necesarios para `sitemap.xml`.
-- Estado: diseno Fase 2B; implementacion posterior.
-- Restriccion: incluir solo URLs publicadas, canónicas e indexables.
-- No genera `sitemap.xml` en backend durante Fase 2B.
-- Next.js o Storefront futuro generara `sitemap.xml` en fase posterior.
+- Proposito: fuente JSON para exponer datos necesarios para `sitemap.xml` futuro.
+- Estado: **implementado en Fase 2C** como endpoint JSON read-only.
+- Restriccion: incluir solo URLs publicadas, canonicas e indexables.
+- **No es sitemap.xml real**; Next.js o Storefront futuro generara `sitemap.xml` en fase posterior.
+- Excluye paths internos: `/api/`, `/ecommerce-admin/`, `?`, `/checkout`, `/pedidos`.
 
 ## Contratos diferidos
 

@@ -46,14 +46,50 @@ Estandarizar cambios tecnicos para reducir regresiones y mantener trazabilidad e
 - Decisiones pendientes documentadas: marcas publicas en MVP o fase posterior, estrategia final SSR/SSG/ISR, politica de productos agotados, sitemap como endpoint JSON o generacion directa, estructura final Next.js, schema.org avanzado y Merchant Center.
 - Restriccion operativa: sin codigo funcional, sin endpoints, sin frontend publico, sin backend, sin DB/Flyway, sin AWS/staging y sin commit/push en esta fase.
 
-### Inicio Fase 2B Public Catalog API Design
+### Cierre Fase 2C implementacion backend read-only
 
-- Tipo: documentacion tecnica y diseno contractual.
-- Base: Fase 2A cerrada con commit `9fc35ca docs: start phase 2a storefront discovery`.
-- Archivos creados: `docs/ecommerce/STOREFRONT_PUBLIC_API_DESIGN.md`, `docs/ecommerce/STOREFRONT_PUBLIC_DTO_DESIGN.md`, `docs/qa/PHASE2_PUBLIC_CATALOG_API_DESIGN_QA_CHECKLIST.md`.
-- Archivos actualizados: `docs/ecommerce/STOREFRONT_PUBLIC_CONTRACTS_DRAFT.md`, `docs/ecommerce/ECOMMERCE_BACKLOG.md`, `docs/ai/CURRENT_STATUS.md`, `docs/ai/CHANGE_CONTROL.md`.
-- Decisiones cerradas: namespace MVP `/api/v1/storefront/catalog/...`, endpoints MVP read-only, sitemap como fuente JSON futura, marcas publicas embebidas/diferidas como paginas, producto agotado no comprable, producto no publicado como 404 seguro, categoria vacia no indexable, cacheabilidad futura sin cache real.
-- Restriccion operativa: sin codigo funcional, sin backend, sin frontend funcional, sin endpoints reales, sin DTOs Java, sin controllers, sin use cases, sin ports, sin repositories, sin SecurityConfig, sin GlobalExceptionHandler, sin DB/Flyway, sin Next.js, sin checkout, sin pagos, sin delivery, sin Merchant Center, sin AWS/staging y sin commit/push automatico.
+- Tipo: implementacion backend funcional + cierre documental QA.
+- Base: Fase 2B cerrada con diseno contractual de Public Catalog API.
+- Commits incluidos:
+  - `3236e02 feat(storefront): add public API security baseline`
+  - `d247106 feat(storefront): add public products listing`
+  - `65a2921 feat(storefront): add public product detail by slug`
+  - `4c6e1c6 feat(storefront): add public categories listing`
+  - `abc4809 feat(storefront): add public category detail by slug`
+  - `d5ab5ea feat(storefront): add public sitemap JSON source`
+- Alcance real implementado:
+  - `GET /api/v1/storefront/catalog/products` — listado publico paginado de productos publicados.
+  - `GET /api/v1/storefront/catalog/products/{slug}` — detalle publico de producto por slug.
+  - `GET /api/v1/storefront/catalog/categories` — listado publico de categorias online activas.
+  - `GET /api/v1/storefront/catalog/categories/{slug}` — detalle publico de categoria por slug.
+  - `GET /api/v1/storefront/seo/sitemap` — fuente JSON para sitemap futuro (no es sitemap.xml real).
+- Arquitectura: hexagonal estricta (controllers, DTOs publicos separados, use cases, ports, adapters, proyecciones de dominio).
+- Tests focalizados: 52 tests, 0 failures, BUILD SUCCESS.
+  - `StorefrontPublicProductsIntegrationTest`
+  - `StorefrontPublicCategoriesIntegrationTest`
+  - `StorefrontPublicSitemapIntegrationTest`
+  - `AuthRbacCorsIntegrationTest`
+  - `SecurityConfigTest`
+- Exclusiones confirmadas:
+  - No se implemento sitemap.xml real.
+  - No se implemento Next.js ni Storefront publica.
+  - No se implementaron filtros categorySlug.
+  - No se implementaron marcas publicas.
+  - No se implemento checkout, pagos, delivery, Merchant Center, pedidos online ni stock reservado.
+  - No se toco frontend Angular, Flyway/DB, Docker, `.env`, secretos, dependencias, POS, ventas, caja, facturacion ni inventario.
+- QA focalizada: tests de integracion focalizados aprobados (52/52, BUILD SUCCESS).
+- Deuda QA conocida: `mvn test` completo falla por deuda preexistente no relacionada:
+  - `ProductCleanupPreviewIntegrationTest.shouldBlockExecuteWhenElectronicDocumentExistsAndKeepDataUnchanged`
+  - `DuplicateKey` en `billing_series / uq_billing_series_doc_type_environment_active`
+  - No corregida en esta fase; pendiente prioritaria antes de avanzar a fases mayores.
+- Separacion admin/public mantenida: `/api/v1/ecommerce-admin/...` protegido, `/api/v1/storefront/...` publico read-only.
+- Archivos documentales actualizados en cierre 2C.5:
+  - `docs/ai/CURRENT_STATUS.md`
+  - `docs/ai/CHANGE_CONTROL.md`
+  - `docs/qa/PHASE2_PUBLIC_CATALOG_API_DESIGN_QA_CHECKLIST.md`
+  - `docs/qa/MATRIX_API_ENDPOINTS.md`
+  - `docs/ecommerce/STOREFRONT_PUBLIC_CONTRACTS_DRAFT.md`
+  - `docs/ecommerce/ECOMMERCE_BACKLOG.md`
 
 ### Decisiones aprobadas para Fase 1
 

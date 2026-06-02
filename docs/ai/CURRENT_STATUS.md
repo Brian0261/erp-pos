@@ -11,9 +11,28 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
 - `docs/qa/PHASE0_ECOMMERCE_VALIDATION_CHECKLIST.md` existe y queda revisado/cerrado mediante seccion de cierre formal, sin validar codigo funcional porque Fase 0 es documental.
 - Fase 1C del modulo ecommerce admin interno quedo cerrada funcional y documentalmente: perfiles online, detalle/editor, marcas ecommerce y categorias online implementados y auditados; build frontend exitoso; QA manual ligero sin bloqueantes conocidos.
 - El backend ecommerce admin ya cuenta con soporte interno para perfiles online, marcas, categorias, slugs/metadata/assets/precio online segun alcance Fase 1B/1C.
-- Fase 2A Storefront publico SEO-first Discovery & Contracts quedo cerrada documentalmente con commit `9fc35ca docs: start phase 2a storefront discovery`.
-- Fase 2B iniciada como diseno documental de Public Catalog API: contratos read-only, DTOs publicos, errores seguros, reglas SEO y checklist QA de diseno.
-- Restricciones vigentes en Fase 2B: no backend funcional, no frontend funcional, no Flyway/DB, no endpoints reales, no DTOs Java, no controllers, no use cases, no ports, no repositories, no SecurityConfig, no GlobalExceptionHandler, no Next.js, no checkout, no pagos, no pedidos online, no delivery, no Merchant Center y no AWS/staging.
+- Fase 2A Storefront publico SEO-first Discovery & Contracts quedo cerrada documentalmente con commit `9fc65ca docs: start phase 2a storefront discovery`.
+- Fase 2B Public Catalog API Design cerrada documentalmente con diseno de endpoints, DTOs publicos, errores seguros, reglas SEO y checklist QA de diseno.
+- Fase 2C implementacion backend read-only completada funcionalmente y pusheada. Commits:
+  - `3236e02 feat(storefront): add public API security baseline`
+  - `d247106 feat(storefront): add public products listing`
+  - `65a2921 feat(storefront): add public product detail by slug`
+  - `4c6e1c6 feat(storefront): add public categories listing`
+  - `abc4809 feat(storefront): add public category detail by slug`
+  - `d5ab5ea feat(storefront): add public sitemap JSON source`
+- Endpoints publicos read-only implementados y testeados:
+  - `GET /api/v1/storefront/catalog/products` — listado paginado de productos publicados.
+  - `GET /api/v1/storefront/catalog/products/{slug}` — detalle de producto por slug.
+  - `GET /api/v1/storefront/catalog/categories` — listado de categorias online activas.
+  - `GET /api/v1/storefront/catalog/categories/{slug}` — detalle de categoria por slug.
+  - `GET /api/v1/storefront/seo/sitemap` — fuente JSON para sitemap futuro.
+- Tests focalizados de Fase 2C: 52 tests, 0 failures, BUILD SUCCESS.
+- Arquitectura hexagonal estricta mantenida: controllers, DTOs publicos separados, use cases, ports, adapters, proyecciones de dominio.
+- Sitemap implementado como endpoint JSON (`/api/v1/storefront/seo/sitemap`), no como `sitemap.xml` real.
+- NO se implemento: `sitemap.xml` real, Next.js, Storefront publica, filtros `categorySlug`, marcas publicas, checkout, pagos, delivery, Merchant Center, pedidos online, stock reservado.
+- NO se toco: frontend Angular, Flyway/DB, Docker, `.env`, secretos, dependencias, POS, ventas, caja, facturacion, inventario.
+- Deuda QA preexistente conocida: `mvn test` completo falla por `ProductCleanupPreviewIntegrationTest.shouldBlockExecuteWhenElectronicDocumentExistsAndKeepDataUnchanged` y `DuplicateKey` en `billing_series / uq_billing_series_doc_type_environment_active`. No corregida en esta fase; pendiente prioritaria antes de avanzar a fases mayores.
+- Restricciones vigentes en Fase 2C: no frontend Angular, no Flyway/DB, no Docker, no `.env`, no secretos, no dependencias, no POS/ventas/caja/facturacion/inventario, no filtros categorySlug, no marcas publicas, no sitemap.xml real, no Next.js, no Storefront publica, no checkout/pagos/pedidos/stock reservado.
 - Modulos protegidos para Fase 1A y preparacion Fase 1: POS, inventario, ventas, caja y facturacion no deben modificarse.
 - AWS/staging no debe tocarse hasta que exista una fase local estable y validada.
 - Confirmado: no se toco codigo funcional en esta fase documental.
@@ -102,7 +121,9 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
 
 ## Siguiente etapa recomendada
 
-Preparar carga inicial real controlada (catalogo, almacenes, stock base y parametros operativos), solo cuando exista autorizacion explicita del responsable de negocio/tecnico.
+1. Resolver deuda QA preexistente del full `mvn test` (`ProductCleanupPreviewIntegrationTest` + `DuplicateKey billing_series`) antes de avanzar a fases mayores.
+2. Preparar carga inicial real controlada (catalogo, almacenes, stock base y parametros operativos), solo cuando exista autorizacion explicita del responsable de negocio/tecnico.
+3. No avanzar a Next.js/Storefront publica sin planificacion formal de Fase 2D con aprobacion humana explicita.
 
 ## Nota de alcance
 
