@@ -129,6 +129,6 @@ Definir la estrategia minima para que la futura tienda publica de InkToy nazca S
 - Politica inicial de productos agotados.
 - Schema.org avanzado.
 - Merchant Center.
-- Implementacion real de Next.js (stack tecnico confirmado en ADR-021: Next.js 16, App Router, TypeScript, npm, Tailwind CSS).
-- Implementacion real de `sitemap.xml` y `robots.txt`.
-- Creacion de carpeta `storefront/` (diferida a Fase 2E.1 con aprobacion explicita).
+- Implementacion real de `sitemap.xml` (diferido a fase posterior).
+- Implementacion real de `robots.txt` productivo (diferido a fase posterior).
+- Paginas reales de producto y categoria (diferido a Fase 2F con aprobacion explicita).

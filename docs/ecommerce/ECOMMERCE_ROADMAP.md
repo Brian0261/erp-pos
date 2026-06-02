@@ -32,13 +32,19 @@
 | 2D | Storefront Architecture Decision & SEO Delivery Plan | Decision documental sobre Next.js, SSG/ISR, SSR diferido, rutas publicas, `sitemap.xml` futuro, `robots.txt`, canonical, noindex staging, estructura futura `storefront/` y limites de Storefront. |
 | 2E.0 | Storefront MVP Shell Planning | Decision tecnica documental del stack (Next.js 16, App Router, TypeScript, Tailwind), estructura de carpetas y configuracion base del shell. |
 | 2E.1 | Storefront MVP Shell Implementation | Shell publico minimo instalado en `storefront/` con build exitoso, sin paginas reales. |
-| 2F | Public SEO Catalog MVP | Catalogo publico SEO con listados y detalle de producto/categoria. |
+| 2F.0 | Public SEO Catalog MVP Planning | Plan documental, limpieza de deuda heredada y definicion de subfases con Google Stitch. |
+| 2F.1 | Diseno visual con Google Stitch | Artefactos visuales aprobados: home, productos, categorias, layout, componentes, responsive. |
+| 2F.2 | Componentes base Next.js/Tailwind | Layout, header/footer, cards, grids, estados vacios/error sin API real aun. |
+| 2F.3 | Integracion real Storefront API | Paginas /productos, /productos/{slug}, /categorias, /categorias/{slug} consumiendo endpoints. |
+| 2F.4 | SEO tecnico inicial | generateMetadata, canonical, notFound(), noindex/indexable, ISR. |
+| 2F.5 | QA/cierre documental 2F | Build/lint/typecheck, smoke local, docs actualizados y deudas registradas. |
 | Posteriores | Intencion de compra, pedidos, pagos, delivery, Merchant Center y despliegue | Fases futuras separadas, aprobadas una por una. |
 
 ## Limites de aprobacion actuales
 
-- Fase 2E.2 esta aprobada solo como trabajo documental/QA.
-- Fase 2F (catalogo publico SEO) no queda aprobada todavia.
+- Fase 2E.2 cerrada documentalmente.
+- Fase 2F.0 iniciada como planificacion documental del MVP SEO catalog.
+- Fase 2F.1 (diseno visual con Google Stitch) no queda aprobada todavia.
 - No se autoriza en fase actual:
   - Paginas reales de producto/categoria
   - Consumo real de endpoints Storefront
@@ -53,12 +59,13 @@
 ## Criterio de salida de Fase 2E.2
 
 - QA documental del shell completado.
+- Fase 2F.0 plan documental creado.
 - CURRENT_STATUS, CHANGE_CONTROL, ROADMAP, BACKLOG y QA checklist actualizados.
 - Deudas no bloqueantes registradas (npm audit, warning Turbopack, README generico, SVGs default).
 - No hay paginas reales implementadas.
-- No hay consumo real de API.
+- No hay consumo real de API desde paginas.
 - No hay cambios fuera de `docs/` y `storefront/`.
 
 ## Siguiente paso esperado
 
-Preparar Fase 2F Public SEO Catalog MVP en Plan Mode para definir listados y detalle de producto/categoria reales, antes de implementar cualquier pagina funcional.
+Preparar Fase 2F.1 Diseno visual con Google Stitch para aprobacion explicita antes de implementar componentes o paginas reales.

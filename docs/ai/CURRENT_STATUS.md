@@ -146,11 +146,27 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
 - Sin cambios en backend, Angular, Flyway/DB, Docker, `.env` raiz, AWS/staging.
 - Pendientes no bloqueantes: README.md generico, SVGs default de Next.js en `public/`, warning Turbopack.
 
+## Fase 2F.0 Public SEO Catalog MVP Planning
+
+- Plan documental creado: `docs/ecommerce/STOREFRONT_PUBLIC_SEO_CATALOG_MVP_PLAN.md`.
+- Checklist QA creado: `docs/qa/PHASE2F_PUBLIC_SEO_CATALOG_QA_CHECKLIST.md`.
+- Limpieza documental ejecutada:
+  - Duplicados 2E eliminados de `ECOMMERCE_BACKLOG.md`.
+  - Duplicados 2E eliminados de `PHASE2E_STOREFRONT_MVP_SHELL_QA_CHECKLIST.md`.
+  - `STOREFRONT_SEO_FIRST_STRATEGY.md` actualizado: `storefront/` ya existe, sitemap.xml real diferido.
+- Subfases 2F.0 a 2F.5 definidas en plan documental.
+- Google Stitch documentado como subfase 2F.1: herramienta de diseño visual, no generador de código final.
+- Restricciones vigentes:
+  - No paginas reales, no consumo real de API, no checkout, no pagos, no pedidos.
+  - No sitemap.xml real, no marcas publicas, no filtros avanzados.
+  - No AWS/staging, no Docker raiz, no .env raiz.
+  - No cambios backend, Angular, Flyway/DB.
+
 ## Siguiente etapa recomendada
 
 1. Preparar carga inicial real controlada (catalogo, almacenes, stock base y parametros operativos), solo cuando exista autorizacion explicita del responsable de negocio/tecnico.
-2. Preparar Fase 2F Public SEO Catalog MVP en Plan Mode para definir listados y detalle de producto/categoria reales.
-3. No avanzar a catalogo publico real sin aprobacion humana explicita de Fase 2F.
+2. Aprobar Fase 2F.1 Diseno visual con Google Stitch antes de tocar componentes o paginas reales.
+3. No avanzar a implementacion de catalogo publico sin aprobacion humana explicita de Fase 2F.1.
 
 ## Nota de alcance
 

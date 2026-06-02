@@ -489,61 +489,109 @@ Backlog ecommerce incremental. Fase 2A y Fase 2B quedaron cerradas documentalmen
   - sin sitemap.xml real.
 - Estado: IMPLEMENTADO (Fase 2E.1) — commit `c049e3e`, build/lint/tsc OK.
 
-### HIST-2E-002 Estructura de carpetas del shell
+## Historias Fase 2F - Public SEO Catalog MVP
 
-- Descripcion breve: definir la estructura interna de `storefront/`.
-- Valor de negocio: evita retrabajo estructural y mantiene separacion de responsabilidades.
+### HIST-2F-001 Plan documental MVP SEO catalog
+
+- Descripcion breve: crear plan de Fase 2F con subfases, alcance, riesgos y criterios de salida.
+- Valor de negocio: alinea equipo y evita scope creep antes de diseno e implementacion.
 - Criterios de aceptacion:
-  - carpetas `app/`, `components/`, `lib/`, `types/`, `public/` documentadas;
-  - `.env.local.example` definido como plantilla;
-  - `.env.local` real debe quedar ignorado.
-- Restricciones tecnicas:
-  - sin crear carpeta real;
-  - sin archivos de configuracion reales.
-- Estado: DOCUMENTADO (Fase 2E.0).
+  - existe `docs/ecommerce/STOREFRONT_PUBLIC_SEO_CATALOG_MVP_PLAN.md`;
+  - subfases 2F.0 a 2F.5 definidas;
+  - Google Stitch ubicado como 2F.1;
+  - rutas objetivo documentadas;
+  - fuera de alcance explicito.
+- Estado: IMPLEMENTADO (Fase 2F.0).
 
-### HIST-2E-003 Configuracion base del shell
+### HIST-2F-002 Diseno visual con Google Stitch
 
-- Descripcion breve: documentar configuracion minima de Next.js para build exitoso futuro.
-- Valor de negocio: acelera la fase de implementacion evitando decisiones sobre la marcha.
+- Descripcion breve: producir artefactos visuales de referencia para home, productos, categorias y layout.
+- Valor de negocio: reduce incertidumbre visual antes de codificar y evita retrabajo estetico.
 - Criterios de aceptacion:
-  - `next.config.ts` documentado con `output: 'standalone'`;
-  - `tsconfig.json` con modo estricto;
-  - `tailwind.config.ts` basico;
-  - metadata base placeholder en layout;
-  - `robots.txt` de desarrollo bloqueando crawlers.
-- Restricciones tecnicas:
-  - sin implementar paginas reales;
-  - sin consumir endpoints reales;
-  - sin sitemap.xml.
-- Estado: DOCUMENTADO (Fase 2E.0).
+  - mockups aprobados de home, listado producto, detalle producto, listado categoria, detalle categoria;
+  - layout, header, footer, navegacion definidos;
+  - componentes visuales identificados;
+  - paleta, tipografia, responsive mobile/tablet/desktop;
+  - estados vacios, error, sin imagen, agotado;
+  - sin checkout, carrito, pagos ni CTA transaccional.
+- Estado: PENDIENTE (Fase 2F.1).
 
-### HIST-2E-004 Wrapper API futuro
+### HIST-2F-003 Conversion a componentes base Next.js/Tailwind
 
-- Descripcion breve: definir estrategia del wrapper de consumo de Storefront API.
-- Valor de negocio: asegura que el consumo sea server-side por defecto y no exponga datos internos.
+- Descripcion breve: transformar disenos aprobados en componentes base funcionales sin API real.
+- Valor de negocio: permite validar estructura visual y responsive antes de integrar datos.
 - Criterios de aceptacion:
-  - wrapper server-side por defecto documentado;
-  - sin consulta directa a base de datos;
-  - sin consumo de endpoints admin.
-- Restricciones tecnicas:
-  - sin implementacion funcional;
-  - sin consumo real de endpoints.
-- Estado: DOCUMENTADO (Fase 2E.0).
+  - layout general implementado;
+  - header/footer/navegacion funcionales;
+  - product card, category card, badges, price block, image frame, breadcrumb;
+  - estados vacios y error visuales;
+  - responsive validado;
+  - build/lint/typecheck sin errores.
+- Estado: PENDIENTE (Fase 2F.2).
+
+### HIST-2F-004 Integracion real Storefront API
+
+- Descripcion breve: conectar paginas reales con endpoints publicos de backend.
+- Valor de negocio: habilita contenido dinamico real en la tienda publica.
+- Criterios de aceptacion:
+  - `/productos` consume listado paginado;
+  - `/productos/{slug}` consume detalle por slug;
+  - `/categorias` consume listado de categorias;
+  - `/categorias/{slug}` consume detalle por slug;
+  - fetch server-side desde Server Components;
+  - no consumo de endpoints admin;
+  - no consulta directa a DB.
+- Estado: PENDIENTE (Fase 2F.3).
+
+### HIST-2F-005 SEO tecnico inicial
+
+- Descripcion breve: implementar metadata, canonical, notFound, noindex e ISR en paginas publicas.
+- Valor de negocio: asegura que las paginas sean indexables y seguras para SEO.
+- Criterios de aceptacion:
+  - `generateMetadata` en detalle producto y categoria;
+  - canonical desde backend;
+  - Open Graph basico;
+  - `notFound()` para slugs invalidos/no publicados;
+  - ISR con revalidate conservador;
+  - `robots.txt` y layout protegen desarrollo;
+  - paginas `indexable=false` devuelven noindex.
+- Estado: PENDIENTE (Fase 2F.4).
+
+### HIST-2F-006 QA y cierre documental 2F
+
+- Descripcion breve: validar build, lint, typecheck, smoke local y cerrar trazabilidad documental.
+- Valor de negocio: garantiza calidad antes de considerar la fase completada.
+- Criterios de aceptacion:
+  - build/lint/typecheck sin errores;
+  - smoke test local de slugs validos/invalidos y listados vacios/con datos;
+  - documentacion actualizada: roadmap, backlog, status, change control;
+  - deudas no bloqueantes registradas.
+- Estado: PENDIENTE (Fase 2F.5).
 
 ## Historias explicitamente fuera de alcance en Fase 2A/2B/2C/2D/2E
 
+Los siguientes puntos estuvieron fuera de alcance hasta Fase 2E inclusive. En Fase 2F entran al alcance progresivo:
+
+- Pagina de producto real `/productos/{slug}` (dentro de alcance 2F).
+- Pagina de categoria real `/categorias/{slug}` (dentro de alcance 2F).
+- Consumo real de endpoints Storefront desde paginas (dentro de alcance 2F).
+
+## Historias explicitamente fuera de alcance en Fase 2F
+
 - Checkout.
-- Mercado Pago.
+- Carrito.
+- Pagos.
 - Pedidos online.
 - Delivery.
-- Merchant Center implementado.
-- Pagina de producto real `/productos/{slug}`.
-- Pagina de categoria real `/categorias/{slug}`.
-- Consumo real de endpoints Storefront desde paginas.
-- Filtros `categorySlug` en productos publicos.
-- Marcas publicas como paginas independientes.
 - Stock reservado.
+- Merchant Center implementado.
+- Marcas publicas como paginas independientes (diferidas).
+- Filtros avanzados.
+- Sort por precio.
+- `sitemap.xml` real (diferido).
+- AWS/staging.
+- Cambios backend/Flyway/Docker.
+- Cambios en Angular interno.
 
 ## Deuda QA resuelta
 

@@ -132,6 +132,40 @@ Estandarizar cambios tecnicos para reducir regresiones y mantener trazabilidad e
   - SVGs default en `storefront/public/`.
 - Siguiente paso: Fase 2F Public SEO Catalog MVP en Plan Mode.
 
+### Inicio Fase 2F.0 Public SEO Catalog MVP Planning
+
+- Tipo: documentacion y planificacion.
+- Alcance: definir subfases 2F.0 a 2F.5, limpiar deuda documental heredada y ubicar Google Stitch como herramienta de diseno visual.
+- Archivos creados:
+  - `docs/ecommerce/STOREFRONT_PUBLIC_SEO_CATALOG_MVP_PLAN.md`
+  - `docs/qa/PHASE2F_PUBLIC_SEO_CATALOG_QA_CHECKLIST.md`
+- Archivos actualizados:
+  - `docs/ecommerce/ECOMMERCE_ROADMAP.md`
+  - `docs/ecommerce/ECOMMERCE_BACKLOG.md`
+  - `docs/ecommerce/STOREFRONT_SEO_FIRST_STRATEGY.md`
+  - `docs/qa/PHASE2E_STOREFRONT_MVP_SHELL_QA_CHECKLIST.md`
+  - `docs/ai/CURRENT_STATUS.md`
+  - `docs/ai/CHANGE_CONTROL.md`
+- Decisiones documentales:
+  - Fase 2F dividida en 6 subfases: 2F.0 planificacion, 2F.1 Google Stitch, 2F.2 componentes base, 2F.3 integracion API, 2F.4 SEO tecnico, 2F.5 QA cierre.
+  - Google Stitch es herramienta de diseno visual en 2F.1, no generador de codigo final.
+  - Entregables de Google Stitch: home, productos, categorias, layout, componentes, paleta, responsive, estados vacios/error.
+  - Antes de codificar se deben convertir disenos en design tokens, componentes Tailwind, breakpoints, jerarquia semantica, reglas de imagenes, accesibilidad, Core Web Vitals, SEO metadata, canonical y noindex.
+  - Rutas objetivo: `/productos`, `/productos/{slug}`, `/categorias`, `/categorias/{slug}`.
+  - Estrategia server-side fetch por defecto.
+  - Proteccion noindex en desarrollo mediante `robots.txt`, layout metadata y flag env.
+- Restricciones vigentes:
+  - No paginas reales, no consumo real de API, no checkout, no pagos, no pedidos.
+  - No sitemap.xml real, no marcas publicas, no filtros avanzados.
+  - No AWS/staging, no Docker raiz, no .env raiz.
+  - No cambios backend, Angular, Flyway/DB.
+- Deudas no bloqueantes persisten:
+  - 2 vulnerabilidades moderadas en `postcss`.
+  - Warning Turbopack por multiples lockfiles.
+  - README.md generico.
+  - SVGs default en `public/`.
+- Siguiente paso esperado: aprobar Fase 2F.1 Diseno visual con Google Stitch antes de tocar componentes o paginas reales.
+
 ### Inicio Fase 2E.0 Storefront MVP Shell Planning
 
 - Tipo: documentacion tecnica de planificacion, sin implementacion funcional.
