@@ -10,6 +10,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MvcResult;
 
 import java.math.BigDecimal;
+import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -679,15 +681,7 @@ class ProductCleanupPreviewIntegrationTest extends AbstractHttpIntegrationTest {
     }
 
     private void insertElectronicDocument(long saleId, long productId, String suffix) {
-        Long seriesId = jdbcTemplate.queryForObject(
-                """
-                        insert into billing_series (document_type, series, current_number, environment, active, created_by, updated_by)
-                        values ('RECEIPT', ?, 1, 'LOCAL', true, 'it-cleanup', 'it-cleanup')
-                        returning id
-                        """,
-                Long.class,
-                "B" + suffix.substring(Math.max(0, suffix.length() - 6))
-        );
+        Long seriesId = findOrCreateBillingSeries(suffix);
 
         Long documentId = jdbcTemplate.queryForObject(
                 """
@@ -712,6 +706,24 @@ class ProductCleanupPreviewIntegrationTest extends AbstractHttpIntegrationTest {
                 documentId,
                 productId,
                 "Producto cleanup " + suffix
+        );
+    }
+
+    private Long findOrCreateBillingSeries(String suffix) {
+        List<Map<String, Object>> existing = jdbcTemplate.queryForList(
+                "select id from billing_series where document_type = 'RECEIPT' and environment = 'LOCAL' and active = true"
+        );
+        if (existing != null && !existing.isEmpty()) {
+            return ((Number) existing.get(0).get("id")).longValue();
+        }
+        return jdbcTemplate.queryForObject(
+                """
+                        insert into billing_series (document_type, series, current_number, environment, active, created_by, updated_by)
+                        values ('RECEIPT', ?, 1, 'LOCAL', true, 'it-cleanup', 'it-cleanup')
+                        returning id
+                        """,
+                Long.class,
+                "B" + suffix.substring(Math.max(0, suffix.length() - 6))
         );
     }
 
