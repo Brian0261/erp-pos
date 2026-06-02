@@ -123,11 +123,20 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
 5. En QA frontend, controlar riesgo de cache visual (segun protocolo UX-011).
 6. No realizar commits/tags/push automaticos desde agentes.
 
+## Fase 2E.0 Storefront MVP Shell Planning
+
+- Fase 2E.0 iniciada como documentacion tecnica de stack, estructura y shell minimo.
+- ADR-021 creado: confirma Next.js 16, App Router, TypeScript, npm, Tailwind CSS.
+- Plan MVP Shell creado: define estructura de carpetas, configuracion base, variables de entorno y wrapper API futuro.
+- Checklist QA Fase 2E creado.
+- Fase 2E.0 NO crea `storefront/`, NO instala Next.js, NO instala dependencias, NO implementa paginas reales.
+- Restricciones vigentes: no backend funcional, no Angular, no Flyway/DB, no Docker, no `.env` raiz, no AWS/staging, no checkout/pagos/pedidos/stock reservado/delivery/Merchant Center.
+
 ## Siguiente etapa recomendada
 
 1. Preparar carga inicial real controlada (catalogo, almacenes, stock base y parametros operativos), solo cuando exista autorizacion explicita del responsable de negocio/tecnico.
-2. Revisar y aprobar la documentacion de Fase 2D antes de abrir Fase 2E Storefront MVP Shell.
-3. No avanzar a Next.js/Storefront publica ni crear `storefront/` sin aprobacion humana explicita de Fase 2E.
+2. Revisar y aprobar la documentacion de Fase 2E.0 antes de abrir Fase 2E.1 Storefront MVP Shell Implementation.
+3. No avanzar a Next.js/Storefront publica ni crear `storefront/` sin aprobacion humana explicita de Fase 2E.1.
 
 ## Nota de alcance
 

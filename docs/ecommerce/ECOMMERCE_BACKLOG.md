@@ -411,7 +411,67 @@ Backlog ecommerce incremental. Fase 2A y Fase 2B quedaron cerradas documentalmen
   - sin commit ni push automatico.
 - Estado: DOCUMENTADO (Fase 2D).
 
-## Historias explicitamente fuera de alcance en Fase 2A/2B/2C/2D
+## Historias Fase 2E - Storefront MVP Shell
+
+### HIST-2E-001 Stack tecnico del shell
+
+- Descripcion breve: cerrar decisiones tecnicas minimas para el proyecto Next.js futuro.
+- Valor de negocio: reduce incertidumbre tecnica antes de crear `storefront/`.
+- Criterios de aceptacion:
+  - Next.js 16 confirmado;
+  - App Router confirmado;
+  - TypeScript confirmado;
+  - npm confirmado;
+  - Tailwind CSS confirmado.
+- Restricciones tecnicas:
+  - sin instalar Next.js;
+  - sin crear `storefront/`;
+  - sin dependencias.
+- Estado: DOCUMENTADO (Fase 2E.0).
+
+### HIST-2E-002 Estructura de carpetas del shell
+
+- Descripcion breve: definir la estructura interna de `storefront/`.
+- Valor de negocio: evita retrabajo estructural y mantiene separacion de responsabilidades.
+- Criterios de aceptacion:
+  - carpetas `app/`, `components/`, `lib/`, `types/`, `public/` documentadas;
+  - `.env.local.example` definido como plantilla;
+  - `.env.local` real debe quedar ignorado.
+- Restricciones tecnicas:
+  - sin crear carpeta real;
+  - sin archivos de configuracion reales.
+- Estado: DOCUMENTADO (Fase 2E.0).
+
+### HIST-2E-003 Configuracion base del shell
+
+- Descripcion breve: documentar configuracion minima de Next.js para build exitoso futuro.
+- Valor de negocio: acelera la fase de implementacion evitando decisiones sobre la marcha.
+- Criterios de aceptacion:
+  - `next.config.ts` documentado con `output: 'standalone'`;
+  - `tsconfig.json` con modo estricto;
+  - `tailwind.config.ts` basico;
+  - metadata base placeholder en layout;
+  - `robots.txt` de desarrollo bloqueando crawlers.
+- Restricciones tecnicas:
+  - sin implementar paginas reales;
+  - sin consumir endpoints reales;
+  - sin sitemap.xml.
+- Estado: DOCUMENTADO (Fase 2E.0).
+
+### HIST-2E-004 Wrapper API futuro
+
+- Descripcion breve: definir estrategia del wrapper de consumo de Storefront API.
+- Valor de negocio: asegura que el consumo sea server-side por defecto y no exponga datos internos.
+- Criterios de aceptacion:
+  - wrapper server-side por defecto documentado;
+  - sin consulta directa a base de datos;
+  - sin consumo de endpoints admin.
+- Restricciones tecnicas:
+  - sin implementacion funcional;
+  - sin consumo real de endpoints.
+- Estado: DOCUMENTADO (Fase 2E.0).
+
+## Historias explicitamente fuera de alcance en Fase 2A/2B/2C/2D/2E
 
 - Checkout.
 - Mercado Pago.

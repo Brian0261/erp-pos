@@ -103,6 +103,34 @@ Estandarizar cambios tecnicos para reducir regresiones y mantener trazabilidad e
   - Tests Storefront focalizados: 52 tests, 0 failures, BUILD SUCCESS.
 - Alcance: solo se modifico un test fixture. No se toco produccion, Storefront/ecommerce 2C, Flyway/DB, frontend, Docker, `.env`, secretos ni dependencias.
 
+### Inicio Fase 2E.0 Storefront MVP Shell Planning
+
+- Tipo: documentacion tecnica de planificacion, sin implementacion funcional.
+- Objetivo: cerrar el stack tecnico, la estructura y la configuracion base del futuro shell Next.js en `storefront/`.
+- Archivos creados:
+  - `docs/adr/ecommerce/ECOM-ADR-021-storefront-tech-stack.md`
+  - `docs/ecommerce/STOREFRONT_MVP_SHELL_PLAN.md`
+  - `docs/qa/PHASE2E_STOREFRONT_MVP_SHELL_QA_CHECKLIST.md`
+- Archivos actualizados:
+  - `docs/ecommerce/ECOMMERCE_ROADMAP.md`
+  - `docs/ecommerce/ECOMMERCE_BACKLOG.md`
+  - `docs/ai/CURRENT_STATUS.md`
+  - `docs/ai/CHANGE_CONTROL.md`
+- Decisiones tecnicas cerradas:
+  - Next.js 16 como version objetivo estable/LTS.
+  - App Router obligatorio.
+  - TypeScript obligatorio.
+  - npm como package manager.
+  - Tailwind CSS como base visual inicial.
+  - `storefront/` definida como carpeta raiz futura; `frontend/` Angular queda solo para ERP/POS interno.
+  - `.env.local.example` como plantilla commiteable; `.env.local` real ignorado.
+  - No usar `NEXT_PUBLIC_` para secretos ni URLs internas sensibles.
+  - Wrapper API server-side por defecto.
+  - `robots.txt` futuro bloquea crawlers durante desarrollo.
+  - Paginas reales y `sitemap.xml` quedan para fase posterior.
+- Restricciones: no crear `storefront/`, no instalar Next.js, no instalar dependencias, no crear paginas reales, no consumir endpoints reales, no `sitemap.xml` real, no robots productivo, no checkout/pagos/pedidos/stock reservado/delivery/Merchant Center, no AWS/staging, no Docker, no `.env` raiz, no backend funcional, no Angular, no Flyway/DB.
+- No hacer commit ni push en esta fase sin instruccion explicita.
+
 ### Inicio Fase 2D Storefront Architecture Decision & SEO Delivery Plan
 
 - Tipo: documentacion y arquitectura, sin implementacion funcional.

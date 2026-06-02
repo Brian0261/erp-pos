@@ -6,8 +6,9 @@
 - Fase 2A Storefront Discovery & Contracts cerrada documentalmente.
 - Fase 2B Public Catalog API Design cerrada documentalmente.
 - Fase 2C Public Catalog API Read-only Implementation cerrada funcional y documentalmente.
-- Fase actual autorizada: Fase 2D Storefront Architecture Decision & SEO Delivery Plan.
-- Esta fase es documental/arquitectonica y no implementa codigo funcional, Next.js, `storefront/`, dependencias ni infraestructura publica.
+- Fase 2D Storefront Architecture Decision & SEO Delivery Plan cerrada documentalmente.
+- Fase actual autorizada: Fase 2E.0 Storefront MVP Shell Planning (stack tecnico, estructura y shell minimo).
+- Fase 2E.0 es documental/tecnica y no implementa `storefront/`, Next.js, dependencias ni infraestructura publica.
 
 ## Principios
 
@@ -27,18 +28,19 @@
 | 2B | Public Catalog API Design | Diseno contractual de API publica read-only con DTOs publicos y errores seguros. |
 | 2C | Public Catalog API Read-only Implementation | Implementacion local de API publica read-only para catalogo, categorias y SEO basico. |
 | 2D | Storefront Architecture Decision & SEO Delivery Plan | Decision documental sobre Next.js, SSG/ISR, SSR diferido, rutas publicas, `sitemap.xml` futuro, `robots.txt`, canonical, noindex staging, estructura futura `storefront/` y limites de Storefront. |
-| 2E | Storefront MVP Shell | Shell publico inicial y capas tecnicas minimas solo si Fase 2D queda revisada y aprobada; sin compra online. |
+| 2E.0 | Storefront MVP Shell Planning | Decision tecnica documental del stack (Next.js 16, App Router, TypeScript, Tailwind), estructura de carpetas y configuracion base del shell. |
+| 2E.1 | Storefront MVP Shell Implementation | Shell publico minimo instalado en `storefront/` con build exitoso, sin paginas reales. |
 | 2F | Public SEO Catalog MVP | Catalogo publico SEO con listados y detalle de producto/categoria. |
 | Posteriores | Intencion de compra, pedidos, pagos, delivery, Merchant Center y despliegue | Fases futuras separadas, aprobadas una por una. |
 
 ## Limites de aprobacion actuales
 
-- Fase 2D esta aprobada solo como trabajo documental/arquitectonico.
-- Fase 2E no queda aprobada para implementacion todavia.
+- Fase 2E.0 esta aprobada solo como trabajo documental/tecnico de planificacion.
+- Fase 2E.1 (implementacion del shell) no queda aprobada todavia.
 - No se autoriza en esta fase:
-  - Next.js
-  - carpeta `storefront/`
-  - instalacion de dependencias
+  - Next.js instalado
+  - carpeta `storefront/` creada
+  - dependencias instaladas
   - Storefront funcional
   - sitemap.xml real
   - Checkout
@@ -48,19 +50,18 @@
   - Merchant Center
   - AWS/staging
 
-## Criterio de salida de Fase 2D
+## Criterio de salida de Fase 2E.0
 
-- ADR Storefront Next.js Delivery Architecture creado.
-- Plan Storefront Next.js Delivery creado.
-- Checklist QA documental Fase 2D creado.
-- Rutas publicas objetivo documentadas: `/productos/{slug}` y `/categorias/{slug}`.
-- `/marcas/{slug}` diferido.
-- Estrategia SSG/ISR principal y SSR diferido documentada.
-- `sitemap.xml` futuro definido como generado por Next.js usando fuente JSON backend.
-- `robots.txt`, canonical y noindex staging documentados.
-- Separacion Angular interno vs Storefront publica validada.
+- ADR Storefront Tech Stack (ECOM-ADR-021) creado.
+- Plan MVP Shell creado.
+- Checklist QA Fase 2E creado.
+- Stack tecnico confirmado: Next.js 16, App Router, TypeScript, npm, Tailwind CSS.
+- Estructura de carpetas futura documentada.
+- Variables de entorno y seguridad documentadas.
+- `robots.txt` de desarrollo definido.
+- Paginas reales y sitemap.xml diferidos.
 - Restricciones fuera de alcance registradas.
 
 ## Siguiente paso esperado
 
-Revisar y aprobar la documentacion de Fase 2D antes de abrir Fase 2E Storefront MVP Shell. Fase 2E solo deberia crear el shell publico minimo si existe aprobacion explicita para crear `storefront/` e instalar dependencias.
+Revisar y aprobar la documentacion de Fase 2E.0 antes de abrir Fase 2E.1 Storefront MVP Shell Implementation. Fase 2E.1 solo deberia crear el shell publico minimo si existe aprobacion explicita para crear `storefront/` e instalar dependencias.
