@@ -132,11 +132,25 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
 - Fase 2E.0 NO crea `storefront/`, NO instala Next.js, NO instala dependencias, NO implementa paginas reales.
 - Restricciones vigentes: no backend funcional, no Angular, no Flyway/DB, no Docker, no `.env` raiz, no AWS/staging, no checkout/pagos/pedidos/stock reservado/delivery/Merchant Center.
 
+## Fase 2E.1 Storefront MVP Shell Implementation
+
+- Implementacion completada y pusheada en commit `c049e3e feat(storefront): add Next.js MVP shell`.
+- Next.js 16.2.7 instalado con App Router, TypeScript, Tailwind CSS, ESLint, npm.
+- Estructura creada: `app/`, `lib/api.ts`, `types/storefront.ts`, `public/robots.txt`, `.env.local.example`, `next.config.ts`.
+- Build, lint y typecheck: OK.
+- `npm audit`: 2 vulnerabilidades moderadas en `postcss` (dependencia transitiva de Next.js) como deuda no bloqueante.
+- Warning Turbopack por multiples lockfiles como deuda no bloqueante.
+- `robots.txt` bloquea crawlers (`Disallow: /`). Layout con `robots: { index: false, follow: false }`.
+- `.env.local` real no existe. `.env.local.example` es la plantilla commiteable.
+- Sin paginas reales, sin consumo real de API, sin `sitemap.xml`.
+- Sin cambios en backend, Angular, Flyway/DB, Docker, `.env` raiz, AWS/staging.
+- Pendientes no bloqueantes: README.md generico, SVGs default de Next.js en `public/`, warning Turbopack.
+
 ## Siguiente etapa recomendada
 
 1. Preparar carga inicial real controlada (catalogo, almacenes, stock base y parametros operativos), solo cuando exista autorizacion explicita del responsable de negocio/tecnico.
-2. Revisar y aprobar la documentacion de Fase 2E.0 antes de abrir Fase 2E.1 Storefront MVP Shell Implementation.
-3. No avanzar a Next.js/Storefront publica ni crear `storefront/` sin aprobacion humana explicita de Fase 2E.1.
+2. Preparar Fase 2F Public SEO Catalog MVP en Plan Mode para definir listados y detalle de producto/categoria reales.
+3. No avanzar a catalogo publico real sin aprobacion humana explicita de Fase 2F.
 
 ## Nota de alcance
 

@@ -103,6 +103,35 @@ Estandarizar cambios tecnicos para reducir regresiones y mantener trazabilidad e
   - Tests Storefront focalizados: 52 tests, 0 failures, BUILD SUCCESS.
 - Alcance: solo se modifico un test fixture. No se toco produccion, Storefront/ecommerce 2C, Flyway/DB, frontend, Docker, `.env`, secretos ni dependencias.
 
+### Cierre Fase 2E.1 Storefront MVP Shell Implementation
+
+- Tipo: implementacion funcional del shell publico minimo en `storefront/`.
+- Commit: `c049e3e feat(storefront): add Next.js MVP shell`.
+- Resultados de validacion:
+  - `npm run build`: OK, Next.js 16.2.7 compilado correctamente.
+  - `npm run lint`: OK, sin errores.
+  - `npx tsc --noEmit`: OK, sin errores de tipo.
+  - `npm audit`: 2 vulnerabilidades moderadas en `postcss` (dependencia transitiva). No corregidas. Deuda no bloqueante.
+- Archivos creados (21):
+  - `storefront/package.json`, `package-lock.json`, `tsconfig.json`, `next.config.ts`, `postcss.config.mjs`, `eslint.config.mjs`, `.gitignore`, `README.md`
+  - `storefront/app/layout.tsx`, `page.tsx`, `globals.css`, `favicon.ico`
+  - `storefront/lib/api.ts`
+  - `storefront/types/storefront.ts`
+  - `storefront/public/robots.txt`, `file.svg`, `globe.svg`, `next.svg`, `vercel.svg`, `window.svg`
+  - `storefront/.env.local.example`
+- Confirmaciones:
+  - Sin paginas reales /`productos/{slug}` ni /`categorias/{slug}`.
+  - Sin consumo real de endpoints Storefront.
+  - Sin `sitemap.xml` real.
+  - Sin checkout, pagos, pedidos, delivery, Merchant Center ni stock reservado.
+  - Sin cambios en backend, Angular, Flyway/DB, Docker, `.env` raiz, AWS/staging.
+- Deudas no bloqueantes registradas:
+  - 2 vulnerabilidades moderadas en `postcss`.
+  - Warning Turbopack por multiples lockfiles.
+  - README.md generico de `create-next-app`.
+  - SVGs default en `storefront/public/`.
+- Siguiente paso: Fase 2F Public SEO Catalog MVP en Plan Mode.
+
 ### Inicio Fase 2E.0 Storefront MVP Shell Planning
 
 - Tipo: documentacion tecnica de planificacion, sin implementacion funcional.

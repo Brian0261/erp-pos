@@ -7,8 +7,10 @@
 - Fase 2B Public Catalog API Design cerrada documentalmente.
 - Fase 2C Public Catalog API Read-only Implementation cerrada funcional y documentalmente.
 - Fase 2D Storefront Architecture Decision & SEO Delivery Plan cerrada documentalmente.
-- Fase actual autorizada: Fase 2E.0 Storefront MVP Shell Planning (stack tecnico, estructura y shell minimo).
-- Fase 2E.0 es documental/tecnica y no implementa `storefront/`, Next.js, dependencias ni infraestructura publica.
+- Fase 2E.0 Storefront MVP Shell Planning cerrada documentalmente.
+- Fase 2E.1 Storefront MVP Shell Implementation cerrada funcionalmente (commit `c049e3e`).
+- Fase actual autorizada: Fase 2E.2 QA y documentacion del shell.
+- Fase 2E.2 es solo documental/QA. No implementa codigo funcional.
 
 ## Principios
 
@@ -35,33 +37,28 @@
 
 ## Limites de aprobacion actuales
 
-- Fase 2E.0 esta aprobada solo como trabajo documental/tecnico de planificacion.
-- Fase 2E.1 (implementacion del shell) no queda aprobada todavia.
-- No se autoriza en esta fase:
-  - Next.js instalado
-  - carpeta `storefront/` creada
-  - dependencias instaladas
-  - Storefront funcional
+- Fase 2E.2 esta aprobada solo como trabajo documental/QA.
+- Fase 2F (catalogo publico SEO) no queda aprobada todavia.
+- No se autoriza en fase actual:
+  - Paginas reales de producto/categoria
+  - Consumo real de endpoints Storefront
   - sitemap.xml real
-  - Checkout
-  - Pagos
+  - Checkout, carrito, pagos
   - Pedidos online
   - Delivery
   - Merchant Center
+  - Stock reservado
   - AWS/staging
 
-## Criterio de salida de Fase 2E.0
+## Criterio de salida de Fase 2E.2
 
-- ADR Storefront Tech Stack (ECOM-ADR-021) creado.
-- Plan MVP Shell creado.
-- Checklist QA Fase 2E creado.
-- Stack tecnico confirmado: Next.js 16, App Router, TypeScript, npm, Tailwind CSS.
-- Estructura de carpetas futura documentada.
-- Variables de entorno y seguridad documentadas.
-- `robots.txt` de desarrollo definido.
-- Paginas reales y sitemap.xml diferidos.
-- Restricciones fuera de alcance registradas.
+- QA documental del shell completado.
+- CURRENT_STATUS, CHANGE_CONTROL, ROADMAP, BACKLOG y QA checklist actualizados.
+- Deudas no bloqueantes registradas (npm audit, warning Turbopack, README generico, SVGs default).
+- No hay paginas reales implementadas.
+- No hay consumo real de API.
+- No hay cambios fuera de `docs/` y `storefront/`.
 
 ## Siguiente paso esperado
 
-Revisar y aprobar la documentacion de Fase 2E.0 antes de abrir Fase 2E.1 Storefront MVP Shell Implementation. Fase 2E.1 solo deberia crear el shell publico minimo si existe aprobacion explicita para crear `storefront/` e instalar dependencias.
+Preparar Fase 2F Public SEO Catalog MVP en Plan Mode para definir listados y detalle de producto/categoria reales, antes de implementar cualquier pagina funcional.

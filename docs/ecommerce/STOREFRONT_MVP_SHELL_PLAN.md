@@ -2,7 +2,7 @@
 
 ## Estado
 
-Plan tecnico de Fase 2E. No crea `storefront/`, no instala dependencias y no implementa codigo funcional en esta fase documental.
+Plan tecnico de Fase 2E. Fase 2E.0 documental cerrada. Fase 2E.1 implementacion completada (commit `c049e3e`). Este plan refleja la estructura real creada en `storefront/`.
 
 ## Objetivo
 
@@ -110,16 +110,16 @@ npm run lint     # ESLint
 npx tsc --noEmit # Type check
 ```
 
-## Criterios de salida del shell tecnico (fase implementacion futura)
+## Criterios de salida del shell tecnico — Estado REAL (Fase 2E.1)
 
-1. `storefront/` creada con estructura definida.
-2. `npm run dev` levanta sin errores.
-3. `npm run build` compila sin errores.
-4. Metadata base presente.
-5. `robots.txt` bloquea crawlers.
-6. Wrapper de API compilable (sin consumir endpoints reales todavia).
-7. Sin paginas reales funcionales.
-8. Sin tocar backend, Angular, Flyway, Docker raiz, `.env` raiz ni AWS/staging.
+1. `storefront/` creada con estructura definida. ✅
+2. `npm run dev` levanta sin errores. ✅
+3. `npm run build` compila sin errores. ✅
+4. Metadata base presente. ✅
+5. `robots.txt` bloquea crawlers. ✅
+6. Wrapper de API compilable (sin consumir endpoints reales todavia). ✅
+7. Sin paginas reales funcionales. ✅
+8. Sin tocar backend, Angular, Flyway, Docker raiz, `.env` raiz ni AWS/staging. ✅
 
 ## Fuera de alcance
 

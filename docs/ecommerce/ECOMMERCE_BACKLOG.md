@@ -427,7 +427,67 @@ Backlog ecommerce incremental. Fase 2A y Fase 2B quedaron cerradas documentalmen
   - sin instalar Next.js;
   - sin crear `storefront/`;
   - sin dependencias.
-- Estado: DOCUMENTADO (Fase 2E.0).
+- Estado: IMPLEMENTADO (Fase 2E.1) — Next.js 16.2.7 instalado en `storefront/`.
+
+### HIST-2E-002 Estructura de carpetas del shell
+
+- Descripcion breve: definir la estructura interna de `storefront/`.
+- Valor de negocio: evita retrabajo estructural y mantiene separacion de responsabilidades.
+- Criterios de aceptacion:
+  - carpetas `app/`, `components/`, `lib/`, `types/`, `public/` documentadas;
+  - `.env.local.example` definido como plantilla;
+  - `.env.local` real debe quedar ignorado.
+- Restricciones tecnicas:
+  - sin crear carpeta real;
+  - sin archivos de configuracion reales.
+- Estado: IMPLEMENTADO (Fase 2E.1) — estructura creada con `app/`, `lib/`, `types/`, `public/`, `.env.local.example`.
+
+### HIST-2E-003 Configuracion base del shell
+
+- Descripcion breve: documentar configuracion minima de Next.js para build exitoso futuro.
+- Valor de negocio: acelera la fase de implementacion evitando decisiones sobre la marcha.
+- Criterios de aceptacion:
+  - `next.config.ts` documentado con `output: 'standalone'`;
+  - `tsconfig.json` con modo estricto;
+  - `tailwind.config.ts` basico;
+  - metadata base placeholder en layout;
+  - `robots.txt` de desarrollo bloqueando crawlers.
+- Restricciones tecnicas:
+  - sin implementar paginas reales;
+  - sin consumir endpoints reales;
+  - sin sitemap.xml.
+- Estado: IMPLEMENTADO (Fase 2E.1) — `next.config.ts` con `output: 'standalone'`, `robots.txt` con `Disallow: /`, layout con `noindex`.
+
+### HIST-2E-004 Wrapper API futuro
+
+- Descripcion breve: definir estrategia del wrapper de consumo de Storefront API.
+- Valor de negocio: asegura que el consumo sea server-side por defecto y no exponga datos internos.
+- Criterios de aceptacion:
+  - wrapper server-side por defecto documentado;
+  - sin consulta directa a base de datos;
+  - sin consumo de endpoints admin.
+- Restricciones tecnicas:
+  - sin implementacion funcional;
+  - sin consumo real de endpoints.
+- Estado: IMPLEMENTADO (Fase 2E.1) — `lib/api.ts` creado con wrapper server-side preparado, sin consumo real.
+
+### HIST-2E-005 Shell minimo implementado
+
+- Descripcion breve: crear y validar el shell publico minimo Next.js en `storefront/`.
+- Valor de negocio: tener el andamiaje tecnico listo antes de implementar paginas reales.
+- Criterios de aceptacion:
+  - `npm run build` exitoso;
+  - `npm run lint` sin errores;
+  - `npx tsc --noEmit` sin errores;
+  - metadata base y noindex en layout;
+  - `robots.txt` bloqueando crawlers;
+  - wrapper API compilable sin consumo real;
+  - sin paginas reales.
+- Restricciones tecnicas:
+  - sin implementar paginas de producto/categoria;
+  - sin consumir endpoints reales;
+  - sin sitemap.xml real.
+- Estado: IMPLEMENTADO (Fase 2E.1) — commit `c049e3e`, build/lint/tsc OK.
 
 ### HIST-2E-002 Estructura de carpetas del shell
 
@@ -478,12 +538,12 @@ Backlog ecommerce incremental. Fase 2A y Fase 2B quedaron cerradas documentalmen
 - Pedidos online.
 - Delivery.
 - Merchant Center implementado.
-- Next.js funcional.
-- Carpeta `storefront/` creada.
-- Storefront publica (frontend).
-- `sitemap.xml` real (solo existe fuente JSON).
+- Pagina de producto real `/productos/{slug}`.
+- Pagina de categoria real `/categorias/{slug}`.
+- Consumo real de endpoints Storefront desde paginas.
 - Filtros `categorySlug` en productos publicos.
 - Marcas publicas como paginas independientes.
+- Stock reservado.
 
 ## Deuda QA resuelta
 
