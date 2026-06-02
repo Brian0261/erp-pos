@@ -12,12 +12,15 @@ import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontPro
 import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontProductListItemResult;
 import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontProductPageResult;
 import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontSeoResult;
+import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontSitemapEntryResult;
+import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontSitemapResult;
 import com.erppos.backend.erp.ecommerce.application.usecase.StorefrontProductCatalogUseCase;
 import com.erppos.backend.erp.ecommerce.domain.model.RobotsPolicy;
 import com.erppos.backend.erp.ecommerce.domain.model.StorefrontPublicCategoryProjection;
 import com.erppos.backend.erp.ecommerce.domain.model.StorefrontPublicCategoryDetailProjection;
 import com.erppos.backend.erp.ecommerce.domain.model.StorefrontPublicProductDetailProjection;
 import com.erppos.backend.erp.ecommerce.domain.model.StorefrontPublicProductProjection;
+import com.erppos.backend.erp.ecommerce.domain.model.StorefrontSitemapEntryProjection;
 import com.erppos.backend.erp.ecommerce.domain.port.StorefrontProductReadPort;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -27,6 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 
@@ -101,6 +105,20 @@ public class StorefrontProductCatalogApplicationService implements StorefrontPro
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Public resource not found"));
 
         return toPublicCategoryDetail(detail);
+    }
+
+    @Override
+    public StorefrontSitemapResult getPublicSitemap() {
+        List<StorefrontSitemapEntryResult> entries = storefrontProductReadPort.findPublicSitemapEntries().stream()
+                .filter(this::isValidPublicSitemapEntry)
+                .map(this::toSitemapEntry)
+                .toList();
+
+        return new StorefrontSitemapResult(
+                Instant.now(),
+                entries,
+                entries.size()
+        );
     }
 
     private StorefrontProductListItemResult toPublicProduct(StorefrontPublicProductProjection item) {
@@ -233,6 +251,30 @@ public class StorefrontProductCatalogApplicationService implements StorefrontPro
                 item.canonicalPath(),
                 indexable
         );
+    }
+
+    private StorefrontSitemapEntryResult toSitemapEntry(StorefrontSitemapEntryProjection item) {
+        return new StorefrontSitemapEntryResult(
+                item.loc(),
+                item.type(),
+                item.lastModified()
+        );
+    }
+
+    private boolean isValidPublicSitemapEntry(StorefrontSitemapEntryProjection item) {
+        if (item == null || !notBlank(item.loc()) || !notBlank(item.type())) {
+            return false;
+        }
+        String loc = item.loc().trim();
+        if (!loc.startsWith("/")) {
+            return false;
+        }
+        String normalized = loc.toLowerCase(Locale.ROOT);
+        return !normalized.startsWith("/api/")
+                && !normalized.startsWith("/ecommerce-admin/")
+                && !normalized.contains("/checkout")
+                && !normalized.contains("/pedidos")
+                && !normalized.contains("?");
     }
 
     private boolean hasSeoData(StorefrontPublicProductDetailProjection item) {

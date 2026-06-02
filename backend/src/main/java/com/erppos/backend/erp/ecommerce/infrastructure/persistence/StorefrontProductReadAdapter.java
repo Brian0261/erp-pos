@@ -4,6 +4,7 @@ import com.erppos.backend.erp.ecommerce.domain.model.StorefrontPublicCategoryPro
 import com.erppos.backend.erp.ecommerce.domain.model.StorefrontPublicCategoryDetailProjection;
 import com.erppos.backend.erp.ecommerce.domain.model.StorefrontPublicProductDetailProjection;
 import com.erppos.backend.erp.ecommerce.domain.model.StorefrontPublicProductProjection;
+import com.erppos.backend.erp.ecommerce.domain.model.StorefrontSitemapEntryProjection;
 import com.erppos.backend.erp.ecommerce.domain.port.StorefrontProductReadPort;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -295,6 +296,54 @@ public class StorefrontProductReadAdapter implements StorefrontProductReadPort {
         return Optional.of(items.get(0));
     }
 
+    @Override
+    public List<StorefrontSitemapEntryProjection> findPublicSitemapEntries() {
+        return jdbcTemplate.query(
+                """
+                        select
+                            sm.canonical_path as loc,
+                            'PRODUCT' as entry_type,
+                            pop.updated_at as last_modified
+                        from ecommerce_product_online_profiles pop
+                        join products p on p.id = pop.product_id
+                        join ecommerce_seo_metadata sm on sm.product_online_profile_id = pop.id
+                        where pop.publication_status = 'PUBLISHED'
+                          and p.active = true
+                          and sm.indexable = true
+                          and nullif(trim(sm.canonical_path), '') is not null
+                          and sm.robots_policy = 'INDEX_FOLLOW'
+
+                        union all
+
+                        select
+                            sm.canonical_path as loc,
+                            'CATEGORY' as entry_type,
+                            c.updated_at as last_modified
+                        from ecommerce_online_categories c
+                        join ecommerce_seo_metadata sm on sm.online_category_id = c.id
+                        where c.active = true
+                          and sm.indexable = true
+                          and nullif(trim(sm.canonical_path), '') is not null
+                          and sm.robots_policy = 'INDEX_FOLLOW'
+                          and (
+                                select count(*)
+                                from ecommerce_product_online_profiles pop2
+                                join products p2 on p2.id = pop2.product_id
+                                where pop2.online_category_id = c.id
+                                  and pop2.publication_status = 'PUBLISHED'
+                                  and p2.active = true
+                          ) > 0
+
+                        order by entry_type asc, loc asc
+                        """,
+                (rs, rowNum) -> new StorefrontSitemapEntryProjection(
+                        rs.getString("loc"),
+                        rs.getString("entry_type"),
+                        getNullableInstant(rs.getObject("last_modified"))
+                )
+        );
+    }
+
     private long countPublishedProducts() {
         Long total = jdbcTemplate.queryForObject(
                 """
@@ -342,5 +391,18 @@ public class StorefrontProductReadAdapter implements StorefrontProductReadPort {
             return boolValue;
         }
         return Boolean.valueOf(value.toString());
+    }
+
+    private Instant getNullableInstant(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Instant instantValue) {
+            return instantValue;
+        }
+        if (value instanceof Timestamp timestamp) {
+            return timestamp.toInstant();
+        }
+        return Timestamp.valueOf(value.toString()).toInstant();
     }
 }
