@@ -27,12 +27,16 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
   - `GET /api/v1/storefront/catalog/categories/{slug}` — detalle de categoria por slug.
   - `GET /api/v1/storefront/seo/sitemap` — fuente JSON para sitemap futuro.
 - Tests focalizados de Fase 2C: 52 tests, 0 failures, BUILD SUCCESS.
+- Full backend suite verde tras correccion de deuda QA: `mvn test`, 348 tests, 0 failures, 0 errors, BUILD SUCCESS.
 - Arquitectura hexagonal estricta mantenida: controllers, DTOs publicos separados, use cases, ports, adapters, proyecciones de dominio.
 - Sitemap implementado como endpoint JSON (`/api/v1/storefront/seo/sitemap`), no como `sitemap.xml` real.
 - NO se implemento: `sitemap.xml` real, Next.js, Storefront publica, filtros `categorySlug`, marcas publicas, checkout, pagos, delivery, Merchant Center, pedidos online, stock reservado.
 - NO se toco: frontend Angular, Flyway/DB, Docker, `.env`, secretos, dependencias, POS, ventas, caja, facturacion, inventario.
 - Deuda QA preexistente resuelta: `ProductCleanupPreviewIntegrationTest` corregida en commit `eb56641 fix(test): make billing series fixture idempotent`. La causa era un helper privado `insertElectronicDocument` que no respetaba el constraint `uq_billing_series_doc_type_environment_active` al intentar insertar siempre una billing_series activa `RECEIPT`/`LOCAL` sin reutilizar una existente. Se agrego metodo `findOrCreateBillingSeries` find-or-create para hacer el fixture idempotente. `mvn test` completo ahora pasa: 348 tests, 0 failures, 0 errors, BUILD SUCCESS.
-- Restricciones vigentes en Fase 2C: no frontend Angular, no Flyway/DB, no Docker, no `.env`, no secretos, no dependencias, no POS/ventas/caja/facturacion/inventario, no filtros categorySlug, no marcas publicas, no sitemap.xml real, no Next.js, no Storefront publica, no checkout/pagos/pedidos/stock reservado.
+- Fase 2D Storefront Architecture Decision & SEO Delivery Plan iniciada como fase documental/arquitectonica.
+- Fase 2D crea/actualiza documentacion para ADR Storefront Next.js, plan delivery SEO-first y checklist QA documental.
+- Fase 2D no crea Next.js, no crea `storefront/`, no instala dependencias, no implementa `sitemap.xml` real y no toca codigo funcional.
+- Restricciones vigentes en Fase 2D: no frontend Angular, no backend funcional, no Flyway/DB, no Docker, no `.env`, no secretos, no dependencias, no POS/ventas/caja/facturacion/inventario, no AWS/staging, no checkout/pagos/pedidos/stock reservado/delivery/Merchant Center.
 - Modulos protegidos para Fase 1A y preparacion Fase 1: POS, inventario, ventas, caja y facturacion no deben modificarse.
 - AWS/staging no debe tocarse hasta que exista una fase local estable y validada.
 - Confirmado: no se toco codigo funcional en esta fase documental.
@@ -122,7 +126,8 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
 ## Siguiente etapa recomendada
 
 1. Preparar carga inicial real controlada (catalogo, almacenes, stock base y parametros operativos), solo cuando exista autorizacion explicita del responsable de negocio/tecnico.
-2. No avanzar a Next.js/Storefront publica sin planificacion formal de Fase 2D con aprobacion humana explicita.
+2. Revisar y aprobar la documentacion de Fase 2D antes de abrir Fase 2E Storefront MVP Shell.
+3. No avanzar a Next.js/Storefront publica ni crear `storefront/` sin aprobacion humana explicita de Fase 2E.
 
 ## Nota de alcance
 

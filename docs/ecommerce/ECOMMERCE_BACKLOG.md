@@ -2,7 +2,7 @@
 
 ## Estado
 
-Backlog ecommerce incremental. Fase 2A quedo cerrada documentalmente y Fase 2B agrega diseno tecnico documental de API publica. No autoriza implementacion funcional por si mismo.
+Backlog ecommerce incremental. Fase 2A y Fase 2B quedaron cerradas documentalmente. Fase 2C quedo cerrada funcional y documentalmente con Storefront API read-only. Fase 2D agrega decision arquitectonica y plan de delivery SEO-first para la futura Storefront Next.js. No autoriza implementacion funcional por si mismo.
 
 ## Epicas iniciales
 
@@ -17,6 +17,8 @@ Backlog ecommerce incremental. Fase 2A quedo cerrada documentalmente y Fase 2B a
 - QA SEO tecnico.
 - Diseno API publica read-only.
 - Diseno DTOs publicos.
+- Arquitectura Storefront Next.js.
+- Delivery SEO-first.
 
 ## Historias iniciales
 
@@ -302,7 +304,114 @@ Backlog ecommerce incremental. Fase 2A quedo cerrada documentalmente y Fase 2B a
   - sin tests automatizados en esta fase.
 - **Estado: COMPLETADO (Fase 2C)** — checklist actualizado a Fase 2C, tests focalizados 52/52, BUILD SUCCESS.
 
-## Historias explicitamente fuera de alcance en Fase 2A/2B/2C
+## Historias Fase 2D - Storefront Architecture Decision & SEO Delivery Plan
+
+### HIST-2D-001 ADR Storefront Next.js
+
+- Descripcion breve: crear ADR de arquitectura de entrega para la futura Storefront publica Next.js.
+- Valor de negocio: evita mezclar Angular interno con tienda publica y reduce retrabajo SEO.
+- Criterios de aceptacion:
+  - Next.js queda documentado como tecnologia de Storefront publica SEO-first;
+  - Angular `frontend/` queda solo para ERP/POS interno;
+  - `storefront/` queda definido como ubicacion futura raiz separada, sin crearse en Fase 2D;
+  - Storefront API queda dentro del monolito Spring Boot por ahora y extraction-ready.
+- Restricciones tecnicas:
+  - sin crear Next.js;
+  - sin crear `storefront/`;
+  - sin dependencias;
+  - sin cambios funcionales.
+- Estado: DOCUMENTADO (Fase 2D).
+
+### HIST-2D-002 Plan delivery SEO-first
+
+- Descripcion breve: documentar el plan de delivery para paginas publicas SEO, consumo API y entorno local futuro.
+- Valor de negocio: permite abrir Fase 2E con limites claros y sin adelantar checkout o infraestructura.
+- Criterios de aceptacion:
+  - arquitectura propuesta documentada;
+  - estructura futura de carpetas documentada;
+  - consumo de endpoints Storefront documentado;
+  - estrategia local/dev sin AWS documentada;
+  - riesgos y criterios para Fase 2E documentados.
+- Restricciones tecnicas:
+  - sin AWS/staging;
+  - sin Docker;
+  - sin `.env`;
+  - sin secretos.
+- Estado: DOCUMENTADO (Fase 2D).
+
+### HIST-2D-003 QA checklist arquitectura
+
+- Descripcion breve: crear checklist documental para validar decisiones de arquitectura Storefront.
+- Valor de negocio: confirma que Fase 2D no introdujo codigo ni scope transaccional.
+- Criterios de aceptacion:
+  - ADR y plan validados documentalmente;
+  - separacion admin/public validada;
+  - restricciones de no implementacion marcadas;
+  - criterio de salida QA definido.
+- Restricciones tecnicas:
+  - sin runtime;
+  - sin tests automatizados nuevos;
+  - sin cambios fuera de docs.
+- Estado: DOCUMENTADO (Fase 2D).
+
+### HIST-2D-004 Decision de rutas publicas
+
+- Descripcion breve: cerrar rutas objetivo para el MVP SEO inicial.
+- Valor de negocio: da estabilidad a slugs, canonical y sitemap futuro.
+- Criterios de aceptacion:
+  - `/productos/{slug}` queda como ruta objetivo de producto;
+  - `/categorias/{slug}` queda como ruta objetivo de categoria;
+  - `/marcas/{slug}` queda diferido;
+  - no se usan IDs internos en URLs publicas.
+- Restricciones tecnicas:
+  - sin routing real;
+  - sin pagina publica real;
+  - sin redirecciones implementadas.
+- Estado: DOCUMENTADO (Fase 2D).
+
+### HIST-2D-005 Decision de rendering
+
+- Descripcion breve: definir SSG/ISR como estrategia principal y SSR como diferida.
+- Valor de negocio: balancea SEO, rendimiento, costo y frescura de catalogo.
+- Criterios de aceptacion:
+  - SSG/ISR documentado para productos y categorias;
+  - SSR reservado para casos realmente necesarios;
+  - catalogo no depende de renderizado cliente para indexacion.
+- Restricciones tecnicas:
+  - sin implementacion Next.js;
+  - sin configuracion ISR real;
+  - sin cache/invalidation runtime.
+- Estado: DOCUMENTADO (Fase 2D).
+
+### HIST-2D-006 Sitemap, robots y canonical
+
+- Descripcion breve: cerrar estrategia tecnica para sitemap, robots, canonical y noindex staging.
+- Valor de negocio: reduce riesgo de staging indexado, duplicados y paginas pobres en buscadores.
+- Criterios de aceptacion:
+  - `sitemap.xml` futuro definido como generado por Next.js usando `GET /api/v1/storefront/seo/sitemap`;
+  - `robots.txt` futuro definido como responsabilidad/control de Storefront;
+  - canonical definido desde `canonicalPath` o regla backend/contractual aprobada;
+  - staging no indexable por defecto;
+  - filtros/facetas no indexables por defecto.
+- Restricciones tecnicas:
+  - sin `sitemap.xml` real;
+  - sin `robots.txt` real;
+  - sin cambios de backend.
+- Estado: DOCUMENTADO (Fase 2D).
+
+### HIST-2D-007 Limites fuera de alcance
+
+- Descripcion breve: registrar explicitamente lo que Fase 2D no autoriza.
+- Valor de negocio: evita scope creep hacia tienda transaccional o infraestructura prematura.
+- Criterios de aceptacion:
+  - sin checkout, pagos, pedidos, stock reservado, delivery ni Merchant Center;
+  - sin frontend Angular;
+  - sin backend funcional;
+  - sin Flyway/DB, Docker, `.env`, secretos, dependencias ni AWS/staging;
+  - sin commit ni push automatico.
+- Estado: DOCUMENTADO (Fase 2D).
+
+## Historias explicitamente fuera de alcance en Fase 2A/2B/2C/2D
 
 - Checkout.
 - Mercado Pago.
@@ -310,6 +419,7 @@ Backlog ecommerce incremental. Fase 2A quedo cerrada documentalmente y Fase 2B a
 - Delivery.
 - Merchant Center implementado.
 - Next.js funcional.
+- Carpeta `storefront/` creada.
 - Storefront publica (frontend).
 - `sitemap.xml` real (solo existe fuente JSON).
 - Filtros `categorySlug` en productos publicos.

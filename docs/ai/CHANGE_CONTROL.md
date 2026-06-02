@@ -103,6 +103,36 @@ Estandarizar cambios tecnicos para reducir regresiones y mantener trazabilidad e
   - Tests Storefront focalizados: 52 tests, 0 failures, BUILD SUCCESS.
 - Alcance: solo se modifico un test fixture. No se toco produccion, Storefront/ecommerce 2C, Flyway/DB, frontend, Docker, `.env`, secretos ni dependencias.
 
+### Inicio Fase 2D Storefront Architecture Decision & SEO Delivery Plan
+
+- Tipo: documentacion y arquitectura, sin implementacion funcional.
+- Objetivo: cerrar la decision de arquitectura de entrega para la futura Storefront publica SEO-first con Next.js, SSG/ISR, rutas publicas, sitemap/robots/canonical y limites de alcance.
+- Archivos creados:
+  - `docs/adr/ecommerce/ECOM-ADR-020-storefront-nextjs-delivery-architecture.md`
+  - `docs/ecommerce/STOREFRONT_NEXTJS_DELIVERY_PLAN.md`
+  - `docs/qa/PHASE2D_STOREFRONT_ARCHITECTURE_QA_CHECKLIST.md`
+- Archivos actualizados:
+  - `docs/ecommerce/ECOMMERCE_ROADMAP.md`
+  - `docs/ecommerce/ECOMMERCE_BACKLOG.md`
+  - `docs/ecommerce/STOREFRONT_SEO_FIRST_STRATEGY.md`
+  - `docs/ai/CURRENT_STATUS.md`
+  - `docs/ai/CHANGE_CONTROL.md`
+- Decisiones documentales cerradas:
+  - Next.js sera la futura Storefront publica SEO-first.
+  - Angular `frontend/` queda solo para ERP/POS interno.
+  - `storefront/` queda como ubicacion futura recomendada, sin crearse en Fase 2D.
+  - Storefront API sigue dentro del monolito Spring Boot por ahora y extraction-ready.
+  - Rutas objetivo: `/productos/{slug}` y `/categorias/{slug}`.
+  - `/marcas/{slug}` queda diferido.
+  - SSG/ISR sera la estrategia principal para productos y categorias.
+  - SSR queda reservado para casos realmente necesarios.
+  - `sitemap.xml` futuro sera generado por Next.js usando `GET /api/v1/storefront/seo/sitemap`.
+  - `robots.txt` futuro sera generado/controlado por Storefront.
+  - Canonical debe derivar de `canonicalPath` o regla backend/contractual aprobada.
+  - Staging sera no indexable por defecto.
+- Restricciones: no crear Next.js, no crear `storefront/`, no instalar dependencias, no tocar Angular, backend funcional, Flyway/DB, Docker, `.env`, secretos, AWS/staging, POS, ventas, caja, facturacion, inventario, checkout, pagos, delivery, Merchant Center, pedidos online ni stock reservado.
+- No hacer commit ni push en esta fase sin instruccion explicita.
+
 ### Decisiones aprobadas para Fase 1
 
 - Producto sin marca: no usar texto libre; permitir solo marca formal o regla explicita auditada tipo `Sin marca`/`Generico`.
