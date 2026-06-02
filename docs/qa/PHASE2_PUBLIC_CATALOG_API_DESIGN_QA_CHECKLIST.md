@@ -93,10 +93,7 @@ Checklist de validacion QA para Fase 2C (implementacion backend read-only). Fase
 
 ## Pendientes y deuda QA
 
-- [ ] Full `mvn test` no limpio por deuda preexistente:
-  - `ProductCleanupPreviewIntegrationTest.shouldBlockExecuteWhenElectronicDocumentExistsAndKeepDataUnchanged`
-  - `DuplicateKey` en `billing_series / uq_billing_series_doc_type_environment_active`
-  - Pendiente prioritaria antes de avanzar a fases mayores.
+- [x] Full `mvn test` verde: 348 tests, 0 failures, 0 errors, BUILD SUCCESS. Deuda `ProductCleanupPreviewIntegrationTest` resuelta en commit `eb56641` (find-or-create billing_series).
 - [ ] Filtros `categorySlug` diferidos a fase posterior.
 - [ ] Marcas publicas diferidas a fase posterior.
 - [ ] `sitemap.xml` real diferido a fase posterior (solo existe fuente JSON).

@@ -31,7 +31,7 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
 - Sitemap implementado como endpoint JSON (`/api/v1/storefront/seo/sitemap`), no como `sitemap.xml` real.
 - NO se implemento: `sitemap.xml` real, Next.js, Storefront publica, filtros `categorySlug`, marcas publicas, checkout, pagos, delivery, Merchant Center, pedidos online, stock reservado.
 - NO se toco: frontend Angular, Flyway/DB, Docker, `.env`, secretos, dependencias, POS, ventas, caja, facturacion, inventario.
-- Deuda QA preexistente conocida: `mvn test` completo falla por `ProductCleanupPreviewIntegrationTest.shouldBlockExecuteWhenElectronicDocumentExistsAndKeepDataUnchanged` y `DuplicateKey` en `billing_series / uq_billing_series_doc_type_environment_active`. No corregida en esta fase; pendiente prioritaria antes de avanzar a fases mayores.
+- Deuda QA preexistente resuelta: `ProductCleanupPreviewIntegrationTest` corregida en commit `eb56641 fix(test): make billing series fixture idempotent`. La causa era un helper privado `insertElectronicDocument` que no respetaba el constraint `uq_billing_series_doc_type_environment_active` al intentar insertar siempre una billing_series activa `RECEIPT`/`LOCAL` sin reutilizar una existente. Se agrego metodo `findOrCreateBillingSeries` find-or-create para hacer el fixture idempotente. `mvn test` completo ahora pasa: 348 tests, 0 failures, 0 errors, BUILD SUCCESS.
 - Restricciones vigentes en Fase 2C: no frontend Angular, no Flyway/DB, no Docker, no `.env`, no secretos, no dependencias, no POS/ventas/caja/facturacion/inventario, no filtros categorySlug, no marcas publicas, no sitemap.xml real, no Next.js, no Storefront publica, no checkout/pagos/pedidos/stock reservado.
 - Modulos protegidos para Fase 1A y preparacion Fase 1: POS, inventario, ventas, caja y facturacion no deben modificarse.
 - AWS/staging no debe tocarse hasta que exista una fase local estable y validada.
@@ -121,9 +121,8 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
 
 ## Siguiente etapa recomendada
 
-1. Resolver deuda QA preexistente del full `mvn test` (`ProductCleanupPreviewIntegrationTest` + `DuplicateKey billing_series`) antes de avanzar a fases mayores.
-2. Preparar carga inicial real controlada (catalogo, almacenes, stock base y parametros operativos), solo cuando exista autorizacion explicita del responsable de negocio/tecnico.
-3. No avanzar a Next.js/Storefront publica sin planificacion formal de Fase 2D con aprobacion humana explicita.
+1. Preparar carga inicial real controlada (catalogo, almacenes, stock base y parametros operativos), solo cuando exista autorizacion explicita del responsable de negocio/tecnico.
+2. No avanzar a Next.js/Storefront publica sin planificacion formal de Fase 2D con aprobacion humana explicita.
 
 ## Nota de alcance
 

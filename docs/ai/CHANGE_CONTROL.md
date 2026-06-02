@@ -91,6 +91,18 @@ Estandarizar cambios tecnicos para reducir regresiones y mantener trazabilidad e
   - `docs/ecommerce/STOREFRONT_PUBLIC_CONTRACTS_DRAFT.md`
   - `docs/ecommerce/ECOMMERCE_BACKLOG.md`
 
+### Correccion deuda QA ProductCleanupPreviewIntegrationTest
+
+- Tipo: correccion de fixture en test de integracion.
+- Contexto: el helper privado `insertElectronicDocument` en `ProductCleanupPreviewIntegrationTest.insertElectronicDocument` intentaba insertar siempre una billing_series activa `RECEIPT`/`LOCAL`, violando el constraint `uq_billing_series_doc_type_environment_active` cuando dos tests del mismo suite lo invocaban.
+- Commit: `eb56641 fix(test): make billing series fixture idempotent`.
+- Cambio: se extrajo metodo `findOrCreateBillingSeries` que primero busca una billing_series activa existente; si existe, la reutiliza; si no, la crea.
+- Impacto:
+  - `mvn test` completo ahora pasa: 348 tests, 0 failures, 0 errors, BUILD SUCCESS.
+  - `ProductCleanupPreviewIntegrationTest`: 22 tests, 0 failures, BUILD SUCCESS.
+  - Tests Storefront focalizados: 52 tests, 0 failures, BUILD SUCCESS.
+- Alcance: solo se modifico un test fixture. No se toco produccion, Storefront/ecommerce 2C, Flyway/DB, frontend, Docker, `.env`, secretos ni dependencias.
+
 ### Decisiones aprobadas para Fase 1
 
 - Producto sin marca: no usar texto libre; permitir solo marca formal o regla explicita auditada tipo `Sin marca`/`Generico`.

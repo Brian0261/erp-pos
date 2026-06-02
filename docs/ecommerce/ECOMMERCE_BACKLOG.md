@@ -315,9 +315,9 @@ Backlog ecommerce incremental. Fase 2A quedo cerrada documentalmente y Fase 2B a
 - Filtros `categorySlug` en productos publicos.
 - Marcas publicas como paginas independientes.
 
-## Deuda QA pendiente antes de fases mayores
+## Deuda QA resuelta
 
-- `mvn test` completo falla por deuda preexistente no relacionada:
-  - `ProductCleanupPreviewIntegrationTest.shouldBlockExecuteWhenElectronicDocumentExistsAndKeepDataUnchanged`
-  - `DuplicateKey` en `billing_series / uq_billing_series_doc_type_environment_active`
-- No corregida en Fase 2C; pendiente prioritaria antes de avanzar a Fase 2D o fases mayores.
+- [x] Deuda `ProductCleanupPreviewIntegrationTest` resuelta en commit `eb56641`:
+  - Causa: helper `insertElectronicDocument` no respetaba constraint `uq_billing_series_doc_type_environment_active` al siempre insertar billing_series activa `RECEIPT`/`LOCAL`.
+  - Solucion: metodo `findOrCreateBillingSeries` find-or-create para fixture idempotente.
+  - `mvn test` completo: 348 tests, 0 failures, 0 errors, BUILD SUCCESS.
