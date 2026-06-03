@@ -514,7 +514,18 @@ Backlog ecommerce incremental. Fase 2A y Fase 2B quedaron cerradas documentalmen
   - paleta, tipografia, responsive mobile/tablet/desktop;
   - estados vacios, error, sin imagen, agotado;
   - sin checkout, carrito, pagos ni CTA transaccional.
-- Estado: PENDIENTE (Fase 2F.1).
+- Estado: IMPLEMENTADO (Fase 2F.1) — diseno "Catalogo Creativo Profesional" aprobado. Paleta, tipografias, componentes y restricciones documentados.
+
+### HIST-2F-002B Aprobacion visual 2F.1
+
+- Descripcion breve: documentar aprobacion visual del sistema "Catalogo Creativo Profesional".
+- Valor de negocio: establece contrato visual antes de implementar componentes Next.js/Tailwind.
+- Criterios de aceptacion:
+  - `docs/ecommerce/STOREFRONT_VISUAL_APPROVAL_2F1.md` creado;
+  - `docs/qa/PHASE2F1_VISUAL_APPROVAL_QA_CHECKLIST.md` creado;
+  - direccion visual, paleta, tipografia, componentes y restricciones documentados;
+  - ajustes menores registrados como deuda de implementacion.
+- Estado: IMPLEMENTADO (Fase 2F.1).
 
 ### HIST-2F-003 Conversion a componentes base Next.js/Tailwind
 

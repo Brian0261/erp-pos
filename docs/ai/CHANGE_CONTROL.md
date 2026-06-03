@@ -166,6 +166,33 @@ Estandarizar cambios tecnicos para reducir regresiones y mantener trazabilidad e
   - SVGs default en `public/`.
 - Siguiente paso esperado: aprobar Fase 2F.1 Diseno visual con Google Stitch antes de tocar componentes o paginas reales.
 
+### Aprobacion Visual Fase 2F.1 - Catalogo Creativo Profesional
+
+- Tipo: documentacion y aprobacion visual.
+- Alcance: registrar decisiones de diseno aprobadas para el sistema "Catalogo Creativo Profesional" de la Storefront publica.
+- Archivos creados:
+  - `docs/ecommerce/STOREFRONT_VISUAL_APPROVAL_2F1.md`
+  - `docs/qa/PHASE2F1_VISUAL_APPROVAL_QA_CHECKLIST.md`
+- Archivos actualizados:
+  - `docs/ecommerce/ECOMMERCE_ROADMAP.md`
+  - `docs/ecommerce/ECOMMERCE_BACKLOG.md`
+  - `docs/ecommerce/STOREFRONT_PUBLIC_SEO_CATALOG_MVP_PLAN.md`
+  - `docs/ai/CURRENT_STATUS.md`
+  - `docs/ai/CHANGE_CONTROL.md`
+- Decisiones visuales aprobadas:
+  - Direccion visual: "Catalogo Creativo Profesional".
+  - Logo: usar siempre logo real de InkToy.
+  - Paleta: Azul `#0A2540`, Amarillo `#FFD166`, Rojo `#EF476F`, blanco y grises suaves.
+  - Tipografias: Fraunces (titulos), DM Sans (cuerpo/UI).
+  - Estilo: mobile-first, SEO-first, limpio, profesional, comercial, accesible. Bordes 8px, sombras suaves, sin efectos pesados.
+  - Navegacion MVP: Inicio, Categorias, Buscar, Tiendas.
+  - CTAs: "Ver detalle", "Ver categoria", "Consultar en tienda".
+  - Badges: Disponible, Agotado, Disponible en tienda.
+- Componentes visuales definidos: StorefrontHeader, StorefrontFooter, BottomNavigation, Button, Badge, Chip, ProductCard, CategoryCard, EmptyState, ProductImageFrame, Accordion, StickyProductCTA, Breadcrumbs, SectionHeading.
+- Ajustes menores registrados: sticky CTA safe area, chips scroll horizontal, productos relacionados opcionales, noindex/robots durante desarrollo, next/image con proporciones estables, H1 unico, breadcrumbs semanticos.
+- Restricciones vigentes: sin checkout, carrito, pagos, pedidos, login, perfil, admin, ERP interno, Merchant Center.
+- Siguiente paso esperado: Fase 2F.2 Componentes base Next.js + Tailwind.
+
 ### Inicio Fase 2E.0 Storefront MVP Shell Planning
 
 - Tipo: documentacion tecnica de planificacion, sin implementacion funcional.

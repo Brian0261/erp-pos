@@ -42,9 +42,9 @@
 
 ## Limites de aprobacion actuales
 
-- Fase 2E.2 cerrada documentalmente.
-- Fase 2F.0 iniciada como planificacion documental del MVP SEO catalog.
-- Fase 2F.1 (diseno visual con Google Stitch) no queda aprobada todavia.
+- Fase 2F.0 cerrada documentalmente (commit `4e22712`).
+- Fase 2F.1 aprobada como diseno visual "Catalogo Creativo Profesional".
+- Fase 2F.1 es solo aprobacion visual. No implementa codigo funcional.
 - No se autoriza en fase actual:
   - Paginas reales de producto/categoria
   - Consumo real de endpoints Storefront
@@ -59,7 +59,8 @@
 ## Criterio de salida de Fase 2E.2
 
 - QA documental del shell completado.
-- Fase 2F.0 plan documental creado.
+- Fase 2F.0 plan documental creado y cerrado.
+- Fase 2F.1 diseno visual aprobado.
 - CURRENT_STATUS, CHANGE_CONTROL, ROADMAP, BACKLOG y QA checklist actualizados.
 - Deudas no bloqueantes registradas (npm audit, warning Turbopack, README generico, SVGs default).
 - No hay paginas reales implementadas.
@@ -68,4 +69,4 @@
 
 ## Siguiente paso esperado
 
-Preparar Fase 2F.1 Diseno visual con Google Stitch para aprobacion explicita antes de implementar componentes o paginas reales.
+Abrir Fase 2F.2 Componentes base Next.js + Tailwind para implementar layout, header, footer, cards y estados visuales sin consumo real de API.

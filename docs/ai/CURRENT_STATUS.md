@@ -161,12 +161,29 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
   - No sitemap.xml real, no marcas publicas, no filtros avanzados.
   - No AWS/staging, no Docker raiz, no .env raiz.
   - No cambios backend, Angular, Flyway/DB.
+- Cerrada documentalmente en commit `4e22712`.
+
+## Fase 2F.1 Diseno Visual - Catalogo Creativo Profesional
+
+- Direccion visual aprobada: "Catalogo Creativo Profesional".
+- Documentos creados:
+  - `docs/ecommerce/STOREFRONT_VISUAL_APPROVAL_2F1.md`
+  - `docs/qa/PHASE2F1_VISUAL_APPROVAL_QA_CHECKLIST.md`
+- Paleta: Azul `#0A2540`, Amarillo `#FFD166`, Rojo `#EF476F`, blanco y grises suaves.
+- Tipografias: Fraunces (titulos), DM Sans (cuerpo/UI).
+- Componentes visuales definidos: Header, Footer, BottomNavigation, Button, Badge, Chip, ProductCard, CategoryCard, EmptyState, ProductImageFrame, Accordion, StickyProductCTA, Breadcrumbs, SectionHeading.
+- Navegacion MVP: Inicio, Categorias, Buscar, Tiendas.
+- CTAs: "Ver detalle", "Ver categoria", "Consultar en tienda".
+- Badges: Disponible, Agotado, Disponible en tienda.
+- Ajustes menores registrados: sticky CTA safe area, chips scroll horizontal, productos relacionados opcionales.
+- Restricciones: sin checkout, carrito, pagos, pedidos, login, perfil, admin, ERP interno, Merchant Center.
+- Siguiente paso: Fase 2F.2 Componentes base Next.js + Tailwind.
 
 ## Siguiente etapa recomendada
 
 1. Preparar carga inicial real controlada (catalogo, almacenes, stock base y parametros operativos), solo cuando exista autorizacion explicita del responsable de negocio/tecnico.
-2. Aprobar Fase 2F.1 Diseno visual con Google Stitch antes de tocar componentes o paginas reales.
-3. No avanzar a implementacion de catalogo publico sin aprobacion humana explicita de Fase 2F.1.
+2. Abrir Fase 2F.2 Componentes base Next.js + Tailwind para implementar layout, header, footer, cards y estados visuales sin consumo real de API.
+3. No avanzar a integracion de API (2F.3) sin completar componentes base y QA visual.
 
 ## Nota de alcance
 
