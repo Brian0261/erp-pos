@@ -1,3 +1,5 @@
+export { Accordion } from "./accordion";
+export type { AccordionItem, AccordionProps } from "./accordion";
 export { Badge } from "./badge";
 export type { BadgeProps } from "./badge";
 export { Breadcrumbs } from "./breadcrumbs";
