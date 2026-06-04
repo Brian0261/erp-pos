@@ -9,8 +9,16 @@
 - Fase 2D Storefront Architecture Decision & SEO Delivery Plan cerrada documentalmente.
 - Fase 2E.0 Storefront MVP Shell Planning cerrada documentalmente.
 - Fase 2E.1 Storefront MVP Shell Implementation cerrada funcionalmente (commit `c049e3e`).
-- Fase actual autorizada: Fase 2E.2 QA y documentacion del shell.
-- Fase 2E.2 es solo documental/QA. No implementa codigo funcional.
+- Fase 2E.2 QA y documentacion del shell cerrada documentalmente.
+- Fase 2F.0 Public SEO Catalog MVP Planning cerrada documentalmente (commit `4e22712`).
+- Fase 2F.1 Diseno visual con Google Stitch aprobada (Catalogo Creativo Profesional).
+- Fase 2F.2 Componentes base Next.js/Tailwind cerrada funcional y documentalmente.
+  - 2F.2A: Foundations visuales + UI base (Button, Badge, Chip, Breadcrumbs, SectionHeading, ProductImageFrame, Accordion).
+  - 2F.2B: Layout (StorefrontHeader, StorefrontFooter, BottomNavigation) con logo InkToy real.
+  - 2F.2C: Catalogo visual (ProductCard, CategoryCard, EmptyState, StickyProductCTA) + preview tecnico en `/`.
+  - Commit: `1a55ec0 feat(storefront): add catalog visual components`.
+- Fase actual autorizada: Fase 2F.2D QA tecnica y documentacion de componentes.
+- Fase 2F.2D es solo documental/QA. No implementa codigo funcional.
 
 ## Principios
 
@@ -56,17 +64,17 @@
   - Stock reservado
   - AWS/staging
 
-## Criterio de salida de Fase 2E.2
+## Criterio de salida de Fase 2F.2D
 
-- QA documental del shell completado.
-- Fase 2F.0 plan documental creado y cerrado.
-- Fase 2F.1 diseno visual aprobado.
-- CURRENT_STATUS, CHANGE_CONTROL, ROADMAP, BACKLOG y QA checklist actualizados.
-- Deudas no bloqueantes registradas (npm audit, warning Turbopack, README generico, SVGs default).
+- QA documental de componentes completado.
+- Documentacion de sistema de componentes creada (`STOREFRONT_COMPONENTS_SYSTEM_2F2.md`).
+- QA checklist de componentes creado (`PHASE2F2_STOREFRONT_COMPONENTS_QA_CHECKLIST.md`).
+- CURRENT_STATUS, CHANGE_CONTROL, ROADMAP, BACKLOG y MVP_PLAN actualizados.
+- Deudas no bloqueantes registradas.
 - No hay paginas reales implementadas.
 - No hay consumo real de API desde paginas.
 - No hay cambios fuera de `docs/` y `storefront/`.
 
 ## Siguiente paso esperado
 
-Abrir Fase 2F.2 Componentes base Next.js + Tailwind para implementar layout, header, footer, cards y estados visuales sin consumo real de API.
+Abrir Fase 2F.3A — Alineacion de tipos TypeScript/API client con DTOs publicos reales antes de implementar paginas reales de catalogo.

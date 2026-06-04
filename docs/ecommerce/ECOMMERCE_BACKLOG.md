@@ -538,7 +538,7 @@ Backlog ecommerce incremental. Fase 2A y Fase 2B quedaron cerradas documentalmen
   - estados vacios y error visuales;
   - responsive validado;
   - build/lint/typecheck sin errores.
-- Estado: PENDIENTE (Fase 2F.2).
+- Estado: IMPLEMENTADO (Fase 2F.2) — commits `dd8f1a3` (2F.2A + 2F.2B) y `1a55ec0` (2F.2C). Preview tecnico en `/` con datos mock.
 
 ### HIST-2F-004 Integracion real Storefront API
 

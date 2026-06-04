@@ -39,7 +39,7 @@ Habilitar páginas públicas indexables de producto y categoría en la Storefron
 |---------|----------|-----------|
 | 2F.0 | Planificación SEO/catalog + limpieza documental | Docs limpias, plan 2F, checklist QA 2F, alcance Google Stitch documentado. |
 | 2F.1 | Diseño visual con Google Stitch | Diseño "Catálogo Creativo Profesional" aprobado. Paleta, tipografía, componentes y restricciones documentados. |
-| 2F.2 | Conversión del diseño a componentes base Next.js/Tailwind | Layout, header/footer, cards, grids y estados visuales sin API real aún. |
+| 2F.2 | Conversión del diseño a componentes base Next.js/Tailwind | Layout, header/footer, cards, grids y estados visuales sin API real aún. Preview técnico en `/`. IMPLEMENTADO (commits `dd8f1a3`, `1a55ec0`). |
 | 2F.3 | Integración real con Storefront API | Listados y detalles de producto/categoría consumiendo endpoints públicos. |
 | 2F.4 | SEO técnico inicial | `generateMetadata`, canonical, `notFound()`, noindex/indexable, ISR. |
 | 2F.5 | QA/cierre documental | Build/lint/typecheck, smoke local, docs, backlog, roadmap, status, change control. |

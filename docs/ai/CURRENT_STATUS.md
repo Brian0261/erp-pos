@@ -179,12 +179,51 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
 - Restricciones: sin checkout, carrito, pagos, pedidos, login, perfil, admin, ERP interno, Merchant Center.
 - Siguiente paso: Fase 2F.2 Componentes base Next.js + Tailwind.
 
+## Fase 2F.2 Componentes base Next.js + Tailwind
+
+- Fase 2F.2A completada: foundations visuales y componentes UI base.
+  - Button, Badge, Chip, Breadcrumbs, SectionHeading, ProductImageFrame.
+  - Tokens visuales en `globals.css` con `@theme inline` de Tailwind v4.
+- Fase 2F.2B completada: componentes de layout.
+  - StorefrontHeader, StorefrontFooter, BottomNavigation.
+  - Logo real InkToy integrado desde `storefront/public/assets/images/brand/logo-inktoy.png`.
+- Fase 2F.2C completada: componentes visuales de catálogo.
+  - ProductCard, CategoryCard, EmptyState, Accordion, StickyProductCTA.
+  - Preview técnico en `storefront/app/page.tsx` con datos mock/static.
+  - Commit: `1a55ec0 feat(storefront): add catalog visual components`.
+- Validaciones:
+  - `npm run build`: OK (compiled successfully, 0 errors).
+  - `npm run lint`: OK (0 warnings).
+  - `npx tsc --noEmit`: OK (0 errors).
+- Confirmaciones:
+  - Sin páginas reales `/productos`, `/productos/[slug]`, `/categorias`, `/categorias/[slug]`.
+  - Sin consumo real de endpoints Storefront.
+  - Sin `sitemap.xml` real.
+  - Sin checkout, pagos, pedidos, delivery, Merchant Center, login, perfil ni admin.
+  - Sin cambios en backend, Angular, Flyway/DB, Docker, `.env` raíz, AWS/staging.
+- Deudas no bloqueantes registradas:
+  - Logo puede requerir ajuste fino en páginas reales.
+  - Placeholders visuales no son assets finales.
+  - Páginas reales con BottomNavigation deben reservar padding inferior.
+  - Chips requieren scroll horizontal controlado.
+  - Imágenes reales pendientes.
+  - StickyProductCTA implementado pero no montado en preview.
+  - Warning Turbopack por múltiples lockfiles.
+  - ProductImageFrame/next/image requerirá configuración de patrones remotos.
+  - Preview en `/` debe ser reemplazado por Home real.
+- Fase 2F.2D QA técnica/documentación de componentes cerrada documentalmente.
+- Documentación creada:
+  - `docs/ecommerce/STOREFRONT_COMPONENTS_SYSTEM_2F2.md`
+  - `docs/qa/PHASE2F2_STOREFRONT_COMPONENTS_QA_CHECKLIST.md`
+- Documentación actualizada:
+  - `docs/ecommerce/ECOMMERCE_ROADMAP.md`
+  - `docs/ecommerce/ECOMMERCE_BACKLOG.md`
+  - `docs/ecommerce/STOREFRONT_PUBLIC_SEO_CATALOG_MVP_PLAN.md`
+  - `docs/ai/CURRENT_STATUS.md`
+  - `docs/ai/CHANGE_CONTROL.md`
+
 ## Siguiente etapa recomendada
 
-1. Preparar carga inicial real controlada (catalogo, almacenes, stock base y parametros operativos), solo cuando exista autorizacion explicita del responsable de negocio/tecnico.
-2. Abrir Fase 2F.2 Componentes base Next.js + Tailwind para implementar layout, header, footer, cards y estados visuales sin consumo real de API.
-3. No avanzar a integracion de API (2F.3) sin completar componentes base y QA visual.
-
-## Nota de alcance
-
-Este estado se basa en README, ADR y reportes QA actuales del repositorio. Cualquier punto no cubierto por evidencia adicional queda "pendiente de verificar".
+1. Abrir Fase 2F.3A — Alineación de tipos TypeScript/API client con DTOs públicos reales antes de implementar páginas reales de catálogo.
+2. No avanzar a integración de API (2F.3) sin completar alineación de tipos y validar contratos DTO.
+3. Preparar carga inicial real controlada (catalogo, almacenes, stock base y parametros operativos), solo cuando exista autorizacion explicita del responsable de negocio/tecnico.

@@ -132,6 +132,45 @@ Estandarizar cambios tecnicos para reducir regresiones y mantener trazabilidad e
   - SVGs default en `storefront/public/`.
 - Siguiente paso: Fase 2F Public SEO Catalog MVP en Plan Mode.
 
+### Cierre Fase 2F.2 Componentes base Next.js + Tailwind
+
+- Tipo: implementacion funcional de componentes visuales + cierre documental QA.
+- Commits incluidos:
+  - `dd8f1a3 feat(storefront): add layout components with InkToy branding` (2F.2A + 2F.2B)
+  - `1a55ec0 feat(storefront): add catalog visual components` (2F.2C)
+- Alcance real implementado:
+  - 2F.2A: Foundations visuales + UI base (Button, Badge, Chip, Breadcrumbs, SectionHeading, ProductImageFrame, Accordion).
+  - 2F.2B: Layout (StorefrontHeader, StorefrontFooter, BottomNavigation) con logo InkToy real.
+  - 2F.2C: Catalogo visual (ProductCard, CategoryCard, EmptyState, StickyProductCTA) + preview tecnico en `/`.
+- Validaciones:
+  - `npm run build`: OK (compiled successfully, 0 errors).
+  - `npm run lint`: OK (0 warnings).
+  - `npx tsc --noEmit`: OK (0 errors).
+- Exclusiones confirmadas:
+  - No se implementaron paginas reales `/productos`, `/productos/[slug]`, `/categorias`, `/categorias/[slug]`.
+  - No se consumio API real.
+  - No se implemento `sitemap.xml` real.
+  - No se implemento checkout, pagos, pedidos, delivery, Merchant Center, login, perfil ni admin.
+  - No se toco backend, Angular, Flyway/DB, Docker, `.env` raiz, secretos, dependencias ni AWS/staging.
+- Deudas no bloqueantes registradas:
+  - Logo puede requerir ajuste fino en paginas reales.
+  - Placeholders visuales no son assets finales.
+  - Paginas reales con BottomNavigation deben reservar padding inferior.
+  - Chips requieren scroll horizontal controlado.
+  - Imagenes reales pendientes.
+  - StickyProductCTA implementado pero no montado en preview.
+  - Warning Turbopack por multiples lockfiles.
+  - ProductImageFrame/next/image requerira configuracion de patrones remotos.
+  - Preview en `/` debe ser reemplazado por Home real.
+- Archivos documentales actualizados en cierre 2F.2D:
+  - `docs/ecommerce/STOREFRONT_COMPONENTS_SYSTEM_2F2.md` (creado)
+  - `docs/qa/PHASE2F2_STOREFRONT_COMPONENTS_QA_CHECKLIST.md` (creado)
+  - `docs/ecommerce/ECOMMERCE_ROADMAP.md`
+  - `docs/ecommerce/ECOMMERCE_BACKLOG.md`
+  - `docs/ecommerce/STOREFRONT_PUBLIC_SEO_CATALOG_MVP_PLAN.md`
+  - `docs/ai/CURRENT_STATUS.md`
+  - `docs/ai/CHANGE_CONTROL.md`
+
 ### Inicio Fase 2F.0 Public SEO Catalog MVP Planning
 
 - Tipo: documentacion y planificacion.
