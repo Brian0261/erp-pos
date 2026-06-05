@@ -51,6 +51,13 @@ export class EcommerceAdminService {
     );
   }
 
+  createOnlineProfile(productId: number): Observable<EcommerceAdminOnlineProfileDetailResponse> {
+    return this.http.post<EcommerceAdminOnlineProfileDetailResponse>(
+      `${this.endpoint}/products/${productId}/online-profile`,
+      {},
+    );
+  }
+
   updateOnlineProfile(
     productId: number,
     payload: EcommerceAdminUpdateOnlineProfileRequest,

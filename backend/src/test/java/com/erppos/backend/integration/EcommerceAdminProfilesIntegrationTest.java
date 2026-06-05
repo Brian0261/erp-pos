@@ -33,6 +33,67 @@ class EcommerceAdminProfilesIntegrationTest extends AbstractHttpIntegrationTest 
     private EcommerceOnlineCategoryRepositoryPort onlineCategoryRepositoryPort;
 
     @Test
+    void adminShouldCreateDraftOnlineProfileFromExistingProduct() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = String.valueOf(System.nanoTime());
+        long productId = createProductWithoutDraftProfile(adminToken, suffix, BigDecimal.valueOf(10.00));
+
+        mockMvc.perform(post("/api/v1/ecommerce-admin/products/{productId}/online-profile", productId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.profileId").isNumber())
+                .andExpect(jsonPath("$.productId").value(productId))
+                .andExpect(jsonPath("$.publicationStatus").value("DRAFT"));
+
+        mockMvc.perform(get("/api/v1/ecommerce-admin/products/{productId}/online-profile", productId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.productId").value(productId))
+                .andExpect(jsonPath("$.publicationStatus").value("DRAFT"));
+    }
+
+    @Test
+    void shouldReturn409WhenCreatingDuplicateOnlineProfile() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = String.valueOf(System.nanoTime());
+        long productId = createProductWithoutDraftProfile(adminToken, suffix, BigDecimal.valueOf(10.00));
+
+        mockMvc.perform(post("/api/v1/ecommerce-admin/products/{productId}/online-profile", productId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(post("/api/v1/ecommerce-admin/products/{productId}/online-profile", productId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void shouldReturn404WhenCreatingOnlineProfileForMissingProduct() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+
+        mockMvc.perform(post("/api/v1/ecommerce-admin/products/{productId}/online-profile", 999999999L)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void supervisorShouldNotCreateOnlineProfile() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String supervisorToken = login(SUPERVISOR_EMAIL, SUPERVISOR_PASSWORD);
+        String suffix = String.valueOf(System.nanoTime());
+        long productId = createProductWithoutDraftProfile(adminToken, suffix, BigDecimal.valueOf(10.00));
+
+        mockMvc.perform(post("/api/v1/ecommerce-admin/products/{productId}/online-profile", productId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(supervisorToken))
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void adminShouldManageOnlineProfileAndPublishFlow() throws Exception {
         String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
         String suffix = String.valueOf(System.nanoTime());
@@ -247,11 +308,15 @@ class EcommerceAdminProfilesIntegrationTest extends AbstractHttpIntegrationTest 
     }
 
     private long createProductWithDraftProfile(String adminToken, String suffix, BigDecimal salePrice) throws Exception {
-        long categoryId = createCategory(adminToken, suffix);
-        long unitId = createUnit(adminToken, suffix);
-        long productId = createProduct(adminToken, categoryId, unitId, suffix, salePrice);
+        long productId = createProductWithoutDraftProfile(adminToken, suffix, salePrice);
         ecommerceCatalogUseCase.createDraftProfile(new CreateProductOnlineProfileCommand(productId));
         return productId;
+    }
+
+    private long createProductWithoutDraftProfile(String adminToken, String suffix, BigDecimal salePrice) throws Exception {
+        long categoryId = createCategory(adminToken, suffix);
+        long unitId = createUnit(adminToken, suffix);
+        return createProduct(adminToken, categoryId, unitId, suffix, salePrice);
     }
 
     private long createOnlineBrand(String suffix) {

@@ -1880,3 +1880,23 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
   - [x] `docker compose up --build -d` => OK.
   - [x] `docker compose ps` => OK.
 - [x] Logs backend revisados sin `500` inesperados en ventana de validacion BT-006 F1.
+
+## Fase 2G.1 - Admin Create Online Profile MVP (2026-06-04)
+
+- [x] Alcance backend/frontend acotado:
+  - [x] `POST /api/v1/ecommerce-admin/products/{productId}/online-profile` agregado como endpoint ADMIN.
+  - [x] `ProductsPageComponent` agrega CTA ADMIN para crear perfil online `DRAFT` desde producto ERP/POS.
+  - [x] Sin cambios en Storefront, Flyway, `products`, checkout, carrito, pagos u ordenes online.
+- [x] Pruebas backend agregadas en `EcommerceAdminProfilesIntegrationTest`:
+  - [x] Crear perfil de producto existente retorna `201` y `DRAFT`.
+  - [x] `GET` posterior retorna el perfil creado.
+  - [x] Duplicado retorna `409`.
+  - [x] Producto inexistente retorna `404`.
+  - [x] SUPERVISOR no puede crear (`403`).
+- [x] Validacion ejecutada:
+  - [x] `mvn -Dtest=EcommerceAdminProfilesIntegrationTest test` => SUCCESS (11 tests, 0 fail/error).
+  - [x] `mvn test` => SUCCESS (352 tests, 0 fail/error).
+  - [x] `npm run build` => SUCCESS.
+  - [x] `git status --short --untracked-files=all` revisado.
+  - [x] `git status --short -- . ":(exclude)backend/**" ":(exclude)frontend/**"` revisado; solo docs QA intencionales tras actualizar matrices.
+  - [x] `git diff --check` sin errores de whitespace.

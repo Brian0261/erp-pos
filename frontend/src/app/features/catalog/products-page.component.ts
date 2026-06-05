@@ -1,11 +1,13 @@
 import { CommonModule } from "@angular/common";
+import { HttpErrorResponse } from "@angular/common/http";
 import { Component, OnInit } from "@angular/core";
 import { FormBuilder, ReactiveFormsModule } from "@angular/forms";
-import { RouterLink } from "@angular/router";
+import { Router, RouterLink } from "@angular/router";
 import { catchError, forkJoin, of } from "rxjs";
 
 import { AuthService } from "../../core/auth/auth.service";
 import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.service";
+import { EcommerceAdminService } from "../ecommerce-admin/data/ecommerce-admin.service";
 import { Category, Product, Unit } from "./data/catalog.models";
 import { CategoryService } from "./data/category.service";
 import { ProductListFilters, ProductService } from "./data/product.service";
@@ -99,6 +101,12 @@ import { UnitService } from "./data/unit.service";
       <p class="ui-alert ui-alert--success" *ngIf="successMessage">
         {{ successMessage }}
       </p>
+      <p class="ui-alert ui-alert--info" *ngIf="reviewOnlineProfileProductId">
+        El producto ya tiene un perfil online.
+        <a [routerLink]="['/ecommerce-admin/perfiles', reviewOnlineProfileProductId]">
+          Revisar perfil online
+        </a>
+      </p>
       <p class="ui-alert ui-alert--info" *ngIf="loading">
         Cargando productos...
       </p>
@@ -150,8 +158,18 @@ import { UnitService } from "./data/unit.service";
                 <a
                   class="ui-button ui-button--secondary"
                   [routerLink]="['/catalogo/productos', product.id, 'editar']"
-                >Editar</a
+                >
+                  Editar
+                </a>
+                <button
+                   *ngIf="isAdmin"
+                   type="button"
+                   class="ui-button ui-button--secondary"
+                   [disabled]="loading"
+                   (click)="createOnlineProfile(product)"
                  >
+                  Crear perfil online
+                </button>
                 <button
                    type="button"
                    class="ui-button ui-button--secondary action-deactivate"
@@ -564,6 +582,7 @@ export class ProductsPageComponent implements OnInit {
   successMessage = "";
   isAdmin = false;
   pageJumpValue = "";
+  reviewOnlineProfileProductId: number | null = null;
 
   private readonly categoriesById = new Map<number, Category>();
   private readonly unitsById = new Map<number, Unit>();
@@ -575,6 +594,8 @@ export class ProductsPageComponent implements OnInit {
     private readonly authService: AuthService,
     private readonly confirmDialog: ConfirmDialogService,
     private readonly unitService: UnitService,
+    private readonly ecommerceAdminService: EcommerceAdminService,
+    private readonly router: Router,
   ) {}
 
   ngOnInit(): void {
@@ -727,6 +748,42 @@ export class ProductsPageComponent implements OnInit {
     });
   }
 
+  createOnlineProfile(product: Product): void {
+    if (!this.isAdmin) {
+      this.errorMessage = "Solo ADMIN puede crear perfiles online.";
+      return;
+    }
+
+    if (this.loading) {
+      return;
+    }
+
+    this.loading = true;
+    this.errorMessage = "";
+    this.successMessage = "";
+    this.reviewOnlineProfileProductId = null;
+
+    this.ecommerceAdminService.createOnlineProfile(product.id).subscribe({
+      next: () => {
+        this.loading = false;
+        void this.router.navigate(["/ecommerce-admin/perfiles", product.id]);
+      },
+      error: (error: unknown) => {
+        this.loading = false;
+        if (error instanceof HttpErrorResponse && error.status === 409) {
+          this.errorMessage = "Este producto ya tiene un perfil online. Revisa el perfil existente antes de crear otro.";
+          this.reviewOnlineProfileProductId = product.id;
+          return;
+        }
+
+        this.errorMessage = toHttpErrorMessage(
+          error,
+          "No se pudo crear el perfil online.",
+        );
+      },
+    });
+  }
+
   barcodeLabel(barcode: string | null): string {
     const normalized = barcode?.trim();
     if (!normalized || normalized === "-") {
@@ -792,6 +849,7 @@ export class ProductsPageComponent implements OnInit {
     this.loading = true;
     this.errorMessage = "";
     this.successMessage = "";
+    this.reviewOnlineProfileProductId = null;
 
     this.productService.list(
       this.page,

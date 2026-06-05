@@ -21,6 +21,7 @@ import com.erppos.backend.erp.ecommerce.application.usecase.ChangeEcommerceBrand
 import com.erppos.backend.erp.ecommerce.application.usecase.ChangeEcommerceOnlineCategoryStatusCommand;
 import com.erppos.backend.erp.ecommerce.application.usecase.CreateEcommerceBrandCommand;
 import com.erppos.backend.erp.ecommerce.application.usecase.CreateEcommerceOnlineCategoryCommand;
+import com.erppos.backend.erp.ecommerce.application.usecase.CreateProductOnlineProfileCommand;
 import com.erppos.backend.erp.ecommerce.application.usecase.EcommerceCatalogUseCase;
 import com.erppos.backend.erp.ecommerce.application.usecase.EffectiveOnlinePriceResult;
 import com.erppos.backend.erp.ecommerce.application.usecase.PublicationValidationResult;
@@ -186,6 +187,15 @@ public class EcommerceAdminController {
     public ResponseEntity<EcommerceAdminOnlineProfileDetailResponse> getOnlineProfile(@PathVariable Long productId) {
         ProductOnlineProfile profile = ecommerceCatalogUseCase.getProfileByProductId(productId);
         return ResponseEntity.ok(buildDetail(profile));
+    }
+
+    @PostMapping("/products/{productId}/online-profile")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<EcommerceAdminOnlineProfileDetailResponse> createOnlineProfile(@PathVariable Long productId) {
+        ProductOnlineProfile created = ecommerceCatalogUseCase.createDraftProfile(new CreateProductOnlineProfileCommand(productId));
+        return ResponseEntity
+                .created(URI.create("/api/v1/ecommerce-admin/products/" + productId + "/online-profile"))
+                .body(buildDetail(created));
     }
 
     @PutMapping("/products/{productId}/online-profile")
