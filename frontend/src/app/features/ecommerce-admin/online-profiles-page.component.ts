@@ -2,13 +2,16 @@ import { CommonModule } from "@angular/common";
 import { Component, OnInit } from "@angular/core";
 import { FormBuilder, ReactiveFormsModule } from "@angular/forms";
 import { RouterLink } from "@angular/router";
+import { forkJoin } from "rxjs";
 
 import { AuthService } from "../../core/auth/auth.service";
 import {
+  EcommerceAdminBrandResponse,
+  EcommerceAdminOnlineCategoryResponse,
   EcommerceAdminOnlineProfileSummaryResponse,
   OnlinePublicationStatus,
 } from "./data/ecommerce-admin.models";
-import { EcommerceAdminService } from "./data/ecommerce-admin.service";
+import { EcommerceAdminService, OnlineProfileListFilters } from "./data/ecommerce-admin.service";
 import { toHttpErrorMessage } from "./data/http-error-message";
 
 type PublicationFilter = "ALL" | OnlinePublicationStatus;
@@ -55,13 +58,13 @@ type PublicationFilter = "ALL" | OnlinePublicationStatus;
           <input
             type="text"
             formControlName="query"
-            placeholder="productId, nombre online o slug"
+            placeholder="Nombre online o slug"
           />
         </label>
 
         <label class="filter-field filter-field--status">
           <span>Estado</span>
-          <select formControlName="status" (change)="applyFilters()">
+          <select formControlName="status">
             <option value="ALL">Todos</option>
             <option *ngFor="let status of publicationStatuses" [value]="status">
               {{ statusLabel(status) }}
@@ -69,9 +72,39 @@ type PublicationFilter = "ALL" | OnlinePublicationStatus;
           </select>
         </label>
 
+        <label class="filter-field">
+          <span>Marca</span>
+          <select formControlName="brandId" [disabled]="filtersForm.controls.withoutBrand.value === true">
+            <option value="">Todas</option>
+            <option *ngFor="let brand of brands" [value]="brand.id">
+              {{ brand.name }}
+            </option>
+          </select>
+        </label>
+
+        <label class="filter-field">
+          <span>Categoría online</span>
+          <select formControlName="onlineCategoryId" [disabled]="filtersForm.controls.withoutOnlineCategory.value === true">
+            <option value="">Todas</option>
+            <option *ngFor="let category of onlineCategories" [value]="category.id">
+              {{ category.name }}
+            </option>
+          </select>
+        </label>
+
+        <label class="filter-toggle">
+          <input type="checkbox" formControlName="withoutBrand" />
+          <span>Sin marca</span>
+        </label>
+
+        <label class="filter-toggle">
+          <input type="checkbox" formControlName="withoutOnlineCategory" />
+          <span>Sin categoría online</span>
+        </label>
+
         <div class="filter-actions">
           <button type="submit" class="ui-button ui-button--primary" [disabled]="loading">
-            Filtrar
+            Aplicar filtros
           </button>
           <button
             type="button"
@@ -93,7 +126,7 @@ type PublicationFilter = "ALL" | OnlinePublicationStatus;
       <p class="ui-alert ui-alert--info" *ngIf="loading">Cargando perfiles online...</p>
 
       <div class="ui-table-wrapper" *ngIf="!loading && canView">
-        <table class="ui-table ecommerce-table" *ngIf="filteredProfiles.length > 0">
+        <table class="ui-table ecommerce-table" *ngIf="profiles.length > 0">
           <thead>
             <tr>
               <th>Producto</th>
@@ -108,7 +141,7 @@ type PublicationFilter = "ALL" | OnlinePublicationStatus;
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let profile of filteredProfiles">
+            <tr *ngFor="let profile of profiles">
               <td class="cell-code">#{{ profile.productId }}</td>
               <td class="cell-name">{{ profile.onlineName || "-" }}</td>
               <td class="cell-code">{{ profile.slug || "-" }}</td>
@@ -132,8 +165,8 @@ type PublicationFilter = "ALL" | OnlinePublicationStatus;
           </tbody>
         </table>
 
-        <div class="ui-empty-state" *ngIf="filteredProfiles.length === 0">
-          <p class="empty-state-title">{{ profiles.length === 0 ? "Aún no hay perfiles online" : "Sin resultados" }}</p>
+        <div class="ui-empty-state" *ngIf="profiles.length === 0">
+          <p class="empty-state-title">{{ hasActiveFilters() ? "Sin resultados" : "Aún no hay perfiles online" }}</p>
           <p class="ui-muted">{{ emptyMessage }}</p>
         </div>
       </div>
@@ -179,7 +212,7 @@ type PublicationFilter = "ALL" | OnlinePublicationStatus;
 
       .filters-panel {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) 220px auto;
+        grid-template-columns: minmax(220px, 1fr) 180px 220px 220px auto auto auto;
         gap: var(--space-3);
         align-items: end;
         border: 1px solid var(--color-border-default);
@@ -206,6 +239,21 @@ type PublicationFilter = "ALL" | OnlinePublicationStatus;
         border: 1px solid var(--color-border-strong);
         border-radius: var(--radius-sm);
         background: var(--color-bg-surface);
+      }
+
+      .filter-toggle {
+        min-height: 2.65rem;
+        display: inline-flex;
+        align-items: center;
+        gap: var(--space-2);
+        font-size: var(--font-size-sm);
+        font-weight: 700;
+        color: var(--color-text-secondary);
+        white-space: nowrap;
+      }
+
+      .filter-toggle input {
+        width: auto;
       }
 
       .filter-actions {
@@ -289,10 +337,15 @@ export class OnlineProfilesPageComponent implements OnInit {
   readonly filtersForm = this.formBuilder.group({
     query: [""],
     status: ["ALL" as PublicationFilter],
+    brandId: [""],
+    withoutBrand: [false],
+    onlineCategoryId: [""],
+    withoutOnlineCategory: [false],
   });
 
   profiles: EcommerceAdminOnlineProfileSummaryResponse[] = [];
-  filteredProfiles: EcommerceAdminOnlineProfileSummaryResponse[] = [];
+  brands: EcommerceAdminBrandResponse[] = [];
+  onlineCategories: EcommerceAdminOnlineCategoryResponse[] = [];
 
   loading = false;
   canView = false;
@@ -314,10 +367,10 @@ export class OnlineProfilesPageComponent implements OnInit {
   ) {}
 
   get emptyMessage(): string {
-    if (this.profiles.length === 0) {
-      return "No existen perfiles online para la pagina seleccionada.";
+    if (this.hasActiveFilters()) {
+      return "No hay perfiles online para los filtros aplicados.";
     }
-    return "No hay resultados para los filtros aplicados en esta pagina.";
+    return "No existen perfiles online para la página seleccionada.";
   }
 
   ngOnInit(): void {
@@ -330,6 +383,7 @@ export class OnlineProfilesPageComponent implements OnInit {
             "No tienes permisos para revisar perfiles online en esta pantalla.";
           return;
         }
+        this.loadFilterOptions();
         this.loadProfiles();
       },
       error: () => {
@@ -339,35 +393,21 @@ export class OnlineProfilesPageComponent implements OnInit {
   }
 
   applyFilters(): void {
-    const rawQuery = String(this.filtersForm.controls.query.value || "").trim().toLowerCase();
-    const status = this.filtersForm.controls.status.value as PublicationFilter;
-
-    this.filteredProfiles = this.profiles.filter((profile) => {
-      if (status !== "ALL" && profile.publicationStatus !== status) {
-        return false;
-      }
-
-      if (!rawQuery) {
-        return true;
-      }
-
-      const searchable = [
-        String(profile.productId),
-        profile.onlineName || "",
-        profile.slug || "",
-        String(profile.brandId ?? ""),
-        String(profile.onlineCategoryId ?? ""),
-      ]
-        .join(" ")
-        .toLowerCase();
-
-      return searchable.includes(rawQuery);
-    });
+    this.page = 0;
+    this.loadProfiles();
   }
 
   clearFilters(): void {
-    this.filtersForm.reset({ query: "", status: "ALL" });
-    this.filteredProfiles = [...this.profiles];
+    this.filtersForm.reset({
+      query: "",
+      status: "ALL",
+      brandId: "",
+      withoutBrand: false,
+      onlineCategoryId: "",
+      withoutOnlineCategory: false,
+    });
+    this.page = 0;
+    this.loadProfiles();
   }
 
   reloadProfiles(): void {
@@ -439,6 +479,18 @@ export class OnlineProfilesPageComponent implements OnInit {
     }).format(new Date(value));
   }
 
+  hasActiveFilters(): boolean {
+    const raw = this.filtersForm.getRawValue();
+    return Boolean(
+      String(raw.query || "").trim() ||
+        raw.status !== "ALL" ||
+        raw.brandId ||
+        raw.withoutBrand ||
+        raw.onlineCategoryId ||
+        raw.withoutOnlineCategory,
+    );
+  }
+
   private loadProfiles(showSuccess = false): void {
     if (!this.canView) {
       return;
@@ -450,7 +502,7 @@ export class OnlineProfilesPageComponent implements OnInit {
       this.successMessage = "";
     }
 
-    this.ecommerceAdminService.listOnlineProfiles(this.page, this.size).subscribe({
+    this.ecommerceAdminService.listOnlineProfiles(this.page, this.size, this.currentFilters()).subscribe({
       next: (response) => {
         this.loading = false;
         this.profiles = response.items;
@@ -458,7 +510,6 @@ export class OnlineProfilesPageComponent implements OnInit {
         this.totalPages = Math.max(response.totalPages || 1, 1);
         this.page = response.page;
         this.size = response.size;
-        this.applyFilters();
 
         if (showSuccess) {
           this.successMessage = "Listado actualizado correctamente.";
@@ -472,5 +523,35 @@ export class OnlineProfilesPageComponent implements OnInit {
         );
       },
     });
+  }
+
+  private loadFilterOptions(): void {
+    forkJoin({
+      brands: this.ecommerceAdminService.listBrands(),
+      onlineCategories: this.ecommerceAdminService.listOnlineCategories(),
+    }).subscribe({
+      next: ({ brands, onlineCategories }) => {
+        this.brands = brands;
+        this.onlineCategories = onlineCategories;
+      },
+      error: () => {
+        this.brands = [];
+        this.onlineCategories = [];
+      },
+    });
+  }
+
+  private currentFilters(): OnlineProfileListFilters {
+    const raw = this.filtersForm.getRawValue();
+    const brandId = raw.brandId ? Number(raw.brandId) : undefined;
+    const onlineCategoryId = raw.onlineCategoryId ? Number(raw.onlineCategoryId) : undefined;
+    return {
+      q: String(raw.query || "").trim() || undefined,
+      status: raw.status === "ALL" ? undefined : raw.status as OnlinePublicationStatus,
+      brandId: !raw.withoutBrand && Number.isFinite(brandId) ? brandId : undefined,
+      withoutBrand: Boolean(raw.withoutBrand),
+      onlineCategoryId: !raw.withoutOnlineCategory && Number.isFinite(onlineCategoryId) ? onlineCategoryId : undefined,
+      withoutOnlineCategory: Boolean(raw.withoutOnlineCategory),
+    };
   }
 }

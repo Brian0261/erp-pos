@@ -4,13 +4,18 @@ import com.erppos.backend.erp.ecommerce.domain.exception.EcommerceNotFoundExcept
 import com.erppos.backend.erp.ecommerce.domain.model.OnlinePublicationStatus;
 import com.erppos.backend.erp.ecommerce.domain.model.ProductOnlineProfile;
 import com.erppos.backend.erp.ecommerce.domain.port.ProductOnlineProfileRepositoryPort;
+import com.erppos.backend.erp.ecommerce.domain.port.ProductOnlineProfileSearchCriteria;
 import com.erppos.backend.erp.ecommerce.infrastructure.mapper.ProductOnlineProfileMapper;
+import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 
 @Component
@@ -37,6 +42,12 @@ public class ProductOnlineProfilePersistenceAdapter implements ProductOnlineProf
     @Override
     public Page<ProductOnlineProfile> findAll(Pageable pageable) {
         return profileJpaRepository.findAll(pageable).map(ProductOnlineProfileMapper::toDomain);
+    }
+
+    @Override
+    public Page<ProductOnlineProfile> findAll(ProductOnlineProfileSearchCriteria criteria, Pageable pageable) {
+        return profileJpaRepository.findAll(toSpecification(criteria), pageable)
+                .map(ProductOnlineProfileMapper::toDomain);
     }
 
     @Override
@@ -83,5 +94,39 @@ public class ProductOnlineProfilePersistenceAdapter implements ProductOnlineProf
     @Override
     public boolean existsByOnlineCategoryIdAndPublicationStatus(Long onlineCategoryId, OnlinePublicationStatus publicationStatus) {
         return profileJpaRepository.existsByOnlineCategoryIdAndPublicationStatus(onlineCategoryId, publicationStatus);
+    }
+
+    private Specification<ProductOnlineProfileEntity> toSpecification(ProductOnlineProfileSearchCriteria criteria) {
+        return (root, query, criteriaBuilder) -> {
+            if (criteria == null) {
+                return criteriaBuilder.conjunction();
+            }
+
+            List<Predicate> predicates = new ArrayList<>();
+            if (criteria.status() != null) {
+                predicates.add(criteriaBuilder.equal(root.get("publicationStatus"), criteria.status()));
+            }
+            if (criteria.brandId() != null) {
+                predicates.add(criteriaBuilder.equal(root.get("brandId"), criteria.brandId()));
+            } else if (criteria.withoutBrand()) {
+                predicates.add(criteriaBuilder.isNull(root.get("brandId")));
+            }
+            if (criteria.onlineCategoryId() != null) {
+                predicates.add(criteriaBuilder.equal(root.get("onlineCategoryId"), criteria.onlineCategoryId()));
+            } else if (criteria.withoutOnlineCategory()) {
+                predicates.add(criteriaBuilder.isNull(root.get("onlineCategoryId")));
+            }
+
+            String normalizedQuery = criteria.query() == null ? null : criteria.query().trim().toLowerCase(Locale.ROOT);
+            if (normalizedQuery != null && !normalizedQuery.isBlank()) {
+                String pattern = "%" + normalizedQuery + "%";
+                predicates.add(criteriaBuilder.or(
+                        criteriaBuilder.like(criteriaBuilder.lower(root.get("onlineName")), pattern),
+                        criteriaBuilder.like(criteriaBuilder.lower(root.get("slug")), pattern)
+                ));
+            }
+
+            return criteriaBuilder.and(predicates.toArray(Predicate[]::new));
+        };
     }
 }

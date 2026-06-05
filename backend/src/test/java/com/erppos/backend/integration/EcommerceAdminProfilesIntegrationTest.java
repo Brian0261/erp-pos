@@ -422,6 +422,100 @@ class EcommerceAdminProfilesIntegrationTest extends AbstractHttpIntegrationTest 
                 .andExpect(jsonPath("$.items[?(@.productId == " + productId + ")].onlineCategoryName", org.hamcrest.Matchers.hasItem(categoryName)));
     }
 
+    @Test
+    void listOnlineProfilesShouldApplyServerSideFilters() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = Long.toString(System.nanoTime(), 36);
+        long alphaProductId = createProductWithDraftProfile(adminToken, suffix + "alpha", BigDecimal.valueOf(15.00));
+        long betaProductId = createProductWithDraftProfile(adminToken, suffix + "beta", BigDecimal.valueOf(16.00));
+        long orphanProductId = createProductWithDraftProfile(adminToken, suffix + "orphan", BigDecimal.valueOf(17.00));
+        long alphaBrandId = createOnlineBrand(suffix + "alpha");
+        long betaBrandId = createOnlineBrand(suffix + "beta");
+        long alphaCategoryId = createOnlineCategory(suffix + "alpha");
+        long betaCategoryId = createOnlineCategory(suffix + "beta");
+
+        updateProfile(adminToken, alphaProductId, "filter-suite-" + suffix + "-alpha", "Filter Suite " + suffix + " Alpha", alphaBrandId, alphaCategoryId);
+        updateProfile(adminToken, betaProductId, "filter-suite-" + suffix + "-beta", "Filter Suite " + suffix + " Beta", betaBrandId, betaCategoryId);
+        updateProfile(adminToken, orphanProductId, "filter-suite-" + suffix + "-orphan", "Filter Suite " + suffix + " Orphan", null, null);
+        upsertSeoForPublish(adminToken, betaProductId, suffix + "beta");
+        upsertAssetForPublish(adminToken, betaProductId, suffix + "beta");
+        mockMvc.perform(post("/api/v1/ecommerce-admin/products/{productId}/publish", betaProductId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/ecommerce-admin/products/online-profiles")
+                        .param("q", "Filter Suite " + suffix)
+                        .param("page", "0")
+                        .param("size", "1")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.totalItems").value(3));
+
+        mockMvc.perform(get("/api/v1/ecommerce-admin/products/online-profiles")
+                        .param("q", "Filter Suite " + suffix)
+                        .param("status", "DRAFT")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalItems").value(2));
+
+        mockMvc.perform(get("/api/v1/ecommerce-admin/products/online-profiles")
+                        .param("q", "Filter Suite " + suffix)
+                        .param("brandId", String.valueOf(betaBrandId))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalItems").value(1))
+                .andExpect(jsonPath("$.items[0].productId").value(betaProductId));
+
+        mockMvc.perform(get("/api/v1/ecommerce-admin/products/online-profiles")
+                        .param("q", "Filter Suite " + suffix)
+                        .param("onlineCategoryId", String.valueOf(alphaCategoryId))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalItems").value(1))
+                .andExpect(jsonPath("$.items[0].productId").value(alphaProductId));
+
+        mockMvc.perform(get("/api/v1/ecommerce-admin/products/online-profiles")
+                        .param("q", "filter-suite-" + suffix + "-beta")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalItems").value(1))
+                .andExpect(jsonPath("$.items[0].productId").value(betaProductId));
+
+        mockMvc.perform(get("/api/v1/ecommerce-admin/products/online-profiles")
+                        .param("q", "Filter Suite " + suffix + " Alpha")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalItems").value(1))
+                .andExpect(jsonPath("$.items[0].productId").value(alphaProductId));
+
+        mockMvc.perform(get("/api/v1/ecommerce-admin/products/online-profiles")
+                        .param("q", "Filter Suite " + suffix)
+                        .param("status", "PUBLISHED")
+                        .param("brandId", String.valueOf(betaBrandId))
+                        .param("onlineCategoryId", String.valueOf(betaCategoryId))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalItems").value(1))
+                .andExpect(jsonPath("$.items[0].productId").value(betaProductId));
+
+        mockMvc.perform(get("/api/v1/ecommerce-admin/products/online-profiles")
+                        .param("q", "Filter Suite " + suffix)
+                        .param("withoutBrand", "true")
+                        .param("withoutOnlineCategory", "true")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalItems").value(1))
+                .andExpect(jsonPath("$.items[0].productId").value(orphanProductId));
+
+        mockMvc.perform(get("/api/v1/ecommerce-admin/products/online-profiles")
+                        .param("brandId", String.valueOf(betaBrandId))
+                        .param("withoutBrand", "true")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken)))
+                .andExpect(status().isBadRequest());
+    }
+
     private long createProductWithDraftProfile(String adminToken, String suffix, BigDecimal salePrice) throws Exception {
         long productId = createProductWithoutDraftProfile(adminToken, suffix, salePrice);
         ecommerceCatalogUseCase.createDraftProfile(new CreateProductOnlineProfileCommand(productId));
@@ -466,12 +560,31 @@ class EcommerceAdminProfilesIntegrationTest extends AbstractHttpIntegrationTest 
     }
 
     private void updateProfileForPublish(String adminToken, long productId, String suffix, long brandId, long onlineCategoryId) throws Exception {
+        updateProfile(adminToken, productId, "lapicero-online-" + suffix, "Lapicero online " + suffix, brandId, onlineCategoryId);
+    }
+
+    private void updateProfile(
+            String adminToken,
+            long productId,
+            String slug,
+            String onlineName,
+            Long brandId,
+            Long onlineCategoryId
+    ) throws Exception {
         ObjectNode payload = objectMapper.createObjectNode();
-        payload.put("slug", "lapicero-online-" + suffix);
-        payload.put("onlineName", "Lapicero online " + suffix);
-        payload.put("onlineDescription", "Descripcion online completa " + suffix);
-        payload.put("onlineCategoryId", onlineCategoryId);
-        payload.put("brandId", brandId);
+        payload.put("slug", slug);
+        payload.put("onlineName", onlineName);
+        payload.put("onlineDescription", "Descripcion online completa " + slug);
+        if (onlineCategoryId == null) {
+            payload.putNull("onlineCategoryId");
+        } else {
+            payload.put("onlineCategoryId", onlineCategoryId);
+        }
+        if (brandId == null) {
+            payload.putNull("brandId");
+        } else {
+            payload.put("brandId", brandId);
+        }
 
         mockMvc.perform(put("/api/v1/ecommerce-admin/products/{productId}/online-profile", productId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))

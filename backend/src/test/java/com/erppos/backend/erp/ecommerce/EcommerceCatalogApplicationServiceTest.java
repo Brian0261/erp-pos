@@ -31,6 +31,7 @@ import com.erppos.backend.erp.ecommerce.domain.port.EcommerceSeoMetadataReposito
 import com.erppos.backend.erp.ecommerce.domain.port.OnlinePriceOverrideRepositoryPort;
 import com.erppos.backend.erp.ecommerce.domain.port.ProductAssetRepositoryPort;
 import com.erppos.backend.erp.ecommerce.domain.port.ProductOnlineProfileRepositoryPort;
+import com.erppos.backend.erp.ecommerce.domain.port.ProductOnlineProfileSearchCriteria;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.Page;
@@ -400,6 +401,25 @@ class EcommerceCatalogApplicationServiceTest {
         @Override
         public Page<ProductOnlineProfile> findAll(Pageable pageable) {
             return new PageImpl<>(profiles.values().stream().toList(), pageable, profiles.size());
+        }
+
+        @Override
+        public Page<ProductOnlineProfile> findAll(ProductOnlineProfileSearchCriteria criteria, Pageable pageable) {
+            List<ProductOnlineProfile> filtered = profiles.values().stream()
+                    .filter(profile -> criteria == null || criteria.status() == null || profile.publicationStatus() == criteria.status())
+                    .filter(profile -> criteria == null || criteria.brandId() == null || criteria.brandId().equals(profile.brandId()))
+                    .filter(profile -> criteria == null || !criteria.withoutBrand() || profile.brandId() == null)
+                    .filter(profile -> criteria == null || criteria.onlineCategoryId() == null || criteria.onlineCategoryId().equals(profile.onlineCategoryId()))
+                    .filter(profile -> criteria == null || !criteria.withoutOnlineCategory() || profile.onlineCategoryId() == null)
+                    .filter(profile -> criteria == null || criteria.query() == null || matchesQuery(profile, criteria.query()))
+                    .toList();
+            return new PageImpl<>(filtered, pageable, filtered.size());
+        }
+
+        private boolean matchesQuery(ProductOnlineProfile profile, String query) {
+            String normalized = query.toLowerCase(java.util.Locale.ROOT);
+            return (profile.onlineName() != null && profile.onlineName().toLowerCase(java.util.Locale.ROOT).contains(normalized))
+                    || (profile.slug() != null && profile.slug().toLowerCase(java.util.Locale.ROOT).contains(normalized));
         }
 
         @Override

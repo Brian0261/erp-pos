@@ -11,6 +11,7 @@ import java.util.Optional;
 public interface ProductOnlineProfileRepositoryPort {
     ProductOnlineProfile save(ProductOnlineProfile profile);
     Page<ProductOnlineProfile> findAll(Pageable pageable);
+    Page<ProductOnlineProfile> findAll(ProductOnlineProfileSearchCriteria criteria, Pageable pageable);
     List<ProductOnlineProfile> findByProductIds(List<Long> productIds);
     Optional<ProductOnlineProfile> findById(Long id);
     Optional<ProductOnlineProfile> findByProductId(Long productId);

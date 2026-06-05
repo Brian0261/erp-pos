@@ -22,7 +22,17 @@ import {
   EcommerceAdminUpsertPriceOverrideRequest,
   EcommerceAdminUpsertPrimaryAssetRequest,
   EcommerceAdminUpsertSeoRequest,
+  OnlinePublicationStatus,
 } from "./ecommerce-admin.models";
+
+export interface OnlineProfileListFilters {
+  q?: string;
+  status?: OnlinePublicationStatus;
+  brandId?: number;
+  withoutBrand?: boolean;
+  onlineCategoryId?: number;
+  withoutOnlineCategory?: boolean;
+}
 
 @Injectable({ providedIn: "root" })
 export class EcommerceAdminService {
@@ -33,12 +43,33 @@ export class EcommerceAdminService {
   listOnlineProfiles(
     page: number,
     size: number,
+    filters: OnlineProfileListFilters = {},
     sort = "updatedAt,desc",
   ): Observable<EcommerceAdminPageResponse<EcommerceAdminOnlineProfileSummaryResponse>> {
-    const params = new HttpParams()
+    let params = new HttpParams()
       .set("page", String(page))
       .set("size", String(size))
       .set("sort", sort);
+
+    const query = filters.q?.trim();
+    if (query) {
+      params = params.set("q", query);
+    }
+    if (filters.status) {
+      params = params.set("status", filters.status);
+    }
+    if (filters.brandId !== undefined) {
+      params = params.set("brandId", String(filters.brandId));
+    }
+    if (filters.withoutBrand) {
+      params = params.set("withoutBrand", "true");
+    }
+    if (filters.onlineCategoryId !== undefined) {
+      params = params.set("onlineCategoryId", String(filters.onlineCategoryId));
+    }
+    if (filters.withoutOnlineCategory) {
+      params = params.set("withoutOnlineCategory", "true");
+    }
 
     return this.http.get<EcommerceAdminPageResponse<EcommerceAdminOnlineProfileSummaryResponse>>(
       `${this.endpoint}/products/online-profiles`,

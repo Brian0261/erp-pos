@@ -7,6 +7,7 @@ import com.erppos.backend.erp.ecommerce.domain.model.EcommerceOnlineCategory;
 import com.erppos.backend.erp.ecommerce.domain.model.OnlinePriceOverride;
 import com.erppos.backend.erp.ecommerce.domain.model.ProductAsset;
 import com.erppos.backend.erp.ecommerce.domain.model.ProductOnlineProfile;
+import com.erppos.backend.erp.ecommerce.domain.port.ProductOnlineProfileSearchCriteria;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -26,6 +27,7 @@ public interface EcommerceCatalogUseCase {
     EcommerceOnlineCategory changeOnlineCategoryStatus(Long id, ChangeEcommerceOnlineCategoryStatusCommand command);
     ProductOnlineProfile createDraftProfile(CreateProductOnlineProfileCommand command);
     Page<OnlineProfileSummaryResult> listOnlineProfiles(Pageable pageable);
+    Page<OnlineProfileSummaryResult> listOnlineProfiles(ProductOnlineProfileSearchCriteria criteria, Pageable pageable);
     List<ProductOnlineProfile> listProfilesByProductIds(List<Long> productIds);
     ProductOnlineProfile getProfileByProductId(Long productId);
     Optional<EcommerceSeoMetadata> getSeoMetadataByProductId(Long productId);

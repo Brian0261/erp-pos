@@ -705,6 +705,23 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [x] Sin cambios en backend funcional ni Angular funcional durante smoke.
 - [x] Sin commit ni push durante fase de smoke.
 
+### Ecommerce - Fase 2H.1A Filtros server-side en Perfiles online
+
+- [ ] Backend: `GET /api/v1/ecommerce-admin/products/online-profiles` sin filtros conserva listado paginado actual.
+- [ ] Backend: filtro `status` aplica antes de paginar.
+- [ ] Backend: filtro `brandId` aplica antes de paginar.
+- [ ] Backend: filtro `onlineCategoryId` aplica antes de paginar.
+- [ ] Backend: búsqueda `q` aplica sobre `onlineName` y `slug`.
+- [ ] Backend: filtros combinados (`status` + `brandId` + `onlineCategoryId` + `q`) retornan resultados consistentes.
+- [ ] Backend: `withoutBrand=true` y `withoutOnlineCategory=true` filtran perfiles sin marca/categoría.
+- [ ] Backend: combinaciones inválidas `brandId + withoutBrand` y `onlineCategoryId + withoutOnlineCategory` retornan 400 controlado.
+- [ ] Backend: enriquecimiento `brandName`/`onlineCategoryName` se mantiene sin lookup por fila.
+- [ ] Frontend Perfiles online: filtros de estado, marca, categoría online y texto usan botón `Aplicar filtros`.
+- [ ] Frontend Perfiles online: `Limpiar` vuelve a página 0 y recarga listado general.
+- [ ] Frontend Perfiles online: paginación respeta filtros server-side.
+- [ ] Frontend Perfiles online: botón `Revisar` sigue navegando al detalle.
+- [ ] Sin cambios en Storefront, Flyway, Docker, `.env` raiz, secretos ni AWS/staging.
+
 ### Ecommerce - Fase 2G.4B Enriquecer listado de Perfiles online
 
 - [ ] Backend: `GET /api/v1/ecommerce-admin/products/online-profiles` retorna `brandName` y `onlineCategoryName` enriquecidos.

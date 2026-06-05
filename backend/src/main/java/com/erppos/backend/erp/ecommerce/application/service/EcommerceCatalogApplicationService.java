@@ -36,6 +36,7 @@ import com.erppos.backend.erp.ecommerce.domain.port.EcommerceSeoMetadataReposito
 import com.erppos.backend.erp.ecommerce.domain.port.OnlinePriceOverrideRepositoryPort;
 import com.erppos.backend.erp.ecommerce.domain.port.ProductAssetRepositoryPort;
 import com.erppos.backend.erp.ecommerce.domain.port.ProductOnlineProfileRepositoryPort;
+import com.erppos.backend.erp.ecommerce.domain.port.ProductOnlineProfileSearchCriteria;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -299,7 +300,12 @@ public class EcommerceCatalogApplicationService implements EcommerceCatalogUseCa
 
     @Override
     public Page<OnlineProfileSummaryResult> listOnlineProfiles(Pageable pageable) {
-        Page<ProductOnlineProfile> profilesPage = profileRepositoryPort.findAll(pageable);
+        return listOnlineProfiles(null, pageable);
+    }
+
+    @Override
+    public Page<OnlineProfileSummaryResult> listOnlineProfiles(ProductOnlineProfileSearchCriteria criteria, Pageable pageable) {
+        Page<ProductOnlineProfile> profilesPage = profileRepositoryPort.findAll(criteria, pageable);
         List<ProductOnlineProfile> profiles = profilesPage.getContent();
 
         Set<Long> brandIds = profiles.stream()
@@ -312,13 +318,17 @@ public class EcommerceCatalogApplicationService implements EcommerceCatalogUseCa
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
 
-        Map<Long, String> brandNamesById = brandRepositoryPort.findAll().stream()
-                .filter(brand -> brandIds.contains(brand.id()))
-                .collect(Collectors.toMap(EcommerceBrand::id, EcommerceBrand::name));
+        Map<Long, String> brandNamesById = brandIds.isEmpty()
+                ? Map.of()
+                : brandRepositoryPort.findAll().stream()
+                        .filter(brand -> brandIds.contains(brand.id()))
+                        .collect(Collectors.toMap(EcommerceBrand::id, EcommerceBrand::name));
 
-        Map<Long, String> categoryNamesById = onlineCategoryRepositoryPort.findAll().stream()
-                .filter(category -> categoryIds.contains(category.id()))
-                .collect(Collectors.toMap(EcommerceOnlineCategory::id, EcommerceOnlineCategory::name));
+        Map<Long, String> categoryNamesById = categoryIds.isEmpty()
+                ? Map.of()
+                : onlineCategoryRepositoryPort.findAll().stream()
+                        .filter(category -> categoryIds.contains(category.id()))
+                        .collect(Collectors.toMap(EcommerceOnlineCategory::id, EcommerceOnlineCategory::name));
 
         List<OnlineProfileSummaryResult> enrichedResults = profiles.stream()
                 .map(profile -> new OnlineProfileSummaryResult(

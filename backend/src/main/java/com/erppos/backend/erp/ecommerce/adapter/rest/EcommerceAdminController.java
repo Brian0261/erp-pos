@@ -41,6 +41,8 @@ import com.erppos.backend.erp.ecommerce.domain.model.EcommerceSeoMetadata;
 import com.erppos.backend.erp.ecommerce.domain.model.OnlinePriceOverride;
 import com.erppos.backend.erp.ecommerce.domain.model.ProductAsset;
 import com.erppos.backend.erp.ecommerce.domain.model.ProductOnlineProfile;
+import com.erppos.backend.erp.ecommerce.domain.model.OnlinePublicationStatus;
+import com.erppos.backend.erp.ecommerce.domain.port.ProductOnlineProfileSearchCriteria;
 import com.erppos.backend.erp.shared.adapter.dto.PageResponse;
 import com.erppos.backend.erp.shared.adapter.dto.PageResponseMapper;
 import jakarta.validation.Valid;
@@ -182,9 +184,25 @@ public class EcommerceAdminController {
 
     @GetMapping("/products/online-profiles")
     @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR')")
-    public ResponseEntity<PageResponse<EcommerceAdminOnlineProfileSummaryResponse>> listOnlineProfiles(Pageable pageable) {
+    public ResponseEntity<PageResponse<EcommerceAdminOnlineProfileSummaryResponse>> listOnlineProfiles(
+            @RequestParam(required = false) OnlinePublicationStatus status,
+            @RequestParam(required = false) Long brandId,
+            @RequestParam(defaultValue = "false") boolean withoutBrand,
+            @RequestParam(required = false) Long onlineCategoryId,
+            @RequestParam(defaultValue = "false") boolean withoutOnlineCategory,
+            @RequestParam(required = false) String q,
+            Pageable pageable
+    ) {
+        ProductOnlineProfileSearchCriteria criteria = buildOnlineProfilesCriteria(
+                status,
+                brandId,
+                withoutBrand,
+                onlineCategoryId,
+                withoutOnlineCategory,
+                q
+        );
         Page<EcommerceAdminOnlineProfileSummaryResponse> page = ecommerceCatalogUseCase
-                .listOnlineProfiles(pageable)
+                .listOnlineProfiles(criteria, pageable)
                 .map(this::toSummaryResponse);
         return ResponseEntity.ok(PageResponseMapper.from(page));
     }
@@ -402,6 +420,38 @@ public class EcommerceAdminController {
         } catch (NumberFormatException ex) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "productIds must be numeric");
         }
+    }
+
+    private ProductOnlineProfileSearchCriteria buildOnlineProfilesCriteria(
+            OnlinePublicationStatus status,
+            Long brandId,
+            boolean withoutBrand,
+            Long onlineCategoryId,
+            boolean withoutOnlineCategory,
+            String q
+    ) {
+        if (brandId != null && brandId <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "brandId must be positive");
+        }
+        if (onlineCategoryId != null && onlineCategoryId <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "onlineCategoryId must be positive");
+        }
+        if (brandId != null && withoutBrand) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "brandId and withoutBrand cannot be combined");
+        }
+        if (onlineCategoryId != null && withoutOnlineCategory) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "onlineCategoryId and withoutOnlineCategory cannot be combined");
+        }
+
+        String normalizedQuery = q == null || q.isBlank() ? null : q.trim();
+        return new ProductOnlineProfileSearchCriteria(
+                status,
+                brandId,
+                withoutBrand,
+                onlineCategoryId,
+                withoutOnlineCategory,
+                normalizedQuery
+        );
     }
 
     private EcommerceAdminSeoMetadataResponse toSeoResponse(EcommerceSeoMetadata metadata) {
