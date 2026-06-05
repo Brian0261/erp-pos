@@ -34,7 +34,7 @@ import { toHttpErrorMessage } from "./data/http-error-message";
             Perfil online del producto #{{ productId || "-" }}
           </h1>
           <p class="ui-page-description">
-            Gestiona perfil, SEO, asset principal y override de precio para publicación.
+            Gestiona perfil, SEO, imagen principal y precio online para publicación.
           </p>
         </div>
 
@@ -69,7 +69,7 @@ import { toHttpErrorMessage } from "./data/http-error-message";
             (click)="reloadData()"
             [disabled]="loading"
           >
-            Actualizar
+            Actualizar datos
           </button>
         </div>
       </header>
@@ -112,7 +112,7 @@ import { toHttpErrorMessage } from "./data/http-error-message";
 
       <section class="ui-module-section" *ngIf="profile && publicationValidation">
         <header class="section-head">
-          <h2>Checklist de publicación (backend)</h2>
+          <h2>Requisitos para publicar</h2>
         </header>
 
         <div class="validation-head">
@@ -124,7 +124,7 @@ import { toHttpErrorMessage } from "./data/http-error-message";
             {{ publicationValidation.publishable ? "Publicable" : "Bloqueado" }}
           </span>
           <span class="ui-muted" *ngIf="publicationValidation.effectivePrice !== null">
-            Precio efectivo backend:
+            Precio efectivo:
             {{ formatCurrency(publicationValidation.effectivePrice, publicationValidation.currency) }}
           </span>
         </div>
@@ -133,7 +133,7 @@ import { toHttpErrorMessage } from "./data/http-error-message";
           <li *ngFor="let error of publicationValidation.errors">{{ error }}</li>
         </ul>
         <ng-template #noErrors>
-          <p class="ui-muted">Sin bloqueos de publicación reportados por backend.</p>
+          <p class="ui-muted">Sin bloqueos de publicación.</p>
         </ng-template>
       </section>
 
@@ -226,37 +226,37 @@ import { toHttpErrorMessage } from "./data/http-error-message";
           </label>
 
           <label class="field">
-            <span>Canonical path</span>
+            <span>Ruta canónica</span>
             <input type="text" formControlName="canonicalPath" maxlength="300" />
           </label>
 
           <label class="field">
-            <span>Robots policy</span>
+            <span>Indexación para buscadores</span>
             <select formControlName="robotsPolicy">
               <option [ngValue]="null">Sin definir</option>
               <option *ngFor="let policy of robotsPolicies" [ngValue]="policy">
-                {{ policy }}
+                {{ robotsPolicyLabel(policy) }}
               </option>
             </select>
           </label>
 
           <label class="field field--checkbox">
             <input type="checkbox" formControlName="indexable" />
-            <span>Indexable</span>
+            <span>Permitir indexación</span>
           </label>
 
           <label class="field">
-            <span>OG title</span>
+            <span>Título para redes sociales</span>
             <input type="text" formControlName="ogTitle" maxlength="160" />
           </label>
 
           <label class="field field--full">
-            <span>OG description</span>
+            <span>Descripción para redes sociales</span>
             <textarea formControlName="ogDescription" rows="3" maxlength="320"></textarea>
           </label>
 
           <label class="field">
-            <span>OG image URL</span>
+            <span>Imagen para redes sociales</span>
             <input type="text" formControlName="ogImageUrl" maxlength="500" />
           </label>
 
@@ -279,10 +279,10 @@ import { toHttpErrorMessage } from "./data/http-error-message";
 
         <form [formGroup]="assetForm" class="form-grid" (ngSubmit)="saveAsset()">
           <label class="field">
-            <span>Asset type</span>
+            <span>Tipo de imagen</span>
             <select formControlName="assetType">
               <option *ngFor="let assetType of assetTypes" [ngValue]="assetType">
-                {{ assetType }}
+                {{ assetTypeLabel(assetType) }}
               </option>
             </select>
           </label>
@@ -296,7 +296,7 @@ import { toHttpErrorMessage } from "./data/http-error-message";
           </label>
 
           <label class="field">
-            <span>Alt text</span>
+            <span>Texto alternativo</span>
             <input type="text" formControlName="altText" maxlength="250" />
           </label>
 
@@ -304,13 +304,13 @@ import { toHttpErrorMessage } from "./data/http-error-message";
             <span>Fuente</span>
             <select formControlName="source">
               <option *ngFor="let source of assetSources" [ngValue]="source">
-                {{ source }}
+                {{ assetSourceLabel(source) }}
               </option>
             </select>
           </label>
 
           <label class="field">
-            <span>Display order</span>
+            <span>Orden de visualización</span>
             <input type="number" formControlName="displayOrder" min="0" step="1" />
           </label>
 
@@ -337,11 +337,11 @@ import { toHttpErrorMessage } from "./data/http-error-message";
 
       <section class="ui-module-section" *ngIf="profile">
         <header class="section-head">
-          <h2>Override de precio online</h2>
+          <h2>Precio online personalizado</h2>
         </header>
 
         <p class="ui-muted effective-price">
-          Precio efectivo (backend):
+            Precio efectivo:
           <strong>
             {{
               profile.effectivePrice
@@ -367,7 +367,7 @@ import { toHttpErrorMessage } from "./data/http-error-message";
 
           <label class="field field--checkbox">
             <input type="checkbox" formControlName="active" />
-            <span>Override activo</span>
+            <span>Usar precio online diferente</span>
           </label>
 
           <label class="field">
@@ -387,7 +387,7 @@ import { toHttpErrorMessage } from "./data/http-error-message";
 
           <div class="section-actions" *ngIf="canManage">
             <button type="submit" class="ui-button ui-button--primary" [disabled]="priceSaving">
-              Guardar override
+              Guardar precio
             </button>
           </div>
         </form>
@@ -841,14 +841,14 @@ export class OnlineProfileDetailPageComponent implements OnInit {
       .subscribe({
         next: () => {
           this.priceSaving = false;
-          this.successMessage = "Override de precio actualizado correctamente.";
+          this.successMessage = "Precio online actualizado correctamente.";
           this.refreshProfileAndValidation();
         },
         error: (error: unknown) => {
           this.priceSaving = false;
           this.priceErrorMessage = toHttpErrorMessage(
             error,
-            "No se pudo actualizar el override de precio.",
+            "No se pudo actualizar el precio online.",
           );
         },
       });
@@ -979,6 +979,49 @@ export class OnlineProfileDetailPageComponent implements OnInit {
         return "Bloqueado";
       default:
         return status;
+    }
+  }
+
+  robotsPolicyLabel(policy: RobotsPolicy): string {
+    switch (policy) {
+      case "INDEX_FOLLOW":
+        return "Indexar y seguir enlaces";
+      case "NOINDEX_FOLLOW":
+        return "No indexar, seguir enlaces";
+      case "NOINDEX_NOFOLLOW":
+        return "No indexar ni seguir enlaces";
+      default:
+        return policy;
+    }
+  }
+
+  assetTypeLabel(assetType: AssetType): string {
+    switch (assetType) {
+      case "PRODUCT_IMAGE":
+        return "Imagen de producto";
+      case "BRAND_LOGO":
+        return "Logo de marca";
+      case "CATEGORY_IMAGE":
+        return "Imagen de categoría";
+      case "OPEN_GRAPH_IMAGE":
+        return "Imagen para redes sociales";
+      default:
+        return assetType;
+    }
+  }
+
+  assetSourceLabel(source: AssetSource): string {
+    switch (source) {
+      case "OWN":
+        return "Propia";
+      case "SUPPLIER":
+        return "Proveedor";
+      case "GENERATED":
+        return "Generada";
+      case "OTHER":
+        return "Otra fuente";
+      default:
+        return source;
     }
   }
 

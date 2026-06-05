@@ -659,6 +659,23 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [x] Frontend Productos: productos con perfil muestran `Revisar perfil`.
 - [x] Sin cambios en Storefront, Flyway, Docker, `.env` raiz ni slug en `products`.
 
+### Ecommerce - Fase 2G.4A UX administrativa ecommerce quick polish
+
+- [ ] Productos: acciones ecommerce compactadas (`Crear perfil online` -> `Crear perfil`, `Revisar perfil` -> `Revisar`) con `title` completo conservado.
+- [ ] Productos: ADMIN-only conserva `Crear perfil` para productos sin perfil.
+- [ ] Productos: `Revisar` aparece para productos con perfil existente.
+- [ ] Productos: carga batch por pagina visible sin N+1 HTTP por fila.
+- [ ] Perfiles online: columna `Publicado` renombrada a `Publicado el`.
+- [ ] Detalle perfil: `Checklist de publicacion (backend)` renombrado a `Requisitos para publicar`.
+- [ ] Detalle perfil: `Actualizar` renombrado a `Actualizar datos`.
+- [ ] Detalle perfil: SEO labels traducidos (`Canonical path` -> `Ruta canonica`, `Robots policy` -> `Indexacion para buscadores`, `OG title` -> `Titulo para redes sociales`, `OG description` -> `Descripcion para redes sociales`, `OG image URL` -> `Imagen para redes sociales`, `Indexable` -> `Permitir indexacion`).
+- [ ] Detalle perfil: SEO enums traducidos (`INDEX_FOLLOW` -> `Indexar y seguir enlaces`, `NOINDEX_FOLLOW` -> `No indexar, seguir enlaces`, `NOINDEX_NOFOLLOW` -> `No indexar ni seguir enlaces`).
+- [ ] Detalle perfil: Imagen principal labels traducidos (`Asset type` -> `Tipo de imagen`, `Alt text` -> `Texto alternativo`, `Display order` -> `Orden de visualizacion`).
+- [ ] Detalle perfil: Imagen principal enums traducidos (`PRODUCT_IMAGE` -> `Imagen de producto`, `OWN` -> `Propia`, `SUPPLIER` -> `Proveedor`, `GENERATED` -> `Generada`, `OTHER` -> `Otra fuente`).
+- [ ] Detalle perfil: Override de precio renombrado (`Override de precio online` -> `Precio online personalizado`, `Override activo` -> `Usar precio online diferente`, `Guardar override` -> `Guardar precio`).
+- [ ] Valores internos enviados al backend sin cambios (enums, payloads, contratos).
+- [ ] Sin cambios en Storefront, Flyway, Docker, `.env` raiz, slug en `products` ni backend.
+
 ### Caja - UX operativa frontend-only (2026-05-25)
 
 - [ ] Estados `OPEN` y `CLOSED` se muestran como `Abierta` y `Cerrada`.

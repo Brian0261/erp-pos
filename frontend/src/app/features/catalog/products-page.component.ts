@@ -180,8 +180,9 @@ import { UnitService } from "./data/unit.service";
                   *ngIf="hasOnlineProfile(product.id)"
                   class="ui-button ui-button--secondary"
                   [routerLink]="['/ecommerce-admin/perfiles', product.id]"
+                  title="Revisar perfil online"
                 >
-                  Revisar perfil
+                  Revisar
                 </a>
                 <button
                    *ngIf="canCreateOnlineProfile(product.id)"
@@ -189,8 +190,9 @@ import { UnitService } from "./data/unit.service";
                    class="ui-button ui-button--secondary"
                     [disabled]="loading || loadingOnlineStatuses"
                     (click)="createOnlineProfile(product)"
+                    title="Crear perfil online"
                   >
-                  Crear perfil online
+                  Crear perfil
                 </button>
                 <button
                    type="button"

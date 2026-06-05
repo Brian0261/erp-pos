@@ -102,7 +102,7 @@ type PublicationFilter = "ALL" | OnlinePublicationStatus;
               <th>Estado</th>
               <th>Marca</th>
               <th>Categoría</th>
-              <th>Publicado</th>
+              <th>Publicado el</th>
               <th>Actualizado</th>
               <th>Acciones</th>
             </tr>
