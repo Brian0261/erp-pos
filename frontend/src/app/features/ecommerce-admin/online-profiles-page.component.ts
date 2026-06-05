@@ -1,8 +1,8 @@
 import { CommonModule } from "@angular/common";
-import { Component, OnInit } from "@angular/core";
+import { Component, OnDestroy, OnInit } from "@angular/core";
 import { FormBuilder, ReactiveFormsModule } from "@angular/forms";
 import { RouterLink } from "@angular/router";
-import { forkJoin } from "rxjs";
+import { debounceTime, distinctUntilChanged, forkJoin, Subject, takeUntil } from "rxjs";
 
 import { AuthService } from "../../core/auth/auth.service";
 import {
@@ -15,6 +15,8 @@ import { EcommerceAdminService, OnlineProfileListFilters } from "./data/ecommerc
 import { toHttpErrorMessage } from "./data/http-error-message";
 
 type PublicationFilter = "ALL" | OnlinePublicationStatus;
+
+const NONE_VALUE = "__NONE__";
 
 @Component({
   selector: "app-online-profiles-page",
@@ -51,69 +53,61 @@ type PublicationFilter = "ALL" | OnlinePublicationStatus;
         class="filters-panel"
         [formGroup]="filtersForm"
         *ngIf="canView"
-        (ngSubmit)="applyFilters()"
       >
-        <label class="filter-field filter-field--query">
-          <span>Búsqueda rápida</span>
-          <input
-            type="text"
-            formControlName="query"
-            placeholder="Nombre online o slug"
-          />
-        </label>
+        <div class="filters-row filters-row--primary">
+          <label class="filter-field filter-field--query">
+            <span>Búsqueda</span>
+            <input
+              type="text"
+              formControlName="query"
+              placeholder="Nombre online o slug"
+            />
+          </label>
 
-        <label class="filter-field filter-field--status">
-          <span>Estado</span>
-          <select formControlName="status">
-            <option value="ALL">Todos</option>
-            <option *ngFor="let status of publicationStatuses" [value]="status">
-              {{ statusLabel(status) }}
-            </option>
-          </select>
-        </label>
+          <label class="filter-field filter-field--status">
+            <span>Estado</span>
+            <select formControlName="status">
+              <option value="ALL">Todos</option>
+              <option *ngFor="let status of publicationStatuses" [value]="status">
+                {{ statusLabel(status) }}
+              </option>
+            </select>
+          </label>
+        </div>
 
-        <label class="filter-field">
-          <span>Marca</span>
-          <select formControlName="brandId" [disabled]="filtersForm.controls.withoutBrand.value === true">
-            <option value="">Todas</option>
-            <option *ngFor="let brand of brands" [value]="brand.id">
-              {{ brand.name }}
-            </option>
-          </select>
-        </label>
+        <div class="filters-row filters-row--secondary">
+          <label class="filter-field">
+            <span>Marca</span>
+            <select formControlName="brandId">
+              <option value="">Todas</option>
+              <option [value]="noneValue">Sin marca</option>
+              <option *ngFor="let brand of brands" [value]="brand.id">
+                {{ brand.name }}
+              </option>
+            </select>
+          </label>
 
-        <label class="filter-field">
-          <span>Categoría online</span>
-          <select formControlName="onlineCategoryId" [disabled]="filtersForm.controls.withoutOnlineCategory.value === true">
-            <option value="">Todas</option>
-            <option *ngFor="let category of onlineCategories" [value]="category.id">
-              {{ category.name }}
-            </option>
-          </select>
-        </label>
+          <label class="filter-field">
+            <span>Categoría online</span>
+            <select formControlName="onlineCategoryId">
+              <option value="">Todas</option>
+              <option [value]="noneValue">Sin categoría online</option>
+              <option *ngFor="let category of onlineCategories" [value]="category.id">
+                {{ category.name }}
+              </option>
+            </select>
+          </label>
 
-        <label class="filter-toggle">
-          <input type="checkbox" formControlName="withoutBrand" />
-          <span>Sin marca</span>
-        </label>
-
-        <label class="filter-toggle">
-          <input type="checkbox" formControlName="withoutOnlineCategory" />
-          <span>Sin categoría online</span>
-        </label>
-
-        <div class="filter-actions">
-          <button type="submit" class="ui-button ui-button--primary" [disabled]="loading">
-            Aplicar filtros
-          </button>
-          <button
-            type="button"
-            class="ui-button ui-button--secondary"
-            (click)="clearFilters()"
-            [disabled]="loading"
-          >
-            Limpiar
-          </button>
+          <div class="filter-actions">
+            <button
+              type="button"
+              class="ui-button ui-button--secondary"
+              (click)="clearFilters()"
+              [disabled]="loading"
+            >
+              Limpiar filtros
+            </button>
+          </div>
         </div>
       </form>
 
@@ -212,18 +206,31 @@ type PublicationFilter = "ALL" | OnlinePublicationStatus;
 
       .filters-panel {
         display: grid;
-        grid-template-columns: minmax(220px, 1fr) 180px 220px 220px auto auto auto;
         gap: var(--space-3);
-        align-items: end;
         border: 1px solid var(--color-border-default);
         border-radius: var(--radius-md);
         background: var(--color-bg-soft);
         padding: var(--space-3);
       }
 
+      .filters-row {
+        display: grid;
+        gap: var(--space-3);
+        align-items: end;
+      }
+
+      .filters-row--primary {
+        grid-template-columns: minmax(200px, 1fr) 180px;
+      }
+
+      .filters-row--secondary {
+        grid-template-columns: 220px 220px minmax(140px, auto);
+      }
+
       .filter-field {
         display: grid;
         gap: var(--space-1);
+        min-width: 0;
       }
 
       .filter-field span {
@@ -234,6 +241,9 @@ type PublicationFilter = "ALL" | OnlinePublicationStatus;
 
       .filter-field input,
       .filter-field select {
+        width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
         min-height: 2.65rem;
         padding: 0.55rem 0.65rem;
         border: 1px solid var(--color-border-strong);
@@ -241,25 +251,11 @@ type PublicationFilter = "ALL" | OnlinePublicationStatus;
         background: var(--color-bg-surface);
       }
 
-      .filter-toggle {
-        min-height: 2.65rem;
-        display: inline-flex;
-        align-items: center;
-        gap: var(--space-2);
-        font-size: var(--font-size-sm);
-        font-weight: 700;
-        color: var(--color-text-secondary);
-        white-space: nowrap;
-      }
-
-      .filter-toggle input {
-        width: auto;
-      }
-
       .filter-actions {
         display: inline-flex;
         gap: var(--space-2);
         flex-wrap: wrap;
+        align-self: end;
       }
 
       .ecommerce-table {
@@ -301,8 +297,9 @@ type PublicationFilter = "ALL" | OnlinePublicationStatus;
         color: var(--color-text-primary);
       }
 
-      @media (max-width: 1100px) {
-        .filters-panel {
+      @media (max-width: 900px) {
+        .filters-row--primary,
+        .filters-row--secondary {
           grid-template-columns: 1fr;
         }
 
@@ -324,7 +321,9 @@ type PublicationFilter = "ALL" | OnlinePublicationStatus;
     `,
   ],
 })
-export class OnlineProfilesPageComponent implements OnInit {
+export class OnlineProfilesPageComponent implements OnInit, OnDestroy {
+  readonly noneValue = NONE_VALUE;
+
   readonly publicationStatuses: OnlinePublicationStatus[] = [
     "DRAFT",
     "INCOMPLETE",
@@ -338,9 +337,7 @@ export class OnlineProfilesPageComponent implements OnInit {
     query: [""],
     status: ["ALL" as PublicationFilter],
     brandId: [""],
-    withoutBrand: [false],
     onlineCategoryId: [""],
-    withoutOnlineCategory: [false],
   });
 
   profiles: EcommerceAdminOnlineProfileSummaryResponse[] = [];
@@ -359,6 +356,8 @@ export class OnlineProfilesPageComponent implements OnInit {
   permissionMessage = "";
   errorMessage = "";
   successMessage = "";
+
+  private readonly destroy$ = new Subject<void>();
 
   constructor(
     private readonly formBuilder: FormBuilder,
@@ -385,6 +384,7 @@ export class OnlineProfilesPageComponent implements OnInit {
         }
         this.loadFilterOptions();
         this.loadProfiles();
+        this.setupFilterSubscriptions();
       },
       error: () => {
         this.permissionMessage = "No se pudo validar permisos del usuario.";
@@ -392,9 +392,9 @@ export class OnlineProfilesPageComponent implements OnInit {
     });
   }
 
-  applyFilters(): void {
-    this.page = 0;
-    this.loadProfiles();
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   clearFilters(): void {
@@ -402,9 +402,7 @@ export class OnlineProfilesPageComponent implements OnInit {
       query: "",
       status: "ALL",
       brandId: "",
-      withoutBrand: false,
       onlineCategoryId: "",
-      withoutOnlineCategory: false,
     });
     this.page = 0;
     this.loadProfiles();
@@ -485,10 +483,42 @@ export class OnlineProfilesPageComponent implements OnInit {
       String(raw.query || "").trim() ||
         raw.status !== "ALL" ||
         raw.brandId ||
-        raw.withoutBrand ||
-        raw.onlineCategoryId ||
-        raw.withoutOnlineCategory,
+        raw.onlineCategoryId,
     );
+  }
+
+  private setupFilterSubscriptions(): void {
+    this.filtersForm.controls.query.valueChanges
+      .pipe(
+        takeUntil(this.destroy$),
+        debounceTime(450),
+        distinctUntilChanged(),
+      )
+      .subscribe(() => {
+        this.page = 0;
+        this.loadProfiles();
+      });
+
+    this.filtersForm.controls.status.valueChanges
+      .pipe(takeUntil(this.destroy$), distinctUntilChanged())
+      .subscribe(() => {
+        this.page = 0;
+        this.loadProfiles();
+      });
+
+    this.filtersForm.controls.brandId.valueChanges
+      .pipe(takeUntil(this.destroy$), distinctUntilChanged())
+      .subscribe(() => {
+        this.page = 0;
+        this.loadProfiles();
+      });
+
+    this.filtersForm.controls.onlineCategoryId.valueChanges
+      .pipe(takeUntil(this.destroy$), distinctUntilChanged())
+      .subscribe(() => {
+        this.page = 0;
+        this.loadProfiles();
+      });
   }
 
   private loadProfiles(showSuccess = false): void {
@@ -543,15 +573,22 @@ export class OnlineProfilesPageComponent implements OnInit {
 
   private currentFilters(): OnlineProfileListFilters {
     const raw = this.filtersForm.getRawValue();
-    const brandId = raw.brandId ? Number(raw.brandId) : undefined;
-    const onlineCategoryId = raw.onlineCategoryId ? Number(raw.onlineCategoryId) : undefined;
+    const brandIdRaw = raw.brandId;
+    const onlineCategoryIdRaw = raw.onlineCategoryId;
+
+    const withoutBrand = brandIdRaw === NONE_VALUE;
+    const withoutOnlineCategory = onlineCategoryIdRaw === NONE_VALUE;
+
+    const brandId = !withoutBrand && brandIdRaw ? Number(brandIdRaw) : undefined;
+    const onlineCategoryId = !withoutOnlineCategory && onlineCategoryIdRaw ? Number(onlineCategoryIdRaw) : undefined;
+
     return {
       q: String(raw.query || "").trim() || undefined,
       status: raw.status === "ALL" ? undefined : raw.status as OnlinePublicationStatus,
-      brandId: !raw.withoutBrand && Number.isFinite(brandId) ? brandId : undefined,
-      withoutBrand: Boolean(raw.withoutBrand),
-      onlineCategoryId: !raw.withoutOnlineCategory && Number.isFinite(onlineCategoryId) ? onlineCategoryId : undefined,
-      withoutOnlineCategory: Boolean(raw.withoutOnlineCategory),
+      brandId: Number.isFinite(brandId) ? brandId : undefined,
+      withoutBrand: withoutBrand || undefined,
+      onlineCategoryId: Number.isFinite(onlineCategoryId) ? onlineCategoryId : undefined,
+      withoutOnlineCategory: withoutOnlineCategory || undefined,
     };
   }
 }
