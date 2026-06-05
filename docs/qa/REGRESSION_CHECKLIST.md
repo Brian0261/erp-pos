@@ -676,6 +676,35 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [ ] Valores internos enviados al backend sin cambios (enums, payloads, contratos).
 - [ ] Sin cambios en Storefront, Flyway, Docker, `.env` raiz, slug en `products` ni backend.
 
+### Ecommerce - Fase 2G.4C Smoke funcional UI en Docker para Perfiles online enriquecido
+
+- [x] Docker reconstruido con commit `144ea1a` (backend, frontend, postgres).
+- [x] Backend iniciado correctamente (`Started BackendApplication in 12.431 seconds`).
+- [x] Frontend disponible en `http://localhost:4200` (HTTP 200).
+- [x] Postgres healthy.
+- [x] Login ADMIN correcto.
+- [x] Navegación a Catálogo online > Perfiles online funciona.
+- [x] Tabla de Perfiles online carga correctamente sin romperse visualmente.
+- [x] Columna Marca muestra nombres reales cuando existe marca (no IDs).
+- [x] Columna Categoría online muestra nombres reales cuando existe categoría online (no IDs).
+- [x] Fallback "Sin marca" funciona cuando perfil no tiene marca asignada.
+- [x] Fallback "Sin categoría online" funciona cuando perfil no tiene categoría asignada.
+- [x] Columna "Publicado el" visible y formateada correctamente.
+- [x] Botón "Revisar" aparece y navega correctamente al detalle del perfil.
+- [x] Paginación funciona correctamente.
+- [x] Filtro de estado existente funciona correctamente.
+- [x] Al cambiar de página, los nombres de marca/categoría siguen mostrándose correctamente.
+- [x] Network: endpoint observado `GET /api/v1/ecommerce-admin/products/online-profiles`.
+- [x] Network: respuesta 200 OK incluye `brandName` y `onlineCategoryName`.
+- [x] Network: no se observaron llamadas por fila para resolver marca/categoría (sin N+1).
+- [x] Network: no se observaron llamadas a Storefront.
+- [x] Network: no se observaron errores 500 inesperados.
+- [x] Consola: sin errores JS bloqueantes.
+- [x] Consola: sin errores HTTP inesperados.
+- [x] Sin cambios en Storefront, Flyway, Docker, `.env` raiz, secretos ni AWS/staging.
+- [x] Sin cambios en backend funcional ni Angular funcional durante smoke.
+- [x] Sin commit ni push durante fase de smoke.
+
 ### Ecommerce - Fase 2G.4B Enriquecer listado de Perfiles online
 
 - [ ] Backend: `GET /api/v1/ecommerce-admin/products/online-profiles` retorna `brandName` y `onlineCategoryName` enriquecidos.
