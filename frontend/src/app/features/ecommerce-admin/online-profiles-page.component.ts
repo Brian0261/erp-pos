@@ -117,8 +117,8 @@ type PublicationFilter = "ALL" | OnlinePublicationStatus;
                   {{ statusLabel(profile.publicationStatus) }}
                 </span>
               </td>
-              <td class="cell-code">{{ profile.brandId ?? "-" }}</td>
-              <td class="cell-code">{{ profile.onlineCategoryId ?? "-" }}</td>
+              <td class="cell-code">{{ profile.brandName ?? "Sin marca" }}</td>
+              <td class="cell-code">{{ profile.onlineCategoryName ?? "Sin categoría online" }}</td>
               <td class="cell-date">{{ formatDateTime(profile.publishedAt) }}</td>
               <td class="cell-date">{{ formatDateTime(profile.updatedAt) }}</td>
               <td class="actions">

@@ -391,6 +391,37 @@ class EcommerceAdminProfilesIntegrationTest extends AbstractHttpIntegrationTest 
                 .andExpect(jsonPath("$.errors.length()").value(org.hamcrest.Matchers.greaterThan(0)));
     }
 
+    @Test
+    void listOnlineProfilesShouldIncludeBrandAndCategoryNames() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = Long.toString(System.nanoTime(), 36);
+        long productId = createProductWithDraftProfile(adminToken, suffix, BigDecimal.valueOf(15.00));
+        long brandId = createOnlineBrand(suffix);
+        long onlineCategoryId = createOnlineCategory(suffix);
+        String brandName = "Marca IT " + suffix;
+        String categoryName = "Online Cat IT " + suffix;
+
+        ObjectNode profilePayload = objectMapper.createObjectNode();
+        profilePayload.put("slug", "profile-enriched-" + suffix);
+        profilePayload.put("onlineName", "Producto enriquecido " + suffix);
+        profilePayload.put("onlineDescription", "Descripcion para enriquecimiento " + suffix);
+        profilePayload.put("onlineCategoryId", onlineCategoryId);
+        profilePayload.put("brandId", brandId);
+
+        mockMvc.perform(put("/api/v1/ecommerce-admin/products/{productId}/online-profile", productId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(profilePayload.toString()))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/ecommerce-admin/products/online-profiles?page=0&size=50")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items").isArray())
+                .andExpect(jsonPath("$.items[?(@.productId == " + productId + ")].brandName", org.hamcrest.Matchers.hasItem(brandName)))
+                .andExpect(jsonPath("$.items[?(@.productId == " + productId + ")].onlineCategoryName", org.hamcrest.Matchers.hasItem(categoryName)));
+    }
+
     private long createProductWithDraftProfile(String adminToken, String suffix, BigDecimal salePrice) throws Exception {
         long productId = createProductWithoutDraftProfile(adminToken, suffix, salePrice);
         ecommerceCatalogUseCase.createDraftProfile(new CreateProductOnlineProfileCommand(productId));

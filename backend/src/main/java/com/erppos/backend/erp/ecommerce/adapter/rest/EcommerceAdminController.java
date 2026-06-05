@@ -18,6 +18,7 @@ import com.erppos.backend.erp.ecommerce.adapter.dto.EcommerceAdminUpdateOnlinePr
 import com.erppos.backend.erp.ecommerce.adapter.dto.EcommerceAdminUpsertPriceOverrideRequest;
 import com.erppos.backend.erp.ecommerce.adapter.dto.EcommerceAdminUpsertPrimaryAssetRequest;
 import com.erppos.backend.erp.ecommerce.adapter.dto.EcommerceAdminUpsertSeoRequest;
+import com.erppos.backend.erp.ecommerce.application.dto.OnlineProfileSummaryResult;
 import com.erppos.backend.erp.ecommerce.application.usecase.ChangeEcommerceBrandStatusCommand;
 import com.erppos.backend.erp.ecommerce.application.usecase.ChangeEcommerceOnlineCategoryStatusCommand;
 import com.erppos.backend.erp.ecommerce.application.usecase.CreateEcommerceBrandCommand;
@@ -354,18 +355,20 @@ public class EcommerceAdminController {
         );
     }
 
-    private EcommerceAdminOnlineProfileSummaryResponse toSummaryResponse(ProductOnlineProfile profile) {
+    private EcommerceAdminOnlineProfileSummaryResponse toSummaryResponse(OnlineProfileSummaryResult result) {
         return new EcommerceAdminOnlineProfileSummaryResponse(
-                profile.id(),
-                profile.productId(),
-                profile.publicationStatus(),
-                profile.slug(),
-                profile.onlineName(),
-                profile.onlineCategoryId(),
-                profile.brandId(),
-                profile.brandAbsencePolicy(),
-                profile.publishedAt(),
-                profile.updatedAt()
+                result.profileId(),
+                result.productId(),
+                result.publicationStatus(),
+                result.slug(),
+                result.onlineName(),
+                result.onlineCategoryId(),
+                result.onlineCategoryName(),
+                result.brandId(),
+                result.brandName(),
+                result.brandAbsencePolicy(),
+                result.publishedAt(),
+                result.updatedAt()
         );
     }
 

@@ -1,11 +1,11 @@
-package com.erppos.backend.erp.ecommerce.adapter.dto;
+package com.erppos.backend.erp.ecommerce.application.dto;
 
 import com.erppos.backend.erp.ecommerce.domain.model.BrandAbsencePolicy;
 import com.erppos.backend.erp.ecommerce.domain.model.OnlinePublicationStatus;
 
 import java.time.Instant;
 
-public record EcommerceAdminOnlineProfileSummaryResponse(
+public record OnlineProfileSummaryResult(
         Long profileId,
         Long productId,
         OnlinePublicationStatus publicationStatus,

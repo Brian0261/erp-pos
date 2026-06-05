@@ -1,5 +1,6 @@
 package com.erppos.backend.erp.ecommerce.application.usecase;
 
+import com.erppos.backend.erp.ecommerce.application.dto.OnlineProfileSummaryResult;
 import com.erppos.backend.erp.ecommerce.domain.model.EcommerceSeoMetadata;
 import com.erppos.backend.erp.ecommerce.domain.model.EcommerceBrand;
 import com.erppos.backend.erp.ecommerce.domain.model.EcommerceOnlineCategory;
@@ -24,7 +25,7 @@ public interface EcommerceCatalogUseCase {
     EcommerceOnlineCategory updateOnlineCategory(Long id, UpdateEcommerceOnlineCategoryCommand command);
     EcommerceOnlineCategory changeOnlineCategoryStatus(Long id, ChangeEcommerceOnlineCategoryStatusCommand command);
     ProductOnlineProfile createDraftProfile(CreateProductOnlineProfileCommand command);
-    Page<ProductOnlineProfile> listOnlineProfiles(Pageable pageable);
+    Page<OnlineProfileSummaryResult> listOnlineProfiles(Pageable pageable);
     List<ProductOnlineProfile> listProfilesByProductIds(List<Long> productIds);
     ProductOnlineProfile getProfileByProductId(Long productId);
     Optional<EcommerceSeoMetadata> getSeoMetadataByProductId(Long productId);

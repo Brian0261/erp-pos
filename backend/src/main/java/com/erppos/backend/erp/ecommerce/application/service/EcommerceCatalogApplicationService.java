@@ -1,5 +1,6 @@
 package com.erppos.backend.erp.ecommerce.application.service;
 
+import com.erppos.backend.erp.ecommerce.application.dto.OnlineProfileSummaryResult;
 import com.erppos.backend.erp.ecommerce.application.usecase.CreateProductOnlineProfileCommand;
 import com.erppos.backend.erp.ecommerce.application.usecase.ChangeEcommerceBrandStatusCommand;
 import com.erppos.backend.erp.ecommerce.application.usecase.ChangeEcommerceOnlineCategoryStatusCommand;
@@ -45,8 +46,11 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 public class EcommerceCatalogApplicationService implements EcommerceCatalogUseCase {
@@ -294,8 +298,50 @@ public class EcommerceCatalogApplicationService implements EcommerceCatalogUseCa
     }
 
     @Override
-    public Page<ProductOnlineProfile> listOnlineProfiles(Pageable pageable) {
-        return profileRepositoryPort.findAll(pageable);
+    public Page<OnlineProfileSummaryResult> listOnlineProfiles(Pageable pageable) {
+        Page<ProductOnlineProfile> profilesPage = profileRepositoryPort.findAll(pageable);
+        List<ProductOnlineProfile> profiles = profilesPage.getContent();
+
+        Set<Long> brandIds = profiles.stream()
+                .map(ProductOnlineProfile::brandId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        Set<Long> categoryIds = profiles.stream()
+                .map(ProductOnlineProfile::onlineCategoryId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        Map<Long, String> brandNamesById = brandRepositoryPort.findAll().stream()
+                .filter(brand -> brandIds.contains(brand.id()))
+                .collect(Collectors.toMap(EcommerceBrand::id, EcommerceBrand::name));
+
+        Map<Long, String> categoryNamesById = onlineCategoryRepositoryPort.findAll().stream()
+                .filter(category -> categoryIds.contains(category.id()))
+                .collect(Collectors.toMap(EcommerceOnlineCategory::id, EcommerceOnlineCategory::name));
+
+        List<OnlineProfileSummaryResult> enrichedResults = profiles.stream()
+                .map(profile -> new OnlineProfileSummaryResult(
+                        profile.id(),
+                        profile.productId(),
+                        profile.publicationStatus(),
+                        profile.slug(),
+                        profile.onlineName(),
+                        profile.onlineCategoryId(),
+                        profile.onlineCategoryId() != null ? categoryNamesById.get(profile.onlineCategoryId()) : null,
+                        profile.brandId(),
+                        profile.brandId() != null ? brandNamesById.get(profile.brandId()) : null,
+                        profile.brandAbsencePolicy(),
+                        profile.publishedAt(),
+                        profile.updatedAt()
+                ))
+                .toList();
+
+        return new org.springframework.data.domain.PageImpl<>(
+                enrichedResults,
+                profilesPage.getPageable(),
+                profilesPage.getTotalElements()
+        );
     }
 
     @Override

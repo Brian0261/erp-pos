@@ -676,6 +676,19 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [ ] Valores internos enviados al backend sin cambios (enums, payloads, contratos).
 - [ ] Sin cambios en Storefront, Flyway, Docker, `.env` raiz, slug en `products` ni backend.
 
+### Ecommerce - Fase 2G.4B Enriquecer listado de Perfiles online
+
+- [ ] Backend: `GET /api/v1/ecommerce-admin/products/online-profiles` retorna `brandName` y `onlineCategoryName` enriquecidos.
+- [ ] Backend: batch lookup de marcas y categorías sin N+1 HTTP por fila.
+- [ ] Backend: perfil sin marca retorna `brandName=null`.
+- [ ] Backend: perfil sin categoría online retorna `onlineCategoryName=null`.
+- [ ] Frontend Perfiles online: muestra nombre real de marca en lugar de ID.
+- [ ] Frontend Perfiles online: muestra nombre real de categoría online en lugar de ID.
+- [ ] Frontend Perfiles online: fallback `Sin marca` cuando `brandName` es null.
+- [ ] Frontend Perfiles online: fallback `Sin categoría online` cuando `onlineCategoryName` es null.
+- [ ] Paginación y filtro por estado siguen funcionando.
+- [ ] Sin cambios en Storefront, Flyway, Docker, `.env` raiz ni slug en `products`.
+
 ### Caja - UX operativa frontend-only (2026-05-25)
 
 - [ ] Estados `OPEN` y `CLOSED` se muestran como `Abierta` y `Cerrada`.

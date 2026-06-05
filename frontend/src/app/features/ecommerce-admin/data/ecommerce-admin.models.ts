@@ -36,7 +36,9 @@ export interface EcommerceAdminOnlineProfileSummaryResponse {
   slug: string | null;
   onlineName: string | null;
   onlineCategoryId: number | null;
+  onlineCategoryName: string | null;
   brandId: number | null;
+  brandName: string | null;
   brandAbsencePolicy: BrandAbsencePolicy | null;
   publishedAt: string | null;
   updatedAt: string;
