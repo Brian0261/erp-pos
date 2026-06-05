@@ -216,6 +216,90 @@ class EcommerceAdminProfilesIntegrationTest extends AbstractHttpIntegrationTest 
     }
 
     @Test
+    void batchStatusShouldReturnMissingDraftAndPublishedProfiles() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = Long.toString(System.nanoTime(), 36);
+        String publishedSuffix = suffix + "p";
+        long productWithoutProfileId = createProductWithoutDraftProfile(adminToken, suffix + "n", BigDecimal.valueOf(10.00));
+        long draftProductId = createProductWithDraftProfile(adminToken, suffix + "d", BigDecimal.valueOf(11.00));
+        long publishedProductId = createProductWithDraftProfile(adminToken, publishedSuffix, BigDecimal.valueOf(12.00));
+        long brandId = createOnlineBrand(publishedSuffix);
+        long onlineCategoryId = createOnlineCategory(publishedSuffix);
+        updateProfileForPublish(adminToken, publishedProductId, publishedSuffix, brandId, onlineCategoryId);
+        upsertSeoForPublish(adminToken, publishedProductId, publishedSuffix);
+        upsertAssetForPublish(adminToken, publishedProductId, publishedSuffix);
+
+        mockMvc.perform(post("/api/v1/ecommerce-admin/products/{productId}/publish", publishedProductId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/ecommerce-admin/products/online-profile-status")
+                        .param("productIds", productWithoutProfileId + "," + draftProductId + "," + publishedProductId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(3))
+                .andExpect(jsonPath("$[0].productId").value(productWithoutProfileId))
+                .andExpect(jsonPath("$[0].hasOnlineProfile").value(false))
+                .andExpect(jsonPath("$[1].productId").value(draftProductId))
+                .andExpect(jsonPath("$[1].hasOnlineProfile").value(true))
+                .andExpect(jsonPath("$[1].publicationStatus").value("DRAFT"))
+                .andExpect(jsonPath("$[2].productId").value(publishedProductId))
+                .andExpect(jsonPath("$[2].hasOnlineProfile").value(true))
+                .andExpect(jsonPath("$[2].publicationStatus").value("PUBLISHED"))
+                .andExpect(jsonPath("$[2].slug").value("lapicero-online-" + publishedSuffix));
+    }
+
+    @Test
+    void batchStatusShouldHandleEmptyAndInvalidLists() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+
+        mockMvc.perform(get("/api/v1/ecommerce-admin/products/online-profile-status")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+
+        mockMvc.perform(get("/api/v1/ecommerce-admin/products/online-profile-status")
+                        .param("productIds", "abc")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void batchStatusShouldRejectUnauthorizedRole() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String cajeroToken = login(CAJERO_EMAIL, CAJERO_PASSWORD);
+        String suffix = String.valueOf(System.nanoTime());
+        long productId = createProductWithoutDraftProfile(adminToken, suffix, BigDecimal.valueOf(10.00));
+
+        mockMvc.perform(get("/api/v1/ecommerce-admin/products/online-profile-status")
+                        .param("productIds", String.valueOf(productId))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(cajeroToken)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void batchStatusShouldNotCreateOrModifyProfiles() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = String.valueOf(System.nanoTime());
+        long productId = createProductWithoutDraftProfile(adminToken, suffix, BigDecimal.valueOf(10.00));
+
+        mockMvc.perform(get("/api/v1/ecommerce-admin/products/online-profile-status")
+                        .param("productIds", String.valueOf(productId))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].productId").value(productId))
+                .andExpect(jsonPath("$[0].hasOnlineProfile").value(false));
+
+        mockMvc.perform(post("/api/v1/ecommerce-admin/products/{productId}/online-profile", productId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.productId").value(productId))
+                .andExpect(jsonPath("$.publicationStatus").value("DRAFT"));
+    }
+
+    @Test
     void shouldReturn404WhenOnlineProfileDoesNotExist() throws Exception {
         String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
 

@@ -7,6 +7,10 @@ import { catchError, forkJoin, of } from "rxjs";
 
 import { AuthService } from "../../core/auth/auth.service";
 import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.service";
+import {
+  EcommerceAdminOnlineProfileStatusResponse,
+  OnlinePublicationStatus,
+} from "../ecommerce-admin/data/ecommerce-admin.models";
 import { EcommerceAdminService } from "../ecommerce-admin/data/ecommerce-admin.service";
 import { Category, Product, Unit } from "./data/catalog.models";
 import { CategoryService } from "./data/category.service";
@@ -121,6 +125,7 @@ import { UnitService } from "./data/unit.service";
             <col class="col-unit" />
             <col class="col-price" />
             <col class="col-state" />
+            <col class="col-ecommerce" />
             <col class="col-actions" />
           </colgroup>
           <thead>
@@ -132,6 +137,7 @@ import { UnitService } from "./data/unit.service";
               <th>Unidad</th>
               <th class="cell-right">Precio venta</th>
               <th>Estado</th>
+              <th>Ecommerce</th>
               <th>Acciones</th>
             </tr>
           </thead>
@@ -154,6 +160,15 @@ import { UnitService } from "./data/unit.service";
                   {{ product.active ? "Activo" : "Inactivo" }}
                 </span>
               </td>
+              <td>
+                <span
+                  class="online-status-badge"
+                  [ngClass]="onlineProfileBadgeClass(product.id)"
+                  [title]="onlineProfileBadgeTitle(product.id)"
+                >
+                  {{ onlineProfileBadgeLabel(product.id) }}
+                </span>
+              </td>
               <td class="actions">
                 <a
                   class="ui-button ui-button--secondary"
@@ -161,13 +176,20 @@ import { UnitService } from "./data/unit.service";
                 >
                   Editar
                 </a>
+                <a
+                  *ngIf="hasOnlineProfile(product.id)"
+                  class="ui-button ui-button--secondary"
+                  [routerLink]="['/ecommerce-admin/perfiles', product.id]"
+                >
+                  Revisar perfil
+                </a>
                 <button
-                   *ngIf="isAdmin"
+                   *ngIf="canCreateOnlineProfile(product.id)"
                    type="button"
                    class="ui-button ui-button--secondary"
-                   [disabled]="loading"
-                   (click)="createOnlineProfile(product)"
-                 >
+                    [disabled]="loading || loadingOnlineStatuses"
+                    (click)="createOnlineProfile(product)"
+                  >
                   Crear perfil online
                 </button>
                 <button
@@ -181,7 +203,7 @@ import { UnitService } from "./data/unit.service";
               </td>
             </tr>
             <tr *ngIf="products.length === 0">
-              <td colspan="8" class="ui-table__empty">
+              <td colspan="9" class="ui-table__empty">
                 <div class="ui-empty-state">No hay productos para mostrar.</div>
               </td>
             </tr>
@@ -405,6 +427,48 @@ import { UnitService } from "./data/unit.service";
         opacity: 0.88;
       }
 
+      .online-status-badge {
+        display: inline-flex;
+        align-items: center;
+        max-width: 100%;
+        min-height: 1.45rem;
+        padding: 0.18rem 0.48rem;
+        border: 1px solid var(--color-border-default);
+        border-radius: 999px;
+        background: var(--color-bg-soft);
+        color: var(--color-text-secondary);
+        font-size: 0.76rem;
+        font-weight: 800;
+        line-height: 1.1;
+        white-space: nowrap;
+      }
+
+      .online-status-badge--draft,
+      .online-status-badge--review {
+        border-color: rgba(245, 158, 11, 0.45);
+        background: rgba(245, 158, 11, 0.1);
+        color: var(--color-warning-text, #92400e);
+      }
+
+      .online-status-badge--published {
+        border-color: rgba(22, 163, 74, 0.45);
+        background: rgba(22, 163, 74, 0.1);
+        color: var(--color-success-text, #166534);
+      }
+
+      .online-status-badge--unpublished,
+      .online-status-badge--empty,
+      .online-status-badge--loading {
+        color: var(--color-text-secondary);
+      }
+
+      .online-status-badge--blocked,
+      .online-status-badge--error {
+        border-color: rgba(220, 38, 38, 0.35);
+        background: rgba(220, 38, 38, 0.08);
+        color: var(--color-danger-text, #991b1b);
+      }
+
       .cell-id,
       .cell-code {
         white-space: nowrap;
@@ -422,7 +486,7 @@ import { UnitService } from "./data/unit.service";
 
       .catalog-table {
         width: 100%;
-        min-width: 1080px;
+        min-width: 1220px;
         table-layout: fixed;
         margin-top: 1rem;
       }
@@ -433,15 +497,15 @@ import { UnitService } from "./data/unit.service";
       }
 
       .col-sku {
-        width: 9%;
+        width: 8%;
       }
 
       .col-barcode {
-        width: 11%;
+        width: 10%;
       }
 
       .col-name {
-        width: 39%;
+        width: 27%;
       }
 
       .col-category {
@@ -453,11 +517,15 @@ import { UnitService } from "./data/unit.service";
       }
 
       .col-price {
-        width: 11%;
+        width: 9%;
       }
 
       .col-state {
         width: 6%;
+      }
+
+      .col-ecommerce {
+        width: 12%;
       }
 
       .col-actions {
@@ -578,6 +646,7 @@ export class ProductsPageComponent implements OnInit {
   totalPages = 1;
   totalElements = 0;
   loading = false;
+  loadingOnlineStatuses = false;
   errorMessage = "";
   successMessage = "";
   isAdmin = false;
@@ -586,6 +655,8 @@ export class ProductsPageComponent implements OnInit {
 
   private readonly categoriesById = new Map<number, Category>();
   private readonly unitsById = new Map<number, Unit>();
+  private readonly onlineProfileStatusesByProductId = new Map<number, EcommerceAdminOnlineProfileStatusResponse>();
+  private latestOnlineStatusRequestKey = "";
 
   constructor(
     private readonly formBuilder: FormBuilder,
@@ -784,6 +855,67 @@ export class ProductsPageComponent implements OnInit {
     });
   }
 
+  hasOnlineProfile(productId: number): boolean {
+    return Boolean(this.onlineProfileStatusesByProductId.get(productId)?.hasOnlineProfile);
+  }
+
+  canCreateOnlineProfile(productId: number): boolean {
+    const status = this.onlineProfileStatusesByProductId.get(productId);
+    return this.isAdmin && Boolean(status) && !status?.hasOnlineProfile;
+  }
+
+  onlineProfileBadgeLabel(productId: number): string {
+    const status = this.onlineProfileStatusesByProductId.get(productId);
+    if (!status) {
+      return this.loadingOnlineStatuses ? "Cargando ecommerce" : "Estado no disponible";
+    }
+
+    if (!status.hasOnlineProfile) {
+      return "Sin perfil online";
+    }
+
+    return this.onlinePublicationStatusLabel(status.publicationStatus);
+  }
+
+  onlineProfileBadgeTitle(productId: number): string {
+    const status = this.onlineProfileStatusesByProductId.get(productId);
+    if (!status) {
+      return "Estado ecommerce pendiente de cargar.";
+    }
+
+    if (!status.hasOnlineProfile) {
+      return "Este producto aun no tiene perfil online.";
+    }
+
+    const profileName = status.profileName?.trim();
+    const slug = status.slug?.trim();
+    return [profileName || "Perfil online existente", slug ? `Slug: ${slug}` : null]
+      .filter(Boolean)
+      .join(" · ");
+  }
+
+  onlineProfileBadgeClass(productId: number): Record<string, boolean> {
+    const status = this.onlineProfileStatusesByProductId.get(productId);
+    if (!status) {
+      return {
+        "online-status-badge--loading": this.loadingOnlineStatuses,
+        "online-status-badge--error": !this.loadingOnlineStatuses,
+      };
+    }
+
+    if (!status.hasOnlineProfile) {
+      return { "online-status-badge--empty": true };
+    }
+
+    return {
+      "online-status-badge--draft": status.publicationStatus === "DRAFT" || status.publicationStatus === "INCOMPLETE",
+      "online-status-badge--review": status.publicationStatus === "READY_FOR_REVIEW",
+      "online-status-badge--published": status.publicationStatus === "PUBLISHED",
+      "online-status-badge--unpublished": status.publicationStatus === "UNPUBLISHED",
+      "online-status-badge--blocked": status.publicationStatus === "BLOCKED",
+    };
+  }
+
   barcodeLabel(barcode: string | null): string {
     const normalized = barcode?.trim();
     if (!normalized || normalized === "-") {
@@ -847,9 +979,12 @@ export class ProductsPageComponent implements OnInit {
 
   private loadProducts(): void {
     this.loading = true;
+    this.loadingOnlineStatuses = false;
     this.errorMessage = "";
     this.successMessage = "";
     this.reviewOnlineProfileProductId = null;
+    this.onlineProfileStatusesByProductId.clear();
+    this.latestOnlineStatusRequestKey = "";
 
     this.productService.list(
       this.page,
@@ -863,9 +998,11 @@ export class ProductsPageComponent implements OnInit {
         this.totalElements = response.totalElements;
         this.totalPages = Math.max(response.totalPages, 1);
         this.pageJumpValue = String(this.page + 1);
+        this.loadOnlineProfileStatuses(response.content);
       },
       error: (error: unknown) => {
         this.loading = false;
+        this.loadingOnlineStatuses = false;
         this.errorMessage = toHttpErrorMessage(
           error,
           "No se pudo cargar productos.",
@@ -888,6 +1025,58 @@ export class ProductsPageComponent implements OnInit {
           ? value.barcodeStatus
           : undefined,
     };
+  }
+
+  private loadOnlineProfileStatuses(products: Product[]): void {
+    const productIds = products.map((product) => product.id).filter((id) => Number.isFinite(id));
+    if (productIds.length === 0) {
+      return;
+    }
+
+    const requestKey = productIds.join(",");
+    this.latestOnlineStatusRequestKey = requestKey;
+    this.loadingOnlineStatuses = true;
+
+    this.ecommerceAdminService.listOnlineProfileStatuses(productIds).subscribe({
+      next: (statuses) => {
+        if (this.latestOnlineStatusRequestKey !== requestKey) {
+          return;
+        }
+
+        this.onlineProfileStatusesByProductId.clear();
+        statuses.forEach((status) => {
+          this.onlineProfileStatusesByProductId.set(status.productId, status);
+        });
+        this.loadingOnlineStatuses = false;
+      },
+      error: () => {
+        if (this.latestOnlineStatusRequestKey !== requestKey) {
+          return;
+        }
+
+        this.onlineProfileStatusesByProductId.clear();
+        this.loadingOnlineStatuses = false;
+      },
+    });
+  }
+
+  private onlinePublicationStatusLabel(status: OnlinePublicationStatus | null): string {
+    switch (status) {
+      case "DRAFT":
+        return "Borrador ecommerce";
+      case "INCOMPLETE":
+        return "Pendiente ecommerce";
+      case "READY_FOR_REVIEW":
+        return "Listo para revisar";
+      case "PUBLISHED":
+        return "Publicado online";
+      case "UNPUBLISHED":
+        return "No publicado";
+      case "BLOCKED":
+        return "Revisar ecommerce";
+      default:
+        return "Perfil online";
+    }
   }
 
 }

@@ -403,6 +403,13 @@ class EcommerceCatalogApplicationServiceTest {
         }
 
         @Override
+        public List<ProductOnlineProfile> findByProductIds(List<Long> productIds) {
+            return profiles.values().stream()
+                    .filter(profile -> productIds.contains(profile.productId()))
+                    .toList();
+        }
+
+        @Override
         public Optional<ProductOnlineProfile> findByProductId(Long productId) {
             return profiles.values().stream().filter(profile -> profile.productId().equals(productId)).findFirst();
         }

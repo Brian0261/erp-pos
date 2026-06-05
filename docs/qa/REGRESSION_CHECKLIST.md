@@ -644,6 +644,21 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [x] Sin cambios en codigo funcional durante fase documental 2G.2D.
 - [x] Sin cambios en frontend Angular, Flyway/DB, Docker, `.env` raiz, AWS/staging.
 
+### Ecommerce - Fase 2G.3A Indicador de perfil online en Productos
+
+- [x] Backend: `GET /api/v1/ecommerce-admin/products/online-profile-status?productIds=1,2,3` retorna estados batch sin N+1 HTTP por fila.
+- [x] Backend: producto sin perfil retorna `hasOnlineProfile=false`.
+- [x] Backend: producto con perfil DRAFT retorna `publicationStatus=DRAFT`.
+- [x] Backend: producto PUBLISHED retorna `publicationStatus=PUBLISHED` y `slug`.
+- [x] Backend: lista vacia retorna arreglo vacio; lista invalida retorna 400 controlado.
+- [x] Backend: rol no autorizado retorna 403.
+- [x] Backend: endpoint batch no crea ni modifica perfiles.
+- [x] Frontend Productos: se solicita estado ecommerce solo para productos visibles de la pagina actual.
+- [x] Frontend Productos: se muestra badge compacto `Sin perfil online`, `Borrador ecommerce`/`Pendiente ecommerce`, `Publicado online` o `No publicado` segun estado.
+- [x] Frontend Productos: `Crear perfil online` queda disponible solo para ADMIN y productos sin perfil.
+- [x] Frontend Productos: productos con perfil muestran `Revisar perfil`.
+- [x] Sin cambios en Storefront, Flyway, Docker, `.env` raiz ni slug en `products`.
+
 ### Caja - UX operativa frontend-only (2026-05-25)
 
 - [ ] Estados `OPEN` y `CLOSED` se muestran como `Abierta` y `Cerrada`.

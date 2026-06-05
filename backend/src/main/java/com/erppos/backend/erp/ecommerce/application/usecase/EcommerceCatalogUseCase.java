@@ -25,6 +25,7 @@ public interface EcommerceCatalogUseCase {
     EcommerceOnlineCategory changeOnlineCategoryStatus(Long id, ChangeEcommerceOnlineCategoryStatusCommand command);
     ProductOnlineProfile createDraftProfile(CreateProductOnlineProfileCommand command);
     Page<ProductOnlineProfile> listOnlineProfiles(Pageable pageable);
+    List<ProductOnlineProfile> listProfilesByProductIds(List<Long> productIds);
     ProductOnlineProfile getProfileByProductId(Long productId);
     Optional<EcommerceSeoMetadata> getSeoMetadataByProductId(Long productId);
     Optional<ProductAsset> getPrimaryAssetByProductId(Long productId);

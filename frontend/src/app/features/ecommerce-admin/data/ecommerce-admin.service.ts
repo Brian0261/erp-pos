@@ -11,6 +11,7 @@ import {
   EcommerceAdminOnlineCategoryRequest,
   EcommerceAdminOnlineCategoryStatusRequest,
   EcommerceAdminOnlineProfileDetailResponse,
+  EcommerceAdminOnlineProfileStatusResponse,
   EcommerceAdminOnlineProfileSummaryResponse,
   EcommerceAdminPageResponse,
   EcommerceAdminPriceOverrideResponse,
@@ -41,6 +42,17 @@ export class EcommerceAdminService {
 
     return this.http.get<EcommerceAdminPageResponse<EcommerceAdminOnlineProfileSummaryResponse>>(
       `${this.endpoint}/products/online-profiles`,
+      { params },
+    );
+  }
+
+  listOnlineProfileStatuses(
+    productIds: number[],
+  ): Observable<EcommerceAdminOnlineProfileStatusResponse[]> {
+    const params = new HttpParams().set("productIds", productIds.join(","));
+
+    return this.http.get<EcommerceAdminOnlineProfileStatusResponse[]>(
+      `${this.endpoint}/products/online-profile-status`,
       { params },
     );
   }

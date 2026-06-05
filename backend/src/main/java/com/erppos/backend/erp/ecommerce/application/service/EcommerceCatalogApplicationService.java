@@ -45,6 +45,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
 
 @Service
@@ -295,6 +296,24 @@ public class EcommerceCatalogApplicationService implements EcommerceCatalogUseCa
     @Override
     public Page<ProductOnlineProfile> listOnlineProfiles(Pageable pageable) {
         return profileRepositoryPort.findAll(pageable);
+    }
+
+    @Override
+    public List<ProductOnlineProfile> listProfilesByProductIds(List<Long> productIds) {
+        if (productIds == null || productIds.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> normalizedProductIds = productIds.stream()
+                .filter(Objects::nonNull)
+                .filter(productId -> productId > 0)
+                .distinct()
+                .toList();
+        if (normalizedProductIds.isEmpty()) {
+            return List.of();
+        }
+
+        return profileRepositoryPort.findByProductIds(normalizedProductIds);
     }
 
     @Override

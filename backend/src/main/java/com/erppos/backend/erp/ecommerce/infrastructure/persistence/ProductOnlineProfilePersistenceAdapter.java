@@ -10,6 +10,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Optional;
 
 @Component
@@ -36,6 +37,17 @@ public class ProductOnlineProfilePersistenceAdapter implements ProductOnlineProf
     @Override
     public Page<ProductOnlineProfile> findAll(Pageable pageable) {
         return profileJpaRepository.findAll(pageable).map(ProductOnlineProfileMapper::toDomain);
+    }
+
+    @Override
+    public List<ProductOnlineProfile> findByProductIds(List<Long> productIds) {
+        if (productIds == null || productIds.isEmpty()) {
+            return List.of();
+        }
+
+        return profileJpaRepository.findByProductIdIn(productIds).stream()
+                .map(ProductOnlineProfileMapper::toDomain)
+                .toList();
     }
 
     @Override

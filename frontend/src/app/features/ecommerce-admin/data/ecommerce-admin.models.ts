@@ -42,6 +42,14 @@ export interface EcommerceAdminOnlineProfileSummaryResponse {
   updatedAt: string;
 }
 
+export interface EcommerceAdminOnlineProfileStatusResponse {
+  productId: number;
+  hasOnlineProfile: boolean;
+  publicationStatus: OnlinePublicationStatus | null;
+  slug: string | null;
+  profileName: string | null;
+}
+
 export interface EcommerceAdminEffectivePriceResponse {
   amount: number;
   currency: string;

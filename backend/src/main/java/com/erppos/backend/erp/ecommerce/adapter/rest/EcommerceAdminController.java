@@ -8,6 +8,7 @@ import com.erppos.backend.erp.ecommerce.adapter.dto.EcommerceAdminOnlineCategory
 import com.erppos.backend.erp.ecommerce.adapter.dto.EcommerceAdminOnlineCategoryResponse;
 import com.erppos.backend.erp.ecommerce.adapter.dto.EcommerceAdminOnlineCategoryStatusRequest;
 import com.erppos.backend.erp.ecommerce.adapter.dto.EcommerceAdminOnlineProfileDetailResponse;
+import com.erppos.backend.erp.ecommerce.adapter.dto.EcommerceAdminOnlineProfileStatusResponse;
 import com.erppos.backend.erp.ecommerce.adapter.dto.EcommerceAdminOnlineProfileSummaryResponse;
 import com.erppos.backend.erp.ecommerce.adapter.dto.EcommerceAdminPriceOverrideResponse;
 import com.erppos.backend.erp.ecommerce.adapter.dto.EcommerceAdminPrimaryAssetResponse;
@@ -44,6 +45,7 @@ import com.erppos.backend.erp.shared.adapter.dto.PageResponseMapper;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -51,13 +53,17 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.net.URI;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1/ecommerce-admin")
@@ -180,6 +186,26 @@ public class EcommerceAdminController {
                 .listOnlineProfiles(pageable)
                 .map(this::toSummaryResponse);
         return ResponseEntity.ok(PageResponseMapper.from(page));
+    }
+
+    @GetMapping("/products/online-profile-status")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR')")
+    public ResponseEntity<List<EcommerceAdminOnlineProfileStatusResponse>> listOnlineProfileStatuses(
+            @RequestParam(required = false) String productIds
+    ) {
+        List<Long> normalizedProductIds = parseProductIds(productIds);
+        if (normalizedProductIds.isEmpty()) {
+            return ResponseEntity.ok(List.of());
+        }
+
+        Map<Long, ProductOnlineProfile> profilesByProductId = ecommerceCatalogUseCase
+                .listProfilesByProductIds(normalizedProductIds)
+                .stream()
+                .collect(Collectors.toMap(ProductOnlineProfile::productId, profile -> profile));
+
+        return ResponseEntity.ok(normalizedProductIds.stream()
+                .map(productId -> toStatusResponse(productId, profilesByProductId.get(productId)))
+                .toList());
     }
 
     @GetMapping("/products/{productId}/online-profile")
@@ -341,6 +367,38 @@ public class EcommerceAdminController {
                 profile.publishedAt(),
                 profile.updatedAt()
         );
+    }
+
+    private EcommerceAdminOnlineProfileStatusResponse toStatusResponse(Long productId, ProductOnlineProfile profile) {
+        if (profile == null) {
+            return new EcommerceAdminOnlineProfileStatusResponse(productId, false, null, null, null);
+        }
+
+        return new EcommerceAdminOnlineProfileStatusResponse(
+                profile.productId(),
+                true,
+                profile.publicationStatus(),
+                profile.slug(),
+                profile.onlineName()
+        );
+    }
+
+    private List<Long> parseProductIds(String productIds) {
+        if (productIds == null || productIds.isBlank()) {
+            return List.of();
+        }
+
+        try {
+            return List.of(productIds.split(",")).stream()
+                    .map(String::trim)
+                    .filter(value -> !value.isEmpty())
+                    .map(Long::valueOf)
+                    .filter(productId -> productId > 0)
+                    .distinct()
+                    .toList();
+        } catch (NumberFormatException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "productIds must be numeric");
+        }
     }
 
     private EcommerceAdminSeoMetadataResponse toSeoResponse(EcommerceSeoMetadata metadata) {
