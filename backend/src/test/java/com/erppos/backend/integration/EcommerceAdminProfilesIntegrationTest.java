@@ -623,4 +623,69 @@ class EcommerceAdminProfilesIntegrationTest extends AbstractHttpIntegrationTest 
                         .content(payload.toString()))
                 .andExpect(status().isOk());
     }
+
+    @Test
+    void listOnlineProfilesShouldIncludeReadinessSummary() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = String.valueOf(System.nanoTime());
+        long productId = createProductWithDraftProfile(adminToken, suffix, BigDecimal.valueOf(10.00));
+
+        mockMvc.perform(get("/api/v1/ecommerce-admin/products/online-profiles")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
+                        .param("page", "0")
+                        .param("size", "20"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items").isArray())
+                .andExpect(jsonPath("$.items[0].readinessStatus").exists())
+                .andExpect(jsonPath("$.items[0].readinessCompleted").isNumber())
+                .andExpect(jsonPath("$.items[0].readinessTotal").value(11))
+                .andExpect(jsonPath("$.items[0].missingRequirements").isArray());
+    }
+
+    @Test
+    void incompleteProfileShouldShowMissingRequirements() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = String.valueOf(System.nanoTime());
+        long productId = createProductWithDraftProfile(adminToken, suffix, BigDecimal.valueOf(10.00));
+
+        mockMvc.perform(get("/api/v1/ecommerce-admin/products/online-profiles")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
+                        .param("page", "0")
+                        .param("size", "20"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[?(@.productId == " + productId + ")].readinessStatus").exists())
+                .andExpect(jsonPath("$.items[?(@.productId == " + productId + ")].missingRequirements").isArray())
+                .andExpect(jsonPath("$.items[?(@.productId == " + productId + ")].missingRequirements[0]").exists());
+    }
+
+    @Test
+    void publishedProfileShouldShowPublishedReadinessStatus() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = String.valueOf(System.nanoTime());
+        long productId = createProductWithDraftProfile(adminToken, suffix, BigDecimal.valueOf(10.00));
+
+        EcommerceBrand brand = brandRepositoryPort.save(new EcommerceBrand(
+                null, "Brand " + suffix, "brand-" + suffix, null, true, null, null, "admin", "admin"
+        ));
+        EcommerceOnlineCategory category = onlineCategoryRepositoryPort.save(new EcommerceOnlineCategory(
+                null, null, "Category " + suffix, "category-" + suffix, null, true, null, null, "admin", "admin"
+        ));
+
+        updateProfileForPublish(adminToken, productId, suffix, brand.id(), category.id());
+        upsertSeoForPublish(adminToken, productId, suffix);
+        upsertAssetForPublish(adminToken, productId, suffix);
+
+        mockMvc.perform(post("/api/v1/ecommerce-admin/products/{productId}/publish", productId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/ecommerce-admin/products/online-profiles")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
+                        .param("page", "0")
+                        .param("size", "20"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[?(@.productId == " + productId + ")].readinessStatus").value("PUBLISHED"))
+                .andExpect(jsonPath("$.items[?(@.productId == " + productId + ")].missingRequirements.length()").value(0));
+    }
 }

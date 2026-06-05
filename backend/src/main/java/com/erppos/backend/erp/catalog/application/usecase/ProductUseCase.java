@@ -7,6 +7,7 @@ public interface ProductUseCase {
     Product create(CreateProductCommand command);
     Page<Product> list(String query, Long categoryId, Boolean active, ProductBarcodeStatus barcodeStatus, Pageable pageable);
     Product getById(Long id);
+    List<Product> getByIds(List<Long> ids);
     Product update(Long id, UpdateProductCommand command);
     void deactivate(Long id);
     List<Product> search(String query);

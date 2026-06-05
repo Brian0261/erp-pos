@@ -8,4 +8,5 @@ import java.util.Optional;
 public interface ProductAssetJpaRepository extends JpaRepository<ProductAssetEntity, Long> {
     List<ProductAssetEntity> findByProductOnlineProfileId(Long productOnlineProfileId);
     Optional<ProductAssetEntity> findFirstByProductOnlineProfileIdAndPrimaryTrueAndActiveTrue(Long productOnlineProfileId);
+    List<ProductAssetEntity> findByProductOnlineProfileIdInAndPrimaryTrueAndActiveTrue(List<Long> productOnlineProfileIds);
 }

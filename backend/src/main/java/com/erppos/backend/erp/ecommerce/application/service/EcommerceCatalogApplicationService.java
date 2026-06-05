@@ -8,7 +8,9 @@ import com.erppos.backend.erp.ecommerce.application.usecase.CreateEcommerceBrand
 import com.erppos.backend.erp.ecommerce.application.usecase.CreateEcommerceOnlineCategoryCommand;
 import com.erppos.backend.erp.ecommerce.application.usecase.EffectiveOnlinePriceResult;
 import com.erppos.backend.erp.ecommerce.application.usecase.EcommerceCatalogUseCase;
+import com.erppos.backend.erp.ecommerce.application.usecase.MissingRequirement;
 import com.erppos.backend.erp.ecommerce.application.usecase.PublicationValidationResult;
+import com.erppos.backend.erp.ecommerce.application.usecase.ReadinessStatus;
 import com.erppos.backend.erp.ecommerce.application.usecase.UpdateProductOnlineProfileCommand;
 import com.erppos.backend.erp.ecommerce.application.usecase.UpdateEcommerceBrandCommand;
 import com.erppos.backend.erp.ecommerce.application.usecase.UpdateEcommerceOnlineCategoryCommand;
@@ -56,6 +58,7 @@ import java.util.stream.Collectors;
 @Service
 public class EcommerceCatalogApplicationService implements EcommerceCatalogUseCase {
     private static final String PEN_CURRENCY = "PEN";
+    private static final int READINESS_TOTAL = 11;
 
     private final ProductOnlineProfileRepositoryPort profileRepositoryPort;
     private final EcommerceCatalogProductReadPort productReadPort;
@@ -330,21 +333,68 @@ public class EcommerceCatalogApplicationService implements EcommerceCatalogUseCa
                         .filter(category -> categoryIds.contains(category.id()))
                         .collect(Collectors.toMap(EcommerceOnlineCategory::id, EcommerceOnlineCategory::name));
 
+        List<Long> profileIds = profiles.stream().map(ProductOnlineProfile::id).toList();
+        List<Long> productIds = profiles.stream().map(ProductOnlineProfile::productId).toList();
+
+        Map<Long, EcommerceCatalogProductSnapshot> productSnapshotsById = productIds.isEmpty()
+                ? Map.of()
+                : productReadPort.findByIds(productIds).stream()
+                        .collect(Collectors.toMap(EcommerceCatalogProductSnapshot::id, snapshot -> snapshot));
+
+        Map<Long, EcommerceSeoMetadata> seoByProfileId = profileIds.isEmpty()
+                ? Map.of()
+                : seoMetadataRepositoryPort.findAllByProductOnlineProfileIds(profileIds).stream()
+                        .collect(Collectors.toMap(EcommerceSeoMetadata::productOnlineProfileId, seo -> seo));
+
+        Map<Long, ProductAsset> assetsByProfileId = profileIds.isEmpty()
+                ? Map.of()
+                : productAssetRepositoryPort.findPrimaryActiveByProductOnlineProfileIds(profileIds).stream()
+                        .collect(Collectors.toMap(ProductAsset::productOnlineProfileId, asset -> asset));
+
+        Map<Long, OnlinePriceOverride> overridesByProfileId = profileIds.isEmpty()
+                ? Map.of()
+                : onlinePriceOverrideRepositoryPort.findActiveByProductOnlineProfileIds(profileIds).stream()
+                        .collect(Collectors.toMap(OnlinePriceOverride::productOnlineProfileId, override -> override));
+
         List<OnlineProfileSummaryResult> enrichedResults = profiles.stream()
-                .map(profile -> new OnlineProfileSummaryResult(
-                        profile.id(),
-                        profile.productId(),
-                        profile.publicationStatus(),
-                        profile.slug(),
-                        profile.onlineName(),
-                        profile.onlineCategoryId(),
-                        profile.onlineCategoryId() != null ? categoryNamesById.get(profile.onlineCategoryId()) : null,
-                        profile.brandId(),
-                        profile.brandId() != null ? brandNamesById.get(profile.brandId()) : null,
-                        profile.brandAbsencePolicy(),
-                        profile.publishedAt(),
-                        profile.updatedAt()
-                ))
+                .map(profile -> {
+                    EcommerceCatalogProductSnapshot productSnapshot = productSnapshotsById.get(profile.productId());
+                    EcommerceSeoMetadata seoMetadata = seoByProfileId.get(profile.id());
+                    ProductAsset primaryAsset = assetsByProfileId.get(profile.id());
+                    OnlinePriceOverride priceOverride = overridesByProfileId.get(profile.id());
+
+                    List<MissingRequirement> missingRequirements = calculateMissingRequirements(
+                            profile,
+                            productSnapshot,
+                            seoMetadata,
+                            primaryAsset,
+                            priceOverride,
+                            brandNamesById,
+                            categoryNamesById
+                    );
+
+                    ReadinessStatus readinessStatus = determineReadinessStatus(profile.publicationStatus(), missingRequirements);
+                    int readinessCompleted = Math.max(0, READINESS_TOTAL - missingRequirements.size());
+
+                    return new OnlineProfileSummaryResult(
+                            profile.id(),
+                            profile.productId(),
+                            profile.publicationStatus(),
+                            profile.slug(),
+                            profile.onlineName(),
+                            profile.onlineCategoryId(),
+                            profile.onlineCategoryId() != null ? categoryNamesById.get(profile.onlineCategoryId()) : null,
+                            profile.brandId(),
+                            profile.brandId() != null ? brandNamesById.get(profile.brandId()) : null,
+                            profile.brandAbsencePolicy(),
+                            profile.publishedAt(),
+                            profile.updatedAt(),
+                            readinessStatus,
+                            readinessCompleted,
+                            READINESS_TOTAL,
+                            missingRequirements
+                    );
+                })
                 .toList();
 
         return new org.springframework.data.domain.PageImpl<>(
@@ -852,5 +902,116 @@ public class EcommerceCatalogApplicationService implements EcommerceCatalogUseCa
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private List<MissingRequirement> calculateMissingRequirements(
+            ProductOnlineProfile profile,
+            EcommerceCatalogProductSnapshot productSnapshot,
+            EcommerceSeoMetadata seoMetadata,
+            ProductAsset primaryAsset,
+            OnlinePriceOverride priceOverride,
+            Map<Long, String> brandNamesById,
+            Map<Long, String> categoryNamesById
+    ) {
+        List<MissingRequirement> missing = new ArrayList<>();
+
+        if (productSnapshot == null) {
+            missing.add(MissingRequirement.PRODUCT_INACTIVE);
+        } else {
+            if (!productSnapshot.active()) {
+                missing.add(MissingRequirement.PRODUCT_INACTIVE);
+            }
+            if (trimToNull(productSnapshot.sku()) == null) {
+                missing.add(MissingRequirement.SKU_MISSING);
+            }
+        }
+
+        if (trimToNull(profile.onlineName()) == null) {
+            missing.add(MissingRequirement.ONLINE_NAME_MISSING);
+        }
+
+        if (trimToNull(profile.onlineDescription()) == null) {
+            missing.add(MissingRequirement.ONLINE_DESCRIPTION_MISSING);
+        }
+
+        String normalizedSlug = normalizeSlug(profile.slug());
+        if (normalizedSlug == null) {
+            missing.add(MissingRequirement.SLUG_MISSING);
+        } else if (!normalizedSlug.equals(profile.slug())) {
+            missing.add(MissingRequirement.SLUG_MISSING);
+        } else if (profileRepositoryPort.existsBySlugIgnoreCaseAndIdNot(normalizedSlug, profile.id())) {
+            missing.add(MissingRequirement.SLUG_DUPLICATE);
+        }
+
+        if (profile.onlineCategoryId() == null) {
+            missing.add(MissingRequirement.CATEGORY_MISSING);
+        } else {
+            String categoryName = categoryNamesById.get(profile.onlineCategoryId());
+            if (categoryName == null) {
+                missing.add(MissingRequirement.CATEGORY_MISSING);
+            }
+        }
+
+        if (profile.brandId() != null) {
+            String brandName = brandNamesById.get(profile.brandId());
+            if (brandName == null) {
+                missing.add(MissingRequirement.BRAND_MISSING);
+            }
+        } else if (profile.brandAbsencePolicy() == null) {
+            missing.add(MissingRequirement.BRAND_MISSING);
+        }
+
+        if (primaryAsset == null) {
+            missing.add(MissingRequirement.ASSET_MISSING);
+        } else {
+            if (primaryAsset.assetType() != AssetType.PRODUCT_IMAGE ||
+                trimToNull(primaryAsset.altText()) == null ||
+                !primaryAsset.rightsConfirmed()) {
+                missing.add(MissingRequirement.ASSET_INVALID);
+            }
+        }
+
+        if (seoMetadata == null) {
+            missing.add(MissingRequirement.SEO_MISSING);
+        } else {
+            if (trimToNull(seoMetadata.seoTitle()) == null ||
+                trimToNull(seoMetadata.seoDescription()) == null) {
+                missing.add(MissingRequirement.SEO_INCOMPLETE);
+            } else if (seoMetadata.indexable() && seoMetadata.robotsPolicy() != RobotsPolicy.INDEX_FOLLOW) {
+                missing.add(MissingRequirement.SEO_INCOMPLETE);
+            }
+        }
+
+        BigDecimal effectivePrice = null;
+        if (priceOverride != null && isUsableOverride(priceOverride, Instant.now())) {
+            effectivePrice = priceOverride.amount();
+        } else if (productSnapshot != null) {
+            effectivePrice = productSnapshot.salePrice();
+        }
+
+        if (effectivePrice == null || effectivePrice.compareTo(BigDecimal.ZERO) <= 0) {
+            missing.add(MissingRequirement.PRICE_INVALID);
+        }
+
+        return missing;
+    }
+
+    private ReadinessStatus determineReadinessStatus(
+            OnlinePublicationStatus publicationStatus,
+            List<MissingRequirement> missingRequirements
+    ) {
+        if (publicationStatus == OnlinePublicationStatus.PUBLISHED) {
+            return ReadinessStatus.PUBLISHED;
+        }
+        if (publicationStatus == OnlinePublicationStatus.UNPUBLISHED) {
+            return ReadinessStatus.UNPUBLISHED;
+        }
+        if (missingRequirements.isEmpty()) {
+            return ReadinessStatus.READY;
+        }
+        if (missingRequirements.size() <= 3) {
+            return ReadinessStatus.INCOMPLETE;
+        }
+        return ReadinessStatus.NEEDS_ATTENTION;
     }
 }

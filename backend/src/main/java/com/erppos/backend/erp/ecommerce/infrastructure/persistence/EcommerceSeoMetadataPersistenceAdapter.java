@@ -7,6 +7,7 @@ import com.erppos.backend.erp.ecommerce.infrastructure.mapper.EcommerceSeoMetada
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Optional;
 
 @Component
@@ -43,5 +44,15 @@ public class EcommerceSeoMetadataPersistenceAdapter implements EcommerceSeoMetad
     @Override
     public Optional<EcommerceSeoMetadata> findByBrandId(Long brandId) {
         return seoMetadataJpaRepository.findByBrandId(brandId).map(EcommerceSeoMetadataMapper::toDomain);
+    }
+
+    @Override
+    public List<EcommerceSeoMetadata> findAllByProductOnlineProfileIds(List<Long> productOnlineProfileIds) {
+        if (productOnlineProfileIds == null || productOnlineProfileIds.isEmpty()) {
+            return List.of();
+        }
+        return seoMetadataJpaRepository.findByProductOnlineProfileIdIn(productOnlineProfileIds).stream()
+                .map(EcommerceSeoMetadataMapper::toDomain)
+                .toList();
     }
 }

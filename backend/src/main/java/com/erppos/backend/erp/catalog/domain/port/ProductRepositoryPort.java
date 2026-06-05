@@ -8,6 +8,7 @@ import java.util.Optional;
 public interface ProductRepositoryPort {
     Product save(Product product);
     Optional<Product> findById(Long id);
+    List<Product> findByIds(List<Long> ids);
     Page<Product> findAll(Pageable pageable);
     Page<Product> findByFilters(String query, boolean applyQuery, Long categoryId, Boolean active, ProductBarcodeStatus barcodeStatus, Pageable pageable);
     List<Product> search(String query, int limit);

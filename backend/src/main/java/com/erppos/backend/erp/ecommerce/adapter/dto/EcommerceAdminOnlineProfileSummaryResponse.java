@@ -1,9 +1,12 @@
 package com.erppos.backend.erp.ecommerce.adapter.dto;
 
+import com.erppos.backend.erp.ecommerce.application.usecase.MissingRequirement;
+import com.erppos.backend.erp.ecommerce.application.usecase.ReadinessStatus;
 import com.erppos.backend.erp.ecommerce.domain.model.BrandAbsencePolicy;
 import com.erppos.backend.erp.ecommerce.domain.model.OnlinePublicationStatus;
 
 import java.time.Instant;
+import java.util.List;
 
 public record EcommerceAdminOnlineProfileSummaryResponse(
         Long profileId,
@@ -17,6 +20,10 @@ public record EcommerceAdminOnlineProfileSummaryResponse(
         String brandName,
         BrandAbsencePolicy brandAbsencePolicy,
         Instant publishedAt,
-        Instant updatedAt
+        Instant updatedAt,
+        ReadinessStatus readinessStatus,
+        int readinessCompleted,
+        int readinessTotal,
+        List<MissingRequirement> missingRequirements
 ) {
 }

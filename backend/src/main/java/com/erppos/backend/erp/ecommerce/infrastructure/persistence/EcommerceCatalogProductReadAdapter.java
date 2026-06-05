@@ -8,6 +8,7 @@ import com.erppos.backend.erp.ecommerce.domain.port.EcommerceCatalogProductReadP
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Optional;
 
 @Component
@@ -26,6 +27,16 @@ public class EcommerceCatalogProductReadAdapter implements EcommerceCatalogProdu
         } catch (CatalogNotFoundException ex) {
             return Optional.empty();
         }
+    }
+
+    @Override
+    public List<EcommerceCatalogProductSnapshot> findByIds(List<Long> productIds) {
+        if (productIds == null || productIds.isEmpty()) {
+            return List.of();
+        }
+        return productUseCase.getByIds(productIds).stream()
+                .map(this::toSnapshot)
+                .toList();
     }
 
     private EcommerceCatalogProductSnapshot toSnapshot(Product product) {

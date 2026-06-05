@@ -43,4 +43,14 @@ public class ProductAssetPersistenceAdapter implements ProductAssetRepositoryPor
         return assetJpaRepository.findFirstByProductOnlineProfileIdAndPrimaryTrueAndActiveTrue(productOnlineProfileId)
                 .map(ProductAssetMapper::toDomain);
     }
+
+    @Override
+    public List<ProductAsset> findPrimaryActiveByProductOnlineProfileIds(List<Long> productOnlineProfileIds) {
+        if (productOnlineProfileIds == null || productOnlineProfileIds.isEmpty()) {
+            return List.of();
+        }
+        return assetJpaRepository.findByProductOnlineProfileIdInAndPrimaryTrueAndActiveTrue(productOnlineProfileIds).stream()
+                .map(ProductAssetMapper::toDomain)
+                .toList();
+    }
 }

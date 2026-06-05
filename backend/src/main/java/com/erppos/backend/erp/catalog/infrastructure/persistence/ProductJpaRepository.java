@@ -15,6 +15,10 @@ public interface ProductJpaRepository extends JpaRepository<ProductEntity, Long>
     @EntityGraph(attributePaths = {"category", "unit"})
     java.util.Optional<ProductEntity> findById(Long id);
 
+    @Override
+    @EntityGraph(attributePaths = {"category", "unit"})
+    List<ProductEntity> findAllById(Iterable<Long> ids);
+
     @EntityGraph(attributePaths = {"category", "unit"})
     List<ProductEntity> findByActive(boolean active);
 

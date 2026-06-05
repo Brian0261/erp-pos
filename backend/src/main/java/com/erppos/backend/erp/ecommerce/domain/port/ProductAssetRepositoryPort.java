@@ -9,4 +9,5 @@ public interface ProductAssetRepositoryPort {
     ProductAsset save(ProductAsset asset);
     List<ProductAsset> findByProductOnlineProfileId(Long productOnlineProfileId);
     Optional<ProductAsset> findPrimaryActiveByProductOnlineProfileId(Long productOnlineProfileId);
+    List<ProductAsset> findPrimaryActiveByProductOnlineProfileIds(List<Long> productOnlineProfileIds);
 }

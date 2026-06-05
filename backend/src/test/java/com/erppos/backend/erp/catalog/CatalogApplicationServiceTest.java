@@ -461,6 +461,16 @@ class CatalogApplicationServiceTest {
             return Optional.ofNullable(storage.get(id));
         }
         @Override
+        public List<Product> findByIds(List<Long> ids) {
+            if (ids == null || ids.isEmpty()) {
+                return List.of();
+            }
+            return ids.stream()
+                    .filter(storage::containsKey)
+                    .map(storage::get)
+                    .toList();
+        }
+        @Override
         public Page<Product> findAll(Pageable pageable) {
             return new PageImpl<>(storage.values().stream().toList(), pageable, storage.size());
         }

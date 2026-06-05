@@ -362,6 +362,17 @@ class EcommerceCatalogApplicationServiceTest {
         public Optional<EcommerceCatalogProductSnapshot> findById(Long productId) {
             return Optional.ofNullable(products.get(productId));
         }
+
+        @Override
+        public List<EcommerceCatalogProductSnapshot> findByIds(List<Long> productIds) {
+            if (productIds == null || productIds.isEmpty()) {
+                return List.of();
+            }
+            return productIds.stream()
+                    .map(products::get)
+                    .filter(java.util.Objects::nonNull)
+                    .toList();
+        }
     }
 
     private static final class InMemoryProductOnlineProfileRepository implements ProductOnlineProfileRepositoryPort {
@@ -613,6 +624,17 @@ class EcommerceCatalogApplicationServiceTest {
         public Optional<EcommerceSeoMetadata> findByBrandId(Long brandId) {
             return Optional.empty();
         }
+
+        @Override
+        public List<EcommerceSeoMetadata> findAllByProductOnlineProfileIds(List<Long> productOnlineProfileIds) {
+            if (productOnlineProfileIds == null || productOnlineProfileIds.isEmpty()) {
+                return List.of();
+            }
+            return productOnlineProfileIds.stream()
+                    .map(metadataByProfile::get)
+                    .filter(java.util.Objects::nonNull)
+                    .toList();
+        }
     }
 
     private static final class InMemoryProductAssetRepository implements ProductAssetRepositoryPort {
@@ -656,6 +678,18 @@ class EcommerceCatalogApplicationServiceTest {
             }
             return Optional.of(asset);
         }
+
+        @Override
+        public List<ProductAsset> findPrimaryActiveByProductOnlineProfileIds(List<Long> productOnlineProfileIds) {
+            if (productOnlineProfileIds == null || productOnlineProfileIds.isEmpty()) {
+                return List.of();
+            }
+            return productOnlineProfileIds.stream()
+                    .map(assetsByProfile::get)
+                    .filter(java.util.Objects::nonNull)
+                    .filter(asset -> asset.primary() && asset.active())
+                    .toList();
+        }
     }
 
     private static final class InMemoryOnlinePriceOverrideRepository implements OnlinePriceOverrideRepositoryPort {
@@ -690,6 +724,17 @@ class EcommerceCatalogApplicationServiceTest {
         @Override
         public Optional<OnlinePriceOverride> findActiveByProductOnlineProfileId(Long productOnlineProfileId) {
             return Optional.ofNullable(activeOverridesByProfile.get(productOnlineProfileId));
+        }
+
+        @Override
+        public List<OnlinePriceOverride> findActiveByProductOnlineProfileIds(List<Long> productOnlineProfileIds) {
+            if (productOnlineProfileIds == null || productOnlineProfileIds.isEmpty()) {
+                return List.of();
+            }
+            return productOnlineProfileIds.stream()
+                    .map(activeOverridesByProfile::get)
+                    .filter(java.util.Objects::nonNull)
+                    .toList();
         }
     }
 }

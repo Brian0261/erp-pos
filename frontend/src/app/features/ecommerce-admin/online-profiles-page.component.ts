@@ -9,7 +9,9 @@ import {
   EcommerceAdminBrandResponse,
   EcommerceAdminOnlineCategoryResponse,
   EcommerceAdminOnlineProfileSummaryResponse,
+  MissingRequirement,
   OnlinePublicationStatus,
+  ReadinessStatus,
 } from "./data/ecommerce-admin.models";
 import { EcommerceAdminService, OnlineProfileListFilters } from "./data/ecommerce-admin.service";
 import { toHttpErrorMessage } from "./data/http-error-message";
@@ -127,6 +129,7 @@ const NONE_VALUE = "__NONE__";
               <th>Nombre online</th>
               <th>Slug</th>
               <th>Estado</th>
+              <th>Readiness</th>
               <th>Marca</th>
               <th>Categoría</th>
               <th>Publicado el</th>
@@ -143,6 +146,22 @@ const NONE_VALUE = "__NONE__";
                 <span class="ui-badge" [ngClass]="publicationBadgeClass(profile.publicationStatus)">
                   {{ statusLabel(profile.publicationStatus) }}
                 </span>
+              </td>
+              <td class="cell-readiness">
+                <div class="readiness-summary">
+                  <span class="ui-badge" [ngClass]="readinessBadgeClass(profile.readinessStatus)">
+                    {{ readinessLabel(profile.readinessStatus) }}
+                  </span>
+                  <span class="readiness-score">{{ profile.readinessCompleted }}/{{ profile.readinessTotal }}</span>
+                </div>
+                <div class="readiness-chips" *ngIf="profile.missingRequirements.length > 0">
+                  <span class="ui-chip ui-chip--small" *ngFor="let req of profile.missingRequirements.slice(0, 3)">
+                    {{ requirementLabel(req) }}
+                  </span>
+                  <span class="ui-chip ui-chip--small" *ngIf="profile.missingRequirements.length > 3">
+                    +{{ profile.missingRequirements.length - 3 }}
+                  </span>
+                </div>
               </td>
               <td class="cell-code">{{ profile.brandName ?? "Sin marca" }}</td>
               <td class="cell-code">{{ profile.onlineCategoryName ?? "Sin categoría online" }}</td>
@@ -259,7 +278,7 @@ const NONE_VALUE = "__NONE__";
       }
 
       .ecommerce-table {
-        min-width: 1020px;
+        min-width: 1200px;
       }
 
       .cell-code,
@@ -270,6 +289,29 @@ const NONE_VALUE = "__NONE__";
 
       .cell-name {
         max-width: 260px;
+      }
+
+      .cell-readiness {
+        min-width: 180px;
+      }
+
+      .readiness-summary {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+        margin-bottom: var(--space-1);
+      }
+
+      .readiness-score {
+        font-size: var(--font-size-sm);
+        color: var(--color-text-secondary);
+        font-family: var(--font-family-mono);
+      }
+
+      .readiness-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-1);
       }
 
       .actions {
@@ -461,6 +503,61 @@ export class OnlineProfilesPageComponent implements OnInit, OnDestroy {
       default:
         return "";
     }
+  }
+
+  readinessLabel(status: ReadinessStatus): string {
+    switch (status) {
+      case "READY":
+        return "Listo";
+      case "INCOMPLETE":
+        return "Incompleto";
+      case "NEEDS_ATTENTION":
+        return "Requiere atención";
+      case "PUBLISHED":
+        return "Publicado";
+      case "UNPUBLISHED":
+        return "Despublicado";
+      default:
+        return status;
+    }
+  }
+
+  readinessBadgeClass(status: ReadinessStatus): string {
+    switch (status) {
+      case "READY":
+        return "ui-badge--success";
+      case "INCOMPLETE":
+        return "ui-badge--warning";
+      case "NEEDS_ATTENTION":
+        return "ui-badge--danger";
+      case "PUBLISHED":
+        return "ui-badge--info";
+      case "UNPUBLISHED":
+        return "";
+      default:
+        return "";
+    }
+  }
+
+  requirementLabel(req: MissingRequirement): string {
+    const labels: Record<MissingRequirement, string> = {
+      PRODUCT_INACTIVE: "Producto inactivo",
+      SKU_MISSING: "SKU",
+      ONLINE_NAME_MISSING: "Nombre",
+      ONLINE_DESCRIPTION_MISSING: "Descripción",
+      SLUG_MISSING: "Slug",
+      SLUG_DUPLICATE: "Slug duplicado",
+      CATEGORY_MISSING: "Categoría",
+      CATEGORY_INACTIVE: "Categoría inactiva",
+      BRAND_MISSING: "Marca",
+      BRAND_INACTIVE: "Marca inactiva",
+      ASSET_MISSING: "Imagen",
+      ASSET_INVALID: "Imagen inválida",
+      SEO_MISSING: "SEO",
+      SEO_INCOMPLETE: "SEO incompleto",
+      PRICE_INVALID: "Precio"
+    };
+    return labels[req];
   }
 
   formatDateTime(value: string | null): string {

@@ -1,0 +1,19 @@
+package com.erppos.backend.erp.ecommerce.application.usecase;
+
+public enum MissingRequirement {
+    PRODUCT_INACTIVE,
+    SKU_MISSING,
+    ONLINE_NAME_MISSING,
+    ONLINE_DESCRIPTION_MISSING,
+    SLUG_MISSING,
+    SLUG_DUPLICATE,
+    CATEGORY_MISSING,
+    CATEGORY_INACTIVE,
+    BRAND_MISSING,
+    BRAND_INACTIVE,
+    ASSET_MISSING,
+    ASSET_INVALID,
+    SEO_MISSING,
+    SEO_INCOMPLETE,
+    PRICE_INVALID
+}

@@ -17,6 +17,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import java.util.Locale;
 import java.util.List;
+import java.util.Objects;
 @Service
 public class ProductApplicationService implements ProductUseCase {
     private final ProductRepositoryPort productRepositoryPort;
@@ -73,6 +74,21 @@ public class ProductApplicationService implements ProductUseCase {
     public Product getById(Long id) {
         return productRepositoryPort.findById(id)
                 .orElseThrow(() -> new CatalogNotFoundException("Product not found"));
+    }
+    @Override
+    public List<Product> getByIds(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        List<Long> normalizedIds = ids.stream()
+                .filter(Objects::nonNull)
+                .filter(id -> id > 0)
+                .distinct()
+                .toList();
+        if (normalizedIds.isEmpty()) {
+            return List.of();
+        }
+        return productRepositoryPort.findByIds(normalizedIds);
     }
     @Override
     public Product update(Long id, UpdateProductCommand command) {

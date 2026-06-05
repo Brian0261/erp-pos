@@ -6,6 +6,30 @@ export type OnlinePublicationStatus =
   | "UNPUBLISHED"
   | "BLOCKED";
 
+export type ReadinessStatus =
+  | "READY"
+  | "INCOMPLETE"
+  | "NEEDS_ATTENTION"
+  | "PUBLISHED"
+  | "UNPUBLISHED";
+
+export type MissingRequirement =
+  | "PRODUCT_INACTIVE"
+  | "SKU_MISSING"
+  | "ONLINE_NAME_MISSING"
+  | "ONLINE_DESCRIPTION_MISSING"
+  | "SLUG_MISSING"
+  | "SLUG_DUPLICATE"
+  | "CATEGORY_MISSING"
+  | "CATEGORY_INACTIVE"
+  | "BRAND_MISSING"
+  | "BRAND_INACTIVE"
+  | "ASSET_MISSING"
+  | "ASSET_INVALID"
+  | "SEO_MISSING"
+  | "SEO_INCOMPLETE"
+  | "PRICE_INVALID";
+
 export type BrandAbsencePolicy = "GENERIC" | "UNBRANDED";
 
 export type RobotsPolicy =
@@ -42,6 +66,10 @@ export interface EcommerceAdminOnlineProfileSummaryResponse {
   brandAbsencePolicy: BrandAbsencePolicy | null;
   publishedAt: string | null;
   updatedAt: string;
+  readinessStatus: ReadinessStatus;
+  readinessCompleted: number;
+  readinessTotal: number;
+  missingRequirements: MissingRequirement[];
 }
 
 export interface EcommerceAdminOnlineProfileStatusResponse {

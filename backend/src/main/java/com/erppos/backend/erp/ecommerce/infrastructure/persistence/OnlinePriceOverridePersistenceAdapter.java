@@ -7,6 +7,7 @@ import com.erppos.backend.erp.ecommerce.infrastructure.mapper.OnlinePriceOverrid
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Optional;
 
 @Component
@@ -34,5 +35,15 @@ public class OnlinePriceOverridePersistenceAdapter implements OnlinePriceOverrid
     public Optional<OnlinePriceOverride> findActiveByProductOnlineProfileId(Long productOnlineProfileId) {
         return priceOverrideJpaRepository.findFirstByProductOnlineProfileIdAndActiveTrue(productOnlineProfileId)
                 .map(OnlinePriceOverrideMapper::toDomain);
+    }
+
+    @Override
+    public List<OnlinePriceOverride> findActiveByProductOnlineProfileIds(List<Long> productOnlineProfileIds) {
+        if (productOnlineProfileIds == null || productOnlineProfileIds.isEmpty()) {
+            return List.of();
+        }
+        return priceOverrideJpaRepository.findByProductOnlineProfileIdInAndActiveTrue(productOnlineProfileIds).stream()
+                .map(OnlinePriceOverrideMapper::toDomain)
+                .toList();
     }
 }

@@ -386,7 +386,11 @@ public class EcommerceAdminController {
                 result.brandName(),
                 result.brandAbsencePolicy(),
                 result.publishedAt(),
-                result.updatedAt()
+                result.updatedAt(),
+                result.readinessStatus(),
+                result.readinessCompleted(),
+                result.readinessTotal(),
+                result.missingRequirements()
         );
     }
 
