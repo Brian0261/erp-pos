@@ -17,8 +17,14 @@
   - 2F.2B: Layout (StorefrontHeader, StorefrontFooter, BottomNavigation) con logo InkToy real.
   - 2F.2C: Catalogo visual (ProductCard, CategoryCard, EmptyState, StickyProductCTA) + preview tecnico en `/`.
   - Commit: `1a55ec0 feat(storefront): add catalog visual components`.
-- Fase actual autorizada: Fase 2F.2D QA tecnica y documentacion de componentes.
-- Fase 2F.2D es solo documental/QA. No implementa codigo funcional.
+- Fase 2F.2D QA tecnica y documentacion de componentes cerrada documentalmente.
+- Fase 2G.1 Publicacion de producto operativo a perfil ecommerce cerrada funcionalmente (commit `f766397`).
+- Fase 2G.2 Smoke Test Real de Producto Publicado → Storefront cerrada funcional y documentalmente.
+  - End-to-end validado: Producto ERP/POS → Perfil online DRAFT → PUBLISHED → Storefront `/productos/{slug}` (200 OK).
+  - Casos negativos validados: 404, 409, 403.
+  - Documentacion: `docs/qa/PHASE2G2_PUBLISHED_PRODUCT_SMOKE_TEST.md`.
+- Fase actual autorizada: Fase 2G.3A — Indicador de perfil online en Productos (Angular frontend).
+- NOTA: `/productos/[slug]` ya fue implementada en 2F.3B y validada exitosamente en 2G.2. No requiere nueva implementacion.
 
 ## Principios
 
@@ -46,35 +52,34 @@
 | 2F.3 | Integracion real Storefront API | Paginas /productos, /productos/{slug}, /categorias, /categorias/{slug} consumiendo endpoints. |
 | 2F.4 | SEO tecnico inicial | generateMetadata, canonical, notFound(), noindex/indexable, ISR. |
 | 2F.5 | QA/cierre documental 2F | Build/lint/typecheck, smoke local, docs actualizados y deudas registradas. |
+| 2G.1 | Crear perfil online desde producto ERP/POS | Endpoint POST para crear perfil DRAFT desde producto existente. |
+| 2G.2 | Smoke Test Real Producto Publicado → Storefront | Validacion end-to-end: producto → perfil publicado → Storefront 200 OK. |
+| 2G.3A | Indicador de perfil online en Productos | Badge/columna en tabla Productos Angular que muestre estado del perfil online (NONE/DRAFT/PUBLISHED). |
 | Posteriores | Intencion de compra, pedidos, pagos, delivery, Merchant Center y despliegue | Fases futuras separadas, aprobadas una por una. |
 
 ## Limites de aprobacion actuales
 
-- Fase 2F.0 cerrada documentalmente (commit `4e22712`).
-- Fase 2F.1 aprobada como diseno visual "Catalogo Creativo Profesional".
-- Fase 2F.1 es solo aprobacion visual. No implementa codigo funcional.
+- Fase 2G.2 cerrada funcional y documentalmente.
+- Fase 2G.3A autorizada para implementacion de indicador de perfil online en Productos.
+- `/productos/[slug]` ya fue implementada en 2F.3B y validada exitosamente en 2G.2.
 - No se autoriza en fase actual:
-  - Paginas reales de producto/categoria
-  - Consumo real de endpoints Storefront
-  - sitemap.xml real
   - Checkout, carrito, pagos
   - Pedidos online
   - Delivery
   - Merchant Center
   - Stock reservado
   - AWS/staging
+  - Login cliente, perfil cliente, panel publico
 
-## Criterio de salida de Fase 2F.2D
+## Criterio de salida de Fase 2G.3A
 
-- QA documental de componentes completado.
-- Documentacion de sistema de componentes creada (`STOREFRONT_COMPONENTS_SYSTEM_2F2.md`).
-- QA checklist de componentes creado (`PHASE2F2_STOREFRONT_COMPONENTS_QA_CHECKLIST.md`).
-- CURRENT_STATUS, CHANGE_CONTROL, ROADMAP, BACKLOG y MVP_PLAN actualizados.
-- Deudas no bloqueantes registradas.
-- No hay paginas reales implementadas.
-- No hay consumo real de API desde paginas.
-- No hay cambios fuera de `docs/` y `storefront/`.
+- Indicador visual de estado de perfil online en tabla de Productos.
+- Estados visibles: Sin perfil, DRAFT, PUBLISHED.
+- Integracion con backend existente (sin nuevos endpoints si ya existe informacion disponible).
+- Build frontend Angular exitoso.
+- Sin cambios en Storefront Next.js.
+- Sin checkout, carrito, pagos, pedidos, login, perfil.
 
 ## Siguiente paso esperado
 
-Abrir Fase 2F.3A — Alineacion de tipos TypeScript/API client con DTOs publicos reales antes de implementar paginas reales de catalogo.
+Implementar Fase 2G.3A — Indicador de perfil online en Productos (Angular frontend).

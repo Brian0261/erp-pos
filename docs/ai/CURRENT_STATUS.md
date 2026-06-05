@@ -224,6 +224,30 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
 
 ## Siguiente etapa recomendada
 
-1. Abrir Fase 2F.3A — Alineación de tipos TypeScript/API client con DTOs públicos reales antes de implementar páginas reales de catálogo.
-2. No avanzar a integración de API (2F.3) sin completar alineación de tipos y validar contratos DTO.
+1. Abrir Fase 2G.3A — Indicador de perfil online en Productos (Angular frontend).
+2. No avanzar a carrito, checkout, pagos, pedidos ni login sin completar 2G.3A.
 3. Preparar carga inicial real controlada (catalogo, almacenes, stock base y parametros operativos), solo cuando exista autorizacion explicita del responsable de negocio/tecnico.
+
+## Fase 2G.1 Publicacion de producto operativo a perfil ecommerce
+
+- Fase 2G.1 completada: endpoint `POST /api/v1/ecommerce-admin/products/{id}/online-profile` implementado.
+- Permite crear perfil online DRAFT directamente desde un producto ERP/POS existente.
+- Commit: `f766397 feat(ecommerce): add create online profile from product`.
+- Tests: `EcommerceAdminProfilesIntegrationTest` 11 tests, 0 failures, BUILD SUCCESS.
+- Sin cambios en frontend Angular, Flyway/DB, Docker, `.env` raiz, AWS/staging.
+- Sin checkout, carrito, pagos, pedidos, login cliente, perfil cliente, Merchant Center.
+
+## Fase 2G.2 Smoke Test Real de Producto Publicado → Storefront
+
+- Fase 2G.2 completada y validada end-to-end.
+- Producto ERP/POS (ProductId 5839) → Perfil online DRAFT → PUBLISHED → Storefront `/productos/producto-smoke-test-2g2-1780622524` (200 OK).
+- Storefront valida: H1 correcto, precio PEN 25.90, descripcion, categoria/marca badges, breadcrumbs, CTA "Consultar en tienda", metadata SEO (noindex, canonical, OG tags), header/footer/bottom navigation.
+- Casos negativos validados: 404 slug inexistente, 404 DRAFT no publicado, 409 duplicado, 403 SUPERVISOR.
+- Backend Docker requirio rebuild (`docker compose up --build -d`) para incluir codigo 2G.1.
+- Configuracion local: `storefront/.env.local` con `STOREFRONT_API_BASE_URL=http://localhost:8080` y `STOREFRONT_INDEXING_ENABLED=false` (ignorado por git).
+- Deudas no bloqueantes: asset externo no renderiza (getSafeImageSrc solo acepta paths relativos), disponibilidad "No disponible temporalmente" por falta de stock operativo.
+- Documentacion creada: `docs/qa/PHASE2G2_PUBLISHED_PRODUCT_SMOKE_TEST.md`.
+- Documentacion actualizada: `docs/ai/CURRENT_STATUS.md`, `docs/ai/CHANGE_CONTROL.md`, `docs/qa/REGRESSION_CHECKLIST.md`, `docs/ecommerce/ECOMMERCE_ROADMAP.md`, `docs/ecommerce/ECOMMERCE_BACKLOG.md`.
+- Sin cambios en codigo funcional durante fase documental 2G.2D.
+- Sin cambios en frontend Angular, Flyway/DB, Docker, `.env` raiz, AWS/staging.
+- Sin checkout, carrito, pagos, pedidos, login cliente, perfil cliente, Merchant Center.

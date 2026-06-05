@@ -579,7 +579,55 @@ Backlog ecommerce incremental. Fase 2A y Fase 2B quedaron cerradas documentalmen
   - deudas no bloqueantes registradas.
 - Estado: PENDIENTE (Fase 2F.5).
 
-## Historias explicitamente fuera de alcance en Fase 2A/2B/2C/2D/2E
+## Historias Fase 2G - Publicacion y Smoke Test
+
+### HIST-2G-001 Crear perfil online desde producto ERP/POS
+
+- Descripcion breve: endpoint POST para crear perfil online DRAFT desde producto ERP/POS existente.
+- Valor de negocio: permite publicar productos operativos directamente a ecommerce sin flujo manual duplicado.
+- Criterios de aceptacion:
+  - `POST /api/v1/ecommerce-admin/products/{id}/online-profile` retorna 201 DRAFT;
+  - producto inexistente retorna 404;
+  - producto con perfil existente retorna 409;
+  - solo ADMIN puede crear; SUPERVISOR retorna 403.
+- Restricciones tecnicas:
+  - sin cambios en frontend Angular;
+  - sin Flyway/DB;
+  - sin checkout, carrito, pagos, pedidos.
+- Estado: IMPLEMENTADO (Fase 2G.1) — commit `f766397`. Tests 11/11, BUILD SUCCESS.
+
+### HIST-2G-002 Smoke Test Real Producto Publicado → Storefront
+
+- Descripcion breve: validacion end-to-end de producto ERP/POS → perfil publicado → Storefront `/productos/{slug}`.
+- Valor de negocio: confirma que el flujo completo funciona antes de invertir en paginas reales.
+- Criterios de aceptacion:
+  - producto creado y publicado → Storefront 200 OK;
+  - H1, precio, descripcion, categoria/marca, breadcrumbs, CTA visibles;
+  - metadata SEO (noindex, canonical, OG tags) presente;
+  - casos negativos: 404, 409, 403 validados;
+  - sin carrito, checkout, login, perfil.
+- Restricciones tecnicas:
+  - sin cambios en codigo funcional durante fase documental;
+  - sin frontend Angular, Flyway/DB, Docker, `.env` raiz, AWS/staging.
+- Estado: IMPLEMENTADO (Fase 2G.2) — validacion completa. Documentacion en `docs/qa/PHASE2G2_PUBLISHED_PRODUCT_SMOKE_TEST.md`.
+
+### HIST-2G-003 Indicador de perfil online en Productos
+
+- Descripcion breve: implementar indicador visual en el listado de Productos (Angular ERP/POS) que muestre si un producto tiene perfil online y en que estado esta (DRAFT / PUBLISHED / NONE).
+- Valor de negocio: permite a los operadores identificar rapidamente que productos estan listos para ecommerce, cuales faltan publicar y cuales no tienen perfil, facilitando la gestion de miles de productos.
+- Criterios de aceptacion:
+  - columna o badge en tabla de Productos que indique estado del perfil online;
+  - estados: Sin perfil, DRAFT, PUBLISHED;
+  - integracion con backend `GET /api/v1/ecommerce-admin/products/online-profile-status` o campo en listado existente;
+  - sin cambios en Storefront.
+- Restricciones tecnicas:
+  - solo frontend Angular ERP/POS;
+  - sin cambios en Storefront Next.js;
+  - sin Flyway/DB;
+  - sin checkout, carrito, pagos, pedidos, login cliente.
+- Estado: PENDIENTE (Fase 2G.3A).
+
+## Historias explicitamente fuera de alcance en Fase 2A/2B/2C/2D/2E/2F/2G
 
 Los siguientes puntos estuvieron fuera de alcance hasta Fase 2E inclusive. En Fase 2F entran al alcance progresivo:
 

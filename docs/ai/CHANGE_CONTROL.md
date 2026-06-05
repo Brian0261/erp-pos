@@ -232,6 +232,60 @@ Estandarizar cambios tecnicos para reducir regresiones y mantener trazabilidad e
 - Restricciones vigentes: sin checkout, carrito, pagos, pedidos, login, perfil, admin, ERP interno, Merchant Center.
 - Siguiente paso esperado: Fase 2F.2 Componentes base Next.js + Tailwind.
 
+### Cierre Fase 2G.1 Publicacion de producto operativo a perfil ecommerce
+
+- Tipo: implementacion backend funcional.
+- Commit: `f766397 feat(ecommerce): add create online profile from product`.
+- Alcance real implementado:
+  - `POST /api/v1/ecommerce-admin/products/{id}/online-profile` — crea perfil online DRAFT desde producto ERP/POS existente.
+  - Validacion de existencia del producto, estado DRAFT inicial, proteccion RBAC ADMIN.
+- Tests: `EcommerceAdminProfilesIntegrationTest` 11 tests, 0 failures, BUILD SUCCESS.
+- Exclusiones confirmadas:
+  - No se toco frontend Angular, Flyway/DB, Docker, `.env` raiz, secretos, dependencias, POS, ventas, caja, facturacion ni inventario.
+  - No se implemento checkout, pagos, pedidos, delivery, Merchant Center, login cliente, perfil cliente ni panel publico.
+- QA: tests de integracion aprobados (11/11, BUILD SUCCESS).
+- Siguiente paso: Fase 2G.2 Smoke Test Real de Producto Publicado → Storefront.
+
+### Cierre Fase 2G.2 Smoke Test Real de Producto Publicado → Storefront
+
+- Tipo: validacion end-to-end + cierre documental QA.
+- Producto de prueba: ProductId 5839, Slug `producto-smoke-test-2g2-1780622524`, Precio S/ 25.90, Estado PUBLISHED.
+- Flujo validado:
+  1. Login `admin@erp.local` → token JWT.
+  2. Creacion categoria/unidad/producto operativo.
+  3. `POST /api/v1/ecommerce-admin/products/5839/online-profile` → 201 DRAFT.
+  4. PUT perfil (slug, nombre, descripcion, categoria, marca) → 200.
+  5. PUT SEO (title, description, canonical, INDEX_FOLLOW, indexable=true) → 200.
+  6. PUT asset principal (URL externa) → 200.
+  7. Validacion publicacion → publishable=true.
+  8. `POST /api/v1/ecommerce-admin/products/5839/publish` → 200 PUBLISHED.
+  9. Storefront `/productos/producto-smoke-test-2g2-1780622524` → 200 OK con contenido correcto.
+- Storefront validado:
+  - H1, precio PEN 25.90, descripcion, categoria/marca badges, breadcrumbs.
+  - CTA "Consultar en tienda" presente.
+  - Metadata SEO: noindex/nofollow, canonical, OG tags.
+  - Header/Footer/BottomNavigation/StickyProductCTA renderizados.
+  - Sin carrito, checkout, "Comprar", login, perfil cliente.
+- Casos negativos validados: 404 slug inexistente, 404 DRAFT, 409 duplicado, 403 SUPERVISOR.
+- Backend Docker requirio rebuild para incluir codigo 2G.1.
+- Configuracion local: `storefront/.env.local` con `STOREFRONT_API_BASE_URL=http://localhost:8080`, `STOREFRONT_INDEXING_ENABLED=false` (ignorado por git).
+- Deudas no bloqueantes:
+  - Asset externo no renderiza (getSafeImageSrc solo acepta paths relativos).
+  - Disponibilidad "No disponible temporalmente" por falta de stock operativo.
+- Exclusiones confirmadas:
+  - No se toco codigo funcional durante fase documental 2G.2D.
+  - No se toco frontend Angular, Flyway/DB, Docker, `.env` raiz, AWS/staging.
+  - No se implemento checkout, carrito, pagos, pedidos, login cliente, perfil cliente, Merchant Center.
+- Archivos documentales actualizados en cierre 2G.2D:
+  - `docs/qa/PHASE2G2_PUBLISHED_PRODUCT_SMOKE_TEST.md` (creado)
+  - `docs/ai/CURRENT_STATUS.md`
+  - `docs/ai/CHANGE_CONTROL.md`
+  - `docs/qa/REGRESSION_CHECKLIST.md`
+  - `docs/ecommerce/ECOMMERCE_ROADMAP.md`
+  - `docs/ecommerce/ECOMMERCE_BACKLOG.md`
+- Siguiente paso esperado: Fase 2G.3A — Indicador de perfil online en Productos (Angular frontend).
+- NOTA: `/productos/[slug]` ya fue implementada en 2F.3B y validada exitosamente en 2G.2. No requiere nueva implementacion.
+
 ### Inicio Fase 2E.0 Storefront MVP Shell Planning
 
 - Tipo: documentacion tecnica de planificacion, sin implementacion funcional.

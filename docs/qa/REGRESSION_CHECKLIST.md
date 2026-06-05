@@ -606,6 +606,44 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [ ] Validar que POS, listado de Comprobantes y Detalle de comprobante no fueron afectados.
 - [ ] Sin cambios en DB/Flyway, endpoints principales, POS ni contratos de payload.
 
+### Ecommerce - Fase 2G.1 Crear perfil online desde producto ERP/POS
+
+- [x] Backend: `POST /api/v1/ecommerce-admin/products/{id}/online-profile` retorna 201 DRAFT.
+- [x] Backend: producto inexistente retorna 404.
+- [x] Backend: producto sin perfil previo crea perfil DRAFT.
+- [x] Backend: producto con perfil existente retorna 409.
+- [x] Backend: SUPERVISOR intentando crear perfil retorna 403.
+- [x] Tests: `EcommerceAdminProfilesIntegrationTest` 11 tests, 0 failures, BUILD SUCCESS.
+- [x] Sin cambios en frontend Angular, Flyway/DB, Docker, `.env` raiz, AWS/staging.
+
+### Ecommerce - Fase 2G.2 Smoke Test Real Producto Publicado → Storefront
+
+- [x] Producto ERP/POS creado con precio S/ 25.90.
+- [x] Perfil online DRAFT creado desde producto → 201.
+- [x] Perfil actualizado (slug, nombre, descripcion, categoria, marca) → 200.
+- [x] SEO configurado (title, description, canonical, INDEX_FOLLOW, indexable=true) → 200.
+- [x] Asset principal registrado (URL externa) → 200.
+- [x] Validacion de publicacion → publishable=true.
+- [x] Publicacion → 200 PUBLISHED.
+- [x] Storefront `/productos/{slug}` → 200 OK.
+- [x] Storefront H1 correcto: "Producto Smoke Test Online 2g2-1780622524".
+- [x] Storefront precio renderizado: "PEN 25.90".
+- [x] Storefront descripcion, categoria/marca badges visibles.
+- [x] Storefront breadcrumbs correctos.
+- [x] Storefront CTA "Consultar en tienda" presente.
+- [x] Storefront metadata SEO: noindex/nofollow, canonical, OG tags.
+- [x] Storefront Header/Footer/BottomNavigation/StickyProductCTA renderizados.
+- [x] Storefront sin carrito, checkout, "Comprar", login, perfil cliente.
+- [x] Caso negativo: slug inexistente → 404.
+- [x] Caso negativo: perfil DRAFT no publicado → 404 publico.
+- [x] Caso negativo: duplicado de perfil → 409.
+- [x] Caso negativo: SUPERVISOR intenta crear perfil → 403.
+- [x] Backend Docker rebuild exitoso para incluir codigo 2G.1.
+- [x] `storefront/.env.local` configurado localmente (ignorado por git).
+- [x] Deudas registradas: asset externo no renderiza, disponibilidad sin stock.
+- [x] Sin cambios en codigo funcional durante fase documental 2G.2D.
+- [x] Sin cambios en frontend Angular, Flyway/DB, Docker, `.env` raiz, AWS/staging.
+
 ### Caja - UX operativa frontend-only (2026-05-25)
 
 - [ ] Estados `OPEN` y `CLOSED` se muestran como `Abierta` y `Cerrada`.
