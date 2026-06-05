@@ -707,20 +707,98 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 
 ### Ecommerce - Fase 2H.1A Filtros server-side en Perfiles online
 
-- [ ] Backend: `GET /api/v1/ecommerce-admin/products/online-profiles` sin filtros conserva listado paginado actual.
-- [ ] Backend: filtro `status` aplica antes de paginar.
-- [ ] Backend: filtro `brandId` aplica antes de paginar.
-- [ ] Backend: filtro `onlineCategoryId` aplica antes de paginar.
-- [ ] Backend: búsqueda `q` aplica sobre `onlineName` y `slug`.
-- [ ] Backend: filtros combinados (`status` + `brandId` + `onlineCategoryId` + `q`) retornan resultados consistentes.
-- [ ] Backend: `withoutBrand=true` y `withoutOnlineCategory=true` filtran perfiles sin marca/categoría.
-- [ ] Backend: combinaciones inválidas `brandId + withoutBrand` y `onlineCategoryId + withoutOnlineCategory` retornan 400 controlado.
-- [ ] Backend: enriquecimiento `brandName`/`onlineCategoryName` se mantiene sin lookup por fila.
-- [ ] Frontend Perfiles online: filtros de estado, marca, categoría online y texto usan botón `Aplicar filtros`.
-- [ ] Frontend Perfiles online: `Limpiar` vuelve a página 0 y recarga listado general.
-- [ ] Frontend Perfiles online: paginación respeta filtros server-side.
-- [ ] Frontend Perfiles online: botón `Revisar` sigue navegando al detalle.
-- [ ] Sin cambios en Storefront, Flyway, Docker, `.env` raiz, secretos ni AWS/staging.
+- [x] Backend: `GET /api/v1/ecommerce-admin/products/online-profiles` sin filtros conserva listado paginado actual.
+- [x] Backend: filtro `status` aplica antes de paginar.
+- [x] Backend: filtro `brandId` aplica antes de paginar.
+- [x] Backend: filtro `onlineCategoryId` aplica antes de paginar.
+- [x] Backend: búsqueda `q` aplica sobre `onlineName` y `slug`.
+- [x] Backend: filtros combinados (`status` + `brandId` + `onlineCategoryId` + `q`) retornan resultados consistentes.
+- [x] Backend: `withoutBrand=true` y `withoutOnlineCategory=true` filtran perfiles sin marca/categoría.
+- [x] Backend: combinaciones inválidas `brandId + withoutBrand` y `onlineCategoryId + withoutOnlineCategory` retornan 400 controlado.
+- [x] Backend: enriquecimiento `brandName`/`onlineCategoryName` se mantiene sin lookup por fila.
+- [x] Frontend Perfiles online: filtros de estado, marca, categoría online y texto usan botón `Aplicar filtros`.
+- [x] Frontend Perfiles online: `Limpiar` vuelve a página 0 y recarga listado general.
+- [x] Frontend Perfiles online: paginación respeta filtros server-side.
+- [x] Frontend Perfiles online: botón `Revisar` sigue navegando al detalle.
+- [x] Sin cambios en Storefront, Flyway, Docker, `.env` raiz, secretos ni AWS/staging.
+
+### Ecommerce - Fase 2H.1B-FIX Ajuste UX del bloque de filtros en Perfiles online
+
+- [x] Alcance aplicado solo en `frontend/src/app/features/ecommerce-admin/online-profiles-page.component.ts`.
+- [x] Bloque de filtros reorganizado en grid responsive de 2 filas:
+  - [x] Fila 1: Búsqueda + Estado.
+  - [x] Fila 2: Marca + Categoría online + Limpiar filtros.
+- [x] Select de Marca incluye opciones especiales:
+  - [x] `Todas` (valor vacío).
+  - [x] `Sin marca` (valor `__NONE__`).
+  - [x] Marcas reales.
+- [x] Select de Categoría online incluye opciones especiales:
+  - [x] `Todas` (valor vacío).
+  - [x] `Sin categoría online` (valor `__NONE__`).
+  - [x] Categorías reales.
+- [x] Eliminados checkboxes sueltos `Sin marca` y `Sin categoría online`.
+- [x] Eliminado botón `Aplicar filtros` (filtros aplican automáticamente).
+- [x] Mantenido botón `Limpiar filtros` visible y funcional.
+- [x] Búsqueda textual usa `debounceTime(450)` + `distinctUntilChanged`.
+- [x] Selects de estado, marca y categoría aplican filtro automáticamente al cambiar.
+- [x] Todos los cambios de filtro resetean paginación a página 0.
+- [x] `currentFilters()` evita combinaciones inválidas:
+  - [x] Nunca envía `brandId` + `withoutBrand` simultáneamente.
+  - [x] Nunca envía `onlineCategoryId` + `withoutOnlineCategory` simultáneamente.
+- [x] `__NONE__` se usa como valor UI interno para enviar `withoutBrand` o `withoutOnlineCategory`.
+- [x] Suscripciones gestionadas con `destroy$` + `OnDestroy` + `takeUntil` para evitar memory leaks.
+- [x] CSS ajustado para evitar overflow de selects:
+  - [x] `.filter-field` con `min-width: 0`.
+  - [x] `.filter-field input, .filter-field select` con `width: 100%`, `min-width: 0`, `box-sizing: border-box`.
+- [x] Grid responsive con breakpoint 900px para colapsar a 1 columna.
+- [x] `npm run build` frontend exitoso.
+- [x] `git diff --check` sin errores reales.
+- [x] Sin cambios en backend, Storefront, Flyway, Docker, `.env` raiz, secretos ni AWS/staging.
+- [x] Sin commit ni push durante fase de ajuste UX.
+
+### Ecommerce - Fase 2H.1B Smoke UI en Docker de filtros server-side
+
+- [x] Docker reconstruido con commit `a825094` (frontend rebuild sin cache).
+- [x] Backend iniciado correctamente (`Started BackendApplication`).
+- [x] Frontend disponible en `http://localhost:4200` (HTTP 200).
+- [x] Postgres healthy.
+- [x] Login ADMIN correcto.
+- [x] Navegación a Catálogo online > Perfiles online funciona.
+- [x] Tabla de Perfiles online carga correctamente sin romperse visualmente.
+- [x] Layout de filtros sin superposición visual.
+- [x] Grid de filtros de 2 filas visible y ordenado.
+- [x] Select de Marca muestra `Todas`, `Sin marca` y marcas reales.
+- [x] Select de Categoría online muestra `Todas`, `Sin categoría online` y categorías reales.
+- [x] No existen checkboxes sueltos `Sin marca` / `Sin categoría online`.
+- [x] No existe botón `Aplicar filtros`.
+- [x] Botón `Limpiar filtros` visible y funcional.
+- [x] Filtro de estado aplica automáticamente al cambiar.
+- [x] Filtro de marca real aplica automáticamente al cambiar.
+- [x] Filtro `Sin marca` aplica automáticamente al cambiar.
+- [x] Filtro de categoría online real aplica automáticamente al cambiar.
+- [x] Filtro `Sin categoría online` aplica automáticamente al cambiar.
+- [x] Búsqueda por nombre online funciona con debounce.
+- [x] Búsqueda por slug funciona con debounce.
+- [x] No se observan llamadas excesivas al escribir (debounce efectivo).
+- [x] Al cambiar filtros, la paginación vuelve a página 1.
+- [x] Paginación mantiene filtros activos al navegar entre páginas.
+- [x] Botón `Revisar` navega correctamente al detalle del perfil.
+- [x] Network: endpoint observado `GET /api/v1/ecommerce-admin/products/online-profiles`.
+- [x] Network: status 200 OK en todas las llamadas.
+- [x] Network: una sola llamada por cambio de select (sin llamadas múltiples).
+- [x] Network: búsqueda con debounce, sin llamadas excesivas.
+- [x] Network: `Sin marca` envía `withoutBrand=true` y no `brandId`.
+- [x] Network: marca real envía `brandId=<id>` y no `withoutBrand=true`.
+- [x] Network: `Sin categoría online` envía `withoutOnlineCategory=true` y no `onlineCategoryId`.
+- [x] Network: categoría real envía `onlineCategoryId=<id>` y no `withoutOnlineCategory=true`.
+- [x] Network: no se observaron llamadas por fila (sin N+1).
+- [x] Network: no se observaron llamadas a Storefront.
+- [x] Network: no se observaron errores 500 inesperados.
+- [x] Consola: sin errores JS bloqueantes.
+- [x] Consola: sin errores HTTP inesperados.
+- [x] Sin cambios en Storefront, Flyway, Docker, `.env` raiz, secretos ni AWS/staging.
+- [x] Sin cambios en backend funcional ni Angular funcional durante smoke.
+- [x] Sin commit ni push durante fase de smoke.
 
 ### Ecommerce - Fase 2G.4B Enriquecer listado de Perfiles online
 
