@@ -856,6 +856,60 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [x] Login ADMIN correcto.
 - [x] Navegacion a `Catalogo online > Perfiles online` correcta.
 - [x] La tabla de Perfiles online carga correctamente y no se rompe visualmente.
+
+### Ecommerce - Fase 2H.4C Smoke UI en Docker de columna Producto ERP
+
+- [x] Evidencia manual validada sobre el smoke UI 2H.4C en navegador `http://localhost:4200` con Docker reconstruido y frontend/backend activos.
+- [x] Login ADMIN correcto.
+- [x] Navegacion a `Catalogo online > Perfiles online` correcta.
+- [x] La tabla de Perfiles online carga correctamente y no se rompe visualmente.
+- [x] Columna `Producto ERP` visible en la tabla.
+- [x] La linea principal muestra el nombre operativo del producto.
+- [x] La linea secundaria muestra `SKU: <sku> · #<id>`.
+- [x] `productId` sigue visible como dato secundario.
+- [x] Fallback `SKU: -` validado a nivel documental; no reproducible en la muestra observada por falta de dato real sin SKU.
+- [x] Fallback `Producto ERP no disponible` validado a nivel documental; no reproducible en la muestra observada por falta de dato real sin nombre.
+- [x] Badge `Inactivo` validado a nivel documental; no reproducible en la muestra observada por falta de producto inactivo.
+- [x] No aparecen `undefined`, `null`, `[object Object]` ni textos tecnicos.
+- [x] Filtros existentes siguen funcionando.
+- [x] Filtro `Preparacion` sigue funcionando.
+- [x] Busqueda con debounce sigue funcionando.
+- [x] Paginacion sigue funcionando.
+- [x] Boton `Revisar` navega al detalle.
+- [x] Columna `Readiness` sigue visible y compacta.
+- [x] Endpoint observado: `GET /api/v1/ecommerce-admin/products/online-profiles`.
+- [x] Status `200 OK`.
+- [x] Response incluye `productId`, `productSku`, `productName` y `productActive`.
+- [x] No se observaron llamadas frontend extra para resolver producto.
+- [x] No se observaron llamadas por fila.
+- [x] No se observo N+1.
+- [x] No se observaron llamadas a Storefront.
+- [x] No se observaron errores `500`.
+- [x] Consola: sin errores JS bloqueantes.
+- [x] Consola: sin errores HTTP inesperados.
+- [x] Consola: sin errores de template Angular.
+- [x] Sin cambios de codigo durante el smoke.
+- [x] Sin cambios en Storefront, Flyway, Docker, `.env`, secretos ni AWS/staging durante esta fase.
+- [x] Sin commit ni push durante la fase de smoke.
+
+#### Siguiente paso recomendado
+
+- [x] `2H.4D - Documentacion QA de columna Producto ERP`.
+
+### Ecommerce - Fase 2H.4D Documentacion QA de columna Producto ERP
+
+- [x] Smoke UI 2H.4C documentado como exitoso.
+- [x] Columna `Producto ERP` validada como visible y estable.
+- [x] Nombre operativo, SKU e ID visibles en la celda.
+- [x] Fallbacks documentados: `SKU: -` y `Producto ERP no disponible` como no reproducibles en la muestra por falta de datos reales para esos casos.
+- [x] Badge `Inactivo` documentado como no reproducible en la muestra por falta de producto inactivo.
+- [x] Endpoint observado: `GET /api/v1/ecommerce-admin/products/online-profiles`.
+- [x] Response observada con `productId`, `productSku`, `productName` y `productActive`.
+- [x] Ausencia de N+1 confirmada visualmente en Network.
+- [x] Ausencia de llamadas a Storefront confirmada visualmente en Network.
+- [x] Filtros, paginacion, `Readiness` y `Revisar` funcionando.
+- [x] Consola sin errores bloqueantes.
+- [x] Siguiente paso recomendado: continuar con el siguiente hito del roadmap una vez consolidada la documentacion QA de columna Producto ERP.
 - [x] El select `Preparacion` aparece visible en el listado.
 - [x] Opciones visibles validadas: `Todos`, `Listo`, `Incompleto`, `Requiere atencion`, `Publicado`, `Despublicado`.
 - [x] El filtro `Preparacion` aplica automaticamente al cambiar.
