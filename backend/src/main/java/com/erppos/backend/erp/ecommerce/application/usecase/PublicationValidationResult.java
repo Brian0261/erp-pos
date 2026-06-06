@@ -7,6 +7,7 @@ public record PublicationValidationResult(
         boolean publishable,
         List<String> errors,
         BigDecimal effectivePrice,
-        String currency
+        String currency,
+        List<MissingRequirement> missingRequirements
 ) {
 }

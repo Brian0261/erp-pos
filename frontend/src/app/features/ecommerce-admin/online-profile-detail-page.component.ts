@@ -14,34 +14,51 @@ import {
   EcommerceAdminOnlineCategoryResponse,
   EcommerceAdminOnlineProfileDetailResponse,
   EcommerceAdminPublicationValidationResponse,
+  MissingRequirement,
   OnlinePublicationStatus,
   RobotsPolicy,
 } from "./data/ecommerce-admin.models";
 import { EcommerceAdminService } from "./data/ecommerce-admin.service";
 import { toHttpErrorMessage } from "./data/http-error-message";
 
+interface RequirementGroup {
+  title: string;
+  anchor: string;
+  requirements: MissingRequirement[];
+}
+
 @Component({
   selector: "app-online-profile-detail-page",
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, RouterLink],
   template: `
-    <section class="ui-card ecommerce-detail-page">
-      <header class="ui-page-head">
-        <div>
+    <section class="ecommerce-detail-page">
+      <header class="detail-hero">
+        <div class="hero-copy">
           <a class="back-link" routerLink="/ecommerce-admin/perfiles">Volver al listado</a>
           <p class="ui-page-kicker">Catálogo online</p>
           <h1 class="ui-page-title">
-            Perfil online del producto #{{ productId || "-" }}
+            {{ profile?.onlineName || profile?.productName || "Perfil online" }}
           </h1>
           <p class="ui-page-description">
-            Gestiona perfil, SEO, imagen principal y precio online para publicación.
+            Revisa el contexto ERP/POS, corrige contenido ecommerce y completa los requisitos antes de publicar.
           </p>
         </div>
 
-        <div class="header-actions" *ngIf="profile">
+        <div class="hero-actions" *ngIf="profile">
           <span class="ui-badge" [ngClass]="publicationBadgeClass(profile.publicationStatus)">
             {{ statusLabel(profile.publicationStatus) }}
           </span>
+
+          <a
+            *ngIf="publicProductPath() as publicPath"
+            class="ui-button ui-button--secondary"
+            [href]="publicPath"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Ver público
+          </a>
 
           <button
             *ngIf="canManage && profile.publicationStatus !== 'PUBLISHED'"
@@ -85,325 +102,389 @@ import { toHttpErrorMessage } from "./data/http-error-message";
       </p>
       <p class="ui-alert ui-alert--info" *ngIf="loading">Cargando perfil online...</p>
 
-      <section class="ui-module-section" *ngIf="!loading && profile">
-        <div class="summary-grid">
-          <article class="summary-card">
-            <p class="summary-label">Producto</p>
-            <p class="summary-value">#{{ profile.productId }}</p>
-          </article>
-          <article class="summary-card">
-            <p class="summary-label">Perfil</p>
-            <p class="summary-value">#{{ profile.profileId }}</p>
-          </article>
-          <article class="summary-card">
-            <p class="summary-label">Publicado</p>
-            <p class="summary-value">{{ formatDateTime(profile.publishedAt) }}</p>
-          </article>
-          <article class="summary-card">
-            <p class="summary-label">Actualizado</p>
-            <p class="summary-value">{{ formatDateTime(profile.updatedAt) }}</p>
-          </article>
-        </div>
+      <p class="ui-alert ui-alert--info" *ngIf="profile && !canManage && canView">
+        Modo revisión: como SUPERVISOR solo puedes consultar. Las acciones de cambio son exclusivas de ADMIN.
+      </p>
 
-        <p class="ui-alert ui-alert--info" *ngIf="!canManage && canView">
-          Modo revisión: como SUPERVISOR solo puedes consultar. Las acciones de cambio son exclusivas de ADMIN.
-        </p>
-      </section>
-
-      <section class="ui-module-section" *ngIf="profile && publicationValidation">
-        <header class="section-head">
-          <h2>Requisitos para publicar</h2>
-        </header>
-
-        <div class="validation-head">
-          <span
-            class="ui-badge"
-            [class.ui-badge--success]="publicationValidation.publishable"
-            [class.ui-badge--danger]="!publicationValidation.publishable"
-          >
-            {{ publicationValidation.publishable ? "Publicable" : "Bloqueado" }}
-          </span>
-          <span class="ui-muted" *ngIf="publicationValidation.effectivePrice !== null">
-            Precio efectivo:
-            {{ formatCurrency(publicationValidation.effectivePrice, publicationValidation.currency) }}
-          </span>
-        </div>
-
-        <ul class="validation-errors" *ngIf="publicationValidation.errors.length > 0; else noErrors">
-          <li *ngFor="let error of publicationValidation.errors">{{ error }}</li>
-        </ul>
-        <ng-template #noErrors>
-          <p class="ui-muted">Sin bloqueos de publicación.</p>
-        </ng-template>
-      </section>
-
-      <section class="ui-module-section" *ngIf="profile">
-        <header class="section-head">
-          <h2>Perfil online</h2>
-        </header>
-
-        <form [formGroup]="profileForm" class="form-grid" (ngSubmit)="saveProfile()">
-          <label class="field">
-            <span>Slug</span>
-            <input type="text" formControlName="slug" maxlength="180" />
-            <small class="field-help">Se valida y normaliza en backend.</small>
-          </label>
-
-          <label class="field">
-            <span>Nombre online</span>
-            <input type="text" formControlName="onlineName" maxlength="180" />
-            <small class="field-help" *ngIf="isProfileInvalid('onlineName')">
-              El nombre online excede el máximo permitido.
-            </small>
-          </label>
-
-          <label class="field field--full">
-            <span>Descripción online</span>
-            <textarea formControlName="onlineDescription" rows="4" maxlength="2000"></textarea>
-          </label>
-
-          <label class="field">
-            <span>Categoría online</span>
-            <select formControlName="onlineCategoryId">
-              <option [ngValue]="null">Seleccionar</option>
-              <option *ngFor="let category of onlineCategories" [ngValue]="category.id">
-                {{ category.name }} (#{{ category.id }})
-              </option>
-            </select>
-          </label>
-
-          <label class="field">
-            <span>Marca</span>
-            <select formControlName="brandId">
-              <option [ngValue]="null">Sin marca</option>
-              <option *ngFor="let brand of brands" [ngValue]="brand.id">
-                {{ brand.name }} (#{{ brand.id }})
-              </option>
-            </select>
-          </label>
-
-          <label class="field">
-            <span>Política sin marca</span>
-            <select formControlName="brandAbsencePolicy">
-              <option [ngValue]="null">No aplica</option>
-              <option *ngFor="let policy of brandAbsencePolicies" [ngValue]="policy">
-                {{ policy }}
-              </option>
-            </select>
-            <small class="field-help">Solo aplica cuando no hay marca seleccionada.</small>
-          </label>
-
-          <div class="section-actions" *ngIf="canManage">
-            <button
-              type="submit"
-              class="ui-button ui-button--primary"
-              [disabled]="profileSaving"
+      <section class="overview-grid" *ngIf="!loading && profile">
+        <article class="overview-card overview-card--product">
+          <p class="overview-kicker">Producto ERP/POS readonly</p>
+          <h2>{{ profile.productName || "Producto ERP no disponible" }}</h2>
+          <div class="meta-line">
+            <span>SKU: {{ profile.productSku || "-" }}</span>
+            <span>#{{ profile.productId }}</span>
+            <span
+              class="ui-badge"
+              [class.ui-badge--success]="profile.productActive"
+              [class.ui-badge--danger]="!profile.productActive"
             >
-              Guardar perfil
-            </button>
+              {{ profile.productActive ? "Activo" : "Inactivo" }}
+            </span>
           </div>
-        </form>
+        </article>
 
-        <p class="ui-alert ui-alert--error" *ngIf="profileErrorMessage">
-          {{ profileErrorMessage }}
-        </p>
+        <article class="overview-card">
+          <p class="overview-kicker">Perfil ecommerce</p>
+          <h3>{{ profile.onlineName || "Nombre online pendiente" }}</h3>
+          <p class="summary-value">{{ profile.slug ? "/productos/" + profile.slug : "Slug pendiente" }}</p>
+        </article>
+
+        <article class="overview-card">
+          <p class="overview-kicker">Taxonomía comercial</p>
+          <h3>{{ onlineCategoryLabel(profile.onlineCategoryId) }}</h3>
+          <p class="summary-value">{{ brandLabel(profile) }}</p>
+        </article>
+
+        <article class="overview-card">
+          <p class="overview-kicker">Precio online</p>
+          <h3>{{ effectivePriceLabel() }}</h3>
+          <p class="summary-value">
+            {{ profile.effectivePrice?.overrideApplied ? "Override ecommerce activo" : "Usa precio ERP/POS" }}
+          </p>
+        </article>
       </section>
 
-      <section class="ui-module-section" *ngIf="profile">
-        <header class="section-head">
-          <h2>SEO</h2>
-        </header>
+      <div class="detail-layout" *ngIf="!loading && profile">
+        <main class="detail-main">
+          <section class="detail-card" id="contenido-ecommerce">
+            <header class="card-head">
+              <div>
+                <p class="overview-kicker">Editable ecommerce</p>
+                <h2>Contenido ecommerce</h2>
+              </div>
+              <span class="card-hint">Nombre, descripción, categoría y marca online.</span>
+            </header>
 
-        <form [formGroup]="seoForm" class="form-grid" (ngSubmit)="saveSeo()">
-          <label class="field">
-            <span>SEO title</span>
-            <input type="text" formControlName="seoTitle" maxlength="160" />
-          </label>
+            <form [formGroup]="profileForm" class="form-grid" (ngSubmit)="saveProfile()">
+              <label class="field">
+                <span>Slug</span>
+                <input type="text" formControlName="slug" maxlength="180" />
+                <small class="field-help">Se valida y normaliza en backend.</small>
+              </label>
 
-          <label class="field field--full">
-            <span>SEO description</span>
-            <textarea formControlName="seoDescription" rows="3" maxlength="320"></textarea>
-          </label>
+              <label class="field">
+                <span>Nombre online</span>
+                <input type="text" formControlName="onlineName" maxlength="180" />
+                <small class="field-help" *ngIf="isProfileInvalid('onlineName')">
+                  El nombre online excede el máximo permitido.
+                </small>
+              </label>
 
-          <label class="field">
-            <span>Ruta canónica</span>
-            <input type="text" formControlName="canonicalPath" maxlength="300" />
-          </label>
+              <label class="field field--full">
+                <span>Descripción online</span>
+                <textarea formControlName="onlineDescription" rows="4" maxlength="2000"></textarea>
+              </label>
 
-          <label class="field">
-            <span>Indexación para buscadores</span>
-            <select formControlName="robotsPolicy">
-              <option [ngValue]="null">Sin definir</option>
-              <option *ngFor="let policy of robotsPolicies" [ngValue]="policy">
-                {{ robotsPolicyLabel(policy) }}
-              </option>
-            </select>
-          </label>
+              <label class="field">
+                <span>Categoría online</span>
+                <select formControlName="onlineCategoryId">
+                  <option [ngValue]="null">Seleccionar</option>
+                  <option *ngFor="let category of onlineCategories" [ngValue]="category.id">
+                    {{ category.name }} (#{{ category.id }})
+                  </option>
+                </select>
+              </label>
 
-          <label class="field field--checkbox">
-            <input type="checkbox" formControlName="indexable" />
-            <span>Permitir indexación</span>
-          </label>
+              <label class="field">
+                <span>Marca</span>
+                <select formControlName="brandId">
+                  <option [ngValue]="null">Sin marca</option>
+                  <option *ngFor="let brand of brands" [ngValue]="brand.id">
+                    {{ brand.name }} (#{{ brand.id }})
+                  </option>
+                </select>
+              </label>
 
-          <label class="field">
-            <span>Título para redes sociales</span>
-            <input type="text" formControlName="ogTitle" maxlength="160" />
-          </label>
+              <label class="field">
+                <span>Política sin marca</span>
+                <select formControlName="brandAbsencePolicy">
+                  <option [ngValue]="null">No aplica</option>
+                  <option *ngFor="let policy of brandAbsencePolicies" [ngValue]="policy">
+                    {{ brandAbsencePolicyLabel(policy) }}
+                  </option>
+                </select>
+                <small class="field-help">Solo aplica cuando no hay marca seleccionada.</small>
+              </label>
 
-          <label class="field field--full">
-            <span>Descripción para redes sociales</span>
-            <textarea formControlName="ogDescription" rows="3" maxlength="320"></textarea>
-          </label>
+              <div class="section-actions" *ngIf="canManage">
+                <button type="submit" class="ui-button ui-button--primary" [disabled]="profileSaving">
+                  Guardar contenido
+                </button>
+              </div>
+            </form>
 
-          <label class="field">
-            <span>Imagen para redes sociales</span>
-            <input type="text" formControlName="ogImageUrl" maxlength="500" />
-          </label>
+            <p class="ui-alert ui-alert--error" *ngIf="profileErrorMessage">
+              {{ profileErrorMessage }}
+            </p>
+          </section>
 
-          <div class="section-actions" *ngIf="canManage">
-            <button type="submit" class="ui-button ui-button--primary" [disabled]="seoSaving">
-              Guardar SEO
-            </button>
-          </div>
-        </form>
+          <section class="detail-card" id="seo">
+            <header class="card-head">
+              <div>
+                <p class="overview-kicker">SEO-first</p>
+                <h2>SEO</h2>
+              </div>
+              <span class="card-hint">Metadatos para buscadores y redes sociales.</span>
+            </header>
 
-        <p class="ui-alert ui-alert--error" *ngIf="seoErrorMessage">
-          {{ seoErrorMessage }}
-        </p>
-      </section>
+            <form [formGroup]="seoForm" class="form-grid" (ngSubmit)="saveSeo()">
+              <label class="field">
+                <span>SEO title</span>
+                <input type="text" formControlName="seoTitle" maxlength="160" />
+              </label>
 
-      <section class="ui-module-section" *ngIf="profile">
-        <header class="section-head">
-          <h2>Imagen principal</h2>
-        </header>
+              <label class="field field--full">
+                <span>SEO description</span>
+                <textarea formControlName="seoDescription" rows="3" maxlength="320"></textarea>
+              </label>
 
-        <form [formGroup]="assetForm" class="form-grid" (ngSubmit)="saveAsset()">
-          <label class="field">
-            <span>Tipo de imagen</span>
-            <select formControlName="assetType">
-              <option *ngFor="let assetType of assetTypes" [ngValue]="assetType">
-                {{ assetTypeLabel(assetType) }}
-              </option>
-            </select>
-          </label>
+              <label class="field">
+                <span>Ruta canónica</span>
+                <input type="text" formControlName="canonicalPath" maxlength="300" />
+              </label>
 
-          <label class="field field--full">
-            <span>URL de imagen</span>
-            <input type="text" formControlName="assetUrl" maxlength="500" />
-            <small class="field-help" *ngIf="isAssetInvalid('assetUrl')">
-              La URL es obligatoria para guardar el asset principal.
-            </small>
-          </label>
+              <label class="field">
+                <span>Indexación para buscadores</span>
+                <select formControlName="robotsPolicy">
+                  <option [ngValue]="null">Sin definir</option>
+                  <option *ngFor="let policy of robotsPolicies" [ngValue]="policy">
+                    {{ robotsPolicyLabel(policy) }}
+                  </option>
+                </select>
+              </label>
 
-          <label class="field">
-            <span>Texto alternativo</span>
-            <input type="text" formControlName="altText" maxlength="250" />
-          </label>
+              <label class="field field--checkbox">
+                <input type="checkbox" formControlName="indexable" />
+                <span>Permitir indexación</span>
+              </label>
 
-          <label class="field">
-            <span>Fuente</span>
-            <select formControlName="source">
-              <option *ngFor="let source of assetSources" [ngValue]="source">
-                {{ assetSourceLabel(source) }}
-              </option>
-            </select>
-          </label>
+              <label class="field">
+                <span>Título para redes sociales</span>
+                <input type="text" formControlName="ogTitle" maxlength="160" />
+              </label>
 
-          <label class="field">
-            <span>Orden de visualización</span>
-            <input type="number" formControlName="displayOrder" min="0" step="1" />
-          </label>
+              <label class="field field--full">
+                <span>Descripción para redes sociales</span>
+                <textarea formControlName="ogDescription" rows="3" maxlength="320"></textarea>
+              </label>
 
-          <label class="field field--checkbox">
-            <input type="checkbox" formControlName="rightsConfirmed" />
-            <span>Derechos confirmados</span>
-          </label>
+              <label class="field">
+                <span>Imagen para redes sociales</span>
+                <input type="text" formControlName="ogImageUrl" maxlength="500" />
+              </label>
 
-          <div class="section-actions" *ngIf="canManage">
-            <button
-              type="submit"
-              class="ui-button ui-button--primary"
-              [disabled]="assetSaving"
-            >
-              Guardar imagen principal
-            </button>
-          </div>
-        </form>
+              <div class="section-actions" *ngIf="canManage">
+                <button type="submit" class="ui-button ui-button--primary" [disabled]="seoSaving">
+                  Guardar SEO
+                </button>
+              </div>
+            </form>
 
-        <p class="ui-alert ui-alert--error" *ngIf="assetErrorMessage">
-          {{ assetErrorMessage }}
-        </p>
-      </section>
+            <p class="ui-alert ui-alert--error" *ngIf="seoErrorMessage">
+              {{ seoErrorMessage }}
+            </p>
+          </section>
 
-      <section class="ui-module-section" *ngIf="profile">
-        <header class="section-head">
-          <h2>Precio online personalizado</h2>
-        </header>
+          <section class="detail-card" id="imagen-principal">
+            <header class="card-head">
+              <div>
+                <p class="overview-kicker">Activo visual</p>
+                <h2>Imagen principal</h2>
+              </div>
+              <span class="card-hint">Imagen pública, alt text y derechos confirmados.</span>
+            </header>
 
-        <p class="ui-muted effective-price">
-            Precio efectivo:
-          <strong>
-            {{
-              profile.effectivePrice
-                ? formatCurrency(profile.effectivePrice.amount, profile.effectivePrice.currency)
-                : "No disponible"
-            }}
-          </strong>
-        </p>
+            <form [formGroup]="assetForm" class="form-grid" (ngSubmit)="saveAsset()">
+              <label class="field">
+                <span>Tipo de imagen</span>
+                <select formControlName="assetType">
+                  <option *ngFor="let assetType of assetTypes" [ngValue]="assetType">
+                    {{ assetTypeLabel(assetType) }}
+                  </option>
+                </select>
+              </label>
 
-        <form [formGroup]="priceForm" class="form-grid" (ngSubmit)="savePriceOverride()">
-          <label class="field">
-            <span>Monto</span>
-            <input type="number" formControlName="amount" step="0.01" min="0.01" />
-            <small class="field-help" *ngIf="isPriceInvalid('amount')">
-              El monto es obligatorio y debe ser mayor a cero.
-            </small>
-          </label>
+              <label class="field field--full">
+                <span>URL de imagen</span>
+                <input type="text" formControlName="assetUrl" maxlength="500" />
+                <small class="field-help" *ngIf="isAssetInvalid('assetUrl')">
+                  La URL es obligatoria para guardar la imagen principal.
+                </small>
+              </label>
 
-          <label class="field">
-            <span>Moneda</span>
-            <input type="text" formControlName="currency" maxlength="3" />
-          </label>
+              <label class="field">
+                <span>Texto alternativo</span>
+                <input type="text" formControlName="altText" maxlength="250" />
+              </label>
 
-          <label class="field field--checkbox">
-            <input type="checkbox" formControlName="active" />
-            <span>Usar precio online diferente</span>
-          </label>
+              <label class="field">
+                <span>Fuente</span>
+                <select formControlName="source">
+                  <option *ngFor="let source of assetSources" [ngValue]="source">
+                    {{ assetSourceLabel(source) }}
+                  </option>
+                </select>
+              </label>
 
-          <label class="field">
-            <span>Válido desde</span>
-            <input type="datetime-local" formControlName="validFrom" />
-          </label>
+              <label class="field">
+                <span>Orden de visualización</span>
+                <input type="number" formControlName="displayOrder" min="0" step="1" />
+              </label>
 
-          <label class="field">
-            <span>Válido hasta</span>
-            <input type="datetime-local" formControlName="validTo" />
-          </label>
+              <label class="field field--checkbox">
+                <input type="checkbox" formControlName="rightsConfirmed" />
+                <span>Derechos confirmados</span>
+              </label>
 
-          <label class="field field--full">
-            <span>Motivo</span>
-            <textarea formControlName="reason" rows="2" maxlength="300"></textarea>
-          </label>
+              <div class="section-actions" *ngIf="canManage">
+                <button type="submit" class="ui-button ui-button--primary" [disabled]="assetSaving">
+                  Guardar imagen principal
+                </button>
+              </div>
+            </form>
 
-          <div class="section-actions" *ngIf="canManage">
-            <button type="submit" class="ui-button ui-button--primary" [disabled]="priceSaving">
-              Guardar precio
-            </button>
-          </div>
-        </form>
+            <p class="ui-alert ui-alert--error" *ngIf="assetErrorMessage">
+              {{ assetErrorMessage }}
+            </p>
+          </section>
 
-        <p class="ui-alert ui-alert--error" *ngIf="priceErrorMessage">
-          {{ priceErrorMessage }}
-        </p>
-      </section>
+          <section class="detail-card" id="precio-online">
+            <header class="card-head">
+              <div>
+                <p class="overview-kicker">Comercial online</p>
+                <h2>Precio online personalizado</h2>
+              </div>
+              <span class="card-hint">Override ecommerce sin modificar el precio ERP/POS.</span>
+            </header>
+
+            <div class="price-strip">
+              <span>Precio efectivo</span>
+              <strong>{{ effectivePriceLabel() }}</strong>
+            </div>
+
+            <form [formGroup]="priceForm" class="form-grid" (ngSubmit)="savePriceOverride()">
+              <label class="field">
+                <span>Monto</span>
+                <input type="number" formControlName="amount" step="0.01" min="0.01" />
+                <small class="field-help" *ngIf="isPriceInvalid('amount')">
+                  El monto es obligatorio y debe ser mayor a cero.
+                </small>
+              </label>
+
+              <label class="field">
+                <span>Moneda</span>
+                <input type="text" formControlName="currency" maxlength="3" />
+              </label>
+
+              <label class="field field--checkbox">
+                <input type="checkbox" formControlName="active" />
+                <span>Usar precio online diferente</span>
+              </label>
+
+              <label class="field">
+                <span>Válido desde</span>
+                <input type="datetime-local" formControlName="validFrom" />
+              </label>
+
+              <label class="field">
+                <span>Válido hasta</span>
+                <input type="datetime-local" formControlName="validTo" />
+              </label>
+
+              <label class="field field--full">
+                <span>Motivo</span>
+                <textarea formControlName="reason" rows="2" maxlength="300"></textarea>
+              </label>
+
+              <div class="section-actions" *ngIf="canManage">
+                <button type="submit" class="ui-button ui-button--primary" [disabled]="priceSaving">
+                  Guardar precio
+                </button>
+              </div>
+            </form>
+
+            <p class="ui-alert ui-alert--error" *ngIf="priceErrorMessage">
+              {{ priceErrorMessage }}
+            </p>
+          </section>
+        </main>
+
+        <aside class="publish-panel" *ngIf="publicationValidation">
+          <section class="publish-card">
+            <div class="publish-card__head">
+              <p class="overview-kicker">Requisitos para publicar</p>
+              <span
+                class="ui-badge"
+                [class.ui-badge--success]="publicationValidation.publishable"
+                [class.ui-badge--danger]="!publicationValidation.publishable"
+              >
+                {{ publicationValidation.publishable ? "Publicable" : "Pendiente" }}
+              </span>
+            </div>
+
+            <p class="publish-state">
+              {{ validationSummaryLabel() }}
+            </p>
+
+            <div class="checklist-group" *ngFor="let group of requirementGroups">
+              <div class="checklist-group__head">
+                <a [href]="'#' + group.anchor">{{ group.title }}</a>
+                <span [class.is-ok]="groupPendingCount(group.requirements) === 0">
+                  {{ groupPendingCount(group.requirements) === 0 ? "OK" : groupPendingCount(group.requirements) + " pendiente(s)" }}
+                </span>
+              </div>
+              <ul class="checklist-list">
+                <li
+                  *ngFor="let requirement of group.requirements"
+                  [class.is-missing]="isRequirementMissing(requirement)"
+                >
+                  <span class="check-dot"></span>
+                  <div>
+                    <strong>{{ requirementLabel(requirement) }}</strong>
+                    <small>{{ requirementHelp(requirement) }}</small>
+                  </div>
+                </li>
+              </ul>
+            </div>
+
+            <p class="ui-muted technical-count" *ngIf="publicationValidation.errors.length > 0">
+              {{ publicationValidation.errors.length }} bloqueo(s) devueltos por backend. Se muestran arriba como tareas accionables.
+            </p>
+          </section>
+        </aside>
+      </div>
     </section>
   `,
   styles: [
     `
       .ecommerce-detail-page {
-        padding: var(--space-5);
         display: grid;
         gap: var(--space-4);
+      }
+
+      .detail-hero,
+      .overview-card,
+      .detail-card,
+      .publish-card {
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-lg);
+        background: var(--color-bg-surface);
+        box-shadow: var(--shadow-sm);
+      }
+
+      .detail-hero {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: var(--space-4);
+        padding: var(--space-5);
+        background:
+          linear-gradient(135deg, rgba(37, 99, 235, 0.09), transparent 42%),
+          var(--color-bg-surface);
+      }
+
+      .hero-copy {
+        min-width: 0;
       }
 
       .back-link {
@@ -418,59 +499,98 @@ import { toHttpErrorMessage } from "./data/http-error-message";
         text-decoration: underline;
       }
 
-      .header-actions {
+      .hero-actions,
+      .meta-line {
         display: inline-flex;
-        gap: var(--space-2);
         align-items: center;
         flex-wrap: wrap;
-      }
-
-      .summary-grid {
-        display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
         gap: var(--space-2);
       }
 
-      .summary-card {
-        border: 1px solid var(--color-border-default);
-        border-radius: var(--radius-sm);
-        padding: var(--space-2);
+      .hero-actions {
+        justify-content: flex-end;
+      }
+
+      .overview-grid {
+        display: grid;
+        grid-template-columns: 1.4fr repeat(3, minmax(0, 1fr));
+        gap: var(--space-3);
+      }
+
+      .overview-card {
+        padding: var(--space-3);
+        display: grid;
+        gap: var(--space-2);
+        min-width: 0;
+      }
+
+      .overview-card--product {
         background: var(--color-bg-soft);
       }
 
-      .summary-label {
+      .overview-card h2,
+      .overview-card h3,
+      .detail-card h2 {
+        margin: 0;
+      }
+
+      .overview-kicker {
+        margin: 0;
+        color: var(--color-text-secondary);
+        font-size: var(--font-size-xs);
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      .summary-value,
+      .meta-line {
         margin: 0;
         color: var(--color-text-secondary);
         font-size: var(--font-size-sm);
       }
 
       .summary-value {
-        margin: var(--space-1) 0 0;
         font-family: var(--font-family-mono);
-        font-weight: 700;
+        overflow-wrap: anywhere;
       }
 
-      .section-head {
-        margin-bottom: var(--space-2);
-      }
-
-      .section-head h2 {
-        margin: 0;
-      }
-
-      .validation-head {
-        display: flex;
-        align-items: center;
-        gap: var(--space-2);
-        flex-wrap: wrap;
-        margin-bottom: var(--space-2);
-      }
-
-      .validation-errors {
-        margin: 0;
-        padding-left: 1.2rem;
+      .detail-layout {
         display: grid;
-        gap: 0.35rem;
+        grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
+        gap: var(--space-4);
+        align-items: start;
+      }
+
+      .detail-main {
+        display: grid;
+        gap: var(--space-4);
+        min-width: 0;
+      }
+
+      .detail-card,
+      .publish-card {
+        padding: var(--space-4);
+      }
+
+      .card-head,
+      .publish-card__head,
+      .checklist-group__head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: var(--space-3);
+      }
+
+      .card-head {
+        margin-bottom: var(--space-3);
+      }
+
+      .card-hint {
+        color: var(--color-text-secondary);
+        font-size: var(--font-size-sm);
+        text-align: right;
+        max-width: 18rem;
       }
 
       .form-grid {
@@ -482,6 +602,7 @@ import { toHttpErrorMessage } from "./data/http-error-message";
       .field {
         display: grid;
         gap: var(--space-1);
+        min-width: 0;
       }
 
       .field span {
@@ -501,7 +622,8 @@ import { toHttpErrorMessage } from "./data/http-error-message";
         box-sizing: border-box;
       }
 
-      .field--full {
+      .field--full,
+      .section-actions {
         grid-column: 1 / -1;
       }
 
@@ -521,40 +643,146 @@ import { toHttpErrorMessage } from "./data/http-error-message";
       }
 
       .section-actions {
-        grid-column: 1 / -1;
-        display: inline-flex;
+        display: flex;
         justify-content: flex-start;
       }
 
-      .effective-price {
-        margin-top: 0;
+      .price-strip {
+        display: flex;
+        justify-content: space-between;
+        gap: var(--space-3);
+        margin-bottom: var(--space-3);
+        padding: var(--space-3);
+        border: 1px dashed var(--color-border-strong);
+        border-radius: var(--radius-md);
+        background: var(--color-bg-soft);
       }
 
-      @media (max-width: 1100px) {
-        .summary-grid {
+      .publish-panel {
+        position: sticky;
+        top: var(--space-4);
+      }
+
+      .publish-card {
+        display: grid;
+        gap: var(--space-3);
+      }
+
+      .publish-state {
+        margin: 0;
+        color: var(--color-text-secondary);
+      }
+
+      .checklist-group {
+        border-top: 1px solid var(--color-border-default);
+        padding-top: var(--space-3);
+      }
+
+      .checklist-group__head a {
+        color: var(--color-text-primary);
+        font-weight: 800;
+        text-decoration: none;
+      }
+
+      .checklist-group__head a:hover {
+        color: var(--color-brand-primary);
+      }
+
+      .checklist-group__head span {
+        color: var(--color-text-secondary);
+        font-size: var(--font-size-xs);
+        font-weight: 800;
+        white-space: nowrap;
+      }
+
+      .checklist-group__head span.is-ok {
+        color: var(--color-success);
+      }
+
+      .checklist-list {
+        list-style: none;
+        margin: var(--space-2) 0 0;
+        padding: 0;
+        display: grid;
+        gap: var(--space-2);
+      }
+
+      .checklist-list li {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: var(--space-2);
+        color: var(--color-text-secondary);
+        opacity: 0.72;
+      }
+
+      .checklist-list li.is-missing {
+        color: var(--color-text-primary);
+        opacity: 1;
+      }
+
+      .checklist-list strong,
+      .checklist-list small {
+        display: block;
+      }
+
+      .checklist-list small {
+        margin-top: 0.15rem;
+        color: var(--color-text-secondary);
+      }
+
+      .check-dot {
+        width: 0.62rem;
+        height: 0.62rem;
+        margin-top: 0.32rem;
+        border-radius: 999px;
+        background: var(--color-success);
+      }
+
+      .is-missing .check-dot {
+        background: var(--color-danger);
+      }
+
+      .technical-count {
+        margin: 0;
+        font-size: var(--font-size-xs);
+      }
+
+      @media (max-width: 1180px) {
+        .overview-grid {
           grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .detail-layout {
+          grid-template-columns: 1fr;
+        }
+
+        .publish-panel {
+          position: static;
         }
       }
 
       @media (max-width: 860px) {
-        .ecommerce-detail-page {
-          padding: var(--space-4);
+        .detail-hero,
+        .card-head,
+        .price-strip {
+          flex-direction: column;
+          align-items: stretch;
         }
 
+        .hero-actions,
+        .card-hint {
+          justify-content: flex-start;
+          text-align: left;
+        }
+
+        .overview-grid,
         .form-grid {
           grid-template-columns: 1fr;
         }
 
-        .field--full {
-          grid-column: auto;
-        }
-
+        .field--full,
         .section-actions {
           grid-column: auto;
-        }
-
-        .summary-grid {
-          grid-template-columns: 1fr;
         }
       }
     `,
@@ -574,6 +802,38 @@ export class OnlineProfileDetailPageComponent implements OnInit {
   ];
   readonly assetSources: AssetSource[] = ["SUPPLIER", "OWN", "GENERATED", "OTHER"];
   readonly brandAbsencePolicies: BrandAbsencePolicy[] = ["GENERIC", "UNBRANDED"];
+  readonly requirementGroups: RequirementGroup[] = [
+    {
+      title: "Producto ERP",
+      anchor: "contenido-ecommerce",
+      requirements: ["PRODUCT_INACTIVE", "SKU_MISSING"],
+    },
+    {
+      title: "Contenido",
+      anchor: "contenido-ecommerce",
+      requirements: ["ONLINE_NAME_MISSING", "ONLINE_DESCRIPTION_MISSING", "SLUG_MISSING", "SLUG_DUPLICATE"],
+    },
+    {
+      title: "Categoría y marca",
+      anchor: "contenido-ecommerce",
+      requirements: ["CATEGORY_MISSING", "CATEGORY_INACTIVE", "BRAND_MISSING", "BRAND_INACTIVE"],
+    },
+    {
+      title: "Imagen",
+      anchor: "imagen-principal",
+      requirements: ["ASSET_MISSING", "ASSET_INVALID"],
+    },
+    {
+      title: "SEO",
+      anchor: "seo",
+      requirements: ["SEO_MISSING", "SEO_INCOMPLETE"],
+    },
+    {
+      title: "Precio",
+      anchor: "precio-online",
+      requirements: ["PRICE_INVALID"],
+    },
+  ];
 
   readonly profileForm = this.formBuilder.group({
     slug: ["", [Validators.maxLength(180)]],
@@ -979,6 +1239,141 @@ export class OnlineProfileDetailPageComponent implements OnInit {
         return "Bloqueado";
       default:
         return status;
+    }
+  }
+
+  publicProductPath(): string | null {
+    const slug = this.profile?.slug?.trim();
+    if (!this.profile || this.profile.publicationStatus !== "PUBLISHED" || !slug) {
+      return null;
+    }
+    return `/productos/${slug}`;
+  }
+
+  effectivePriceLabel(): string {
+    const price = this.profile?.effectivePrice;
+    if (!price) {
+      return "No disponible";
+    }
+    return this.formatCurrency(price.amount, price.currency);
+  }
+
+  onlineCategoryLabel(categoryId: number | null): string {
+    if (categoryId === null) {
+      return "Sin categoría online";
+    }
+    const category = this.onlineCategories.find((item) => item.id === categoryId);
+    return category ? `${category.name} (#${category.id})` : `Categoría #${categoryId}`;
+  }
+
+  brandLabel(profile: EcommerceAdminOnlineProfileDetailResponse): string {
+    if (profile.brandId !== null) {
+      const brand = this.brands.find((item) => item.id === profile.brandId);
+      return brand ? `${brand.name} (#${brand.id})` : `Marca #${profile.brandId}`;
+    }
+    return profile.brandAbsencePolicy
+      ? this.brandAbsencePolicyLabel(profile.brandAbsencePolicy)
+      : "Sin marca definida";
+  }
+
+  brandAbsencePolicyLabel(policy: BrandAbsencePolicy): string {
+    switch (policy) {
+      case "GENERIC":
+        return "Marca genérica";
+      case "UNBRANDED":
+        return "Producto sin marca";
+      default:
+        return policy;
+    }
+  }
+
+  validationSummaryLabel(): string {
+    const missingCount = this.publicationValidation?.missingRequirements.length ?? 0;
+    if (missingCount === 0) {
+      return "Sin pendientes de publicación.";
+    }
+    return `${missingCount} requisito(s) pendiente(s). Corrige las secciones marcadas antes de publicar.`;
+  }
+
+  isRequirementMissing(requirement: MissingRequirement): boolean {
+    return this.publicationValidation?.missingRequirements.includes(requirement) ?? false;
+  }
+
+  groupPendingCount(requirements: MissingRequirement[]): number {
+    return requirements.filter((requirement) => this.isRequirementMissing(requirement)).length;
+  }
+
+  requirementLabel(requirement: MissingRequirement): string {
+    switch (requirement) {
+      case "PRODUCT_INACTIVE":
+        return "Producto ERP activo";
+      case "SKU_MISSING":
+        return "SKU operativo definido";
+      case "ONLINE_NAME_MISSING":
+        return "Nombre online";
+      case "ONLINE_DESCRIPTION_MISSING":
+        return "Descripción online";
+      case "SLUG_MISSING":
+        return "Slug público válido";
+      case "SLUG_DUPLICATE":
+        return "Slug único";
+      case "CATEGORY_MISSING":
+        return "Categoría online";
+      case "CATEGORY_INACTIVE":
+        return "Categoría online activa";
+      case "BRAND_MISSING":
+        return "Marca o política sin marca";
+      case "BRAND_INACTIVE":
+        return "Marca activa";
+      case "ASSET_MISSING":
+        return "Imagen principal";
+      case "ASSET_INVALID":
+        return "Imagen publicable";
+      case "SEO_MISSING":
+        return "SEO creado";
+      case "SEO_INCOMPLETE":
+        return "SEO completo e indexable";
+      case "PRICE_INVALID":
+        return "Precio efectivo válido";
+      default:
+        return requirement;
+    }
+  }
+
+  requirementHelp(requirement: MissingRequirement): string {
+    switch (requirement) {
+      case "PRODUCT_INACTIVE":
+        return "Activa el producto desde Catálogo ERP/POS.";
+      case "SKU_MISSING":
+        return "Define el SKU en el producto ERP/POS.";
+      case "ONLINE_NAME_MISSING":
+        return "Completa el nombre comercial para ecommerce.";
+      case "ONLINE_DESCRIPTION_MISSING":
+        return "Agrega una descripción útil para venta online.";
+      case "SLUG_MISSING":
+        return "Define una ruta limpia para la URL pública.";
+      case "SLUG_DUPLICATE":
+        return "Usa un slug que no exista en otro perfil.";
+      case "CATEGORY_MISSING":
+        return "Selecciona una categoría online activa.";
+      case "CATEGORY_INACTIVE":
+        return "Reactiva o cambia la categoría online.";
+      case "BRAND_MISSING":
+        return "Selecciona una marca o declara que el producto no tiene marca.";
+      case "BRAND_INACTIVE":
+        return "Reactiva o cambia la marca.";
+      case "ASSET_MISSING":
+        return "Carga la URL de la imagen principal.";
+      case "ASSET_INVALID":
+        return "Usa imagen de producto, alt text y derechos confirmados.";
+      case "SEO_MISSING":
+        return "Guarda metadatos SEO para el perfil.";
+      case "SEO_INCOMPLETE":
+        return "Completa title, description y política de indexación.";
+      case "PRICE_INVALID":
+        return "Verifica que el precio efectivo sea mayor a cero.";
+      default:
+        return "Revisa esta condición antes de publicar.";
     }
   }
 

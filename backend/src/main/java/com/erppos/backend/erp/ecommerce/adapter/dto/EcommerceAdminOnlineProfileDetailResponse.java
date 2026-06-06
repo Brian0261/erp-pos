@@ -8,6 +8,9 @@ import java.time.Instant;
 public record EcommerceAdminOnlineProfileDetailResponse(
         Long profileId,
         Long productId,
+        String productSku,
+        String productName,
+        boolean productActive,
         OnlinePublicationStatus publicationStatus,
         String slug,
         String onlineName,

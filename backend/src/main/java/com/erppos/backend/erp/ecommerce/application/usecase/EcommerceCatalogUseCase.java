@@ -3,6 +3,7 @@ package com.erppos.backend.erp.ecommerce.application.usecase;
 import com.erppos.backend.erp.ecommerce.application.dto.OnlineProfileSummaryResult;
 import com.erppos.backend.erp.ecommerce.domain.model.EcommerceSeoMetadata;
 import com.erppos.backend.erp.ecommerce.domain.model.EcommerceBrand;
+import com.erppos.backend.erp.ecommerce.domain.model.EcommerceCatalogProductSnapshot;
 import com.erppos.backend.erp.ecommerce.domain.model.EcommerceOnlineCategory;
 import com.erppos.backend.erp.ecommerce.domain.model.OnlinePriceOverride;
 import com.erppos.backend.erp.ecommerce.domain.model.ProductAsset;
@@ -30,6 +31,7 @@ public interface EcommerceCatalogUseCase {
     Page<OnlineProfileSummaryResult> listOnlineProfiles(ProductOnlineProfileSearchCriteria criteria, Pageable pageable);
     List<ProductOnlineProfile> listProfilesByProductIds(List<Long> productIds);
     ProductOnlineProfile getProfileByProductId(Long productId);
+    EcommerceCatalogProductSnapshot getProductSnapshotByProductId(Long productId);
     Optional<EcommerceSeoMetadata> getSeoMetadataByProductId(Long productId);
     Optional<ProductAsset> getPrimaryAssetByProductId(Long productId);
     Optional<OnlinePriceOverride> getActivePriceOverrideByProductId(Long productId);

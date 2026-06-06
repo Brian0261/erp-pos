@@ -130,11 +130,15 @@ export interface EcommerceAdminPublicationValidationResponse {
   errors: string[];
   effectivePrice: number | null;
   currency: string;
+  missingRequirements: MissingRequirement[];
 }
 
 export interface EcommerceAdminOnlineProfileDetailResponse {
   profileId: number;
   productId: number;
+  productSku: string | null;
+  productName: string | null;
+  productActive: boolean;
   publicationStatus: OnlinePublicationStatus;
   slug: string | null;
   onlineName: string | null;

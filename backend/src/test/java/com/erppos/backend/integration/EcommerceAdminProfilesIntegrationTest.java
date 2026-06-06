@@ -50,6 +50,9 @@ class EcommerceAdminProfilesIntegrationTest extends AbstractHttpIntegrationTest 
                         .header(HttpHeaders.AUTHORIZATION, bearer(adminToken)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.productId").value(productId))
+                .andExpect(jsonPath("$.productSku").value("SKU-IT-" + suffix))
+                .andExpect(jsonPath("$.productName").value("Producto IT " + suffix))
+                .andExpect(jsonPath("$.productActive").value(true))
                 .andExpect(jsonPath("$.publicationStatus").value("DRAFT"));
     }
 
@@ -388,7 +391,9 @@ class EcommerceAdminProfilesIntegrationTest extends AbstractHttpIntegrationTest 
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.publishable").value(false))
                 .andExpect(jsonPath("$.errors").isArray())
-                .andExpect(jsonPath("$.errors.length()").value(org.hamcrest.Matchers.greaterThan(0)));
+                .andExpect(jsonPath("$.errors.length()").value(org.hamcrest.Matchers.greaterThan(0)))
+                .andExpect(jsonPath("$.missingRequirements").isArray())
+                .andExpect(jsonPath("$.missingRequirements", org.hamcrest.Matchers.hasItem("ONLINE_NAME_MISSING")));
     }
 
     @Test

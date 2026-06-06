@@ -432,6 +432,11 @@ public class EcommerceCatalogApplicationService implements EcommerceCatalogUseCa
     }
 
     @Override
+    public EcommerceCatalogProductSnapshot getProductSnapshotByProductId(Long productId) {
+        return requireProductSnapshot(requireProductId(productId));
+    }
+
+    @Override
     public Optional<EcommerceSeoMetadata> getSeoMetadataByProductId(Long productId) {
         ProductOnlineProfile profile = getProfileByProductId(requireProductId(productId));
         return seoMetadataRepositoryPort.findByProductOnlineProfileId(profile.id());
@@ -668,7 +673,36 @@ public class EcommerceCatalogApplicationService implements EcommerceCatalogUseCa
             errors.add(ex.getMessage());
         }
 
-        return new PublicationValidationResult(errors.isEmpty(), List.copyOf(errors), effectivePrice, currency);
+        EcommerceSeoMetadata seoMetadata = seoMetadataRepositoryPort.findByProductOnlineProfileId(profile.id()).orElse(null);
+        ProductAsset primaryAsset = productAssetRepositoryPort.findPrimaryActiveByProductOnlineProfileId(profile.id()).orElse(null);
+        OnlinePriceOverride activeOverride = onlinePriceOverrideRepositoryPort.findActiveByProductOnlineProfileId(profile.id()).orElse(null);
+        Map<Long, String> brandNamesById = profile.brandId() == null
+                ? Map.of()
+                : brandRepositoryPort.findById(profile.brandId())
+                        .map(brand -> Map.of(brand.id(), brand.name()))
+                        .orElseGet(Map::of);
+        Map<Long, String> categoryNamesById = profile.onlineCategoryId() == null
+                ? Map.of()
+                : onlineCategoryRepositoryPort.findById(profile.onlineCategoryId())
+                        .map(category -> Map.of(category.id(), category.name()))
+                        .orElseGet(Map::of);
+        List<MissingRequirement> missingRequirements = calculateMissingRequirements(
+                profile,
+                productSnapshot,
+                seoMetadata,
+                primaryAsset,
+                activeOverride,
+                brandNamesById,
+                categoryNamesById
+        );
+
+        return new PublicationValidationResult(
+                errors.isEmpty(),
+                List.copyOf(errors),
+                effectivePrice,
+                currency,
+                missingRequirements
+        );
     }
 
     @Override

@@ -36,6 +36,7 @@ import com.erppos.backend.erp.ecommerce.application.usecase.UpsertProductAssetCo
 import com.erppos.backend.erp.ecommerce.application.usecase.UpsertProductSeoMetadataCommand;
 import com.erppos.backend.erp.ecommerce.domain.exception.EcommerceBusinessRuleException;
 import com.erppos.backend.erp.ecommerce.domain.model.EcommerceBrand;
+import com.erppos.backend.erp.ecommerce.domain.model.EcommerceCatalogProductSnapshot;
 import com.erppos.backend.erp.ecommerce.domain.model.EcommerceOnlineCategory;
 import com.erppos.backend.erp.ecommerce.domain.exception.EcommerceNotFoundException;
 import com.erppos.backend.erp.ecommerce.domain.model.EcommerceSeoMetadata;
@@ -342,6 +343,7 @@ public class EcommerceAdminController {
     }
 
     private EcommerceAdminOnlineProfileDetailResponse buildDetail(ProductOnlineProfile profile) {
+        EcommerceCatalogProductSnapshot productSnapshot = ecommerceCatalogUseCase.getProductSnapshotByProductId(profile.productId());
         Optional<EcommerceSeoMetadata> seo = ecommerceCatalogUseCase.getSeoMetadataByProductId(profile.productId());
         Optional<ProductAsset> primaryAsset = ecommerceCatalogUseCase.getPrimaryAssetByProductId(profile.productId());
         Optional<OnlinePriceOverride> activeOverride = ecommerceCatalogUseCase.getActivePriceOverrideByProductId(profile.productId());
@@ -357,6 +359,9 @@ public class EcommerceAdminController {
         return new EcommerceAdminOnlineProfileDetailResponse(
                 profile.id(),
                 profile.productId(),
+                productSnapshot.sku(),
+                productSnapshot.name(),
+                productSnapshot.active(),
                 profile.publicationStatus(),
                 profile.slug(),
                 profile.onlineName(),
@@ -524,7 +529,8 @@ public class EcommerceAdminController {
                 validation.publishable(),
                 validation.errors(),
                 validation.effectivePrice(),
-                validation.currency()
+                validation.currency(),
+                validation.missingRequirements()
         );
     }
 
