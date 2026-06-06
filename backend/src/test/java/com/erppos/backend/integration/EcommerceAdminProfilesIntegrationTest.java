@@ -398,6 +398,8 @@ class EcommerceAdminProfilesIntegrationTest extends AbstractHttpIntegrationTest 
         long productId = createProductWithDraftProfile(adminToken, suffix, BigDecimal.valueOf(15.00));
         long brandId = createOnlineBrand(suffix);
         long onlineCategoryId = createOnlineCategory(suffix);
+        String productSku = "SKU-IT-" + suffix;
+        String productName = "Producto IT " + suffix;
         String brandName = "Marca IT " + suffix;
         String categoryName = "Online Cat IT " + suffix;
 
@@ -418,6 +420,9 @@ class EcommerceAdminProfilesIntegrationTest extends AbstractHttpIntegrationTest 
                         .header(HttpHeaders.AUTHORIZATION, bearer(adminToken)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items").isArray())
+                .andExpect(jsonPath("$.items[?(@.productId == " + productId + ")].productSku", org.hamcrest.Matchers.hasItem(productSku)))
+                .andExpect(jsonPath("$.items[?(@.productId == " + productId + ")].productName", org.hamcrest.Matchers.hasItem(productName)))
+                .andExpect(jsonPath("$.items[?(@.productId == " + productId + ")].productActive", org.hamcrest.Matchers.hasItem(true)))
                 .andExpect(jsonPath("$.items[?(@.productId == " + productId + ")].brandName", org.hamcrest.Matchers.hasItem(brandName)))
                 .andExpect(jsonPath("$.items[?(@.productId == " + productId + ")].onlineCategoryName", org.hamcrest.Matchers.hasItem(categoryName)));
     }

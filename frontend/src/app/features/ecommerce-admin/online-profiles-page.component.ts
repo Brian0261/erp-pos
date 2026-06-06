@@ -136,7 +136,7 @@ const NONE_VALUE = "__NONE__";
         <table class="ui-table ecommerce-table" *ngIf="profiles.length > 0">
           <thead>
             <tr>
-              <th>Producto</th>
+                <th>Producto ERP</th>
               <th>Nombre online</th>
               <th>Slug</th>
               <th>Estado</th>
@@ -150,7 +150,17 @@ const NONE_VALUE = "__NONE__";
           </thead>
           <tbody>
             <tr *ngFor="let profile of profiles">
-              <td class="cell-code">#{{ profile.productId }}</td>
+              <td class="cell-product">
+                <div class="product-summary">
+                  <span class="product-name" [attr.title]="profile.productName || 'Producto ERP no disponible'">
+                    {{ profile.productName || "Producto ERP no disponible" }}
+                  </span>
+                  <span class="ui-badge ui-badge--danger" *ngIf="!profile.productActive">Inactivo</span>
+                </div>
+                <div class="product-meta">
+                  SKU: {{ profile.productSku || "-" }} · #{{ profile.productId }}
+                </div>
+              </td>
               <td class="cell-name">{{ profile.onlineName || "-" }}</td>
               <td class="cell-code">{{ profile.slug || "-" }}</td>
               <td>
@@ -299,6 +309,34 @@ const NONE_VALUE = "__NONE__";
 
       .cell-name {
         max-width: 260px;
+      }
+
+      .cell-product {
+        min-width: 260px;
+      }
+
+      .product-summary {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+        min-width: 0;
+      }
+
+      .product-name {
+        font-weight: 600;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .product-meta {
+        margin-top: 0.2rem;
+        font-family: var(--font-family-mono);
+        font-size: var(--font-size-sm);
+        color: var(--color-text-secondary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
 
       .cell-readiness {

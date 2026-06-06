@@ -379,6 +379,9 @@ public class EcommerceCatalogApplicationService implements EcommerceCatalogUseCa
                     return new OnlineProfileSummaryResult(
                             profile.id(),
                             profile.productId(),
+                            productSnapshot != null ? productSnapshot.sku() : null,
+                            productSnapshot != null ? productSnapshot.name() : null,
+                            productSnapshot == null || productSnapshot.active(),
                             profile.publicationStatus(),
                             profile.slug(),
                             profile.onlineName(),

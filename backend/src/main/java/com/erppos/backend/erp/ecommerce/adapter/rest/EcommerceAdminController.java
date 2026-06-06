@@ -380,6 +380,9 @@ public class EcommerceAdminController {
         return new EcommerceAdminOnlineProfileSummaryResponse(
                 result.profileId(),
                 result.productId(),
+                result.productSku(),
+                result.productName(),
+                result.productActive(),
                 result.publicationStatus(),
                 result.slug(),
                 result.onlineName(),

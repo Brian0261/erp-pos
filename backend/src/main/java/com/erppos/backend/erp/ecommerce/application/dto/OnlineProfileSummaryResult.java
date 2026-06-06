@@ -11,6 +11,9 @@ import java.util.List;
 public record OnlineProfileSummaryResult(
         Long profileId,
         Long productId,
+        String productSku,
+        String productName,
+        boolean productActive,
         OnlinePublicationStatus publicationStatus,
         String slug,
         String onlineName,
