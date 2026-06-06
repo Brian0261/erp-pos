@@ -800,6 +800,56 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 - [x] Sin cambios en backend funcional ni Angular funcional durante smoke.
 - [x] Sin commit ni push durante fase de smoke.
 
+### Ecommerce - Fase 2H.2D Documentacion QA de readiness compacto
+
+- [x] Evidencia base validada sobre commits `10cdd1d feat(ecommerce-admin): add readiness summary to online profiles` y `8390dd3 chore(ecommerce-admin): compact readiness summary ux`.
+- [x] Smoke UI ejecutado en navegador sobre `http://localhost:4200` con Docker reconstruido y frontend/backend activos.
+- [x] Login ADMIN correcto.
+- [x] Navegacion a `Catalogo online > Perfiles online` correcta.
+- [x] Tabla de Perfiles online carga correctamente sin romperse visualmente.
+- [x] Columna `Readiness` visible y diferenciada de `Estado` de publicacion.
+- [x] `Readiness` muestra badge + score en una sola linea.
+- [x] Se observaron formatos compactos del tipo `Requiere atencion · X/11` y/o `Publicado · 11/11`.
+- [x] Faltantes se muestran como frase compacta en una sola linea secundaria.
+- [x] Se respeta `+N mas` cuando hay mas de 3 faltantes visibles.
+- [x] Cuando no hay faltantes se muestra `Sin faltantes`.
+- [x] No aparecen `undefined`, `null` ni enums tecnicos crudos en la celda `Readiness`.
+- [x] Las filas no quedan excesivamente altas para operacion real.
+- [x] Layout general de la tabla no se rompe tras compactar la columna.
+- [x] Endpoint observado en Network: `GET /api/v1/ecommerce-admin/products/online-profiles`.
+- [x] Network: status `200 OK`.
+- [x] Network: response incluye `readinessStatus`, `readinessCompleted`, `readinessTotal` y `missingRequirements`.
+- [x] Network: no se observaron llamadas por fila a `publication-validation`.
+- [x] Network: no se observaron llamadas a Storefront.
+- [x] Network: no se observo N+1.
+- [x] Network: filtros siguen viajando como query params.
+- [x] Network: no hubo errores `500`.
+- [x] Búsqueda rápida funciona.
+- [x] Filtro `Estado` funciona.
+- [x] Filtro `Marca` funciona.
+- [x] Filtro `Categoria online` funciona.
+- [x] Opcion `Sin marca` funciona.
+- [x] Opcion `Sin categoria online` funciona.
+- [x] `Limpiar filtros` funciona.
+- [x] Paginacion funciona.
+- [x] Boton `Revisar` navega correctamente al detalle.
+- [x] Consola: sin errores JS bloqueantes.
+- [x] Consola: sin errores de template Angular.
+- [x] Consola: sin errores HTTP inesperados.
+- [x] Validacion automatica `npm run build` frontend exitosa durante smoke.
+- [x] Validacion automatica `mvn -Dtest=EcommerceAdminProfilesIntegrationTest test` exitosa durante smoke.
+- [x] Sin cambios de codigo durante el smoke.
+- [x] Sin cambios en backend funcional, Storefront, Flyway, Docker, `.env` raiz, secretos ni AWS/staging durante esta fase documental.
+
+#### Deudas no bloqueantes
+
+- [x] La tabla sigue siendo relativamente ancha, pero usable en operacion real tras compactar `Readiness`.
+- [x] `CATEGORY_INACTIVE` y `BRAND_INACTIVE` siguen sin distinguirse explicitamente en el resumen del listado; deuda conocida no bloqueante.
+
+#### Siguiente paso recomendado
+
+- [x] Continuar con cierre/documentacion incremental posterior a readiness si el roadmap lo requiere; la siguiente referencia inmediata validada para esta linea es QA/documentacion cerrada de readiness compacto.
+
 ### Ecommerce - Fase 2G.4B Enriquecer listado de Perfiles online
 
 - [ ] Backend: `GET /api/v1/ecommerce-admin/products/online-profiles` retorna `brandName` y `onlineCategoryName` enriquecidos.
