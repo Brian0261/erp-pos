@@ -850,6 +850,45 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 
 - [x] Continuar con cierre/documentacion incremental posterior a readiness si el roadmap lo requiere; la siguiente referencia inmediata validada para esta linea es QA/documentacion cerrada de readiness compacto.
 
+### Ecommerce - Fase 2H.3D Documentacion QA del filtro por readiness
+
+- [x] Evidencia manual validada sobre el smoke UI 2H.3C en navegador `http://localhost:4200` con Docker reconstruido y frontend/backend activos.
+- [x] Login ADMIN correcto.
+- [x] Navegacion a `Catalogo online > Perfiles online` correcta.
+- [x] La tabla de Perfiles online carga correctamente y no se rompe visualmente.
+- [x] El select `Preparacion` aparece visible en el listado.
+- [x] Opciones visibles validadas: `Todos`, `Listo`, `Incompleto`, `Requiere atencion`, `Publicado`, `Despublicado`.
+- [x] El filtro `Preparacion` aplica automaticamente al cambiar.
+- [x] Al cambiar `Preparacion`, la paginacion vuelve a pagina 1.
+- [x] `Limpiar filtros` limpia `Preparacion` y la devuelve a `Todos`.
+- [x] Combinaciones validadas: `Preparacion = Listo`, `Incompleto`, `Requiere atencion`, `Publicado`, `Despublicado`.
+- [x] Combinaciones validadas con `Estado`, `Marca`, `Categoria online`, `busqueda rapida`, `Sin marca`, `Sin categoria online`, paginacion activa y limpieza de filtros.
+- [x] Endpoint observado en Network: `GET /api/v1/ecommerce-admin/products/online-profiles`.
+- [x] Network: status `200 OK`.
+- [x] Network: `readinessStatus` viaja como query param cuando corresponde.
+- [x] Network: `readinessStatus` no viaja cuando `Preparacion = Todos`.
+- [x] Network: no se observaron llamadas por fila.
+- [x] Network: no se observaron llamadas a `publication-validation` por fila.
+- [x] Network: no se observaron llamadas a Storefront.
+- [x] Network: no se observo N+1.
+- [x] Network: `page`, `size`, `totalItems` y `totalPages` se mantienen coherentes.
+- [x] Network: combinaciones sin resultados devuelven `200` con lista vacia.
+- [x] Consola: sin errores JS bloqueantes.
+- [x] Consola: sin errores HTTP inesperados.
+- [x] Consola: sin errores de template Angular.
+- [x] Validacion automatica `mvn -Dtest=EcommerceAdminProfilesIntegrationTest test` exitosa durante la verificacion de smoke.
+- [x] Validacion automatica `npm run build` frontend exitosa durante la verificacion de smoke.
+- [x] Sin cambios de codigo durante esta fase documental.
+- [x] Sin cambios en Storefront, Flyway, Docker, `.env` raiz, secretos ni AWS/staging durante esta fase documental.
+
+#### Deudas no bloqueantes
+
+- [x] No se identificaron deudas bloqueantes en el smoke UI; la validacion confirmo ausencia de N+1, ausencia de llamadas a Storefront y paginacion coherente.
+
+#### Siguiente paso recomendado
+
+- [x] Continuar con `2H.4` o con el siguiente hito del roadmap una vez consolidada la documentacion QA del filtro por readiness.
+
 ### Ecommerce - Fase 2G.4B Enriquecer listado de Perfiles online
 
 - [ ] Backend: `GET /api/v1/ecommerce-admin/products/online-profiles` retorna `brandName` y `onlineCategoryName` enriquecidos.
