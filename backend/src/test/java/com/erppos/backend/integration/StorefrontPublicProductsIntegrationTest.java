@@ -429,10 +429,13 @@ class StorefrontPublicProductsIntegrationTest extends AbstractHttpIntegrationTes
     }
 
     private String compactToken(String value) {
-        if (value.length() <= 12) {
-            return value;
+        String hash = Long.toString(Integer.toUnsignedLong(value.hashCode()), 36);
+        String normalized = value.replaceAll("[^A-Za-z0-9]", "");
+        if (normalized.isBlank()) {
+            return hash;
         }
-        return value.substring(value.length() - 12);
+        String tail = normalized.length() <= 4 ? normalized : normalized.substring(normalized.length() - 4);
+        return hash + tail;
     }
 
     private JsonNode findBySlug(JsonNode items, String slug) {
