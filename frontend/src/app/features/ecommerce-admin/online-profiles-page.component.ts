@@ -154,13 +154,12 @@ const NONE_VALUE = "__NONE__";
                   </span>
                   <span class="readiness-score">{{ profile.readinessCompleted }}/{{ profile.readinessTotal }}</span>
                 </div>
-                <div class="readiness-chips" *ngIf="profile.missingRequirements.length > 0">
-                  <span class="ui-chip ui-chip--small" *ngFor="let req of profile.missingRequirements.slice(0, 3)">
-                    {{ requirementLabel(req) }}
-                  </span>
-                  <span class="ui-chip ui-chip--small" *ngIf="profile.missingRequirements.length > 3">
-                    +{{ profile.missingRequirements.length - 3 }}
-                  </span>
+                <div
+                  class="readiness-detail"
+                  [attr.title]="readinessDetailTitle(profile.missingRequirements)"
+                  [attr.aria-label]="readinessDetailTitle(profile.missingRequirements)"
+                >
+                  {{ readinessDetail(profile.missingRequirements) }}
                 </div>
               </td>
               <td class="cell-code">{{ profile.brandName ?? "Sin marca" }}</td>
@@ -292,26 +291,31 @@ const NONE_VALUE = "__NONE__";
       }
 
       .cell-readiness {
-        min-width: 180px;
+        min-width: 260px;
       }
 
       .readiness-summary {
         display: flex;
         align-items: center;
         gap: var(--space-2);
-        margin-bottom: var(--space-1);
+        flex-wrap: nowrap;
       }
 
       .readiness-score {
         font-size: var(--font-size-sm);
         color: var(--color-text-secondary);
         font-family: var(--font-family-mono);
+        white-space: nowrap;
       }
 
-      .readiness-chips {
-        display: flex;
-        flex-wrap: wrap;
-        gap: var(--space-1);
+      .readiness-detail {
+        margin-top: 0.2rem;
+        font-size: var(--font-size-sm);
+        color: var(--color-text-secondary);
+        line-height: 1.25;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
 
       .actions {
@@ -555,9 +559,29 @@ export class OnlineProfilesPageComponent implements OnInit, OnDestroy {
       ASSET_INVALID: "Imagen inválida",
       SEO_MISSING: "SEO",
       SEO_INCOMPLETE: "SEO incompleto",
-      PRICE_INVALID: "Precio"
+      PRICE_INVALID: "Precio inválido"
     };
     return labels[req];
+  }
+
+  readinessDetail(missingRequirements: MissingRequirement[]): string {
+    if (missingRequirements.length === 0) {
+      return "Sin faltantes";
+    }
+
+    const visible = missingRequirements.slice(0, 3).map((req) => this.requirementLabel(req));
+    const remaining = missingRequirements.length - visible.length;
+    const summary = `Faltan ${missingRequirements.length}: ${visible.join(", ")}`;
+
+    return remaining > 0 ? `${summary} +${remaining} más` : summary;
+  }
+
+  readinessDetailTitle(missingRequirements: MissingRequirement[]): string {
+    if (missingRequirements.length === 0) {
+      return "Sin faltantes";
+    }
+
+    return `Faltantes: ${missingRequirements.map((req) => this.requirementLabel(req)).join(", ")}`;
   }
 
   formatDateTime(value: string | null): string {
