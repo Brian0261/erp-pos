@@ -23,11 +23,13 @@ import {
   EcommerceAdminUpsertPrimaryAssetRequest,
   EcommerceAdminUpsertSeoRequest,
   OnlinePublicationStatus,
+  ReadinessStatus,
 } from "./ecommerce-admin.models";
 
 export interface OnlineProfileListFilters {
   q?: string;
   status?: OnlinePublicationStatus;
+  readinessStatus?: ReadinessStatus;
   brandId?: number;
   withoutBrand?: boolean;
   onlineCategoryId?: number;
@@ -57,6 +59,9 @@ export class EcommerceAdminService {
     }
     if (filters.status) {
       params = params.set("status", filters.status);
+    }
+    if (filters.readinessStatus) {
+      params = params.set("readinessStatus", filters.readinessStatus);
     }
     if (filters.brandId !== undefined) {
       params = params.set("brandId", String(filters.brandId));

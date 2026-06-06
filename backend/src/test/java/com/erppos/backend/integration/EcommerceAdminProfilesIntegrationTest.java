@@ -514,6 +514,130 @@ class EcommerceAdminProfilesIntegrationTest extends AbstractHttpIntegrationTest 
                         .param("withoutBrand", "true")
                         .header(HttpHeaders.AUTHORIZATION, bearer(adminToken)))
                 .andExpect(status().isBadRequest());
+
+        mockMvc.perform(get("/api/v1/ecommerce-admin/products/online-profiles")
+                        .param("onlineCategoryId", String.valueOf(betaCategoryId))
+                        .param("withoutOnlineCategory", "true")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void listOnlineProfilesShouldFilterByReadinessStatusBeforePagination() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = Long.toString(System.nanoTime(), 36);
+        long brandId = createOnlineBrand("readiness-" + suffix);
+        long onlineCategoryId = createOnlineCategory("readiness-" + suffix);
+
+        long readyProductId = createProductWithDraftProfile(adminToken, suffix + "r", BigDecimal.valueOf(10.00));
+        long incompleteProductId = createProductWithDraftProfile(adminToken, suffix + "i1", BigDecimal.valueOf(11.00));
+        long incompleteTwoProductId = createProductWithDraftProfile(adminToken, suffix + "i2", BigDecimal.valueOf(12.00));
+        long needsAttentionProductId = createProductWithDraftProfile(adminToken, suffix + "n", BigDecimal.valueOf(13.00));
+        long publishedProductId = createProductWithDraftProfile(adminToken, suffix + "p", BigDecimal.valueOf(14.00));
+        long unpublishedProductId = createProductWithDraftProfile(adminToken, suffix + "u", BigDecimal.valueOf(15.00));
+
+        updateProfile(adminToken, readyProductId, "readiness-suite-" + suffix + "-ready", "Readiness Suite " + suffix + " Ready", brandId, onlineCategoryId);
+        upsertSeoForPublish(adminToken, readyProductId, suffix + "ready");
+        upsertAssetForPublish(adminToken, readyProductId, suffix + "ready");
+
+        updateProfile(adminToken, incompleteProductId, "readiness-suite-" + suffix + "-incomplete-one", "Readiness Suite " + suffix + " Incomplete One", brandId, onlineCategoryId);
+        updateProfile(adminToken, incompleteTwoProductId, "readiness-suite-" + suffix + "-incomplete-two", "Readiness Suite " + suffix + " Incomplete Two", brandId, onlineCategoryId);
+        updateProfile(adminToken, needsAttentionProductId, "readiness-suite-" + suffix + "-needs", "Readiness Suite " + suffix + " Needs", null, null);
+
+        updateProfileForPublish(adminToken, publishedProductId, suffix + "published", brandId, onlineCategoryId);
+        upsertSeoForPublish(adminToken, publishedProductId, suffix + "published");
+        upsertAssetForPublish(adminToken, publishedProductId, suffix + "published");
+        mockMvc.perform(post("/api/v1/ecommerce-admin/products/{productId}/publish", publishedProductId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk());
+
+        updateProfileForPublish(adminToken, unpublishedProductId, suffix + "unpublished", brandId, onlineCategoryId);
+        upsertSeoForPublish(adminToken, unpublishedProductId, suffix + "unpublished");
+        upsertAssetForPublish(adminToken, unpublishedProductId, suffix + "unpublished");
+        mockMvc.perform(post("/api/v1/ecommerce-admin/products/{productId}/publish", unpublishedProductId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/ecommerce-admin/products/{productId}/unpublish", unpublishedProductId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/ecommerce-admin/products/online-profiles")
+                        .param("readinessStatus", "READY")
+                        .param("q", "Readiness Suite " + suffix + " Ready")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalItems").value(1))
+                .andExpect(jsonPath("$.items[0].productId").value(readyProductId))
+                .andExpect(jsonPath("$.items[0].readinessStatus").value("READY"));
+
+        mockMvc.perform(get("/api/v1/ecommerce-admin/products/online-profiles")
+                        .param("readinessStatus", "INCOMPLETE")
+                        .param("q", "Readiness Suite " + suffix + " Incomplete")
+                        .param("page", "0")
+                        .param("size", "1")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.totalItems").value(2))
+                .andExpect(jsonPath("$.totalPages").value(2))
+                .andExpect(jsonPath("$.items[0].readinessStatus").value("INCOMPLETE"));
+
+        mockMvc.perform(get("/api/v1/ecommerce-admin/products/online-profiles")
+                        .param("readinessStatus", "NEEDS_ATTENTION")
+                        .param("withoutBrand", "true")
+                        .param("withoutOnlineCategory", "true")
+                        .param("q", "Readiness Suite " + suffix + " Needs")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalItems").value(1))
+                .andExpect(jsonPath("$.items[0].productId").value(needsAttentionProductId))
+                .andExpect(jsonPath("$.items[0].readinessStatus").value("NEEDS_ATTENTION"));
+
+        mockMvc.perform(get("/api/v1/ecommerce-admin/products/online-profiles")
+                        .param("readinessStatus", "PUBLISHED")
+                        .param("status", "PUBLISHED")
+                        .param("q", "Lapicero online " + suffix + "published")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalItems").value(1))
+                .andExpect(jsonPath("$.items[0].productId").value(publishedProductId))
+                .andExpect(jsonPath("$.items[0].readinessStatus").value("PUBLISHED"));
+
+        mockMvc.perform(get("/api/v1/ecommerce-admin/products/online-profiles")
+                        .param("readinessStatus", "UNPUBLISHED")
+                        .param("q", "Lapicero online " + suffix + "unpublished")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalItems").value(1))
+                .andExpect(jsonPath("$.items[0].productId").value(unpublishedProductId))
+                .andExpect(jsonPath("$.items[0].readinessStatus").value("UNPUBLISHED"));
+
+        mockMvc.perform(get("/api/v1/ecommerce-admin/products/online-profiles")
+                        .param("readinessStatus", "READY")
+                        .param("brandId", String.valueOf(brandId))
+                        .param("onlineCategoryId", String.valueOf(onlineCategoryId))
+                        .param("q", "Readiness Suite " + suffix + " Ready")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalItems").value(1))
+                .andExpect(jsonPath("$.items[0].productId").value(readyProductId));
+
+        mockMvc.perform(get("/api/v1/ecommerce-admin/products/online-profiles")
+                        .param("readinessStatus", "PUBLISHED")
+                        .param("status", "DRAFT")
+                        .param("q", "Lapicero online " + suffix + "published")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(0))
+                .andExpect(jsonPath("$.totalItems").value(0));
+
+        mockMvc.perform(get("/api/v1/ecommerce-admin/products/online-profiles")
+                        .param("readinessStatus", "UNKNOWN")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken)))
+                .andExpect(status().isBadRequest());
     }
 
     private long createProductWithDraftProfile(String adminToken, String suffix, BigDecimal salePrice) throws Exception {

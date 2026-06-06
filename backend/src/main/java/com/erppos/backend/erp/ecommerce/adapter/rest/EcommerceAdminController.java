@@ -27,6 +27,7 @@ import com.erppos.backend.erp.ecommerce.application.usecase.CreateProductOnlineP
 import com.erppos.backend.erp.ecommerce.application.usecase.EcommerceCatalogUseCase;
 import com.erppos.backend.erp.ecommerce.application.usecase.EffectiveOnlinePriceResult;
 import com.erppos.backend.erp.ecommerce.application.usecase.PublicationValidationResult;
+import com.erppos.backend.erp.ecommerce.application.usecase.ReadinessStatus;
 import com.erppos.backend.erp.ecommerce.application.usecase.UpdateEcommerceBrandCommand;
 import com.erppos.backend.erp.ecommerce.application.usecase.UpdateEcommerceOnlineCategoryCommand;
 import com.erppos.backend.erp.ecommerce.application.usecase.UpdateProductOnlineProfileCommand;
@@ -186,6 +187,7 @@ public class EcommerceAdminController {
     @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR')")
     public ResponseEntity<PageResponse<EcommerceAdminOnlineProfileSummaryResponse>> listOnlineProfiles(
             @RequestParam(required = false) OnlinePublicationStatus status,
+            @RequestParam(required = false) String readinessStatus,
             @RequestParam(required = false) Long brandId,
             @RequestParam(defaultValue = "false") boolean withoutBrand,
             @RequestParam(required = false) Long onlineCategoryId,
@@ -195,6 +197,7 @@ public class EcommerceAdminController {
     ) {
         ProductOnlineProfileSearchCriteria criteria = buildOnlineProfilesCriteria(
                 status,
+                readinessStatus,
                 brandId,
                 withoutBrand,
                 onlineCategoryId,
@@ -428,6 +431,7 @@ public class EcommerceAdminController {
 
     private ProductOnlineProfileSearchCriteria buildOnlineProfilesCriteria(
             OnlinePublicationStatus status,
+            String readinessStatus,
             Long brandId,
             boolean withoutBrand,
             Long onlineCategoryId,
@@ -450,12 +454,24 @@ public class EcommerceAdminController {
         String normalizedQuery = q == null || q.isBlank() ? null : q.trim();
         return new ProductOnlineProfileSearchCriteria(
                 status,
+                parseReadinessStatus(readinessStatus),
                 brandId,
                 withoutBrand,
                 onlineCategoryId,
                 withoutOnlineCategory,
                 normalizedQuery
         );
+    }
+
+    private ReadinessStatus parseReadinessStatus(String readinessStatus) {
+        if (readinessStatus == null || readinessStatus.isBlank()) {
+            return null;
+        }
+        try {
+            return ReadinessStatus.valueOf(readinessStatus.trim());
+        } catch (IllegalArgumentException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "readinessStatus is invalid");
+        }
     }
 
     private EcommerceAdminSeoMetadataResponse toSeoResponse(EcommerceSeoMetadata metadata) {

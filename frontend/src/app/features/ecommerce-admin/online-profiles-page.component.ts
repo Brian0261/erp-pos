@@ -17,6 +17,7 @@ import { EcommerceAdminService, OnlineProfileListFilters } from "./data/ecommerc
 import { toHttpErrorMessage } from "./data/http-error-message";
 
 type PublicationFilter = "ALL" | OnlinePublicationStatus;
+type ReadinessFilter = "ALL" | ReadinessStatus;
 
 const NONE_VALUE = "__NONE__";
 
@@ -72,6 +73,16 @@ const NONE_VALUE = "__NONE__";
               <option value="ALL">Todos</option>
               <option *ngFor="let status of publicationStatuses" [value]="status">
                 {{ statusLabel(status) }}
+              </option>
+            </select>
+          </label>
+
+          <label class="filter-field filter-field--readiness">
+            <span>Preparación</span>
+            <select formControlName="readinessStatus">
+              <option value="ALL">Todas</option>
+              <option *ngFor="let status of readinessStatuses" [value]="status">
+                {{ readinessLabel(status) }}
               </option>
             </select>
           </label>
@@ -238,7 +249,7 @@ const NONE_VALUE = "__NONE__";
       }
 
       .filters-row--primary {
-        grid-template-columns: minmax(200px, 1fr) 180px;
+        grid-template-columns: minmax(200px, 1fr) 180px 200px;
       }
 
       .filters-row--secondary {
@@ -379,9 +390,18 @@ export class OnlineProfilesPageComponent implements OnInit, OnDestroy {
     "BLOCKED",
   ];
 
+  readonly readinessStatuses: ReadinessStatus[] = [
+    "READY",
+    "INCOMPLETE",
+    "NEEDS_ATTENTION",
+    "PUBLISHED",
+    "UNPUBLISHED",
+  ];
+
   readonly filtersForm = this.formBuilder.group({
     query: [""],
     status: ["ALL" as PublicationFilter],
+    readinessStatus: ["ALL" as ReadinessFilter],
     brandId: [""],
     onlineCategoryId: [""],
   });
@@ -447,6 +467,7 @@ export class OnlineProfilesPageComponent implements OnInit, OnDestroy {
     this.filtersForm.reset({
       query: "",
       status: "ALL",
+      readinessStatus: "ALL",
       brandId: "",
       onlineCategoryId: "",
     });
@@ -603,6 +624,7 @@ export class OnlineProfilesPageComponent implements OnInit, OnDestroy {
     return Boolean(
       String(raw.query || "").trim() ||
         raw.status !== "ALL" ||
+        raw.readinessStatus !== "ALL" ||
         raw.brandId ||
         raw.onlineCategoryId,
     );
@@ -621,6 +643,13 @@ export class OnlineProfilesPageComponent implements OnInit, OnDestroy {
       });
 
     this.filtersForm.controls.status.valueChanges
+      .pipe(takeUntil(this.destroy$), distinctUntilChanged())
+      .subscribe(() => {
+        this.page = 0;
+        this.loadProfiles();
+      });
+
+    this.filtersForm.controls.readinessStatus.valueChanges
       .pipe(takeUntil(this.destroy$), distinctUntilChanged())
       .subscribe(() => {
         this.page = 0;
@@ -706,6 +735,7 @@ export class OnlineProfilesPageComponent implements OnInit, OnDestroy {
     return {
       q: String(raw.query || "").trim() || undefined,
       status: raw.status === "ALL" ? undefined : raw.status as OnlinePublicationStatus,
+      readinessStatus: raw.readinessStatus === "ALL" ? undefined : raw.readinessStatus as ReadinessStatus,
       brandId: Number.isFinite(brandId) ? brandId : undefined,
       withoutBrand: withoutBrand || undefined,
       onlineCategoryId: Number.isFinite(onlineCategoryId) ? onlineCategoryId : undefined,

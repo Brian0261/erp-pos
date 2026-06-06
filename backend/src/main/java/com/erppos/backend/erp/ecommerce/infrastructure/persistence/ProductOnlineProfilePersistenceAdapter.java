@@ -1,18 +1,29 @@
 package com.erppos.backend.erp.ecommerce.infrastructure.persistence;
 
+import com.erppos.backend.erp.catalog.infrastructure.persistence.ProductEntity;
 import com.erppos.backend.erp.ecommerce.domain.exception.EcommerceNotFoundException;
+import com.erppos.backend.erp.ecommerce.application.usecase.ReadinessStatus;
+import com.erppos.backend.erp.ecommerce.domain.model.AssetType;
 import com.erppos.backend.erp.ecommerce.domain.model.OnlinePublicationStatus;
 import com.erppos.backend.erp.ecommerce.domain.model.ProductOnlineProfile;
+import com.erppos.backend.erp.ecommerce.domain.model.RobotsPolicy;
 import com.erppos.backend.erp.ecommerce.domain.port.ProductOnlineProfileRepositoryPort;
 import com.erppos.backend.erp.ecommerce.domain.port.ProductOnlineProfileSearchCriteria;
 import com.erppos.backend.erp.ecommerce.infrastructure.mapper.ProductOnlineProfileMapper;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Root;
+import jakarta.persistence.criteria.Subquery;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -106,6 +117,9 @@ public class ProductOnlineProfilePersistenceAdapter implements ProductOnlineProf
             if (criteria.status() != null) {
                 predicates.add(criteriaBuilder.equal(root.get("publicationStatus"), criteria.status()));
             }
+            if (criteria.readinessStatus() != null) {
+                predicates.add(readinessPredicate(root, query, criteriaBuilder, criteria.readinessStatus()));
+            }
             if (criteria.brandId() != null) {
                 predicates.add(criteriaBuilder.equal(root.get("brandId"), criteria.brandId()));
             } else if (criteria.withoutBrand()) {
@@ -128,5 +142,280 @@ public class ProductOnlineProfilePersistenceAdapter implements ProductOnlineProf
 
             return criteriaBuilder.and(predicates.toArray(Predicate[]::new));
         };
+    }
+
+    private Predicate readinessPredicate(
+            Root<ProductOnlineProfileEntity> root,
+            CriteriaQuery<?> query,
+            CriteriaBuilder criteriaBuilder,
+            ReadinessStatus readinessStatus
+    ) {
+        if (readinessStatus == ReadinessStatus.PUBLISHED) {
+            return criteriaBuilder.equal(root.get("publicationStatus"), OnlinePublicationStatus.PUBLISHED);
+        }
+        if (readinessStatus == ReadinessStatus.UNPUBLISHED) {
+            return criteriaBuilder.equal(root.get("publicationStatus"), OnlinePublicationStatus.UNPUBLISHED);
+        }
+
+        Predicate notTerminalPublicationStatus = root.get("publicationStatus").in(
+                OnlinePublicationStatus.PUBLISHED,
+                OnlinePublicationStatus.UNPUBLISHED
+        ).not();
+        Expression<Integer> missingCount = missingRequirementCount(root, query, criteriaBuilder);
+
+        return switch (readinessStatus) {
+            case READY -> criteriaBuilder.and(
+                    notTerminalPublicationStatus,
+                    criteriaBuilder.equal(missingCount, 0)
+            );
+            case INCOMPLETE -> criteriaBuilder.and(
+                    notTerminalPublicationStatus,
+                    criteriaBuilder.between(missingCount, 1, 3)
+            );
+            case NEEDS_ATTENTION -> criteriaBuilder.and(
+                    notTerminalPublicationStatus,
+                    criteriaBuilder.greaterThan(missingCount, 3)
+            );
+            default -> criteriaBuilder.conjunction();
+        };
+    }
+
+    private Expression<Integer> missingRequirementCount(
+            Root<ProductOnlineProfileEntity> root,
+            CriteriaQuery<?> query,
+            CriteriaBuilder criteriaBuilder
+    ) {
+        List<Predicate> missingPredicates = List.of(
+                criteriaBuilder.not(existsActiveProduct(root, query, criteriaBuilder)),
+                existsProductWithMissingSku(root, query, criteriaBuilder),
+                isBlank(root.get("onlineName"), criteriaBuilder),
+                isBlank(root.get("onlineDescription"), criteriaBuilder),
+                slugMissingOrDuplicated(root, query, criteriaBuilder),
+                categoryMissing(root, query, criteriaBuilder),
+                brandMissing(root, query, criteriaBuilder),
+                criteriaBuilder.not(existsValidPrimaryAsset(root, query, criteriaBuilder)),
+                criteriaBuilder.not(existsCompleteSeo(root, query, criteriaBuilder)),
+                criteriaBuilder.not(hasValidPrice(root, query, criteriaBuilder))
+        );
+
+        Expression<Integer> count = criteriaBuilder.literal(0);
+        for (Predicate predicate : missingPredicates) {
+            count = criteriaBuilder.sum(
+                    count,
+                    criteriaBuilder.<Integer>selectCase().when(predicate, 1).otherwise(0)
+            );
+        }
+        return count;
+    }
+
+    private Predicate existsActiveProduct(
+            Root<ProductOnlineProfileEntity> root,
+            CriteriaQuery<?> query,
+            CriteriaBuilder criteriaBuilder
+    ) {
+        Subquery<Integer> subquery = query.subquery(Integer.class);
+        Root<ProductEntity> product = subquery.from(ProductEntity.class);
+        subquery.select(criteriaBuilder.literal(1));
+        subquery.where(
+                criteriaBuilder.equal(product.get("id"), root.get("productId")),
+                criteriaBuilder.isTrue(product.get("active"))
+        );
+        return criteriaBuilder.exists(subquery);
+    }
+
+    private Predicate existsProductWithMissingSku(
+            Root<ProductOnlineProfileEntity> root,
+            CriteriaQuery<?> query,
+            CriteriaBuilder criteriaBuilder
+    ) {
+        Subquery<Integer> subquery = query.subquery(Integer.class);
+        Root<ProductEntity> product = subquery.from(ProductEntity.class);
+        subquery.select(criteriaBuilder.literal(1));
+        subquery.where(
+                criteriaBuilder.equal(product.get("id"), root.get("productId")),
+                isBlank(product.get("sku"), criteriaBuilder)
+        );
+        return criteriaBuilder.exists(subquery);
+    }
+
+    private Predicate slugMissingOrDuplicated(
+            Root<ProductOnlineProfileEntity> root,
+            CriteriaQuery<?> query,
+            CriteriaBuilder criteriaBuilder
+    ) {
+        Predicate slugMissing = criteriaBuilder.or(
+                isBlank(root.get("slug"), criteriaBuilder),
+                criteriaBuilder.notEqual(criteriaBuilder.lower(root.get("slug")), root.get("slug"))
+        );
+        return criteriaBuilder.or(slugMissing, existsDuplicatedSlug(root, query, criteriaBuilder));
+    }
+
+    private Predicate existsDuplicatedSlug(
+            Root<ProductOnlineProfileEntity> root,
+            CriteriaQuery<?> query,
+            CriteriaBuilder criteriaBuilder
+    ) {
+        Subquery<Integer> subquery = query.subquery(Integer.class);
+        Root<ProductOnlineProfileEntity> duplicate = subquery.from(ProductOnlineProfileEntity.class);
+        subquery.select(criteriaBuilder.literal(1));
+        subquery.where(
+                criteriaBuilder.isNotNull(root.get("slug")),
+                criteriaBuilder.notEqual(duplicate.get("id"), root.get("id")),
+                criteriaBuilder.equal(
+                        criteriaBuilder.lower(duplicate.get("slug")),
+                        criteriaBuilder.lower(root.get("slug"))
+                )
+        );
+        return criteriaBuilder.exists(subquery);
+    }
+
+    private Predicate categoryMissing(
+            Root<ProductOnlineProfileEntity> root,
+            CriteriaQuery<?> query,
+            CriteriaBuilder criteriaBuilder
+    ) {
+        return criteriaBuilder.or(
+                criteriaBuilder.isNull(root.get("onlineCategoryId")),
+                criteriaBuilder.not(existsOnlineCategory(root, query, criteriaBuilder))
+        );
+    }
+
+    private Predicate existsOnlineCategory(
+            Root<ProductOnlineProfileEntity> root,
+            CriteriaQuery<?> query,
+            CriteriaBuilder criteriaBuilder
+    ) {
+        Subquery<Integer> subquery = query.subquery(Integer.class);
+        Root<EcommerceOnlineCategoryEntity> category = subquery.from(EcommerceOnlineCategoryEntity.class);
+        subquery.select(criteriaBuilder.literal(1));
+        subquery.where(criteriaBuilder.equal(category.get("id"), root.get("onlineCategoryId")));
+        return criteriaBuilder.exists(subquery);
+    }
+
+    private Predicate brandMissing(
+            Root<ProductOnlineProfileEntity> root,
+            CriteriaQuery<?> query,
+            CriteriaBuilder criteriaBuilder
+    ) {
+        return criteriaBuilder.or(
+                criteriaBuilder.and(
+                        criteriaBuilder.isNull(root.get("brandId")),
+                        criteriaBuilder.isNull(root.get("brandAbsencePolicy"))
+                ),
+                criteriaBuilder.and(
+                        criteriaBuilder.isNotNull(root.get("brandId")),
+                        criteriaBuilder.not(existsBrand(root, query, criteriaBuilder))
+                )
+        );
+    }
+
+    private Predicate existsBrand(
+            Root<ProductOnlineProfileEntity> root,
+            CriteriaQuery<?> query,
+            CriteriaBuilder criteriaBuilder
+    ) {
+        Subquery<Integer> subquery = query.subquery(Integer.class);
+        Root<EcommerceBrandEntity> brand = subquery.from(EcommerceBrandEntity.class);
+        subquery.select(criteriaBuilder.literal(1));
+        subquery.where(criteriaBuilder.equal(brand.get("id"), root.get("brandId")));
+        return criteriaBuilder.exists(subquery);
+    }
+
+    private Predicate existsValidPrimaryAsset(
+            Root<ProductOnlineProfileEntity> root,
+            CriteriaQuery<?> query,
+            CriteriaBuilder criteriaBuilder
+    ) {
+        Subquery<Integer> subquery = query.subquery(Integer.class);
+        Root<ProductAssetEntity> asset = subquery.from(ProductAssetEntity.class);
+        subquery.select(criteriaBuilder.literal(1));
+        subquery.where(
+                criteriaBuilder.equal(asset.get("productOnlineProfileId"), root.get("id")),
+                criteriaBuilder.isTrue(asset.get("active")),
+                criteriaBuilder.isTrue(asset.get("primary")),
+                criteriaBuilder.equal(asset.get("assetType"), AssetType.PRODUCT_IMAGE),
+                criteriaBuilder.isTrue(asset.get("rightsConfirmed")),
+                criteriaBuilder.not(isBlank(asset.get("altText"), criteriaBuilder))
+        );
+        return criteriaBuilder.exists(subquery);
+    }
+
+    private Predicate existsCompleteSeo(
+            Root<ProductOnlineProfileEntity> root,
+            CriteriaQuery<?> query,
+            CriteriaBuilder criteriaBuilder
+    ) {
+        Subquery<Integer> subquery = query.subquery(Integer.class);
+        Root<EcommerceSeoMetadataEntity> seo = subquery.from(EcommerceSeoMetadataEntity.class);
+        subquery.select(criteriaBuilder.literal(1));
+        subquery.where(
+                criteriaBuilder.equal(seo.get("productOnlineProfileId"), root.get("id")),
+                criteriaBuilder.not(isBlank(seo.get("seoTitle"), criteriaBuilder)),
+                criteriaBuilder.not(isBlank(seo.get("seoDescription"), criteriaBuilder)),
+                criteriaBuilder.or(
+                        criteriaBuilder.isFalse(seo.get("indexable")),
+                        criteriaBuilder.equal(seo.get("robotsPolicy"), RobotsPolicy.INDEX_FOLLOW)
+                )
+        );
+        return criteriaBuilder.exists(subquery);
+    }
+
+    private Predicate hasValidPrice(
+            Root<ProductOnlineProfileEntity> root,
+            CriteriaQuery<?> query,
+            CriteriaBuilder criteriaBuilder
+    ) {
+        return criteriaBuilder.or(
+                existsUsablePriceOverride(root, query, criteriaBuilder),
+                existsProductWithValidPrice(root, query, criteriaBuilder)
+        );
+    }
+
+    private Predicate existsUsablePriceOverride(
+            Root<ProductOnlineProfileEntity> root,
+            CriteriaQuery<?> query,
+            CriteriaBuilder criteriaBuilder
+    ) {
+        Instant now = Instant.now();
+        Subquery<Integer> subquery = query.subquery(Integer.class);
+        Root<OnlinePriceOverrideEntity> override = subquery.from(OnlinePriceOverrideEntity.class);
+        subquery.select(criteriaBuilder.literal(1));
+        subquery.where(
+                criteriaBuilder.equal(override.get("productOnlineProfileId"), root.get("id")),
+                criteriaBuilder.isTrue(override.get("active")),
+                criteriaBuilder.greaterThan(override.get("amount"), BigDecimal.ZERO),
+                criteriaBuilder.equal(criteriaBuilder.lower(override.get("currency")), "pen"),
+                criteriaBuilder.or(
+                        criteriaBuilder.isNull(override.get("validFrom")),
+                        criteriaBuilder.lessThanOrEqualTo(override.get("validFrom"), now)
+                ),
+                criteriaBuilder.or(
+                        criteriaBuilder.isNull(override.get("validTo")),
+                        criteriaBuilder.greaterThan(override.get("validTo"), now)
+                )
+        );
+        return criteriaBuilder.exists(subquery);
+    }
+
+    private Predicate existsProductWithValidPrice(
+            Root<ProductOnlineProfileEntity> root,
+            CriteriaQuery<?> query,
+            CriteriaBuilder criteriaBuilder
+    ) {
+        Subquery<Integer> subquery = query.subquery(Integer.class);
+        Root<ProductEntity> product = subquery.from(ProductEntity.class);
+        subquery.select(criteriaBuilder.literal(1));
+        subquery.where(
+                criteriaBuilder.equal(product.get("id"), root.get("productId")),
+                criteriaBuilder.greaterThan(product.get("salePrice"), BigDecimal.ZERO)
+        );
+        return criteriaBuilder.exists(subquery);
+    }
+
+    private Predicate isBlank(Expression<String> value, CriteriaBuilder criteriaBuilder) {
+        return criteriaBuilder.or(
+                criteriaBuilder.isNull(value),
+                criteriaBuilder.equal(criteriaBuilder.trim(value), "")
+        );
     }
 }
