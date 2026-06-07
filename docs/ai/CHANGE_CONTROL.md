@@ -286,6 +286,28 @@ Estandarizar cambios tecnicos para reducir regresiones y mantener trazabilidad e
 - Siguiente paso esperado: Fase 2G.3A — Indicador de perfil online en Productos (Angular frontend).
 - NOTA: `/productos/[slug]` ya fue implementada en 2F.3B y validada exitosamente en 2G.2. No requiere nueva implementacion.
 
+### Cierre Fase 2H.5D QA Detalle de Perfil Online
+
+- Tipo: cierre documental QA de UX administrativa Angular-only.
+- Fase funcional base: 2H.5C-FIX.
+- Commit funcional: `fcf6017 feat(ecommerce-admin): refine online profile detail workflow`.
+- Pantalla: `Catalogo online > Perfiles online > Detalle de Perfil online`.
+- Archivo funcional validado: `frontend/src/app/features/ecommerce-admin/online-profile-detail-page.component.ts`.
+- Alcance cerrado:
+  - Tabs operativos Contenido, SEO, Imagen y Precio.
+  - Checklist lateral clicable.
+  - Boton `Ir al primer pendiente`.
+  - Panel `Requisitos para publicar` como guia operativa con resumen, pendientes primero y completados colapsados/discretos.
+  - Ajustes de copy, paleta, tipografia y jerarquia visual.
+- Validaciones:
+  - `npm run build`: OK.
+  - Smoke UI Docker/headless: OK.
+  - Desktop/tablet/mobile: OK.
+  - Caso con pendientes y caso sin pendientes: OK.
+  - Sin errores JS capturados.
+- Documentacion creada: `docs/qa/PHASE2_2H5D_ONLINE_PROFILE_DETAIL_QA.md`.
+- Exclusiones confirmadas: sin backend, endpoints, DTOs, servicios, Storefront, Flyway/DB, Docker, `.env`, secretos, reglas de publicacion, payloads ni contratos.
+
 ### Inicio Fase 2E.0 Storefront MVP Shell Planning
 
 - Tipo: documentacion tecnica de planificacion, sin implementacion funcional.

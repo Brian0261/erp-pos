@@ -251,3 +251,13 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
 - Sin cambios en codigo funcional durante fase documental 2G.2D.
 - Sin cambios en frontend Angular, Flyway/DB, Docker, `.env` raiz, AWS/staging.
 - Sin checkout, carrito, pagos, pedidos, login cliente, perfil cliente, Merchant Center.
+
+## Fase 2H.5D QA Detalle de Perfil Online
+
+- Fase 2H.5C-FIX cerrada funcionalmente en commit `fcf6017 feat(ecommerce-admin): refine online profile detail workflow`.
+- Pantalla validada: `Catalogo online > Perfiles online > Detalle de Perfil online`.
+- Archivo funcional validado: `frontend/src/app/features/ecommerce-admin/online-profile-detail-page.component.ts`.
+- Alcance validado: tabs Contenido/SEO/Imagen/Precio, checklist lateral clicable, `Ir al primer pendiente`, panel `Requisitos para publicar` como guia operativa, pendientes primero, completados colapsados/discretos, copy/paleta/tipografia/jerarquia visual.
+- Validaciones: `npm run build` OK, smoke UI Docker/headless OK, desktop/tablet/mobile OK, caso con pendientes OK, caso sin pendientes OK, sin errores JS.
+- Documentacion QA creada: `docs/qa/PHASE2_2H5D_ONLINE_PROFILE_DETAIL_QA.md`.
+- Sin cambios en backend, endpoints, DTOs, servicios, Storefront, Flyway/DB, Docker, `.env`, secretos, reglas de publicacion, payloads ni contratos durante el cierre documental.
