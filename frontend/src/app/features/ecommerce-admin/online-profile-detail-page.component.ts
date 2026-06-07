@@ -23,7 +23,16 @@ import { toHttpErrorMessage } from "./data/http-error-message";
 
 interface RequirementGroup {
   title: string;
-  anchor: string;
+  target: OnlineProfileDetailTab | "product";
+  requirements: MissingRequirement[];
+}
+
+type OnlineProfileDetailTab = "content" | "seo" | "asset" | "price";
+
+interface DetailTab {
+  id: OnlineProfileDetailTab;
+  label: string;
+  description: string;
   requirements: MissingRequirement[];
 }
 
@@ -35,13 +44,14 @@ interface RequirementGroup {
     <section class="ecommerce-detail-page">
       <header class="detail-hero">
         <div class="hero-copy">
-          <a class="back-link" routerLink="/ecommerce-admin/perfiles">Volver al listado</a>
-          <p class="ui-page-kicker">Catálogo online</p>
+          <div class="hero-nav-row">
+            <a class="back-link" routerLink="/ecommerce-admin/perfiles">← Volver a perfiles</a>
+          </div>
           <h1 class="ui-page-title">
             {{ profile?.onlineName || profile?.productName || "Perfil online" }}
           </h1>
           <p class="ui-page-description">
-            Revisa el contexto ERP/POS, corrige contenido ecommerce y completa los requisitos antes de publicar.
+            Revisa el producto ERP, completa la información online y corrige los pendientes antes de publicar.
           </p>
         </div>
 
@@ -106,9 +116,9 @@ interface RequirementGroup {
         Modo revisión: como SUPERVISOR solo puedes consultar. Las acciones de cambio son exclusivas de ADMIN.
       </p>
 
-      <section class="overview-grid" *ngIf="!loading && profile">
+      <section class="overview-grid" id="erp-identity-summary" *ngIf="!loading && profile">
         <article class="overview-card overview-card--product">
-          <p class="overview-kicker">Producto ERP/POS readonly</p>
+          <p class="overview-kicker">Identidad ERP/POS</p>
           <h2>{{ profile.productName || "Producto ERP no disponible" }}</h2>
           <div class="meta-line">
             <span>SKU: {{ profile.productSku || "-" }}</span>
@@ -130,7 +140,7 @@ interface RequirementGroup {
         </article>
 
         <article class="overview-card">
-          <p class="overview-kicker">Taxonomía comercial</p>
+          <p class="overview-kicker">Categoría y marca</p>
           <h3>{{ onlineCategoryLabel(profile.onlineCategoryId) }}</h3>
           <p class="summary-value">{{ brandLabel(profile) }}</p>
         </article>
@@ -146,28 +156,55 @@ interface RequirementGroup {
 
       <div class="detail-layout" *ngIf="!loading && profile">
         <main class="detail-main">
-          <section class="detail-card" id="contenido-ecommerce">
+          <section class="tabs-shell" id="profile-tabs">
+            <div class="tab-list" role="tablist" aria-label="Secciones del perfil online">
+              <button
+                *ngFor="let tab of detailTabs"
+                type="button"
+                class="tab-button"
+                role="tab"
+                [class.is-active]="activeTab === tab.id"
+                [attr.aria-selected]="activeTab === tab.id"
+                [attr.aria-controls]="tab.id + '-panel'"
+                (click)="setActiveTab(tab.id)"
+              >
+                <span>{{ tab.label }}</span>
+                <span
+                  class="tab-badge"
+                  [class.is-ok]="pendingCountForTab(tab.id) === 0"
+                >
+                  {{ pendingCountForTab(tab.id) === 0 ? "OK" : pendingCountForTab(tab.id) }}
+                </span>
+              </button>
+            </div>
+          </section>
+
+          <section
+            class="detail-card"
+            id="content-panel"
+            role="tabpanel"
+            [hidden]="activeTab !== 'content'"
+          >
             <header class="card-head">
               <div>
                 <p class="overview-kicker">Editable ecommerce</p>
                 <h2>Contenido ecommerce</h2>
               </div>
-              <span class="card-hint">Nombre, descripción, categoría y marca online.</span>
             </header>
 
             <form [formGroup]="profileForm" class="form-grid" (ngSubmit)="saveProfile()">
-              <label class="field">
-                <span>Slug</span>
-                <input type="text" formControlName="slug" maxlength="180" />
-                <small class="field-help">Se valida y normaliza en backend.</small>
-              </label>
-
               <label class="field">
                 <span>Nombre online</span>
                 <input type="text" formControlName="onlineName" maxlength="180" />
                 <small class="field-help" *ngIf="isProfileInvalid('onlineName')">
                   El nombre online excede el máximo permitido.
                 </small>
+              </label>
+
+              <label class="field">
+                <span>Slug</span>
+                <input type="text" formControlName="slug" maxlength="180" />
+                <small class="field-help">Ruta pública del producto. Se normaliza al guardar.</small>
               </label>
 
               <label class="field field--full">
@@ -218,44 +255,61 @@ interface RequirementGroup {
             </p>
           </section>
 
-          <section class="detail-card" id="seo">
+          <section
+            class="detail-card"
+            id="seo-panel"
+            role="tabpanel"
+            [hidden]="activeTab !== 'seo'"
+          >
             <header class="card-head">
               <div>
-                <p class="overview-kicker">SEO-first</p>
                 <h2>SEO</h2>
               </div>
-              <span class="card-hint">Metadatos para buscadores y redes sociales.</span>
             </header>
 
             <form [formGroup]="seoForm" class="form-grid" (ngSubmit)="saveSeo()">
-              <label class="field">
-                <span>SEO title</span>
+              <p class="form-group-label form-group-label--full">SEO básico</p>
+
+              <label class="field field--full">
+                <span>Título SEO</span>
                 <input type="text" formControlName="seoTitle" maxlength="160" />
               </label>
 
               <label class="field field--full">
-                <span>SEO description</span>
+                <span>Descripción SEO</span>
                 <textarea formControlName="seoDescription" rows="3" maxlength="320"></textarea>
               </label>
 
               <label class="field">
-                <span>Ruta canónica</span>
-                <input type="text" formControlName="canonicalPath" maxlength="300" />
-              </label>
-
-              <label class="field">
-                <span>Indexación para buscadores</span>
+                <span>Política de robots</span>
                 <select formControlName="robotsPolicy">
                   <option [ngValue]="null">Sin definir</option>
                   <option *ngFor="let policy of robotsPolicies" [ngValue]="policy">
                     {{ robotsPolicyLabel(policy) }}
                   </option>
                 </select>
+                <small class="field-help">Define la instrucción técnica que recibirán los buscadores.</small>
               </label>
 
-              <label class="field field--checkbox">
-                <input type="checkbox" formControlName="indexable" />
-                <span>Permitir indexación</span>
+              <div class="field field--checkbox-block">
+                <label class="field field--checkbox field--checkbox-inline">
+                  <input type="checkbox" formControlName="indexable" />
+                  <span>Habilitar indexación pública</span>
+                </label>
+                <small class="field-help field-help--nested">
+                  Requiere política "Indexar y seguir enlaces" y SEO básico completo.
+                </small>
+              </div>
+
+              <p class="ui-alert ui-alert--info seo-index-warning" *ngIf="shouldShowIndexingWarning()">
+                Para habilitar indexación pública, cambia la política de robots a "Indexar y seguir enlaces".
+              </p>
+
+              <p class="form-group-label form-group-label--full">SEO avanzado y redes sociales</p>
+
+              <label class="field">
+                <span>Ruta canónica</span>
+                <input type="text" formControlName="canonicalPath" maxlength="300" />
               </label>
 
               <label class="field">
@@ -285,24 +339,20 @@ interface RequirementGroup {
             </p>
           </section>
 
-          <section class="detail-card" id="imagen-principal">
+          <section
+            class="detail-card"
+            id="asset-panel"
+            role="tabpanel"
+            [hidden]="activeTab !== 'asset'"
+          >
             <header class="card-head">
               <div>
-                <p class="overview-kicker">Activo visual</p>
                 <h2>Imagen principal</h2>
               </div>
-              <span class="card-hint">Imagen pública, alt text y derechos confirmados.</span>
             </header>
 
             <form [formGroup]="assetForm" class="form-grid" (ngSubmit)="saveAsset()">
-              <label class="field">
-                <span>Tipo de imagen</span>
-                <select formControlName="assetType">
-                  <option *ngFor="let assetType of assetTypes" [ngValue]="assetType">
-                    {{ assetTypeLabel(assetType) }}
-                  </option>
-                </select>
-              </label>
+              <p class="form-group-label form-group-label--full">Datos de imagen</p>
 
               <label class="field field--full">
                 <span>URL de imagen</span>
@@ -317,6 +367,8 @@ interface RequirementGroup {
                 <input type="text" formControlName="altText" maxlength="250" />
               </label>
 
+              <p class="form-group-label form-group-label--full">Origen y derechos</p>
+
               <label class="field">
                 <span>Fuente</span>
                 <select formControlName="source">
@@ -326,14 +378,25 @@ interface RequirementGroup {
                 </select>
               </label>
 
-              <label class="field">
-                <span>Orden de visualización</span>
-                <input type="number" formControlName="displayOrder" min="0" step="1" />
-              </label>
-
               <label class="field field--checkbox">
                 <input type="checkbox" formControlName="rightsConfirmed" />
                 <span>Derechos confirmados</span>
+              </label>
+
+              <p class="form-group-label form-group-label--full">Configuración</p>
+
+              <label class="field">
+                <span>Tipo de imagen</span>
+                <select formControlName="assetType">
+                  <option *ngFor="let assetType of assetTypes" [ngValue]="assetType">
+                    {{ assetTypeLabel(assetType) }}
+                  </option>
+                </select>
+              </label>
+
+              <label class="field">
+                <span>Orden de visualización</span>
+                <input type="number" formControlName="displayOrder" min="0" step="1" />
               </label>
 
               <div class="section-actions" *ngIf="canManage">
@@ -348,21 +411,37 @@ interface RequirementGroup {
             </p>
           </section>
 
-          <section class="detail-card" id="precio-online">
+          <section
+            class="detail-card"
+            id="price-panel"
+            role="tabpanel"
+            [hidden]="activeTab !== 'price'"
+          >
             <header class="card-head">
               <div>
-                <p class="overview-kicker">Comercial online</p>
-                <h2>Precio online personalizado</h2>
+                <h2>Precio online</h2>
               </div>
-              <span class="card-hint">Override ecommerce sin modificar el precio ERP/POS.</span>
             </header>
 
+            <p class="form-group-label form-group-label--full">Precio actual</p>
             <div class="price-strip">
               <span>Precio efectivo</span>
               <strong>{{ effectivePriceLabel() }}</strong>
             </div>
 
             <form [formGroup]="priceForm" class="form-grid" (ngSubmit)="savePriceOverride()">
+              <p class="form-group-label form-group-label--full">Precio personalizado</p>
+
+              <div class="field field--full field--checkbox-block field--price-toggle">
+                <label class="field field--checkbox field--checkbox-inline field--price-toggle-inline">
+                  <input type="checkbox" formControlName="active" />
+                  <span>Usar precio personalizado online</span>
+                </label>
+                <small class="field-help field-help--nested field-help--price-toggle">
+                  Solo cambia el precio mostrado online. No modifica el precio del ERP/POS.
+                </small>
+              </div>
+
               <label class="field">
                 <span>Monto</span>
                 <input type="number" formControlName="amount" step="0.01" min="0.01" />
@@ -374,11 +453,6 @@ interface RequirementGroup {
               <label class="field">
                 <span>Moneda</span>
                 <input type="text" formControlName="currency" maxlength="3" />
-              </label>
-
-              <label class="field field--checkbox">
-                <input type="checkbox" formControlName="active" />
-                <span>Usar precio online diferente</span>
               </label>
 
               <label class="field">
@@ -418,38 +492,112 @@ interface RequirementGroup {
                 [class.ui-badge--success]="publicationValidation.publishable"
                 [class.ui-badge--danger]="!publicationValidation.publishable"
               >
-                {{ publicationValidation.publishable ? "Publicable" : "Pendiente" }}
+                {{ publicationValidation.publishable ? "OK" : "Pendiente" }}
               </span>
             </div>
 
-            <p class="publish-state">
-              {{ validationSummaryLabel() }}
-            </p>
-
-            <div class="checklist-group" *ngFor="let group of requirementGroups">
-              <div class="checklist-group__head">
-                <a [href]="'#' + group.anchor">{{ group.title }}</a>
-                <span [class.is-ok]="groupPendingCount(group.requirements) === 0">
-                  {{ groupPendingCount(group.requirements) === 0 ? "OK" : groupPendingCount(group.requirements) + " pendiente(s)" }}
-                </span>
+            <div class="publish-summary" aria-label="Resumen de requisitos de publicación">
+              <div class="publish-summary__item publish-summary__item--pending">
+                <strong>{{ pendingRequirementsCount() }}</strong>
+                <span>Pendientes</span>
               </div>
-              <ul class="checklist-list">
-                <li
-                  *ngFor="let requirement of group.requirements"
-                  [class.is-missing]="isRequirementMissing(requirement)"
-                >
-                  <span class="check-dot"></span>
-                  <div>
-                    <strong>{{ requirementLabel(requirement) }}</strong>
-                    <small>{{ requirementHelp(requirement) }}</small>
-                  </div>
-                </li>
-              </ul>
+              <div class="publish-summary__item">
+                <strong>{{ completedRequirementsCount() }}</strong>
+                <span>Completados</span>
+              </div>
             </div>
 
-            <p class="ui-muted technical-count" *ngIf="publicationValidation.errors.length > 0">
-              {{ publicationValidation.errors.length }} bloqueo(s) devueltos por backend. Se muestran arriba como tareas accionables.
+            <p class="publish-state" *ngIf="firstPendingRequirementLabel() as nextRequirement">
+              Siguiente pendiente: {{ nextRequirement }}
             </p>
+
+            <p class="publish-state" *ngIf="!hasPendingRequirements()">
+              Sin pendientes de publicación.
+            </p>
+
+            <button
+              type="button"
+              class="first-pending-button"
+              (click)="goToFirstPending()"
+              [disabled]="!hasPendingRequirements()"
+            >
+              Ir al primer pendiente
+            </button>
+
+            <div class="publish-card__body">
+              <section class="checklist-section" *ngIf="pendingRequirementGroups().length > 0">
+                <p class="checklist-section-title">Pendientes</p>
+
+                <div class="checklist-group checklist-group--pending" *ngFor="let group of pendingRequirementGroups()">
+                  <div class="checklist-group__head">
+                    <button type="button" class="checklist-nav" (click)="openRequirementGroup(group)">
+                      {{ group.title }}
+                    </button>
+                    <span>{{ groupPendingCount(group.requirements) }} pendiente(s)</span>
+                  </div>
+                  <ul class="checklist-list checklist-list--pending">
+                    <li
+                      *ngFor="let requirement of pendingRequirementsForGroup(group)"
+                      class="is-missing"
+                    >
+                      <span class="check-dot"></span>
+                      <button type="button" class="checklist-item" (click)="openRequirement(requirement)">
+                        <strong>{{ requirementLabel(requirement) }}</strong>
+                        <small>{{ requirementHelp(requirement) }}</small>
+                      </button>
+                    </li>
+                  </ul>
+                </div>
+              </section>
+
+              <details
+                class="checklist-section checklist-section--completed completed-details"
+                *ngIf="hasPendingRequirements() && completedRequirementsCount() > 0"
+              >
+                <summary>
+                  <span>Completados</span>
+                  <strong>{{ completedRequirementsCount() }} OK</strong>
+                </summary>
+
+                <div class="completed-group" *ngFor="let group of completedRequirementGroups()">
+                  <button type="button" class="checklist-nav completed-group__button" (click)="openRequirementGroup(group)">
+                    {{ group.title }}
+                  </button>
+                  <span>{{ group.requirements.length }} OK</span>
+                </div>
+
+                <div class="completed-group" *ngFor="let group of partialCompletedRequirementGroups()">
+                  <button type="button" class="checklist-nav completed-group__button" (click)="openRequirementGroup(group)">
+                    {{ group.title }}
+                  </button>
+                  <span>{{ completedCountForGroup(group.requirements) }} OK</span>
+                </div>
+              </details>
+
+              <section class="checklist-section checklist-section--ready" *ngIf="!hasPendingRequirements()">
+                <p class="ready-note">Todos los requisitos principales están completos.</p>
+                <details class="completed-details ready-details">
+                  <summary>
+                    <span>Ver requisitos completados</span>
+                    <strong>{{ completedRequirementsCount() }} OK</strong>
+                  </summary>
+
+                  <div class="completed-group" *ngFor="let group of requirementGroups">
+                    <button type="button" class="checklist-nav completed-group__button" (click)="openRequirementGroup(group)">
+                      {{ group.title }}
+                    </button>
+                    <span>{{ group.requirements.length }} OK</span>
+                  </div>
+                </details>
+              </section>
+
+              <details class="technical-count" *ngIf="publicationValidation.errors.length > 0">
+                <summary>{{ publicationValidation.errors.length }} bloqueo(s) técnicos</summary>
+                <p>
+                  El backend devolvió bloqueos adicionales. Se muestran arriba como tareas accionables cuando aplican.
+                </p>
+              </details>
+            </div>
           </section>
         </aside>
       </div>
@@ -473,30 +621,63 @@ interface RequirementGroup {
       }
 
       .detail-hero {
-        display: flex;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
         justify-content: space-between;
         align-items: flex-start;
         gap: var(--space-4);
-        padding: var(--space-5);
+        padding: var(--space-4);
         background:
-          linear-gradient(135deg, rgba(37, 99, 235, 0.09), transparent 42%),
+          linear-gradient(135deg, rgba(148, 163, 184, 0.1), transparent 48%),
           var(--color-bg-surface);
       }
 
       .hero-copy {
+        display: grid;
+        gap: var(--space-2);
         min-width: 0;
       }
 
+      .hero-nav-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-2);
+        flex-wrap: wrap;
+      }
+
       .back-link {
-        display: inline-block;
-        margin-bottom: var(--space-2);
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        width: fit-content;
+        margin: 0;
+        padding: 0.55rem 0.95rem;
+        border: 1px solid color-mix(in srgb, var(--color-border-strong) 82%, transparent);
+        border-radius: 999px;
+        background: color-mix(in srgb, var(--color-bg-soft) 86%, var(--color-bg-surface));
         font-weight: 700;
-        color: var(--color-brand-primary);
+        font-size: var(--font-size-sm);
+        color: var(--color-text-primary);
         text-decoration: none;
+        box-shadow: var(--shadow-sm);
+        transition:
+          background-color 140ms ease,
+          border-color 140ms ease,
+          color 140ms ease,
+          transform 140ms ease;
       }
 
       .back-link:hover {
-        text-decoration: underline;
+        background: color-mix(in srgb, var(--color-bg-soft) 100%, var(--color-bg-surface));
+        border-color: color-mix(in srgb, var(--color-text-secondary) 55%, transparent);
+        text-decoration: none;
+        transform: translateY(-1px);
+      }
+
+      .back-link:focus-visible {
+        outline: 2px solid color-mix(in srgb, var(--color-text-secondary) 75%, white);
+        outline-offset: 2px;
       }
 
       .hero-actions,
@@ -508,30 +689,43 @@ interface RequirementGroup {
       }
 
       .hero-actions {
+        align-self: start;
         justify-content: flex-end;
+        padding-top: 0.2rem;
       }
 
       .overview-grid {
         display: grid;
         grid-template-columns: 1.4fr repeat(3, minmax(0, 1fr));
-        gap: var(--space-3);
+        gap: var(--space-2);
       }
 
       .overview-card {
-        padding: var(--space-3);
+        padding: 0.85rem 1rem;
         display: grid;
-        gap: var(--space-2);
+        gap: 0.35rem;
         min-width: 0;
       }
 
       .overview-card--product {
         background: var(--color-bg-soft);
+        border-color: color-mix(in srgb, var(--color-border-strong) 40%, transparent);
       }
 
       .overview-card h2,
       .overview-card h3,
       .detail-card h2 {
         margin: 0;
+      }
+
+      .overview-card h2 {
+        font-size: 1.02rem;
+        line-height: 1.15;
+      }
+
+      .overview-card h3 {
+        font-size: 0.95rem;
+        line-height: 1.18;
       }
 
       .overview-kicker {
@@ -547,7 +741,7 @@ interface RequirementGroup {
       .meta-line {
         margin: 0;
         color: var(--color-text-secondary);
-        font-size: var(--font-size-sm);
+        font-size: var(--font-size-xs);
       }
 
       .summary-value {
@@ -555,9 +749,23 @@ interface RequirementGroup {
         overflow-wrap: anywhere;
       }
 
+      .overview-card--product .meta-line {
+        row-gap: 0.25rem;
+      }
+
+      .ui-page-title {
+        margin: 0;
+        line-height: 1.08;
+      }
+
+      .ui-page-description {
+        margin: 0;
+        max-width: 58rem;
+      }
+
       .detail-layout {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
+        grid-template-columns: minmax(0, 1fr) minmax(295px, 325px);
         gap: var(--space-4);
         align-items: start;
       }
@@ -569,8 +777,74 @@ interface RequirementGroup {
       }
 
       .detail-card,
+      .tabs-shell,
       .publish-card {
-        padding: var(--space-4);
+        padding: var(--space-3);
+      }
+
+      .tabs-shell {
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-lg);
+        background: var(--color-bg-surface);
+        box-shadow: var(--shadow-sm);
+        overflow: hidden;
+      }
+
+      .tab-list {
+        display: flex;
+        gap: var(--space-1);
+        overflow-x: auto;
+        padding: var(--space-1);
+      }
+
+      .tab-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-2);
+        min-width: 8.5rem;
+        border: 1px solid color-mix(in srgb, var(--color-border-default) 72%, transparent);
+        border-radius: var(--radius-md);
+        padding: 0.62rem 0.75rem;
+        background: color-mix(in srgb, var(--color-bg-soft) 42%, transparent);
+        color: var(--color-text-secondary);
+        font: inherit;
+        font-weight: 800;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+
+      .tab-button:hover {
+        background: color-mix(in srgb, var(--color-bg-soft) 88%, var(--color-bg-surface));
+        border-color: color-mix(in srgb, var(--color-border-strong) 56%, transparent);
+        color: var(--color-text-primary);
+      }
+
+      .tab-button:focus-visible {
+        outline: 2px solid color-mix(in srgb, var(--color-text-secondary) 72%, white);
+        outline-offset: 2px;
+      }
+
+      .tab-button.is-active {
+        border-color: color-mix(in srgb, var(--color-border-strong) 88%, transparent);
+        background: color-mix(in srgb, var(--color-bg-soft) 100%, var(--color-bg-surface));
+        color: var(--color-text-primary);
+        box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-text-secondary) 12%, transparent);
+      }
+
+      .tab-badge {
+        min-width: 1.7rem;
+        border-radius: 999px;
+        padding: 0.1rem 0.45rem;
+        background: color-mix(in srgb, var(--color-warning-bg) 88%, var(--color-bg-surface));
+        color: color-mix(in srgb, var(--color-warning-text) 84%, var(--color-text-primary));
+        font-size: var(--font-size-xs);
+        text-align: center;
+      }
+
+      .tab-badge.is-ok {
+        background: var(--color-success-bg);
+        color: var(--color-success-text);
       }
 
       .card-head,
@@ -583,26 +857,27 @@ interface RequirementGroup {
       }
 
       .card-head {
-        margin-bottom: var(--space-3);
+        margin-bottom: var(--space-2);
       }
 
       .card-hint {
         color: var(--color-text-secondary);
-        font-size: var(--font-size-sm);
+        font-size: var(--font-size-xs);
         text-align: right;
-        max-width: 18rem;
+        max-width: 14rem;
       }
 
       .form-grid {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: var(--space-3);
+        gap: var(--space-2);
       }
 
       .field {
         display: grid;
         gap: var(--space-1);
         min-width: 0;
+        align-content: start;
       }
 
       .field span {
@@ -617,9 +892,14 @@ interface RequirementGroup {
         width: 100%;
         border: 1px solid var(--color-border-strong);
         border-radius: var(--radius-sm);
-        padding: 0.58rem 0.65rem;
+        padding: 0.5rem 0.65rem;
         background: var(--color-bg-surface);
         box-sizing: border-box;
+      }
+
+      .field input,
+      .field select {
+        min-height: 2.75rem;
       }
 
       .field--full,
@@ -627,14 +907,79 @@ interface RequirementGroup {
         grid-column: 1 / -1;
       }
 
+      .form-group-label {
+        margin: var(--space-1) 0 0;
+        color: var(--color-text-secondary);
+        font-size: var(--font-size-xs);
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      .form-group-label--full {
+        grid-column: 1 / -1;
+      }
+
       .field--checkbox {
         grid-template-columns: auto 1fr;
         align-items: center;
+        min-height: 2.75rem;
+        align-self: center;
         gap: var(--space-2);
+      }
+
+      .field--checkbox-block {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 0.05rem;
+        min-width: 0;
+        align-self: center;
+      }
+
+      .field--checkbox-inline {
+        display: flex;
+        align-items: center;
+        gap: 0.55rem;
+        margin: 0;
+        transform: translateY(0);
+      }
+
+      .field--price-toggle {
+        align-self: stretch;
+        justify-content: flex-start;
+        gap: 0;
+      }
+
+      .field--price-toggle-inline {
+        min-height: auto;
+        align-self: start;
+        transform: translateY(0);
       }
 
       .field--checkbox input {
         width: auto;
+        margin-top: 0;
+      }
+
+      .field-help--nested {
+        padding-left: calc(1rem + 0.45rem);
+        max-width: 100%;
+        margin-top: -0.05rem;
+        line-height: 1.2;
+      }
+
+      .field-help--price-toggle {
+        margin-top: 0;
+      }
+
+      .seo-index-warning {
+        grid-column: 1 / -1;
+        margin-top: calc(var(--space-1) * -1);
+        margin-bottom: 0;
+        border: 1px solid color-mix(in srgb, var(--color-warning-bg) 70%, var(--color-border-default));
+        background: color-mix(in srgb, var(--color-warning-bg) 18%, var(--color-bg-surface));
+        color: color-mix(in srgb, var(--color-warning-text) 82%, var(--color-text-primary));
       }
 
       .field-help {
@@ -651,8 +996,8 @@ interface RequirementGroup {
         display: flex;
         justify-content: space-between;
         gap: var(--space-3);
-        margin-bottom: var(--space-3);
-        padding: var(--space-3);
+        margin-bottom: var(--space-2);
+        padding: var(--space-2) var(--space-3);
         border: 1px dashed var(--color-border-strong);
         border-radius: var(--radius-md);
         background: var(--color-bg-soft);
@@ -660,59 +1005,241 @@ interface RequirementGroup {
 
       .publish-panel {
         position: sticky;
-        top: var(--space-4);
+        top: 1rem;
+        max-height: calc(100vh - 2rem);
+        overflow: hidden;
       }
 
       .publish-card {
         display: grid;
-        gap: var(--space-3);
+        gap: 0.75rem;
+        max-height: calc(100vh - 2rem);
       }
 
       .publish-state {
         margin: 0;
-        color: var(--color-text-secondary);
+        color: color-mix(in srgb, var(--color-text-secondary) 88%, var(--color-text-primary));
+        font-size: var(--font-size-sm);
+        line-height: 1.35;
+      }
+
+      .publish-summary {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: var(--space-2);
+      }
+
+      .publish-summary__item {
+        display: grid;
+        gap: 0.1rem;
+        padding: var(--space-2);
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-md);
+        background: var(--color-bg-soft);
+      }
+
+      .publish-summary__item strong {
+        color: var(--color-text-primary);
+        font-size: 1.08rem;
+        font-weight: 700;
+        line-height: 1;
+      }
+
+      .publish-summary__item span {
+        color: color-mix(in srgb, var(--color-text-secondary) 86%, var(--color-text-primary));
+        font-size: var(--font-size-xs);
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+
+      .publish-summary__item--pending strong {
+        color: var(--color-warning-text);
+      }
+
+      .publish-card__body {
+        overflow-y: auto;
+        padding-right: 0.35rem;
+      }
+
+      .publish-card__body::-webkit-scrollbar {
+        width: 0.55rem;
+      }
+
+      .publish-card__body::-webkit-scrollbar-thumb {
+        background: color-mix(in srgb, var(--color-border-strong) 70%, transparent);
+        border-radius: 999px;
+      }
+
+      .first-pending-button {
+        width: 100%;
+        border: 1px solid color-mix(in srgb, var(--color-border-strong) 82%, transparent);
+        border-radius: var(--radius-md);
+        padding: 0.55rem 0.75rem;
+        background: color-mix(in srgb, var(--color-bg-soft) 86%, var(--color-bg-surface));
+        color: var(--color-text-primary);
+        font: inherit;
+        font-size: var(--font-size-sm);
+        font-weight: 800;
+        cursor: pointer;
+      }
+
+      .first-pending-button:hover:not(:disabled) {
+        background: color-mix(in srgb, var(--color-bg-soft) 100%, var(--color-bg-surface));
+        border-color: color-mix(in srgb, var(--color-text-secondary) 55%, transparent);
+      }
+
+      .first-pending-button:focus-visible {
+        outline: 2px solid color-mix(in srgb, var(--color-text-secondary) 72%, white);
+        outline-offset: 2px;
+      }
+
+      .first-pending-button:disabled {
+        cursor: not-allowed;
+        opacity: 0.55;
       }
 
       .checklist-group {
         border-top: 1px solid var(--color-border-default);
-        padding-top: var(--space-3);
+        padding-top: var(--space-2);
       }
 
-      .checklist-group__head a {
+      .checklist-section {
+        display: grid;
+        gap: var(--space-2);
+      }
+
+      .checklist-section + .checklist-section {
+        margin-top: var(--space-2);
+      }
+
+      .checklist-section-title {
+        margin: 0;
+        color: color-mix(in srgb, var(--color-text-secondary) 84%, var(--color-text-primary));
+        font-size: var(--font-size-xs);
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      .checklist-group--pending {
+        padding: var(--space-2);
+        border: 1px solid color-mix(in srgb, var(--color-warning-bg) 48%, var(--color-border-default));
+        border-radius: var(--radius-md);
+        background: color-mix(in srgb, var(--color-warning-bg) 8%, transparent);
+      }
+
+      .completed-details {
+        padding: var(--space-2);
+        border: 1px solid color-mix(in srgb, var(--color-border-default) 82%, transparent);
+        border-radius: var(--radius-md);
+        background: color-mix(in srgb, var(--color-bg-soft) 52%, transparent);
+      }
+
+      .completed-details summary {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: var(--space-2);
+        color: color-mix(in srgb, var(--color-text-secondary) 86%, var(--color-text-primary));
+        cursor: pointer;
+        font-size: var(--font-size-xs);
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        list-style: none;
+        text-transform: uppercase;
+      }
+
+      .completed-details summary::-webkit-details-marker {
+        display: none;
+      }
+
+      .completed-details summary::before {
+        content: "+";
+        color: var(--color-text-secondary);
+        font-weight: 900;
+      }
+
+      .completed-details[open] summary::before {
+        content: "-";
+      }
+
+      .completed-details summary span {
+        flex: 1;
+      }
+
+      .completed-details summary strong {
+        color: color-mix(in srgb, var(--color-success) 78%, var(--color-text-primary));
+        font-size: var(--font-size-xs);
+        white-space: nowrap;
+      }
+
+      .ready-details {
+        margin-top: var(--space-2);
+      }
+
+      .checklist-nav {
+        border: 0;
+        padding: 0;
+        background: transparent;
         color: var(--color-text-primary);
-        font-weight: 800;
+        font-weight: 700;
+        font-size: var(--font-size-sm);
+        font-family: inherit;
         text-decoration: none;
+        cursor: pointer;
       }
 
-      .checklist-group__head a:hover {
-        color: var(--color-brand-primary);
+      .checklist-nav:hover,
+      .checklist-item:hover strong {
+        color: var(--color-text-primary);
+      }
+
+      .checklist-nav:focus-visible,
+      .checklist-item:focus-visible {
+        outline: 2px solid color-mix(in srgb, var(--color-text-secondary) 72%, white);
+        outline-offset: 2px;
       }
 
       .checklist-group__head span {
-        color: var(--color-text-secondary);
+        color: color-mix(in srgb, var(--color-text-secondary) 82%, var(--color-text-primary));
         font-size: var(--font-size-xs);
-        font-weight: 800;
+        font-weight: 700;
         white-space: nowrap;
       }
 
       .checklist-group__head span.is-ok {
-        color: var(--color-success);
+        color: color-mix(in srgb, var(--color-success) 84%, var(--color-text-primary));
       }
 
       .checklist-list {
         list-style: none;
-        margin: var(--space-2) 0 0;
+        margin: var(--space-1) 0 0;
         padding: 0;
         display: grid;
-        gap: var(--space-2);
+        gap: var(--space-1);
+      }
+
+      .checklist-list--pending {
+        margin-top: var(--space-2);
       }
 
       .checklist-list li {
         display: grid;
         grid-template-columns: auto minmax(0, 1fr);
-        gap: var(--space-2);
+        gap: var(--space-1);
         color: var(--color-text-secondary);
-        opacity: 0.72;
+        opacity: 0.7;
+        padding: 0.15rem 0;
+      }
+
+      .checklist-item {
+        border: 0;
+        padding: 0;
+        background: transparent;
+        color: inherit;
+        font: inherit;
+        text-align: left;
+        cursor: pointer;
       }
 
       .checklist-list li.is-missing {
@@ -725,15 +1252,23 @@ interface RequirementGroup {
         display: block;
       }
 
+      .checklist-list strong {
+        font-size: var(--font-size-sm);
+        font-weight: 600;
+        line-height: 1.25;
+      }
+
       .checklist-list small {
-        margin-top: 0.15rem;
-        color: var(--color-text-secondary);
+        margin-top: 0.1rem;
+        color: color-mix(in srgb, var(--color-text-secondary) 88%, var(--color-text-primary));
+        font-size: 0.73rem;
+        line-height: 1.3;
       }
 
       .check-dot {
-        width: 0.62rem;
-        height: 0.62rem;
-        margin-top: 0.32rem;
+        width: 0.54rem;
+        height: 0.54rem;
+        margin-top: 0.28rem;
         border-radius: 999px;
         background: var(--color-success);
       }
@@ -742,9 +1277,56 @@ interface RequirementGroup {
         background: var(--color-danger);
       }
 
+      .completed-group {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: var(--space-2);
+        padding: 0.35rem 0;
+        border-top: 1px solid color-mix(in srgb, var(--color-border-default) 72%, transparent);
+        color: color-mix(in srgb, var(--color-text-secondary) 84%, var(--color-text-primary));
+      }
+
+      .completed-group:first-of-type {
+        border-top: 0;
+      }
+
+      .completed-group__button {
+        color: color-mix(in srgb, var(--color-text-secondary) 84%, var(--color-text-primary));
+        font-weight: 700;
+      }
+
+      .completed-group span {
+        color: color-mix(in srgb, var(--color-success) 74%, var(--color-text-primary));
+        font-size: var(--font-size-xs);
+        font-weight: 700;
+        white-space: nowrap;
+      }
+
+      .ready-note {
+        margin: 0;
+        padding: var(--space-2);
+        border: 1px solid color-mix(in srgb, var(--color-success-bg) 52%, var(--color-border-default));
+        border-radius: var(--radius-md);
+        background: color-mix(in srgb, var(--color-success-bg) 12%, transparent);
+        color: color-mix(in srgb, var(--color-success-text) 88%, var(--color-text-primary));
+        font-size: var(--font-size-sm);
+        font-weight: 700;
+      }
+
       .technical-count {
         margin: 0;
         font-size: var(--font-size-xs);
+        color: color-mix(in srgb, var(--color-text-secondary) 82%, var(--color-text-primary));
+      }
+
+      .technical-count summary {
+        cursor: pointer;
+        font-weight: 700;
+      }
+
+      .technical-count p {
+        margin: var(--space-1) 0 0;
       }
 
       @media (max-width: 1180px) {
@@ -758,6 +1340,17 @@ interface RequirementGroup {
 
         .publish-panel {
           position: static;
+          max-height: none;
+          overflow: visible;
+        }
+
+        .publish-card {
+          max-height: none;
+        }
+
+        .publish-card__body {
+          overflow: visible;
+          padding-right: 0;
         }
       }
 
@@ -767,6 +1360,18 @@ interface RequirementGroup {
         .price-strip {
           flex-direction: column;
           align-items: stretch;
+        }
+
+        .detail-hero {
+          grid-template-columns: 1fr;
+        }
+
+        .detail-hero {
+          padding: var(--space-4);
+        }
+
+        .hero-nav-row {
+          align-items: flex-start;
         }
 
         .hero-actions,
@@ -780,9 +1385,32 @@ interface RequirementGroup {
           grid-template-columns: 1fr;
         }
 
+        .overview-grid {
+          gap: var(--space-2);
+        }
+
         .field--full,
         .section-actions {
           grid-column: auto;
+        }
+
+        .field--checkbox-inline {
+          margin-top: 0;
+        }
+
+        .overview-card,
+        .detail-card,
+        .tabs-shell,
+        .publish-card {
+          padding: var(--space-3);
+        }
+
+        .tab-list {
+          padding: 0;
+        }
+
+        .tab-button {
+          min-width: 7.5rem;
         }
       }
     `,
@@ -802,35 +1430,70 @@ export class OnlineProfileDetailPageComponent implements OnInit {
   ];
   readonly assetSources: AssetSource[] = ["SUPPLIER", "OWN", "GENERATED", "OTHER"];
   readonly brandAbsencePolicies: BrandAbsencePolicy[] = ["GENERIC", "UNBRANDED"];
+  readonly detailTabs: DetailTab[] = [
+    {
+      id: "content",
+      label: "Contenido",
+      description: "Nombre, slug, descripción, categoría y marca.",
+      requirements: [
+        "ONLINE_NAME_MISSING",
+        "ONLINE_DESCRIPTION_MISSING",
+        "SLUG_MISSING",
+        "SLUG_DUPLICATE",
+        "CATEGORY_MISSING",
+        "CATEGORY_INACTIVE",
+        "BRAND_MISSING",
+        "BRAND_INACTIVE",
+      ],
+    },
+    {
+      id: "seo",
+      label: "SEO",
+      description: "Metadatos para búsqueda y redes sociales.",
+      requirements: ["SEO_MISSING", "SEO_INCOMPLETE"],
+    },
+    {
+      id: "asset",
+      label: "Imagen",
+      description: "Imagen principal, alt text y derechos.",
+      requirements: ["ASSET_MISSING", "ASSET_INVALID"],
+    },
+    {
+      id: "price",
+      label: "Precio",
+      description: "Precio efectivo y override ecommerce.",
+      requirements: ["PRICE_INVALID"],
+    },
+  ];
   readonly requirementGroups: RequirementGroup[] = [
     {
       title: "Producto ERP",
-      anchor: "contenido-ecommerce",
+      target: "product",
       requirements: ["PRODUCT_INACTIVE", "SKU_MISSING"],
     },
     {
       title: "Contenido",
-      anchor: "contenido-ecommerce",
+      target: "content",
       requirements: ["ONLINE_NAME_MISSING", "ONLINE_DESCRIPTION_MISSING", "SLUG_MISSING", "SLUG_DUPLICATE"],
     },
     {
       title: "Categoría y marca",
-      anchor: "contenido-ecommerce",
+      target: "content",
       requirements: ["CATEGORY_MISSING", "CATEGORY_INACTIVE", "BRAND_MISSING", "BRAND_INACTIVE"],
     },
     {
       title: "Imagen",
-      anchor: "imagen-principal",
+      target: "asset",
       requirements: ["ASSET_MISSING", "ASSET_INVALID"],
     },
     {
       title: "SEO",
-      anchor: "seo",
+      target: "seo",
       requirements: ["SEO_MISSING", "SEO_INCOMPLETE"],
     },
     {
       title: "Precio",
-      anchor: "precio-online",
+      target: "price",
       requirements: ["PRICE_INVALID"],
     },
   ];
@@ -874,6 +1537,7 @@ export class OnlineProfileDetailPageComponent implements OnInit {
   });
 
   productId: number | null = null;
+  activeTab: OnlineProfileDetailTab = "content";
   profile: EcommerceAdminOnlineProfileDetailResponse | null = null;
   publicationValidation: EcommerceAdminPublicationValidationResponse | null = null;
   brands: EcommerceAdminBrandResponse[] = [];
@@ -1303,6 +1967,141 @@ export class OnlineProfileDetailPageComponent implements OnInit {
     return requirements.filter((requirement) => this.isRequirementMissing(requirement)).length;
   }
 
+  pendingRequirementsCount(): number {
+    return this.publicationValidation?.missingRequirements.length ?? 0;
+  }
+
+  completedRequirementsCount(): number {
+    return Math.max(this.totalRequirementsCount() - this.pendingRequirementsCount(), 0);
+  }
+
+  completedCountForGroup(requirements: MissingRequirement[]): number {
+    return requirements.length - this.groupPendingCount(requirements);
+  }
+
+  pendingRequirementGroups(): RequirementGroup[] {
+    return this.requirementGroups.filter((group) => this.groupPendingCount(group.requirements) > 0);
+  }
+
+  completedRequirementGroups(): RequirementGroup[] {
+    if (!this.hasPendingRequirements()) {
+      return [];
+    }
+    return this.requirementGroups.filter((group) => this.groupPendingCount(group.requirements) === 0);
+  }
+
+  partialCompletedRequirementGroups(): RequirementGroup[] {
+    return this.requirementGroups.filter((group) => {
+      const pendingCount = this.groupPendingCount(group.requirements);
+      return pendingCount > 0 && pendingCount < group.requirements.length;
+    });
+  }
+
+  pendingRequirementsForGroup(group: RequirementGroup): MissingRequirement[] {
+    return group.requirements.filter((requirement) => this.isRequirementMissing(requirement));
+  }
+
+  firstPendingRequirementLabel(): string | null {
+    const firstPending = this.firstPendingRequirement();
+    return firstPending ? this.requirementLabel(firstPending) : null;
+  }
+
+  setActiveTab(tab: OnlineProfileDetailTab): void {
+    this.activeTab = tab;
+  }
+
+  pendingCountForTab(tab: OnlineProfileDetailTab): number {
+    const detailTab = this.detailTabs.find((item) => item.id === tab);
+    if (!detailTab) {
+      return 0;
+    }
+    return this.groupPendingCount(detailTab.requirements);
+  }
+
+  hasPendingRequirements(): boolean {
+    return (this.publicationValidation?.missingRequirements.length ?? 0) > 0;
+  }
+
+  goToFirstPending(): void {
+    const firstPending = this.firstPendingRequirement();
+    if (!firstPending) {
+      return;
+    }
+    this.openRequirement(firstPending);
+  }
+
+  openRequirementGroup(group: RequirementGroup): void {
+    this.openRequirementTarget(group.target);
+  }
+
+  openRequirement(requirement: MissingRequirement): void {
+    this.openRequirementTarget(this.targetForRequirement(requirement));
+  }
+
+  private initializeActiveTab(validation: EcommerceAdminPublicationValidationResponse): void {
+    const firstEditablePending = validation.missingRequirements
+      .map((requirement) => this.targetForRequirement(requirement))
+      .find((target): target is OnlineProfileDetailTab => target !== "product");
+    this.activeTab = firstEditablePending ?? "content";
+  }
+
+  private firstPendingRequirement(): MissingRequirement | null {
+    const missing = this.publicationValidation?.missingRequirements ?? [];
+    const priority: MissingRequirement[] = [
+      "PRODUCT_INACTIVE",
+      "SKU_MISSING",
+      "ONLINE_NAME_MISSING",
+      "ONLINE_DESCRIPTION_MISSING",
+      "SLUG_MISSING",
+      "SLUG_DUPLICATE",
+      "CATEGORY_MISSING",
+      "CATEGORY_INACTIVE",
+      "BRAND_MISSING",
+      "BRAND_INACTIVE",
+      "SEO_MISSING",
+      "SEO_INCOMPLETE",
+      "ASSET_MISSING",
+      "ASSET_INVALID",
+      "PRICE_INVALID",
+    ];
+    return priority.find((requirement) => missing.includes(requirement)) ?? null;
+  }
+
+  private totalRequirementsCount(): number {
+    return this.requirementGroups.reduce((total, group) => total + group.requirements.length, 0);
+  }
+
+  private targetForRequirement(requirement: MissingRequirement): OnlineProfileDetailTab | "product" {
+    switch (requirement) {
+      case "PRODUCT_INACTIVE":
+      case "SKU_MISSING":
+        return "product";
+      case "SEO_MISSING":
+      case "SEO_INCOMPLETE":
+        return "seo";
+      case "ASSET_MISSING":
+      case "ASSET_INVALID":
+        return "asset";
+      case "PRICE_INVALID":
+        return "price";
+      default:
+        return "content";
+    }
+  }
+
+  private openRequirementTarget(target: OnlineProfileDetailTab | "product"): void {
+    if (target === "product") {
+      this.scrollToElement("erp-identity-summary");
+      return;
+    }
+    this.activeTab = target;
+    this.scrollToElement("profile-tabs");
+  }
+
+  private scrollToElement(elementId: string): void {
+    document.getElementById(elementId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   requirementLabel(requirement: MissingRequirement): string {
     switch (requirement) {
       case "PRODUCT_INACTIVE":
@@ -1330,9 +2129,9 @@ export class OnlineProfileDetailPageComponent implements OnInit {
       case "ASSET_INVALID":
         return "Imagen publicable";
       case "SEO_MISSING":
-        return "SEO creado";
+        return "Metadatos SEO guardados";
       case "SEO_INCOMPLETE":
-        return "SEO completo e indexable";
+        return "SEO listo para publicar";
       case "PRICE_INVALID":
         return "Precio efectivo válido";
       default:
@@ -1369,7 +2168,7 @@ export class OnlineProfileDetailPageComponent implements OnInit {
       case "SEO_MISSING":
         return "Guarda metadatos SEO para el perfil.";
       case "SEO_INCOMPLETE":
-        return "Completa title, description y política de indexación.";
+        return "Completa título, descripción y configuración de indexación.";
       case "PRICE_INVALID":
         return "Verifica que el precio efectivo sea mayor a cero.";
       default:
@@ -1388,6 +2187,11 @@ export class OnlineProfileDetailPageComponent implements OnInit {
       default:
         return policy;
     }
+  }
+
+  shouldShowIndexingWarning(): boolean {
+    const raw = this.seoForm.getRawValue();
+    return !!raw.indexable && raw.robotsPolicy !== "INDEX_FOLLOW";
   }
 
   assetTypeLabel(assetType: AssetType): string {
@@ -1467,6 +2271,7 @@ export class OnlineProfileDetailPageComponent implements OnInit {
         this.brands = brands;
         this.onlineCategories = onlineCategories;
         this.syncFormsFromProfile(profile);
+        this.initializeActiveTab(validation);
         if (!this.canManage) {
           this.disableMutationForms();
         }
