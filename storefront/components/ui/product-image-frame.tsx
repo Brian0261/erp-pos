@@ -32,11 +32,13 @@ export function ProductImageFrame({
           src={src}
         />
       ) : (
-        <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
-          <div className="flex size-16 items-center justify-center rounded-full bg-ink-accent/40 text-2xl font-bold text-ink-primary">
+        <div className="flex h-full flex-col items-center justify-center gap-2 bg-[linear-gradient(135deg,var(--ink-white),var(--ink-soft))] p-4 text-center">
+          <div className="flex size-12 items-center justify-center rounded-full bg-ink-accent/50 font-serif text-xl font-bold text-ink-primary shadow-[0_10px_24px_rgb(255_209_102_/_0.28)] sm:size-14 sm:text-2xl">
             IT
           </div>
-          <p className="font-sans text-sm font-semibold text-ink-body">Imagen no disponible</p>
+          <p className="max-w-[8rem] font-sans text-[11px] font-semibold leading-tight text-ink-body sm:text-sm">
+            Imagen InkToy proximamente
+          </p>
         </div>
       )}
     </div>

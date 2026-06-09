@@ -21,16 +21,16 @@ type CategoryCardPreviewProps = {
 
 function CategoryCardPreview({ description, name }: CategoryCardPreviewProps) {
   return (
-    <article className="grid overflow-hidden rounded-ink border border-ink-border bg-ink-white shadow-ink-soft sm:grid-cols-[minmax(0,1.3fr)_minmax(220px,0.7fr)]">
-      <div className="relative min-h-36 bg-ink-soft">
-        <div className="flex h-full min-h-36 items-center justify-center bg-[linear-gradient(135deg,var(--ink-accent),var(--ink-cream))] p-6">
-          <span className="font-serif text-4xl font-bold text-ink-primary">{name.slice(0, 1)}</span>
+    <article className="grid min-h-32 grid-cols-[minmax(112px,0.42fr)_minmax(0,0.58fr)] overflow-hidden rounded-ink border border-ink-border bg-ink-white shadow-ink-soft sm:min-h-36 sm:grid-cols-[minmax(0,1.2fr)_minmax(220px,0.8fr)]">
+      <div className="relative bg-ink-soft">
+        <div className="flex h-full min-h-32 items-center justify-center bg-[linear-gradient(135deg,var(--ink-accent),var(--ink-cream))] p-4 sm:min-h-36 sm:p-6">
+          <span className="font-serif text-3xl font-bold text-ink-primary sm:text-4xl">{name.slice(0, 1)}</span>
         </div>
       </div>
-      <div className="flex flex-col justify-center gap-3 p-5">
-        <h3 className="font-serif text-2xl font-bold leading-tight text-ink-primary">{name}</h3>
-        {description ? <p className="font-sans text-sm leading-6 text-ink-body">{description}</p> : null}
-        <p className="font-sans text-xs font-semibold uppercase tracking-wide text-ink-muted">
+      <div className="flex min-w-0 flex-col justify-center gap-2 p-4 sm:gap-3 sm:p-5">
+        <h3 className="font-serif text-xl font-bold leading-tight text-ink-primary sm:text-2xl">{name}</h3>
+        {description ? <p className="line-clamp-2 font-sans text-sm leading-5 text-ink-body sm:leading-6">{description}</p> : null}
+        <p className="font-sans text-[11px] font-semibold uppercase tracking-wide text-ink-muted sm:text-xs">
           Detalle proximamente
         </p>
       </div>
@@ -62,7 +62,7 @@ export default async function CategoriesPage() {
 
         <section className="mx-auto w-full max-w-7xl" aria-label="Listado de categorias">
           {categories.items.length > 0 ? (
-            <div className="grid gap-4 lg:grid-cols-2">
+            <div className="grid gap-3 sm:gap-4 lg:grid-cols-2">
               {categories.items.map((category) => (
                 <CategoryCardPreview
                   description={category.description}

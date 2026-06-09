@@ -61,7 +61,7 @@ export default async function ProductsPage() {
 
         <section className="mx-auto w-full max-w-7xl" aria-label="Listado de productos">
           {products.items.length > 0 ? (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 lg:gap-4">
               {products.items.map((product) => (
                 <ProductCard
                   availability={getAvailabilityVariant(product)}

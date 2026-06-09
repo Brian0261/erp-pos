@@ -34,24 +34,24 @@ export function ProductCard({
   price,
 }: ProductCardProps) {
   return (
-    <article className="flex h-full flex-col rounded-ink border border-ink-border bg-ink-white p-3 shadow-ink-soft">
+    <article className="flex h-full flex-col rounded-ink border border-ink-border bg-ink-white p-2.5 shadow-ink-soft sm:p-3">
       <ProductImageFrame
         alt={imageAlt ?? name}
         className="aspect-square shadow-none"
         src={imageSrc}
       />
-      <div className="flex flex-1 flex-col gap-3 pt-4">
+      <div className="flex flex-1 flex-col gap-2.5 pt-3">
         <div className="min-w-0 space-y-1">
-          {brand ? <p className="truncate font-sans text-sm text-ink-muted">{brand}</p> : null}
-          <h3 className="line-clamp-2 font-sans text-base font-semibold leading-snug text-ink-primary">
+          {brand ? <p className="truncate font-sans text-xs text-ink-muted sm:text-sm">{brand}</p> : null}
+          <h3 className="line-clamp-2 min-h-[2.5rem] font-sans text-sm font-semibold leading-tight text-ink-primary sm:text-base sm:leading-snug">
             {name}
           </h3>
         </div>
-        <div className="mt-auto flex items-center justify-between gap-3">
-          <p className="font-sans text-xl font-extrabold text-ink-primary">{price}</p>
+        <div className="mt-auto flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+          <p className="font-sans text-lg font-extrabold text-ink-primary sm:text-xl">{price}</p>
           <Badge variant={availabilityVariant[availability]}>{availabilityLabel[availability]}</Badge>
         </div>
-        <Button className="w-full" href={detailHref} variant="secondary">
+        <Button className="w-full text-xs sm:text-sm" href={detailHref} size="sm" variant="secondary">
           Ver detalle
         </Button>
       </div>
