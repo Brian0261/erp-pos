@@ -308,6 +308,46 @@ Estandarizar cambios tecnicos para reducir regresiones y mantener trazabilidad e
 - Documentacion creada: `docs/qa/PHASE2_2H5D_ONLINE_PROFILE_DETAIL_QA.md`.
 - Exclusiones confirmadas: sin backend, endpoints, DTOs, servicios, Storefront, Flyway/DB, Docker, `.env`, secretos, reglas de publicacion, payloads ni contratos.
 
+### Cierre Fase 2S.2A Catalogo Publico Navegable Minimo
+
+- Tipo: implementacion funcional Storefront Next.js + cierre documental QA.
+- Alcance: primeras paginas publicas navegables del Storefront usando contratos publicos existentes y componentes Stitch ya implementados.
+- Archivos creados:
+  - `storefront/app/productos/page.tsx` — Listado publico de productos.
+  - `storefront/app/categorias/page.tsx` — Listado publico de categorias.
+- Microajustes aplicados (2S.2A-FIX):
+  - Copy comercial/orientado al cliente en ambas paginas.
+  - Eliminados textos tecnicos orientados al ERP/POS.
+  - `/categorias` muestra "Detalle proximamente" en lugar de CTA enganoso con href="#".
+- Componentes reutilizados: ProductCard, CategoryCard (adaptado), EmptyState, StorefrontHeader, StorefrontFooter, BottomNavigation, Breadcrumbs, SectionHeading.
+- API client: `getStorefrontProducts()`, `getStorefrontCategories()` consumiendo `/api/v1/storefront/catalog/products` y `/api/v1/storefront/catalog/categories`.
+- Validaciones:
+  - `npm run build`: OK.
+  - `npm run lint`: OK.
+  - `npx tsc --noEmit`: OK.
+  - `git diff --check`: OK.
+- Smoke HTTP:
+  - `/productos`: 200 OK.
+  - `/categorias`: 200 OK.
+  - `/productos/{slug}`: 200 OK (sin cambios).
+  - `/categorias/[slug]`: 404 esperado.
+  - `/buscar`: 404 esperado.
+- Confirmaciones:
+  - Sin llamadas a `/api/v1/ecommerce-admin`.
+  - robots/noindex activos.
+  - Server Components.
+  - Consumo exclusivo de `/api/v1/storefront/**`.
+  - Mobile-first responsive.
+- Exclusiones confirmadas:
+  - Sin Home real, buscador, filtros, ordenamiento, paginacion UI avanzada.
+  - Sin `/categorias/[slug]`.
+  - Sin carrito, checkout, pagos, pedidos, login cliente, Merchant Center.
+  - Sin sitemap XML, imagenes externas, remotePatterns.
+  - Sin cambios en backend, Angular, ecommerce-admin, contratos, DTOs, Flyway/DB, Docker, `.env`, secretos, seguridad, endpoints, `/productos/[slug]`.
+- Documentacion creada: `docs/qa/PHASE2S2A_STOREFRONT_NAVIGABLE_CATALOG_QA.md`.
+- Documentacion actualizada: `docs/ai/CURRENT_STATUS.md`, `docs/ai/CHANGE_CONTROL.md`.
+- Pendiente recomendado: fase visual de alineacion Storefront mobile-first basada en disenos Stitch.
+
 ### Inicio Fase 2E.0 Storefront MVP Shell Planning
 
 - Tipo: documentacion tecnica de planificacion, sin implementacion funcional.

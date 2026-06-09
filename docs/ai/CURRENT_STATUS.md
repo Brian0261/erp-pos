@@ -227,6 +227,7 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
 1. Abrir Fase 2G.3A — Indicador de perfil online en Productos (Angular frontend).
 2. No avanzar a carrito, checkout, pagos, pedidos ni login sin completar 2G.3A.
 3. Preparar carga inicial real controlada (catalogo, almacenes, stock base y parametros operativos), solo cuando exista autorizacion explicita del responsable de negocio/tecnico.
+4. Opcionalmente, abrir fase visual de alineacion Storefront mobile-first basada en disenos Stitch (refinamiento visual, `/categorias/[slug]`, Home real, buscador, filtros).
 
 ## Fase 2G.1 Publicacion de producto operativo a perfil ecommerce
 
@@ -261,3 +262,22 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
 - Validaciones: `npm run build` OK, smoke UI Docker/headless OK, desktop/tablet/mobile OK, caso con pendientes OK, caso sin pendientes OK, sin errores JS.
 - Documentacion QA creada: `docs/qa/PHASE2_2H5D_ONLINE_PROFILE_DETAIL_QA.md`.
 - Sin cambios en backend, endpoints, DTOs, servicios, Storefront, Flyway/DB, Docker, `.env`, secretos, reglas de publicacion, payloads ni contratos durante el cierre documental.
+
+## Fase 2S.2A Catalogo Publico Navegable Minimo
+
+- Fase 2S.2A cerrada funcional y documentalmente.
+- Paginas publicas creadas en Storefront Next.js:
+  - `storefront/app/productos/page.tsx` — Listado publico de productos.
+  - `storefront/app/categorias/page.tsx` — Listado publico de categorias.
+- Microajustes visuales/copy aplicados (2S.2A-FIX):
+  - Copy comercial/orientado al cliente en ambas paginas.
+  - Eliminados textos tecnicos orientados al ERP/POS.
+  - `/categorias` muestra "Detalle proximamente" en lugar de CTA enganoso con href="#".
+- Validaciones: `npm run build` OK, `npm run lint` OK, `npx tsc --noEmit` OK, `git diff --check` OK.
+- Smoke HTTP: `/productos` 200 OK, `/categorias` 200 OK, `/productos/{slug}` 200 OK, `/categorias/[slug]` 404 esperado, `/buscar` 404 esperado.
+- Confirmado: sin llamadas a `/api/v1/ecommerce-admin`, robots/noindex activos, Server Components, consumo exclusivo de `/api/v1/storefront/**`.
+- NO se implemento: Home real, buscador, filtros, `/categorias/[slug]`, carrito, checkout, pagos, pedidos, login cliente, Merchant Center, sitemap XML, imagenes externas.
+- NO se toco: backend, Angular, ecommerce-admin, contratos, DTOs, Flyway/DB, Docker, `.env`, secretos, seguridad, endpoints, `/productos/[slug]`.
+- Documentacion QA creada: `docs/qa/PHASE2S2A_STOREFRONT_NAVIGABLE_CATALOG_QA.md`.
+- Documentacion actualizada: `docs/ai/CURRENT_STATUS.md`, `docs/ai/CHANGE_CONTROL.md`.
+- Pendiente recomendado: fase visual de alineacion Storefront mobile-first basada en disenos Stitch.
