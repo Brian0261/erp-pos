@@ -348,6 +348,47 @@ Estandarizar cambios tecnicos para reducir regresiones y mantener trazabilidad e
 - Documentacion actualizada: `docs/ai/CURRENT_STATUS.md`, `docs/ai/CHANGE_CONTROL.md`.
 - Pendiente recomendado: fase visual de alineacion Storefront mobile-first basada en disenos Stitch.
 
+### Cierre Fase 2S.2B-A Alineacion Visual Storefront Mobile-First de Listados
+
+- Tipo: ajustes visuales Storefront Next.js + cierre documental QA.
+- Alcance: alineacion visual de `/productos` y `/categorias` con disenos Stitch mobile-first, sin agregar funcionalidades nuevas.
+- Archivos modificados:
+  - `storefront/app/productos/page.tsx` — Grid mobile-first de 2 columnas.
+  - `storefront/app/categorias/page.tsx` — Cards tipo fila comerciales.
+  - `storefront/components/catalog/product-card.tsx` — Card mas compacta.
+  - `storefront/components/ui/product-image-frame.tsx` — Fallback mas de marca.
+- Cambios visuales:
+  - `/productos`: grid `grid-cols-2 sm:grid-cols-3 lg:grid-cols-4`, espaciado compacto.
+  - `ProductCard`: menos padding, textos mas pequenos en mobile, nombre limitado a 2 lineas, boton "Ver detalle" con `size="sm"`.
+  - `ProductImageFrame`: fallback "Imagen InkToy proximamente" con gradiente y sombra.
+  - `/categorias`: cards tipo fila con bloque visual lateral, nombre destacado, descripcion con limite visual, estado discreto "Detalle proximamente", sin CTA falsa.
+- Validaciones:
+  - `npm run build`: OK.
+  - `npm run lint`: OK.
+  - `npx tsc --noEmit`: OK.
+  - `git diff --check`: OK.
+- Smoke HTTP:
+  - `/productos`: 200 OK (grid 2 columnas mobile).
+  - `/categorias`: 200 OK (sin CTA falsa).
+  - `/productos/{slug}`: 200 OK (sin cambios).
+  - `/categorias/[slug]`: 404 esperado.
+  - `/buscar`: 404 esperado.
+- Confirmaciones:
+  - Sin llamadas a `/api/v1/ecommerce-admin`.
+  - robots/noindex activos.
+  - Server Components.
+  - Consumo exclusivo de `/api/v1/storefront/**`.
+  - Mobile-first responsive.
+- Exclusiones confirmadas:
+  - Sin Home real, buscador, filtros, ordenamiento, paginacion UI avanzada.
+  - Sin `/categorias/[slug]`.
+  - Sin carrito, checkout, pagos, pedidos, login cliente, Merchant Center.
+  - Sin sitemap XML, imagenes externas, remotePatterns, galeria real, productos relacionados.
+  - Sin cambios en backend, Angular, ecommerce-admin, contratos, DTOs, Flyway/DB, Docker, `.env`, secretos, seguridad, endpoints, `/productos/[slug]`, `globals.css`.
+- Documentacion creada: `docs/qa/PHASE2S2B_A_STOREFRONT_VISUAL_ALIGNMENT_QA.md`.
+- Documentacion actualizada: `docs/ai/CURRENT_STATUS.md`, `docs/ai/CHANGE_CONTROL.md`.
+- Pendiente recomendado: discovery separado para categoria publica `/categorias/[slug]` y productos por categoria.
+
 ### Inicio Fase 2E.0 Storefront MVP Shell Planning
 
 - Tipo: documentacion tecnica de planificacion, sin implementacion funcional.

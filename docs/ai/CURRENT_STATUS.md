@@ -281,3 +281,20 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
 - Documentacion QA creada: `docs/qa/PHASE2S2A_STOREFRONT_NAVIGABLE_CATALOG_QA.md`.
 - Documentacion actualizada: `docs/ai/CURRENT_STATUS.md`, `docs/ai/CHANGE_CONTROL.md`.
 - Pendiente recomendado: fase visual de alineacion Storefront mobile-first basada en disenos Stitch.
+
+## Fase 2S.2B-A Alineacion Visual Storefront Mobile-First de Listados
+
+- Fase 2S.2B-A cerrada funcional y documentalmente.
+- Ajustes visuales aplicados en Storefront Next.js:
+  - `/productos` usa grid mobile-first de 2 columnas: `grid-cols-2 sm:grid-cols-3 lg:grid-cols-4`.
+  - `ProductCard` mas compacta: menos padding, textos mas pequenos en mobile, nombre limitado a 2 lineas, boton "Ver detalle" con `size="sm"`.
+  - `ProductImageFrame` con fallback mas de marca: "Imagen InkToy proximamente".
+  - `/categorias` con cards tipo fila comerciales: bloque visual lateral, nombre destacado, descripcion con limite visual, estado discreto "Detalle proximamente", sin CTA falsa.
+- Validaciones: `npm run build` OK, `npm run lint` OK, `npx tsc --noEmit` OK, `git diff --check` OK.
+- Smoke HTTP: `/productos` 200 OK (grid 2 columnas), `/categorias` 200 OK (sin CTA falsa), `/productos/{slug}` 200 OK, `/categorias/[slug]` 404 esperado, `/buscar` 404 esperado.
+- Confirmado: sin llamadas a `/api/v1/ecommerce-admin`, robots/noindex activos, Server Components, consumo exclusivo de `/api/v1/storefront/**`.
+- NO se implemento: Home real, buscador, filtros, `/categorias/[slug]`, carrito, checkout, pagos, pedidos, login cliente, Merchant Center, sitemap XML, imagenes externas, `remotePatterns`.
+- NO se toco: backend, Angular, ecommerce-admin, contratos, DTOs, Flyway/DB, Docker, `.env`, secretos, seguridad, endpoints, `/productos/[slug]`, `globals.css`.
+- Documentacion QA creada: `docs/qa/PHASE2S2B_A_STOREFRONT_VISUAL_ALIGNMENT_QA.md`.
+- Documentacion actualizada: `docs/ai/CURRENT_STATUS.md`, `docs/ai/CHANGE_CONTROL.md`.
+- Pendiente recomendado: discovery separado para categoria publica `/categorias/[slug]` y productos por categoria.
