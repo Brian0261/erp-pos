@@ -344,3 +344,21 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
 - Documentacion QA creada: `docs/qa/PHASE2S4A_STOREFRONT_HOME_QA.md`.
 - Documentacion actualizada: `docs/ai/CURRENT_STATUS.md`, `docs/ai/CHANGE_CONTROL.md`.
 - Pendiente recomendado: discovery de SEO tecnico de publicacion.
+
+## Fase 2S.5A Base SEO tecnica del Storefront
+
+- Fase 2S.5A cerrada funcional y documentalmente.
+- Se creo la base SEO tecnica del Storefront sin activar indexacion.
+- Se creo `storefront/app/sitemap.ts` para generar `sitemap.xml` desde el sitemap JSON backend.
+- Se creo `storefront/app/robots.ts` como unica fuente efectiva de `/robots.txt`.
+- Se creo `storefront/lib/seo.ts` para resolver base URL publica, URL absolutas y robots por entorno.
+- Se agrego `STOREFRONT_PUBLIC_BASE_URL` en `storefront/.env.local.example` con fallback seguro a `http://localhost:3000`.
+- Se normalizo canonical/metadata en `storefront/app/page.tsx`, `storefront/app/productos/page.tsx` y `storefront/app/categorias/page.tsx`.
+- Se elimino `storefront/public/robots.txt` para evitar ambiguedad entre dos fuentes de robots.
+- Confirmado: indexacion sigue bloqueada por defecto y `noindex` sigue activo por defecto.
+- Validaciones: `npm run build`, `npm run lint`, `npx tsc --noEmit`, `git diff --check`.
+- Smoke: `/`, `/productos`, `/categorias`, `/sitemap.xml`, `/robots.txt` 200 y `/buscar` 404 esperado.
+- Excluido: backend, contratos, structured data, buscador, filtros, carrito, checkout, pagos, Merchant Center, `remotePatterns`, imagenes externas.
+- Riesgos pendientes: dominio real en `STOREFRONT_PUBLIC_BASE_URL`, limpieza de datos de prueba antes de indexar, activacion posterior y controlada de indexacion.
+- Documentacion QA creada: `docs/qa/PHASE2S5A_STOREFRONT_TECHNICAL_SEO_QA.md`.
+- Pendiente recomendado: discovery de readiness de indexacion/publicacion real.

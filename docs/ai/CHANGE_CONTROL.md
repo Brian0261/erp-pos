@@ -661,3 +661,45 @@ Solo crear tag cuando se cumpla todo:
 2. No exponer credenciales reales.
 3. No ejecutar comandos destructivos sobre git o base de datos sin aprobacion.
 4. No hacer commit/push/tag automatico desde agentes.
+
+### Cierre Fase 2S.5A Base SEO tecnica del Storefront
+
+- Tipo: implementacion funcional Storefront + cierre documental QA.
+- Alcance: preparar la base SEO tecnica sin activar indexacion.
+- Archivos creados:
+  - `storefront/lib/seo.ts`
+  - `storefront/app/sitemap.ts`
+  - `storefront/app/robots.ts`
+  - `docs/qa/PHASE2S5A_STOREFRONT_TECHNICAL_SEO_QA.md`
+- Archivos modificados:
+  - `storefront/.env.local.example`
+  - `storefront/app/layout.tsx`
+  - `storefront/app/page.tsx`
+  - `storefront/app/productos/page.tsx`
+  - `storefront/app/categorias/page.tsx`
+- Archivo eliminado:
+  - `storefront/public/robots.txt`
+- Decisiones tecnicas:
+  - `app/robots.ts` queda como unica fuente efectiva de `/robots.txt`.
+  - `STOREFRONT_PUBLIC_BASE_URL` se usa para canonicals y sitemap con fallback seguro a `http://localhost:3000`.
+  - `app/sitemap.ts` consume `GET /api/v1/storefront/seo/sitemap` y transforma solo las entradas entregadas por backend.
+  - Indexacion sigue bloqueada por defecto con `STOREFRONT_INDEXING_ENABLED=false`.
+  - `layout.tsx` mantiene `index: false` y `follow: false` por defecto.
+- Validaciones:
+  - `npm run build`: OK.
+  - `npm run lint`: OK.
+  - `npx tsc --noEmit`: OK.
+  - `git diff --check`: OK.
+- Smoke:
+  - `/`: 200.
+  - `/productos`: 200.
+  - `/categorias`: 200.
+  - `/sitemap.xml`: 200.
+  - `/robots.txt`: 200.
+  - `/buscar`: 404 esperado.
+- Exclusiones confirmadas:
+  - sin backend, sin contratos, sin structured data, sin buscador, sin filtros, sin carrito, sin checkout, sin pagos, sin Merchant Center, sin `remotePatterns`, sin imagenes externas.
+- Riesgos pendientes:
+  - configurar dominio real en `STOREFRONT_PUBLIC_BASE_URL` antes de publicar;
+  - limpiar datos de prueba antes de indexar;
+  - activar indexacion solo en una fase posterior separada y controlada.
