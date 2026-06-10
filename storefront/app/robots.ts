@@ -1,8 +1,8 @@
 import type { MetadataRoute } from "next";
-import { buildStorefrontPublicUrl, isStorefrontIndexingEnabled } from "@/lib/seo";
+import { buildStorefrontPublicUrl, canStorefrontAllowIndexing } from "@/lib/seo";
 
 export default function robots(): MetadataRoute.Robots {
-  if (!isStorefrontIndexingEnabled()) {
+  if (!canStorefrontAllowIndexing()) {
     return {
       rules: {
         userAgent: "*",

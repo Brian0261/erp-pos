@@ -6,6 +6,7 @@ import { StorefrontFooter } from "@/components/layout/storefront-footer";
 import { StorefrontHeader } from "@/components/layout/storefront-header";
 import { Accordion, Badge, Breadcrumbs, ProductImageFrame, SectionHeading } from "@/components/ui";
 import { getStorefrontProductBySlug, StorefrontApiError } from "@/lib/api";
+import { canStorefrontAllowIndexing } from "@/lib/seo";
 import type { PublicProductDetailResponse } from "@/types/storefront";
 
 export const revalidate = 300;
@@ -17,8 +18,7 @@ type ProductDetailPageProps = {
 };
 
 function isIndexableProduct(product: PublicProductDetailResponse) {
-  const indexingEnabled = process.env.STOREFRONT_INDEXING_ENABLED === "true";
-  return indexingEnabled && product.indexable && (product.seo?.indexable ?? true);
+  return canStorefrontAllowIndexing() && product.indexable && (product.seo?.indexable ?? true);
 }
 
 function getCanonicalUrl(product: PublicProductDetailResponse) {
