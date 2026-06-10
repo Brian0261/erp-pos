@@ -429,6 +429,52 @@ Estandarizar cambios tecnicos para reducir regresiones y mantener trazabilidad e
 - Documentacion actualizada: `docs/ai/CURRENT_STATUS.md`, `docs/ai/CHANGE_CONTROL.md`.
 - Pendiente recomendado: discovery de Home real SEO-first.
 
+### Cierre Fase 2S.4A Home real SEO-first Storefront
+
+- Tipo: implementacion funcional Storefront + cierre documental QA.
+- Alcance: reemplazar el preview/mock de `storefront/app/page.tsx` por una Home real MVP SEO-first.
+- Datos publicos consumidos:
+  - categorias publicas con `getStorefrontCategories({ page: 0, size: 6 })`;
+  - productos publicos con `getStorefrontProducts({ page: 0, size: 8 })`.
+- Secciones implementadas:
+  - hero comercial real;
+  - categorias reales enlazadas a `/categorias/{slug}`;
+  - productos reales enlazados a `/productos/{slug}`;
+  - bloque simple de confianza/beneficios;
+  - header/footer/bottom navigation existentes.
+- Confirmaciones:
+  - sin mocks funcionales;
+  - sin textos de preview tecnico;
+  - sin `href="#"`;
+  - sin funciones falsas;
+  - sin buscador, filtros, carrito, checkout, pagos, login, pedidos, promociones ni banners administrables.
+- Validaciones:
+  - `npm run build`: OK.
+  - `npm run lint`: OK.
+  - `npx tsc --noEmit`: OK.
+  - `git diff --check`: OK.
+- Smoke HTTP:
+  - `/`: 200 OK.
+  - `/productos`: 200 OK.
+  - `/categorias`: 200 OK.
+  - `/buscar`: 404 OK (esperado).
+- Confirmaciones tecnicas:
+  - no hay llamadas nuevas a `/api/v1/ecommerce-admin`;
+  - robots/noindex activos;
+  - Server Components;
+  - consumo exclusivo de `/api/v1/storefront/**`.
+- Exclusiones confirmadas:
+  - sin backend nuevo;
+  - sin contratos/DTOs/endpoints nuevos;
+  - sin sitemap XML;
+  - sin `remotePatterns`;
+  - sin imagenes externas nuevas;
+  - sin cambios en Angular/ecommerce-admin/Flyway/DB/Docker/seguridad.
+- Riesgo SEO: Home real aun depende del volumen real del catalogo para no verse pobre o duplicada.
+- Documentacion creada: `docs/qa/PHASE2S4A_STOREFRONT_HOME_QA.md`.
+- Documentacion actualizada: `docs/ai/CURRENT_STATUS.md`, `docs/ai/CHANGE_CONTROL.md`.
+- Pendiente recomendado: discovery de SEO tecnico de publicacion.
+
 ### Inicio Fase 2E.0 Storefront MVP Shell Planning
 
 - Tipo: documentacion tecnica de planificacion, sin implementacion funcional.

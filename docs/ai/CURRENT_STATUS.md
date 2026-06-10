@@ -321,3 +321,26 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
 - Documentacion QA creada: `docs/qa/PHASE2S3A_PUBLIC_CATEGORY_PRODUCTS_QA.md`.
 - Documentacion actualizada: `docs/ai/CURRENT_STATUS.md`, `docs/ai/CHANGE_CONTROL.md`.
 - Pendiente recomendado: discovery de Home real SEO-first.
+
+## Fase 2S.4A Home real SEO-first Storefront
+
+- Fase 2S.4A cerrada funcional y documentalmente.
+- `storefront/app/page.tsx` reemplazo el preview/mock por una Home real MVP SEO-first.
+- La Home consume datos reales de contratos publicos existentes:
+  - categorias publicas con `getStorefrontCategories({ page: 0, size: 6 })`;
+  - productos publicos con `getStorefrontProducts({ page: 0, size: 8 })`.
+- Secciones implementadas:
+  - hero comercial real;
+  - categorias reales con enlaces a `/categorias/{slug}`;
+  - productos reales con enlaces a `/productos/{slug}`;
+  - bloque simple de confianza/beneficios;
+  - header/footer/bottom navigation existentes.
+- Confirmado: no quedan mocks funcionales, no quedan textos de preview tecnico, no quedan `href="#"`, no hay funciones falsas.
+- Validaciones: `npm run build` OK, `npm run lint` OK, `npx tsc --noEmit` OK, `git diff --check` OK.
+- Smoke HTTP: `/` 200 OK, `/productos` 200 OK, `/categorias` 200 OK, `/buscar` 404 OK.
+- Confirmado: sin llamadas nuevas a `/api/v1/ecommerce-admin`, robots/noindex activos, Server Components, consumo exclusivo de `/api/v1/storefront/**`.
+- NO se implemento: buscador funcional, filtros, carrito, checkout, pagos, login cliente, pedidos, promociones, banners administrables, sitemap XML, backend nuevo, contratos nuevos, `remotePatterns`, imagenes externas nuevas.
+- NO se toco: backend, Angular, ecommerce-admin, contratos, DTOs, endpoints, Flyway/DB, Docker, seguridad, robots/noindex, sitemap, otras paginas.
+- Documentacion QA creada: `docs/qa/PHASE2S4A_STOREFRONT_HOME_QA.md`.
+- Documentacion actualizada: `docs/ai/CURRENT_STATUS.md`, `docs/ai/CHANGE_CONTROL.md`.
+- Pendiente recomendado: discovery de SEO tecnico de publicacion.
