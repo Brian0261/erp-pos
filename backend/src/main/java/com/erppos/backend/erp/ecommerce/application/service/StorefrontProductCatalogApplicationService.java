@@ -50,12 +50,15 @@ public class StorefrontProductCatalogApplicationService implements StorefrontPro
     }
 
     @Override
-    public StorefrontProductPageResult listPublishedProducts(int page, int size, String sort) {
+    public StorefrontProductPageResult listPublishedProducts(int page, int size, String sort, String categorySlug) {
         validatePage(page);
         validateProductsSize(size);
         validateSort(sort);
 
-        Page<StorefrontPublicProductProjection> products = storefrontProductReadPort.findPublishedProducts(PageRequest.of(page, size));
+        Page<StorefrontPublicProductProjection> products = storefrontProductReadPort.findPublishedProducts(
+                PageRequest.of(page, size),
+                normalizeCategorySlug(categorySlug)
+        );
 
         return new StorefrontProductPageResult(
                 products.getContent().stream().map(this::toPublicProduct).toList(),
@@ -330,6 +333,13 @@ public class StorefrontProductCatalogApplicationService implements StorefrontPro
 
     private boolean notBlank(String value) {
         return value != null && !value.isBlank();
+    }
+
+    private String normalizeCategorySlug(String categorySlug) {
+        if (categorySlug == null || categorySlug.isBlank()) {
+            return null;
+        }
+        return categorySlug.trim();
     }
 
     private void validatePage(int page) {

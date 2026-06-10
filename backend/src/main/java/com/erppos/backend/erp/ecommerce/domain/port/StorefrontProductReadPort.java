@@ -12,7 +12,7 @@ import java.util.Optional;
 import java.util.List;
 
 public interface StorefrontProductReadPort {
-    Page<StorefrontPublicProductProjection> findPublishedProducts(Pageable pageable);
+    Page<StorefrontPublicProductProjection> findPublishedProducts(Pageable pageable, String categorySlug);
 
     Page<StorefrontPublicCategoryProjection> findPublicCategories(Pageable pageable);
 

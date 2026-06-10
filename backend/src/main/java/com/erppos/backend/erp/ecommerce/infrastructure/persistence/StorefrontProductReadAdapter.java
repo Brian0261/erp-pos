@@ -10,6 +10,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Component;
 
 import java.sql.Timestamp;
@@ -27,13 +28,18 @@ public class StorefrontProductReadAdapter implements StorefrontProductReadPort {
     }
 
     @Override
-    public Page<StorefrontPublicProductProjection> findPublishedProducts(Pageable pageable) {
-        long total = countPublishedProducts();
+    public Page<StorefrontPublicProductProjection> findPublishedProducts(Pageable pageable, String categorySlug) {
+        long total = countPublishedProducts(categorySlug);
         if (total == 0) {
             return new PageImpl<>(List.of(), pageable, 0);
         }
 
         Instant now = Instant.now();
+        String categoryFilter = categorySlug == null ? "" : "  and c.slug = ?\n";
+        Object[] args = categorySlug == null
+                ? new Object[]{Timestamp.from(now), Timestamp.from(now), pageable.getPageSize(), pageable.getOffset()}
+                : new Object[]{Timestamp.from(now), Timestamp.from(now), categorySlug, pageable.getPageSize(), pageable.getOffset()};
+
         List<StorefrontPublicProductProjection> items = jdbcTemplate.query(
                 """
                         select
@@ -85,28 +91,12 @@ public class StorefrontProductReadAdapter implements StorefrontProductReadPort {
                         ) ov on true
                         where pop.publication_status = 'PUBLISHED'
                           and p.active = true
+                        """ + categoryFilter + """
                         order by lower(coalesce(nullif(pop.online_name, ''), p.name)) asc, pop.id asc
                         limit ? offset ?
                         """,
-                (rs, rowNum) -> new StorefrontPublicProductProjection(
-                        rs.getString("slug"),
-                        rs.getString("public_name"),
-                        rs.getString("short_description"),
-                        rs.getBigDecimal("effective_price_amount"),
-                        rs.getString("effective_price_currency"),
-                        rs.getString("primary_image_url"),
-                        rs.getString("primary_image_alt_text"),
-                        rs.getString("primary_image_type"),
-                        getNullableInteger(rs.getObject("primary_image_display_order")),
-                        rs.getString("category_slug"),
-                        rs.getString("category_name"),
-                        rs.getString("brand_slug"),
-                        rs.getString("brand_name")
-                ),
-                Timestamp.from(now),
-                Timestamp.from(now),
-                pageable.getPageSize(),
-                pageable.getOffset()
+                storefrontPublicProductProjectionRowMapper(),
+                args
         );
 
         return new PageImpl<>(items, pageable, total);
@@ -344,18 +334,43 @@ public class StorefrontProductReadAdapter implements StorefrontProductReadPort {
         );
     }
 
-    private long countPublishedProducts() {
+    private long countPublishedProducts(String categorySlug) {
+        String categoryFilter = categorySlug == null ? "" : "  and c.slug = ?\n";
+        Object[] args = categorySlug == null ? new Object[]{} : new Object[]{categorySlug};
+
         Long total = jdbcTemplate.queryForObject(
                 """
                         select count(*)
                         from ecommerce_product_online_profiles pop
                         join products p on p.id = pop.product_id
+                        left join ecommerce_online_categories c
+                               on c.id = pop.online_category_id and c.active = true
                         where pop.publication_status = 'PUBLISHED'
                           and p.active = true
+                        """ + categoryFilter + """
                         """,
-                Long.class
+                Long.class,
+                args
         );
         return total == null ? 0 : total;
+    }
+
+    private RowMapper<StorefrontPublicProductProjection> storefrontPublicProductProjectionRowMapper() {
+        return (rs, rowNum) -> new StorefrontPublicProductProjection(
+                rs.getString("slug"),
+                rs.getString("public_name"),
+                rs.getString("short_description"),
+                rs.getBigDecimal("effective_price_amount"),
+                rs.getString("effective_price_currency"),
+                rs.getString("primary_image_url"),
+                rs.getString("primary_image_alt_text"),
+                rs.getString("primary_image_type"),
+                getNullableInteger(rs.getObject("primary_image_display_order")),
+                rs.getString("category_slug"),
+                rs.getString("category_name"),
+                rs.getString("brand_slug"),
+                rs.getString("brand_name")
+        );
     }
 
     private long countPublicCategories() {

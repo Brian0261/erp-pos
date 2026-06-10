@@ -2,6 +2,7 @@ package com.erppos.backend.integration;
 
 import com.erppos.backend.erp.ecommerce.application.usecase.CreateProductOnlineProfileCommand;
 import com.erppos.backend.erp.ecommerce.application.usecase.EcommerceCatalogUseCase;
+import com.erppos.backend.erp.ecommerce.domain.model.EcommerceOnlineCategory;
 import com.erppos.backend.erp.ecommerce.domain.model.OnlinePublicationStatus;
 import com.erppos.backend.erp.ecommerce.domain.model.ProductOnlineProfile;
 import com.erppos.backend.erp.ecommerce.domain.port.EcommerceOnlineCategoryRepositoryPort;
@@ -93,6 +94,77 @@ class StorefrontPublicProductsIntegrationTest extends AbstractHttpIntegrationTes
 
         org.junit.jupiter.api.Assertions.assertTrue(foundPublished);
         org.junit.jupiter.api.Assertions.assertEquals(published.slug(), "slug-storefront-" + base + "-pub");
+    }
+
+    @Test
+    void shouldFilterPublishedProductsByCategorySlug() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = String.valueOf(System.nanoTime());
+        EcommerceOnlineCategory targetCategory = createOnlineCategory("online-cat-filter-target-" + suffix, "Online Cat Filter Target " + suffix, true);
+        EcommerceOnlineCategory otherCategory = createOnlineCategory("online-cat-filter-other-" + suffix, "Online Cat Filter Other " + suffix, true);
+        ProductFixture targetProduct = createPublishedProfileInOnlineCategory(adminToken, suffix + "-target", BigDecimal.valueOf(31.10), null, targetCategory.id());
+        ProductFixture otherProduct = createPublishedProfileInOnlineCategory(adminToken, suffix + "-other", BigDecimal.valueOf(32.20), null, otherCategory.id());
+
+        MvcResult result = mockMvc.perform(get("/api/v1/storefront/catalog/products")
+                        .param("categorySlug", targetCategory.slug())
+                        .param("size", "50"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(50))
+                .andReturn();
+
+        JsonNode items = readJson(result).path("items");
+        org.junit.jupiter.api.Assertions.assertNotNull(findBySlug(items, targetProduct.slug()));
+        org.junit.jupiter.api.Assertions.assertNull(findBySlug(items, otherProduct.slug()));
+        for (JsonNode item : items) {
+            org.junit.jupiter.api.Assertions.assertEquals(targetCategory.slug(), item.path("category").path("slug").asText());
+            org.junit.jupiter.api.Assertions.assertFalse(item.has("categoryId"));
+            org.junit.jupiter.api.Assertions.assertFalse(item.has("onlineCategoryId"));
+        }
+    }
+
+    @Test
+    void shouldReturnEmptyPageWhenCategorySlugDoesNotExist() throws Exception {
+        String suffix = String.valueOf(System.nanoTime());
+
+        mockMvc.perform(get("/api/v1/storefront/catalog/products")
+                        .param("categorySlug", "online-cat-missing-" + suffix)
+                        .param("size", "24"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(0))
+                .andExpect(jsonPath("$.totalItems").value(0))
+                .andExpect(jsonPath("$.totalPages").value(0));
+    }
+
+    @Test
+    void shouldNotExposeProductsWhenOnlineCategoryIsInactive() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = String.valueOf(System.nanoTime());
+        EcommerceOnlineCategory category = createOnlineCategory("online-cat-inactive-filter-" + suffix, "Online Cat Inactive Filter " + suffix, true);
+        ProductFixture product = createPublishedProfileInOnlineCategory(adminToken, suffix + "-inactive-cat", BigDecimal.valueOf(41.30), null, category.id());
+
+        onlineCategoryRepositoryPort.save(new EcommerceOnlineCategory(
+                category.id(),
+                category.parentId(),
+                category.name(),
+                category.slug(),
+                category.description(),
+                false,
+                category.createdAt(),
+                category.updatedAt(),
+                category.createdBy(),
+                "it"
+        ));
+
+        MvcResult result = mockMvc.perform(get("/api/v1/storefront/catalog/products")
+                        .param("categorySlug", category.slug())
+                        .param("size", "50"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(0))
+                .andExpect(jsonPath("$.totalItems").value(0))
+                .andReturn();
+
+        org.junit.jupiter.api.Assertions.assertNull(findBySlug(readJson(result).path("items"), product.slug()));
     }
 
     @Test
@@ -288,13 +360,37 @@ class StorefrontPublicProductsIntegrationTest extends AbstractHttpIntegrationTes
 
     private ProductFixture createPublishedProfile(String adminToken, String suffix, BigDecimal salePrice, BigDecimal overrideAmount) throws Exception {
         ProductFixture product = createProductFixture(adminToken, suffix, salePrice);
-        ecommerceCatalogUseCase.createDraftProfile(new CreateProductOnlineProfileCommand(product.productId()));
 
         long onlineCategoryId = onlineCategoryRepositoryPort.findAll().stream()
                 .filter(cat -> cat.slug().equals("online-cat-storefront-" + suffix))
                 .map(cat -> cat.id())
                 .findFirst()
                 .orElseThrow();
+
+        publishProductOnlineProfile(adminToken, suffix, product, onlineCategoryId, overrideAmount);
+        return product;
+    }
+
+    private ProductFixture createPublishedProfileInOnlineCategory(
+            String adminToken,
+            String suffix,
+            BigDecimal salePrice,
+            BigDecimal overrideAmount,
+            long onlineCategoryId
+    ) throws Exception {
+        ProductFixture product = createProductFixture(adminToken, suffix, salePrice);
+        publishProductOnlineProfile(adminToken, suffix, product, onlineCategoryId, overrideAmount);
+        return product;
+    }
+
+    private void publishProductOnlineProfile(
+            String adminToken,
+            String suffix,
+            ProductFixture product,
+            long onlineCategoryId,
+            BigDecimal overrideAmount
+    ) throws Exception {
+        ecommerceCatalogUseCase.createDraftProfile(new CreateProductOnlineProfileCommand(product.productId()));
 
         ObjectNode profilePayload = objectMapper.createObjectNode();
         profilePayload.put("slug", product.slug());
@@ -354,8 +450,21 @@ class StorefrontPublicProductsIntegrationTest extends AbstractHttpIntegrationTes
                         .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk());
+    }
 
-        return product;
+    private EcommerceOnlineCategory createOnlineCategory(String slug, String name, boolean active) {
+        return onlineCategoryRepositoryPort.save(new EcommerceOnlineCategory(
+                null,
+                null,
+                name,
+                slug,
+                "Categoria storefront",
+                active,
+                null,
+                null,
+                "it",
+                "it"
+        ));
     }
 
     private void createDraftProfileOnly(String adminToken, String suffix) throws Exception {

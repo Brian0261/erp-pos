@@ -43,9 +43,10 @@ public class StorefrontCatalogController {
     public PublicPageResponse<PublicProductListItemResponse> listProducts(
             @RequestParam(name = "page", defaultValue = "0") int page,
             @RequestParam(name = "size", defaultValue = "20") int size,
-            @RequestParam(name = "sort", defaultValue = "name_asc") String sort
+            @RequestParam(name = "sort", defaultValue = "name_asc") String sort,
+            @RequestParam(name = "categorySlug", required = false) String categorySlug
     ) {
-        StorefrontProductPageResult pageResult = storefrontProductCatalogUseCase.listPublishedProducts(page, size, sort);
+        StorefrontProductPageResult pageResult = storefrontProductCatalogUseCase.listPublishedProducts(page, size, sort, categorySlug);
 
         return new PublicPageResponse<>(
                 pageResult.items().stream().map(this::toPublicItem).toList(),

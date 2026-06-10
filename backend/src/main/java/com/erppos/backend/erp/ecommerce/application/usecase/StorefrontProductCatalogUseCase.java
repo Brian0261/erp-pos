@@ -7,7 +7,7 @@ import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontPro
 import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontProductDetailResult;
 
 public interface StorefrontProductCatalogUseCase {
-    StorefrontProductPageResult listPublishedProducts(int page, int size, String sort);
+    StorefrontProductPageResult listPublishedProducts(int page, int size, String sort, String categorySlug);
 
     StorefrontCategoryPageResult listPublicCategories(int page, int size, String sort);
 
