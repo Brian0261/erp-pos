@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { EmptyState } from "@/components/catalog";
 import { BottomNavigation } from "@/components/layout/bottom-navigation";
 import { StorefrontFooter } from "@/components/layout/storefront-footer";
@@ -16,25 +17,28 @@ export const metadata: Metadata = {
 
 type CategoryCardPreviewProps = {
   description?: string | null;
+  href: string;
   name: string;
 };
 
-function CategoryCardPreview({ description, name }: CategoryCardPreviewProps) {
+function CategoryCardPreview({ description, href, name }: CategoryCardPreviewProps) {
   return (
-    <article className="grid min-h-32 grid-cols-[minmax(112px,0.42fr)_minmax(0,0.58fr)] overflow-hidden rounded-ink border border-ink-border bg-ink-white shadow-ink-soft sm:min-h-36 sm:grid-cols-[minmax(0,1.2fr)_minmax(220px,0.8fr)]">
-      <div className="relative bg-ink-soft">
-        <div className="flex h-full min-h-32 items-center justify-center bg-[linear-gradient(135deg,var(--ink-accent),var(--ink-cream))] p-4 sm:min-h-36 sm:p-6">
-          <span className="font-serif text-3xl font-bold text-ink-primary sm:text-4xl">{name.slice(0, 1)}</span>
+    <Link className="group block" href={href}>
+      <article className="grid min-h-32 grid-cols-[minmax(112px,0.42fr)_minmax(0,0.58fr)] overflow-hidden rounded-ink border border-ink-border bg-ink-white shadow-ink-soft transition hover:-translate-y-0.5 sm:min-h-36 sm:grid-cols-[minmax(0,1.2fr)_minmax(220px,0.8fr)]">
+        <div className="relative bg-ink-soft">
+          <div className="flex h-full min-h-32 items-center justify-center bg-[linear-gradient(135deg,var(--ink-accent),var(--ink-cream))] p-4 sm:min-h-36 sm:p-6">
+            <span className="font-serif text-3xl font-bold text-ink-primary sm:text-4xl">{name.slice(0, 1)}</span>
+          </div>
         </div>
-      </div>
-      <div className="flex min-w-0 flex-col justify-center gap-2 p-4 sm:gap-3 sm:p-5">
-        <h3 className="font-serif text-xl font-bold leading-tight text-ink-primary sm:text-2xl">{name}</h3>
-        {description ? <p className="line-clamp-2 font-sans text-sm leading-5 text-ink-body sm:leading-6">{description}</p> : null}
-        <p className="font-sans text-[11px] font-semibold uppercase tracking-wide text-ink-muted sm:text-xs">
-          Detalle proximamente
-        </p>
-      </div>
-    </article>
+        <div className="flex min-w-0 flex-col justify-center gap-2 p-4 sm:gap-3 sm:p-5">
+          <h3 className="font-serif text-xl font-bold leading-tight text-ink-primary sm:text-2xl">{name}</h3>
+          {description ? <p className="line-clamp-2 font-sans text-sm leading-5 text-ink-body sm:leading-6">{description}</p> : null}
+          <p className="font-sans text-[11px] font-semibold uppercase tracking-wide text-ink-muted sm:text-xs">
+            Ver productos
+          </p>
+        </div>
+      </article>
+    </Link>
   );
 }
 
@@ -66,6 +70,7 @@ export default async function CategoriesPage() {
               {categories.items.map((category) => (
                 <CategoryCardPreview
                   description={category.description}
+                  href={`/categorias/${category.slug}`}
                   key={category.slug}
                   name={category.name}
                 />

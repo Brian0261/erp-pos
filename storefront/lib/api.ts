@@ -18,6 +18,10 @@ export interface StorefrontPageParams {
   sort?: string;
 }
 
+export interface StorefrontProductPageParams extends StorefrontPageParams {
+  categorySlug?: string;
+}
+
 export type StorefrontFetchOptions = RequestInit & {
   timeoutMs?: number;
 };
@@ -84,6 +88,14 @@ function appendPageParams(url: URL, params?: StorefrontPageParams) {
   }
   if (params?.sort) {
     url.searchParams.set("sort", params.sort);
+  }
+  return url;
+}
+
+function appendProductParams(url: URL, params?: StorefrontProductPageParams) {
+  appendPageParams(url, params);
+  if (params?.categorySlug?.trim()) {
+    url.searchParams.set("categorySlug", params.categorySlug.trim());
   }
   return url;
 }
@@ -181,8 +193,8 @@ export async function fetchStorefront<T>(path: string, options: StorefrontFetchO
   }
 }
 
-export function getStorefrontProducts(params?: StorefrontPageParams) {
-  const url = appendPageParams(new URL("/catalog/products", "http://storefront.local"), params);
+export function getStorefrontProducts(params?: StorefrontProductPageParams) {
+  const url = appendProductParams(new URL("/catalog/products", "http://storefront.local"), params);
   return fetchStorefront<PublicPageResponse<PublicProductListItemResponse>>(
     `${url.pathname}${url.search}`,
   );
