@@ -362,3 +362,18 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
 - Riesgos pendientes: dominio real en `STOREFRONT_PUBLIC_BASE_URL`, limpieza de datos de prueba antes de indexar, activacion posterior y controlada de indexacion.
 - Documentacion QA creada: `docs/qa/PHASE2S5A_STOREFRONT_TECHNICAL_SEO_QA.md`.
 - Pendiente recomendado: discovery de readiness de indexacion/publicacion real.
+
+## Fase 2S.5C Storefront indexing readiness guardrails
+
+- Fase 2S.5C cerrada funcional y documentalmente.
+- Se centralizo la decision de indexacion en `canStorefrontAllowIndexing()`.
+- Se bloqueo indexacion cuando `STOREFRONT_INDEXING_ENABLED=true` no viene acompanado de una base URL publicable.
+- Se bloquearon `localhost`, `127.0.0.1`, `0.0.0.0` y dominios `example/test` como base publica indexable.
+- `robots.ts`, `layout.tsx` y metadatos dinamicos usan el helper compartido para evitar inconsistencias.
+- Confirmado: indexacion sigue bloqueada por defecto y `localhost` no puede quedar indexable aunque el flag sea true.
+- Validaciones: `npm run build`, `npm run lint`, `npx tsc --noEmit`, `git diff --check`.
+- Smoke: `/`, `/productos`, `/categorias`, `/sitemap.xml`, `/robots.txt` 200 y `/buscar` 404 esperado.
+- Excluido: backend, contratos, structured data, buscador, filtros, carrito, checkout, pagos, Merchant Center, `remotePatterns`.
+- Riesgos pendientes: limpiar datos smoke/test, configurar dominio real, mejorar contenido comercial real, activar indexacion solo en fase posterior separada y controlada.
+- Documentacion QA creada: `docs/qa/PHASE2S5C_STOREFRONT_INDEXING_GUARDRAILS_QA.md`.
+- Pendiente recomendado: discovery de limpieza de datos publicos y contenido indexable.

@@ -703,3 +703,46 @@ Solo crear tag cuando se cumpla todo:
   - configurar dominio real en `STOREFRONT_PUBLIC_BASE_URL` antes de publicar;
   - limpiar datos de prueba antes de indexar;
   - activar indexacion solo en una fase posterior separada y controlada.
+
+### Cierre Fase 2S.5C Storefront indexing readiness guardrails
+
+- Tipo: implementacion funcional Storefront + cierre documental QA.
+- Alcance: endurecer la decision de indexacion para evitar activacion accidental en entornos no preparados.
+- Archivos creados:
+  - `docs/qa/PHASE2S5C_STOREFRONT_INDEXING_GUARDRAILS_QA.md`
+- Archivos modificados:
+  - `storefront/lib/seo.ts`
+  - `storefront/app/robots.ts`
+  - `storefront/app/layout.tsx`
+  - `storefront/app/productos/[slug]/page.tsx`
+  - `storefront/app/categorias/[slug]/page.tsx`
+  - `storefront/.env.local.example`
+- Decisiones tecnicas:
+  - `canStorefrontAllowIndexing()` centraliza la politica de indexacion.
+  - `STOREFRONT_INDEXING_ENABLED=true` no basta: la base URL debe ser publicable.
+  - `localhost`, `127.0.0.1`, `0.0.0.0` y dominios `example/test` quedan bloqueados.
+  - `robots.ts` y metadata comparten la misma decision para evitar inconsistencias.
+  - `layout.tsx` y las paginas dinamicas respetan el helper compartido.
+- Confirmaciones:
+  - indexacion sigue bloqueada por defecto;
+  - localhost no puede quedar indexable aunque el flag sea true;
+  - no se toco backend, Angular, ecommerce-admin, contratos, DTOs, endpoints, Flyway, Docker ni seguridad.
+- Validaciones:
+  - `npm run build`: OK.
+  - `npm run lint`: OK.
+  - `npx tsc --noEmit`: OK.
+  - `git diff --check`: OK.
+- Smoke:
+  - `/`: 200.
+  - `/productos`: 200.
+  - `/categorias`: 200.
+  - `/sitemap.xml`: 200.
+  - `/robots.txt`: 200.
+  - `/buscar`: 404 esperado.
+- Exclusiones confirmadas:
+  - sin backend, sin contratos, sin structured data, sin buscador, sin filtros, sin carrito, sin checkout, sin pagos, sin Merchant Center, sin `remotePatterns`.
+- Riesgos pendientes:
+  - limpiar datos smoke/test antes de publicar;
+  - configurar dominio real en `STOREFRONT_PUBLIC_BASE_URL`;
+  - mejorar contenido comercial real;
+  - activar indexacion solo en fase posterior separada y controlada.
