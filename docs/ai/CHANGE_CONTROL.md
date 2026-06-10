@@ -389,6 +389,46 @@ Estandarizar cambios tecnicos para reducir regresiones y mantener trazabilidad e
 - Documentacion actualizada: `docs/ai/CURRENT_STATUS.md`, `docs/ai/CHANGE_CONTROL.md`.
 - Pendiente recomendado: discovery separado para categoria publica `/categorias/[slug]` y productos por categoria.
 
+### Cierre Fase 2S.3A Categoria Publica /categorias/[slug] con Productos por Categoria
+
+- Tipo: implementacion funcional backend + Storefront + cierre documental QA.
+- Alcance: extender contrato publico con `categorySlug` opcional y crear pagina `/categorias/[slug]` con productos reales filtrados.
+- Backend:
+  - `GET /api/v1/storefront/catalog/products` acepta `categorySlug` opcional.
+  - Filtro server-side por categoria online activa.
+  - Sin cambios en DTOs publicos ni endpoint duplicado.
+  - Tests nuevos: filtro por categoria, slug inexistente, categoria inactiva.
+- Storefront:
+  - `storefront/lib/api.ts`: `getStorefrontProducts()` acepta `categorySlug`.
+  - `storefront/app/categorias/[slug]/page.tsx`: pagina dinamica con metadata SEO.
+  - `storefront/app/categorias/page.tsx`: enlaces a `/categorias/{slug}`.
+- Validaciones:
+  - Tests backend focalizados: 43 tests, 0 failures, BUILD SUCCESS.
+  - `npm run build`: OK.
+  - `npm run lint`: OK.
+  - `npx tsc --noEmit`: OK.
+  - `git diff --check`: OK.
+- Smoke HTTP:
+  - `/categorias/{slug-con-productos}`: 200 OK.
+  - `/categorias/{slug-inexistente}`: 404 OK.
+  - `/productos`: 200 OK (sin cambios).
+  - `/productos/{slug}`: 200 OK (sin cambios).
+  - `/buscar`: 404 OK (esperado).
+- Confirmaciones:
+  - Sin llamadas a `/api/v1/ecommerce-admin`.
+  - robots/noindex activos.
+  - Server Components.
+  - Consumo exclusivo de `/api/v1/storefront/**`.
+- Exclusiones confirmadas:
+  - Sin Home real, buscador, filtros UI, carrito, checkout, pagos, pedidos, login cliente, Merchant Center.
+  - Sin sitemap XML, imagenes externas, remotePatterns, productos relacionados, marcas publicas.
+  - Sin cambios en Angular, ecommerce-admin, Flyway/DB, Docker, `.env`, secretos, seguridad, `/productos/[slug]`, `globals.css`, DTOs publicos.
+  - Sin client-side filtering ni endpoints duplicados.
+- Riesgo de despliegue: Storefront nuevo debe desplegarse junto con backend nuevo.
+- Documentacion creada: `docs/qa/PHASE2S3A_PUBLIC_CATEGORY_PRODUCTS_QA.md`.
+- Documentacion actualizada: `docs/ai/CURRENT_STATUS.md`, `docs/ai/CHANGE_CONTROL.md`.
+- Pendiente recomendado: discovery de Home real SEO-first.
+
 ### Inicio Fase 2E.0 Storefront MVP Shell Planning
 
 - Tipo: documentacion tecnica de planificacion, sin implementacion funcional.

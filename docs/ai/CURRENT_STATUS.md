@@ -298,3 +298,26 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
 - Documentacion QA creada: `docs/qa/PHASE2S2B_A_STOREFRONT_VISUAL_ALIGNMENT_QA.md`.
 - Documentacion actualizada: `docs/ai/CURRENT_STATUS.md`, `docs/ai/CHANGE_CONTROL.md`.
 - Pendiente recomendado: discovery separado para categoria publica `/categorias/[slug]` y productos por categoria.
+
+## Fase 2S.3A Categoria Publica /categorias/[slug] con Productos por Categoria
+
+- Fase 2S.3A cerrada funcional y documentalmente.
+- Backend: `GET /api/v1/storefront/catalog/products` ahora acepta `categorySlug` opcional.
+  - Sin `categorySlug`: comportamiento identico al anterior.
+  - Con `categorySlug`: filtra server-side por categoria online activa.
+  - Mantiene `page`, `size`, `sort=name_asc`.
+  - `categorySlug` inexistente o categoria inactiva: pagina vacia `200`, sin romper contrato.
+  - No se agregaron DTOs nuevos ni endpoint duplicado.
+- Storefront:
+  - `storefront/lib/api.ts`: `getStorefrontProducts()` acepta `categorySlug` opcional.
+  - `storefront/app/categorias/[slug]/page.tsx`: nueva pagina dinamica con metadata SEO, canonical, noindex.
+  - `storefront/app/categorias/page.tsx`: cada categoria enlaza a `/categorias/{slug}`.
+- Validaciones: tests backend focalizados OK (43 tests, 0 failures), `npm run build` OK, `npm run lint` OK, `npx tsc --noEmit` OK, `git diff --check` OK.
+- Smoke HTTP: `/categorias/{slug-con-productos}` 200 OK, `/categorias/{slug-inexistente}` 404 OK, `/productos` 200 OK, `/productos/{slug}` 200 OK, `/buscar` 404 OK.
+- Confirmado: sin llamadas a `/api/v1/ecommerce-admin`, robots/noindex activos, Server Components, consumo exclusivo de `/api/v1/storefront/**`.
+- NO se implemento: Home real, buscador, filtros UI, carrito, checkout, pagos, pedidos, login cliente, Merchant Center, sitemap XML, imagenes externas, `remotePatterns`, productos relacionados, marcas publicas, client-side filtering, endpoints duplicados.
+- NO se toco: Angular, ecommerce-admin, Flyway/DB, Docker, `.env`, secretos, seguridad, `/productos/[slug]`, `globals.css`, DTOs publicos.
+- Riesgo de despliegue: Storefront nuevo debe desplegarse junto con backend nuevo porque depende de `categorySlug`.
+- Documentacion QA creada: `docs/qa/PHASE2S3A_PUBLIC_CATEGORY_PRODUCTS_QA.md`.
+- Documentacion actualizada: `docs/ai/CURRENT_STATUS.md`, `docs/ai/CHANGE_CONTROL.md`.
+- Pendiente recomendado: discovery de Home real SEO-first.
