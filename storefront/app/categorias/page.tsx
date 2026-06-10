@@ -6,6 +6,7 @@ import { StorefrontFooter } from "@/components/layout/storefront-footer";
 import { StorefrontHeader } from "@/components/layout/storefront-header";
 import { Breadcrumbs, SectionHeading } from "@/components/ui";
 import { getStorefrontCategories } from "@/lib/api";
+import { buildStorefrontPublicUrl, getStorefrontRobotsMetadata } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 300;
@@ -13,6 +14,10 @@ export const revalidate = 300;
 export const metadata: Metadata = {
   title: "Categorias | InkToy",
   description: "Explora las categorias publicas del catalogo InkToy.",
+  alternates: {
+    canonical: buildStorefrontPublicUrl("/categorias"),
+  },
+  robots: getStorefrontRobotsMetadata(),
 };
 
 type CategoryCardPreviewProps = {

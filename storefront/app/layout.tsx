@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { DM_Sans, Fraunces } from "next/font/google";
+import { getStorefrontPublicBaseUrl } from "@/lib/seo";
 import "./globals.css";
 
 const dmSans = DM_Sans({
@@ -15,6 +16,7 @@ const fraunces = Fraunces({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(getStorefrontPublicBaseUrl()),
   title: "InkToy - Utiles escolares y pasamaneria",
   description: "Tienda de utiles escolares, papeleria y pasamaneria.",
   robots: {

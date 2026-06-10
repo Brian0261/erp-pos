@@ -5,6 +5,7 @@ import { StorefrontFooter } from "@/components/layout/storefront-footer";
 import { StorefrontHeader } from "@/components/layout/storefront-header";
 import { Breadcrumbs, SectionHeading } from "@/components/ui";
 import { getStorefrontProducts } from "@/lib/api";
+import { buildStorefrontPublicUrl, getStorefrontRobotsMetadata } from "@/lib/seo";
 import type { PublicProductListItemResponse } from "@/types/storefront";
 
 export const dynamic = "force-dynamic";
@@ -13,6 +14,10 @@ export const revalidate = 300;
 export const metadata: Metadata = {
   title: "Productos | InkToy",
   description: "Explora el catalogo publico de productos disponibles para consulta en InkToy.",
+  alternates: {
+    canonical: buildStorefrontPublicUrl("/productos"),
+  },
+  robots: getStorefrontRobotsMetadata(),
 };
 
 function getSafeImageSrc(src?: string | null) {

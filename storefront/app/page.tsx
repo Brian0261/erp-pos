@@ -6,6 +6,7 @@ import { StorefrontFooter } from "@/components/layout/storefront-footer";
 import { StorefrontHeader } from "@/components/layout/storefront-header";
 import { Button, SectionHeading } from "@/components/ui";
 import { getStorefrontCategories, getStorefrontProducts } from "@/lib/api";
+import { buildStorefrontPublicUrl, getStorefrontRobotsMetadata } from "@/lib/seo";
 import type { PublicCategoryListItemResponse, PublicProductListItemResponse } from "@/types/storefront";
 
 export const dynamic = "force-dynamic";
@@ -14,6 +15,10 @@ export const revalidate = 300;
 export const metadata: Metadata = {
   title: "InkToy | Papeleria, utiles y creatividad",
   description: "Explora el catalogo publico InkToy de papeleria, utiles escolares, oficina y materiales creativos.",
+  alternates: {
+    canonical: buildStorefrontPublicUrl("/"),
+  },
+  robots: getStorefrontRobotsMetadata(),
 };
 
 const benefits = [
