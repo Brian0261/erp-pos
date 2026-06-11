@@ -471,6 +471,19 @@ class CatalogApplicationServiceTest {
                     .toList();
         }
         @Override
+        public List<Product> findBySkusIgnoreCase(java.util.Set<String> skus) {
+            if (skus == null || skus.isEmpty()) {
+                return List.of();
+            }
+            java.util.Set<String> normalizedSkus = skus.stream()
+                    .filter(Objects::nonNull)
+                    .map(sku -> sku.trim().toLowerCase(Locale.ROOT))
+                    .collect(java.util.stream.Collectors.toSet());
+            return storage.values().stream()
+                    .filter(product -> normalizedSkus.contains(product.sku().trim().toLowerCase(Locale.ROOT)))
+                    .toList();
+        }
+        @Override
         public Page<Product> findAll(Pageable pageable) {
             return new PageImpl<>(storage.values().stream().toList(), pageable, storage.size());
         }

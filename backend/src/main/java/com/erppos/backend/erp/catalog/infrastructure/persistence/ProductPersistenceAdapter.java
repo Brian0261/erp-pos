@@ -21,6 +21,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
 
 @Component
 @Transactional(readOnly = true)
@@ -67,6 +68,23 @@ public class ProductPersistenceAdapter implements ProductRepositoryPort {
             return List.of();
         }
         return productJpaRepository.findAllById(ids).stream().map(ProductMapper::toDomain).toList();
+    }
+
+    @Override
+    public List<Product> findBySkusIgnoreCase(Set<String> skus) {
+        if (skus == null || skus.isEmpty()) {
+            return List.of();
+        }
+        Set<String> normalizedSkus = skus.stream()
+                .map(this::normalizeSkuKey)
+                .filter(sku -> !sku.isBlank())
+                .collect(java.util.stream.Collectors.toSet());
+        if (normalizedSkus.isEmpty()) {
+            return List.of();
+        }
+        return productJpaRepository.findBySkuLowerIn(normalizedSkus).stream()
+                .map(ProductMapper::toDomain)
+                .toList();
     }
 
     @Override
@@ -141,6 +159,10 @@ public class ProductPersistenceAdapter implements ProductRepositoryPort {
         }
 
         return query.trim().toLowerCase(Locale.ROOT).replaceAll("\\s+", " ");
+    }
+
+    private String normalizeSkuKey(String sku) {
+        return sku == null ? "" : sku.trim().toLowerCase(Locale.ROOT);
     }
 
     private List<String> tokenize(String query) {

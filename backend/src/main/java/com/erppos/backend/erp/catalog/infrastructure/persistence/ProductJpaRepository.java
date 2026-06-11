@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import java.util.Collection;
 import java.util.List;
 public interface ProductJpaRepository extends JpaRepository<ProductEntity, Long>, JpaSpecificationExecutor<ProductEntity> {
     @Override
@@ -21,6 +22,13 @@ public interface ProductJpaRepository extends JpaRepository<ProductEntity, Long>
 
     @EntityGraph(attributePaths = {"category", "unit"})
     List<ProductEntity> findByActive(boolean active);
+
+    @EntityGraph(attributePaths = {"category", "unit"})
+    @Query("""
+            SELECT p FROM ProductEntity p
+            WHERE LOWER(p.sku) IN :skus
+            """)
+    List<ProductEntity> findBySkuLowerIn(@Param("skus") Collection<String> skus);
 
     boolean existsBySkuIgnoreCase(String sku);
     boolean existsBySkuIgnoreCaseAndIdNot(String sku, Long id);
