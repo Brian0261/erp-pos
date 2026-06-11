@@ -746,3 +746,52 @@ Solo crear tag cuando se cumpla todo:
   - configurar dominio real en `STOREFRONT_PUBLIC_BASE_URL`;
   - mejorar contenido comercial real;
   - activar indexacion solo en fase posterior separada y controlada.
+
+### Cierre Fase 2S.7A Bulk ecommerce online profile import/export MVP
+
+- Tipo: implementacion funcional backend + frontend Angular + cierre documental QA.
+- Alcance: flujo separado de importacion/exportacion masiva de Perfiles online ecommerce usando SKU como clave humana.
+- Endpoints creados (ADMIN):
+  - `GET /api/v1/ecommerce-admin/products/online-profiles/import/template`
+  - `POST /api/v1/ecommerce-admin/products/online-profiles/import/preview`
+  - `POST /api/v1/ecommerce-admin/products/online-profiles/import/confirm-file`
+- Backend:
+  - Resolver batch de SKU a productId (`ProductRepositoryPort.findBySkusIgnoreCase`).
+  - Use case, service, workbook adapter, DTOs y controller dedicados.
+  - Plantilla prellenada con productos ERP activos y perfiles no publicados.
+  - Hojas de referencia: `online_categories`, `brands`, `instructions`.
+- Frontend Angular:
+  - Pantalla `/ecommerce-admin/perfiles/importar`.
+  - Modelos y servicio en `ecommerce-admin`.
+  - Link desde Perfiles online y navegacion lateral.
+  - Microajustes UX: texto superior mas corto, boton Quitar archivo con limpieza completa, tabla con anchos estables/truncado, confirmacion previa con conteos.
+- Reglas de negocio:
+  - SKU inexistente/duplicado/producto inactivo se rechaza.
+  - Perfil publicado se protege/rechaza.
+  - No se crean productos ERP.
+  - No se modifica stock, inventario, unidad, costo, precio ERP ni categoria ERP.
+  - No se crean marcas/categorias online automaticamente.
+  - No se publica desde Excel.
+  - Nuevos perfiles quedan DRAFT.
+  - `onlineName` y `slug` se autogeneran cuando corresponde.
+  - Slugs con `test`, `smoke`, `demo`, `prueba` o `example` se rechazan.
+  - Categoria online y marca se validan contra referencias existentes y activas.
+- Validaciones:
+  - `mvn -DskipTests compile`: OK.
+  - Tests backend focalizados: 57 tests, 0 failures, BUILD SUCCESS.
+  - `npm run build`: OK.
+  - `git diff --check`: OK.
+- Smoke: no ejecutado porque no hay servidor local activo en esta sesion.
+- Exclusiones confirmadas:
+  - Sin publicar desde Excel.
+  - Sin bulk SEO/imagenes/ZIP/storage/CDN.
+  - Sin crear productos ERP.
+  - Sin modificar stock/inventario/unidad/costo/precio ERP/categoria ERP.
+  - Sin Storefront/POS/carrito/checkout/pagos/Merchant Center/structured data/remotePatterns/imagenes externas.
+- Riesgos pendientes:
+  - Filtro por categoria ERP para plantilla fuera del MVP.
+  - Sin script lint separado en frontend.
+  - Sin smoke headless/e2e para esta pantalla.
+- Documentacion creada: `docs/qa/PHASE2S7A_ONLINE_PROFILE_BULK_IMPORT_QA.md`.
+- Documentacion actualizada: `docs/ai/CURRENT_STATUS.md`, `docs/ai/CHANGE_CONTROL.md`.
+- Pendiente recomendado: 2S.8 — Discovery de gestion profesional de imagenes ecommerce.

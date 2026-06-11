@@ -377,3 +377,30 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
 - Riesgos pendientes: limpiar datos smoke/test, configurar dominio real, mejorar contenido comercial real, activar indexacion solo en fase posterior separada y controlada.
 - Documentacion QA creada: `docs/qa/PHASE2S5C_STOREFRONT_INDEXING_GUARDRAILS_QA.md`.
 - Pendiente recomendado: discovery de limpieza de datos publicos y contenido indexable.
+
+## Fase 2S.7A Bulk ecommerce online profile import/export MVP
+
+- Fase 2S.7A cerrada funcional y documentalmente.
+- Flujo separado de importacion/exportacion masiva de Perfiles online ecommerce.
+- Endpoints ADMIN creados:
+  - `GET /api/v1/ecommerce-admin/products/online-profiles/import/template`
+  - `POST /api/v1/ecommerce-admin/products/online-profiles/import/preview`
+  - `POST /api/v1/ecommerce-admin/products/online-profiles/import/confirm-file`
+- Importacion por SKU con resolver batch a productId.
+- SKU inexistente, duplicado en Excel o producto ERP inactivo se rechaza.
+- Perfil publicado se protege/rechaza en MVP.
+- No se crean productos ERP ni se modifica stock, inventario, unidad, costo, precio ERP ni categoria ERP.
+- No se crean marcas/categorias online automaticamente.
+- No se publica desde Excel; nuevos perfiles quedan DRAFT.
+- `onlineName` y `slug` se autogeneran cuando corresponde.
+- Slugs con `test`, `smoke`, `demo`, `prueba` o `example` se rechazan.
+- Categoria online y marca se validan contra referencias existentes y activas.
+- Frontend Angular con pantalla `/ecommerce-admin/perfiles/importar`.
+- Microajustes UX: texto superior mas corto, boton Quitar archivo con limpieza completa, tabla con anchos estables/truncado, confirmacion previa con conteos.
+- Validaciones: tests backend focalizados 57/57 OK, `npm run build` OK, `git diff --check` OK.
+- Smoke manual no ejecutado porque no hay servidor local activo en esta sesion.
+- Exclusiones: sin publicar desde Excel, sin bulk SEO/imagenes, sin crear productos ERP, sin modificar stock/inventario/unidad/costo/precio ERP, sin Storefront/POS/carrito/checkout/pagos/Merchant Center/structured data/remotePatterns.
+- Riesgos pendientes: filtro por categoria ERP para plantilla fuera del MVP, sin script lint separado en frontend, sin smoke headless/e2e para esta pantalla.
+- Documentacion QA creada: `docs/qa/PHASE2S7A_ONLINE_PROFILE_BULK_IMPORT_QA.md`.
+- Documentacion actualizada: `docs/ai/CURRENT_STATUS.md`, `docs/ai/CHANGE_CONTROL.md`.
+- Pendiente recomendado: 2S.8 — Discovery de gestion profesional de imagenes ecommerce.
