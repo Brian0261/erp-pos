@@ -45,6 +45,12 @@ export type AssetType =
 
 export type AssetSource = "SUPPLIER" | "OWN" | "GENERATED" | "OTHER";
 
+export type EcommerceOnlineProfileImportAction =
+  | "CREATE"
+  | "UPDATE"
+  | "NO_CHANGE"
+  | "REJECT";
+
 export interface EcommerceAdminPageResponse<T> {
   items: T[];
   page: number;
@@ -235,4 +241,48 @@ export interface EcommerceAdminOnlineCategoryRequest {
 
 export interface EcommerceAdminOnlineCategoryStatusRequest {
   active: boolean;
+}
+
+export interface EcommerceOnlineProfileImportPreviewRow {
+  rowNumber: number;
+  sku: string | null;
+  productName: string | null;
+  publicationStatus: OnlinePublicationStatus | null;
+  onlineName: string | null;
+  slug: string | null;
+  onlineDescription: string | null;
+  onlineCategorySlug: string | null;
+  brandSlug: string | null;
+  brandAbsencePolicy: string | null;
+  action: EcommerceOnlineProfileImportAction;
+  valid: boolean;
+  errors: string[];
+  generatedFields: string[];
+}
+
+export interface EcommerceOnlineProfileImportPreviewResponse {
+  totalRows: number;
+  createRows: number;
+  updateRows: number;
+  unchangedRows: number;
+  rejectedRows: number;
+  rows: EcommerceOnlineProfileImportPreviewRow[];
+}
+
+export interface EcommerceOnlineProfileImportConfirmRowResponse {
+  rowNumber: number;
+  sku: string | null;
+  action: EcommerceOnlineProfileImportAction;
+  applied: boolean;
+  profileId: number | null;
+  errors: string[];
+}
+
+export interface EcommerceOnlineProfileImportConfirmResponse {
+  totalRows: number;
+  createdRows: number;
+  updatedRows: number;
+  unchangedRows: number;
+  rejectedRows: number;
+  rows: EcommerceOnlineProfileImportConfirmRowResponse[];
 }

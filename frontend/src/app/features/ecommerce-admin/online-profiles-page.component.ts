@@ -37,6 +37,13 @@ const NONE_VALUE = "__NONE__";
         </div>
 
         <div class="header-actions">
+          <a
+            *ngIf="canManage"
+            routerLink="/ecommerce-admin/perfiles/importar"
+            class="ui-button ui-button--secondary"
+          >
+            Importar perfiles
+          </a>
           <button
             type="button"
             class="ui-button ui-button--secondary"
@@ -241,6 +248,8 @@ const NONE_VALUE = "__NONE__";
       .header-actions {
         display: inline-flex;
         align-items: center;
+        gap: var(--space-2);
+        flex-wrap: wrap;
       }
 
       .filters-panel {

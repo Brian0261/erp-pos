@@ -22,6 +22,8 @@ import {
   EcommerceAdminUpsertPriceOverrideRequest,
   EcommerceAdminUpsertPrimaryAssetRequest,
   EcommerceAdminUpsertSeoRequest,
+  EcommerceOnlineProfileImportConfirmResponse,
+  EcommerceOnlineProfileImportPreviewResponse,
   OnlinePublicationStatus,
   ReadinessStatus,
 } from "./ecommerce-admin.models";
@@ -39,6 +41,7 @@ export interface OnlineProfileListFilters {
 @Injectable({ providedIn: "root" })
 export class EcommerceAdminService {
   private readonly endpoint = `${environment.apiUrl}/ecommerce-admin`;
+  private readonly onlineProfilesImportEndpoint = `${this.endpoint}/products/online-profiles/import`;
 
   constructor(private readonly http: HttpClient) {}
 
@@ -163,6 +166,30 @@ export class EcommerceAdminService {
     return this.http.post<EcommerceAdminOnlineProfileDetailResponse>(
       `${this.endpoint}/products/${productId}/unpublish`,
       {},
+    );
+  }
+
+  downloadOnlineProfilesImportTemplate(): Observable<Blob> {
+    return this.http.get(`${this.onlineProfilesImportEndpoint}/template`, {
+      responseType: "blob",
+    });
+  }
+
+  previewOnlineProfilesImport(file: File): Observable<EcommerceOnlineProfileImportPreviewResponse> {
+    const formData = new FormData();
+    formData.append("file", file);
+    return this.http.post<EcommerceOnlineProfileImportPreviewResponse>(
+      `${this.onlineProfilesImportEndpoint}/preview`,
+      formData,
+    );
+  }
+
+  confirmOnlineProfilesImportFile(file: File): Observable<EcommerceOnlineProfileImportConfirmResponse> {
+    const formData = new FormData();
+    formData.append("file", file);
+    return this.http.post<EcommerceOnlineProfileImportConfirmResponse>(
+      `${this.onlineProfilesImportEndpoint}/confirm-file`,
+      formData,
     );
   }
 

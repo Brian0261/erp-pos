@@ -16,6 +16,7 @@ import { ProductCleanupPreviewPageComponent } from "./features/admin/product-cle
 import { DashboardComponent } from "./features/dashboard/dashboard.component";
 import { EcommerceBrandsPageComponent } from "./features/ecommerce-admin/ecommerce-brands-page.component";
 import { EcommerceOnlineCategoriesPageComponent } from "./features/ecommerce-admin/ecommerce-online-categories-page.component";
+import { OnlineProfileImportPageComponent } from "./features/ecommerce-admin/online-profile-import-page.component";
 import { OnlineProfileDetailPageComponent } from "./features/ecommerce-admin/online-profile-detail-page.component";
 import { OnlineProfilesPageComponent } from "./features/ecommerce-admin/online-profiles-page.component";
 import { OutboxEventDetailPageComponent } from "./features/integrations/outbox-event-detail-page.component";
@@ -152,6 +153,11 @@ export const routes: Routes = [
         path: "ecommerce-admin/perfiles",
         component: OnlineProfilesPageComponent,
         data: { allowedRoles: ROLES_ECOMMERCE_ADMIN },
+      },
+      {
+        path: "ecommerce-admin/perfiles/importar",
+        component: OnlineProfileImportPageComponent,
+        data: { allowedRoles: ROLES_ADMIN },
       },
       {
         path: "ecommerce-admin/marcas",
