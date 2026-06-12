@@ -795,3 +795,45 @@ Solo crear tag cuando se cumpla todo:
 - Documentacion creada: `docs/qa/PHASE2S7A_ONLINE_PROFILE_BULK_IMPORT_QA.md`.
 - Documentacion actualizada: `docs/ai/CURRENT_STATUS.md`, `docs/ai/CHANGE_CONTROL.md`.
 - Pendiente recomendado: 2S.8 — Discovery de gestion profesional de imagenes ecommerce.
+
+### Cierre Fase 2S.8A Public image URL policy
+
+- Tipo: hardening backend ecommerce admin + readiness/publicacion + microajuste Angular + QA documental.
+- Alcance: politica de URL publica para `ProductAsset.assetUrl` usando el modelo actual de assets ecommerce.
+- Backend:
+  - Nueva configuracion `app.ecommerce.public-images.allowed-domains` / `ECOMMERCE_PUBLIC_IMAGE_ALLOWED_DOMAINS`.
+  - Nueva politica centralizada de URL publica de imagen.
+  - `upsertPrimaryProductAsset` rechaza URLs no publicas o no permitidas.
+  - `validatePublication` agrega error cuando la URL de imagen no es valida.
+  - `ASSET_INVALID` se conserva como codigo de readiness para asset con URL invalida, alt faltante, derechos no confirmados o tipo incorrecto.
+  - Readiness SQL de listado admin considera validos solo paths relativos publicos o dominios `https` permitidos.
+- Angular:
+  - Perfil online detalle ahora ofrece solo `PRODUCT_IMAGE` para producto.
+  - Se agrego ayuda visible para URL publica/dominio permitido, alt text y derechos.
+- Politica implementada:
+  - Permitido: path relativo publico que empieza con `/`.
+  - Permitido: `https://` en dominio allowlisted.
+  - Bloqueado: allowlist externa vacia para dominios no configurados.
+  - Bloqueado: `http`, `file`, `data`, `ftp`, credenciales, host ausente, whitespace/control chars, localhost, `127.0.0.1`, `0.0.0.0`, IPs privadas, `.test`, `.example`, `.example.com`, `.example.test`.
+- Validaciones:
+  - `mvn -DskipTests compile`: OK.
+  - `mvn -Dtest=EcommerceCatalogApplicationServiceTest test`: 27 tests, 0 failures, BUILD SUCCESS.
+  - Integracion ecommerce/storefront focalizada: 79 tests, 0 failures, BUILD SUCCESS.
+  - `npm run build` en frontend: OK.
+- Exclusiones confirmadas:
+  - Sin upload binario.
+  - Sin storage/CDN.
+  - Sin Cloudflare R2/S3/Bunny/Supabase.
+  - Sin ZIP.
+  - Sin importacion masiva de imagenes ni columna imagen en Excel.
+  - Sin galeria.
+  - Sin Storefront, `next.config.ts` ni `remotePatterns`.
+  - Sin structured data, Merchant Center ni activacion de indexacion.
+  - Sin imagen interna en Producto ERP.
+  - Sin buscador, filtros, carrito, checkout ni pagos.
+- Riesgos pendientes:
+  - Storefront aun requiere fase posterior para render seguro de dominios externos aprobados.
+  - Sin validacion binaria de MIME, dimensiones o peso porque no hay upload/storage.
+  - Datos historicos con URLs absolutas invalidas requieren limpieza antes de indexacion.
+- Documentacion creada: `docs/qa/PHASE2S8A_PUBLIC_IMAGE_URL_POLICY_QA.md`.
+- Pendiente recomendado: decision de storage/CDN o fase Storefront-safe para dominios de imagen aprobados, sin activar indexacion.

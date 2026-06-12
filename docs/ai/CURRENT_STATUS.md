@@ -404,3 +404,22 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
 - Documentacion QA creada: `docs/qa/PHASE2S7A_ONLINE_PROFILE_BULK_IMPORT_QA.md`.
 - Documentacion actualizada: `docs/ai/CURRENT_STATUS.md`, `docs/ai/CHANGE_CONTROL.md`.
 - Pendiente recomendado: 2S.8 — Discovery de gestion profesional de imagenes ecommerce.
+
+## Fase 2S.8A Public image URL policy
+
+- Fase 2S.8A implementada y validada localmente, pendiente de commit/push.
+- Se mantuvo la imagen publica ecommerce como `ProductAsset` asociado al Perfil online.
+- No se movio imagen al Producto ERP.
+- No se tocaron POS, stock, inventario, unidad, costo, precio ERP, importacion ERP, Storefront, `next.config.ts`, `remotePatterns`, Docker, Flyway, seguridad ni indexacion.
+- Backend agrega politica centralizada para `ProductAsset.assetUrl`.
+- Se permiten paths publicos relativos que empiezan con `/`.
+- URLs absolutas deben ser `https://` y pertenecer a `app.ecommerce.public-images.allowed-domains` / `ECOMMERCE_PUBLIC_IMAGE_ALLOWED_DOMAINS`.
+- Allowlist externa queda vacia por defecto; sin configurar dominios, no se aceptan hosts externos.
+- Se bloquea `http`, `file`, `data`, `ftp`, URLs con credenciales, host ausente, localhost, `127.0.0.1`, `0.0.0.0`, IPs privadas, `.test`, `.example`, `.example.com` y `.example.test`.
+- Readiness/publicacion conserva asset primario activo, `PRODUCT_IMAGE`, alt text y derechos confirmados, y ahora exige URL publica permitida.
+- Readiness de listado admin tambien valida path publico relativo o dominio `https` permitido.
+- Angular detalle de Perfil online restringe tipos de asset a `PRODUCT_IMAGE` y agrega ayuda sobre URL publica/dominio permitido, alt text y derechos.
+- Validaciones: `mvn -DskipTests compile` OK, `EcommerceCatalogApplicationServiceTest` 27/27 OK, integracion ecommerce/storefront focalizada 79/79 OK, `npm run build` frontend OK.
+- Documentacion QA creada: `docs/qa/PHASE2S8A_PUBLIC_IMAGE_URL_POLICY_QA.md`.
+- Riesgos pendientes: sin upload/storage/CDN/ZIP/galeria/metadatos tecnicos, Storefront aun no renderiza dominios externos sin fase posterior, datos historicos con URLs invalidas requieren limpieza antes de indexacion.
+- Pendiente recomendado: decision de storage/CDN o fase Storefront-safe para dominios de imagen aprobados, sin activar indexacion.
