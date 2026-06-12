@@ -420,7 +420,7 @@ class StorefrontPublicProductsIntegrationTest extends AbstractHttpIntegrationTes
 
         ObjectNode assetPayload = objectMapper.createObjectNode();
         assetPayload.put("assetType", "PRODUCT_IMAGE");
-        assetPayload.put("assetUrl", "https://cdn.example.test/storefront-" + suffix + ".jpg");
+        assetPayload.put("assetUrl", "/images/products/storefront-" + suffix + ".jpg");
         assetPayload.put("altText", "Imagen storefront " + suffix);
         assetPayload.put("source", "OWN");
         assetPayload.put("rightsConfirmed", true);

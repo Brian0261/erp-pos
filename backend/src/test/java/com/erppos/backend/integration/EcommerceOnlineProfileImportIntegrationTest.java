@@ -377,7 +377,7 @@ class EcommerceOnlineProfileImportIntegrationTest extends AbstractHttpIntegratio
         ecommerceCatalogUseCase.upsertPrimaryProductAsset(new UpsertProductAssetCommand(
                 productId,
                 AssetType.PRODUCT_IMAGE,
-                "https://cdn.example.test/product-" + suffix + ".jpg",
+                "/images/products/product-" + suffix + ".jpg",
                 "Producto publicado " + suffix,
                 AssetSource.OWN,
                 true,

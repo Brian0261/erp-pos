@@ -192,7 +192,7 @@ class StorefrontPublicSitemapIntegrationTest extends AbstractHttpIntegrationTest
 
         ObjectNode assetPayload = objectMapper.createObjectNode();
         assetPayload.put("assetType", "PRODUCT_IMAGE");
-        assetPayload.put("assetUrl", "https://cdn.example.test/map-" + suffix + ".jpg");
+        assetPayload.put("assetUrl", "/images/products/map-" + suffix + ".jpg");
         assetPayload.put("altText", "Imagen map " + suffix);
         assetPayload.put("source", "OWN");
         assetPayload.put("rightsConfirmed", true);

@@ -2,6 +2,8 @@ package com.erppos.backend.erp.ecommerce;
 
 import com.erppos.backend.erp.ecommerce.application.service.AuditUserProvider;
 import com.erppos.backend.erp.ecommerce.application.service.EcommerceCatalogApplicationService;
+import com.erppos.backend.erp.ecommerce.application.service.PublicImageUrlPolicy;
+import com.erppos.backend.erp.ecommerce.application.service.PublicImageUrlProperties;
 import com.erppos.backend.erp.ecommerce.application.usecase.CreateProductOnlineProfileCommand;
 import com.erppos.backend.erp.ecommerce.application.usecase.EffectiveOnlinePriceResult;
 import com.erppos.backend.erp.ecommerce.application.usecase.PublicationValidationResult;
@@ -79,7 +81,8 @@ class EcommerceCatalogApplicationServiceTest {
                 seoRepository,
                 assetRepository,
                 overrideRepository,
-                new AuditUserProvider()
+                new AuditUserProvider(),
+                publicImageUrlPolicy(List.of("cdn.inktoy.pe"))
         );
     }
 
@@ -149,7 +152,7 @@ class EcommerceCatalogApplicationServiceTest {
         service.upsertPrimaryProductAsset(new UpsertProductAssetCommand(
                 data.productId(),
                 AssetType.PRODUCT_IMAGE,
-                "https://cdn.example.test/p.jpg",
+                "/images/products/p.jpg",
                 null,
                 AssetSource.SUPPLIER,
                 false,
@@ -164,6 +167,63 @@ class EcommerceCatalogApplicationServiceTest {
     }
 
     @Test
+    void shouldBlockPublicationForMissingPrimaryAsset() {
+        PreparedData data = prepareBaseDraftProfile();
+        service.updateProfile(new UpdateProductOnlineProfileCommand(
+                data.productId(),
+                "lapicero-online",
+                "Lapicero online",
+                "Descripcion online completa",
+                data.categoryId(),
+                data.brandId(),
+                null
+        ));
+        service.upsertSeoMetadata(new UpsertProductSeoMetadataCommand(
+                data.productId(),
+                "Lapicero online | InkToy",
+                "Compra lapicero online con envio rapido",
+                "/productos/lapicero-online",
+                RobotsPolicy.INDEX_FOLLOW,
+                true,
+                null,
+                null,
+                null
+        ));
+
+        PublicationValidationResult result = service.validatePublication(data.productId());
+
+        assertFalse(result.publishable());
+        assertTrue(result.errors().stream().anyMatch(msg -> msg.contains("Active primary asset")));
+    }
+
+    @Test
+    void shouldBlockPublicationForStoredNonProductAssetType() {
+        PreparedData data = prepareValidDraftProfile();
+        ProductOnlineProfile profile = service.getProfileByProductId(data.productId());
+        assetRepository.save(new ProductAsset(
+                null,
+                profile.id(),
+                AssetType.BRAND_LOGO,
+                "/images/products/logo.jpg",
+                "Logo",
+                AssetSource.OWN,
+                true,
+                true,
+                true,
+                0,
+                null,
+                null,
+                "it",
+                "it"
+        ));
+
+        PublicationValidationResult result = service.validatePublication(data.productId());
+
+        assertFalse(result.publishable());
+        assertTrue(result.errors().stream().anyMatch(msg -> msg.contains("PRODUCT_IMAGE")));
+    }
+
+    @Test
     void shouldRejectNonProductAssetTypesForProductProfile() {
         PreparedData data = prepareBaseDraftProfile();
 
@@ -171,13 +231,157 @@ class EcommerceCatalogApplicationServiceTest {
                 new UpsertProductAssetCommand(
                         data.productId(),
                         AssetType.BRAND_LOGO,
-                        "https://cdn.example.test/logo.jpg",
+                        "/images/products/logo.jpg",
                         "Logo",
                         AssetSource.SUPPLIER,
                         true,
                         0
                 )
         ));
+    }
+
+    @Test
+    void shouldAcceptHttpsAssetUrlWhenDomainIsAllowed() {
+        PreparedData data = prepareBaseDraftProfile();
+
+        ProductAsset asset = service.upsertPrimaryProductAsset(validAssetCommand(
+                data.productId(),
+                "https://cdn.inktoy.pe/products/lapicero.jpg"
+        ));
+
+        assertEquals("https://cdn.inktoy.pe/products/lapicero.jpg", asset.assetUrl());
+    }
+
+    @Test
+    void shouldRejectBlankAssetUrl() {
+        PreparedData data = prepareBaseDraftProfile();
+
+        EcommerceBusinessRuleException ex = assertThrows(EcommerceBusinessRuleException.class, () ->
+                service.upsertPrimaryProductAsset(validAssetCommand(data.productId(), "   ")));
+
+        assertTrue(ex.getMessage().contains("required"));
+    }
+
+    @Test
+    void shouldRejectLocalhostAssetUrl() {
+        PreparedData data = prepareBaseDraftProfile();
+
+        EcommerceBusinessRuleException ex = assertThrows(EcommerceBusinessRuleException.class, () ->
+                service.upsertPrimaryProductAsset(validAssetCommand(data.productId(), "https://localhost/product.jpg")));
+
+        assertTrue(ex.getMessage().contains("localhost"));
+    }
+
+    @Test
+    void shouldRejectLoopbackIpAssetUrl() {
+        PreparedData data = prepareBaseDraftProfile();
+
+        EcommerceBusinessRuleException ex = assertThrows(EcommerceBusinessRuleException.class, () ->
+                service.upsertPrimaryProductAsset(validAssetCommand(data.productId(), "https://127.0.0.1/product.jpg")));
+
+        assertTrue(ex.getMessage().contains("localhost"));
+    }
+
+    @Test
+    void shouldRejectPrivateIpAssetUrl() {
+        PreparedData data = prepareBaseDraftProfile();
+
+        EcommerceBusinessRuleException ex = assertThrows(EcommerceBusinessRuleException.class, () ->
+                service.upsertPrimaryProductAsset(validAssetCommand(data.productId(), "https://192.168.1.10/product.jpg")));
+
+        assertTrue(ex.getMessage().contains("no permitido"));
+    }
+
+    @Test
+    void shouldRejectExampleTestAssetUrl() {
+        PreparedData data = prepareBaseDraftProfile();
+
+        EcommerceBusinessRuleException ex = assertThrows(EcommerceBusinessRuleException.class, () ->
+                service.upsertPrimaryProductAsset(validAssetCommand(data.productId(), "https://cdn.example.test/product.jpg")));
+
+        assertTrue(ex.getMessage().contains("test"));
+    }
+
+    @Test
+    void shouldRejectTestDomainAssetUrl() {
+        PreparedData data = prepareBaseDraftProfile();
+
+        EcommerceBusinessRuleException ex = assertThrows(EcommerceBusinessRuleException.class, () ->
+                service.upsertPrimaryProductAsset(validAssetCommand(data.productId(), "https://images.inktoy.test/product.jpg")));
+
+        assertTrue(ex.getMessage().contains("test"));
+    }
+
+    @Test
+    void shouldRejectUnsupportedAssetUrlSchemes() {
+        PreparedData data = prepareBaseDraftProfile();
+
+        assertThrows(EcommerceBusinessRuleException.class, () ->
+                service.upsertPrimaryProductAsset(validAssetCommand(data.productId(), "file:///tmp/product.jpg")));
+        assertThrows(EcommerceBusinessRuleException.class, () ->
+                service.upsertPrimaryProductAsset(validAssetCommand(data.productId(), "data:image/png;base64,abc")));
+        assertThrows(EcommerceBusinessRuleException.class, () ->
+                service.upsertPrimaryProductAsset(validAssetCommand(data.productId(), "ftp://cdn.inktoy.pe/product.jpg")));
+    }
+
+    @Test
+    void shouldRejectAssetUrlWithCredentials() {
+        PreparedData data = prepareBaseDraftProfile();
+
+        EcommerceBusinessRuleException ex = assertThrows(EcommerceBusinessRuleException.class, () ->
+                service.upsertPrimaryProductAsset(validAssetCommand(data.productId(), "https://user:pass@cdn.inktoy.pe/product.jpg")));
+
+        assertTrue(ex.getMessage().contains("no permitido"));
+    }
+
+    @Test
+    void shouldRejectHttpsAssetUrlWhenAllowlistIsEmpty() {
+        PreparedData data = prepareBaseDraftProfile();
+        PublicImageUrlProperties properties = new PublicImageUrlProperties();
+        EcommerceCatalogApplicationService restrictedService = new EcommerceCatalogApplicationService(
+                profileRepository,
+                productReadPort,
+                brandRepository,
+                categoryRepository,
+                seoRepository,
+                assetRepository,
+                overrideRepository,
+                new AuditUserProvider(),
+                new PublicImageUrlPolicy(properties)
+        );
+
+        EcommerceBusinessRuleException ex = assertThrows(EcommerceBusinessRuleException.class, () ->
+                restrictedService.upsertPrimaryProductAsset(validAssetCommand(data.productId(), "https://cdn.inktoy.pe/product.jpg")));
+
+        assertTrue(ex.getMessage().contains("no permitido"));
+    }
+
+    @Test
+    void shouldBlockPublicationForStoredInvalidAssetUrl() {
+        PreparedData data = prepareValidDraftProfile();
+        ProductOnlineProfile profile = service.getProfileByProductId(data.productId());
+        assetRepository.save(new ProductAsset(
+                null,
+                profile.id(),
+                AssetType.PRODUCT_IMAGE,
+                "https://cdn.example.test/product.jpg",
+                "Lapicero azul",
+                AssetSource.OWN,
+                true,
+                true,
+                true,
+                0,
+                null,
+                null,
+                "it",
+                "it"
+        ));
+
+        PublicationValidationResult result = service.validatePublication(data.productId());
+
+        assertFalse(result.publishable());
+        assertTrue(result.errors().stream().anyMatch(msg -> msg.contains("test")));
+        assertTrue(result.missingRequirements().contains(com.erppos.backend.erp.ecommerce.application.usecase.MissingRequirement.ASSET_INVALID));
     }
 
     @Test
@@ -314,7 +518,7 @@ class EcommerceCatalogApplicationServiceTest {
         service.upsertPrimaryProductAsset(new UpsertProductAssetCommand(
                 data.productId(),
                 AssetType.PRODUCT_IMAGE,
-                "https://cdn.example.test/p.jpg",
+                "/images/products/p.jpg",
                 "Lapicero azul",
                 AssetSource.SUPPLIER,
                 true,
@@ -346,6 +550,24 @@ class EcommerceCatalogApplicationServiceTest {
         categoryRepository.save(new EcommerceOnlineCategory(categoryId, null, "Utiles", "utiles", null, true, null, null, "it", "it"));
         service.createDraftProfile(new CreateProductOnlineProfileCommand(productId));
         return new PreparedData(productId, brandId, categoryId);
+    }
+
+    private UpsertProductAssetCommand validAssetCommand(Long productId, String assetUrl) {
+        return new UpsertProductAssetCommand(
+                productId,
+                AssetType.PRODUCT_IMAGE,
+                assetUrl,
+                "Lapicero azul",
+                AssetSource.OWN,
+                true,
+                0
+        );
+    }
+
+    private PublicImageUrlPolicy publicImageUrlPolicy(List<String> allowedDomains) {
+        PublicImageUrlProperties properties = new PublicImageUrlProperties();
+        properties.setAllowedDomains(allowedDomains);
+        return new PublicImageUrlPolicy(properties);
     }
 
     private record PreparedData(Long productId, Long brandId, Long categoryId) {

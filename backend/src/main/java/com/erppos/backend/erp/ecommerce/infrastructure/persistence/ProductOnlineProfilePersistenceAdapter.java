@@ -1,6 +1,7 @@
 package com.erppos.backend.erp.ecommerce.infrastructure.persistence;
 
 import com.erppos.backend.erp.catalog.infrastructure.persistence.ProductEntity;
+import com.erppos.backend.erp.ecommerce.application.service.PublicImageUrlProperties;
 import com.erppos.backend.erp.ecommerce.domain.exception.EcommerceNotFoundException;
 import com.erppos.backend.erp.ecommerce.application.usecase.ReadinessStatus;
 import com.erppos.backend.erp.ecommerce.domain.model.AssetType;
@@ -33,9 +34,14 @@ import java.util.Optional;
 @Transactional(readOnly = true)
 public class ProductOnlineProfilePersistenceAdapter implements ProductOnlineProfileRepositoryPort {
     private final ProductOnlineProfileJpaRepository profileJpaRepository;
+    private final PublicImageUrlProperties publicImageUrlProperties;
 
-    public ProductOnlineProfilePersistenceAdapter(ProductOnlineProfileJpaRepository profileJpaRepository) {
+    public ProductOnlineProfilePersistenceAdapter(
+            ProductOnlineProfileJpaRepository profileJpaRepository,
+            PublicImageUrlProperties publicImageUrlProperties
+    ) {
         this.profileJpaRepository = profileJpaRepository;
+        this.publicImageUrlProperties = publicImageUrlProperties;
     }
 
     @Override
@@ -335,9 +341,51 @@ public class ProductOnlineProfilePersistenceAdapter implements ProductOnlineProf
                 criteriaBuilder.isTrue(asset.get("primary")),
                 criteriaBuilder.equal(asset.get("assetType"), AssetType.PRODUCT_IMAGE),
                 criteriaBuilder.isTrue(asset.get("rightsConfirmed")),
-                criteriaBuilder.not(isBlank(asset.get("altText"), criteriaBuilder))
+                criteriaBuilder.not(isBlank(asset.get("altText"), criteriaBuilder)),
+                isPublicImageAssetUrl(asset, criteriaBuilder)
         );
         return criteriaBuilder.exists(subquery);
+    }
+
+    private Predicate isPublicImageAssetUrl(Root<ProductAssetEntity> asset, CriteriaBuilder criteriaBuilder) {
+        Expression<String> assetUrl = criteriaBuilder.lower(asset.get("assetUrl"));
+        List<Predicate> allowedPredicates = new ArrayList<>();
+        allowedPredicates.add(criteriaBuilder.and(
+                criteriaBuilder.like(assetUrl, "/%"),
+                criteriaBuilder.notLike(assetUrl, "//%"),
+                criteriaBuilder.notLike(assetUrl, "%\\%")
+        ));
+
+        publicImageUrlProperties.getAllowedDomains().stream()
+                .map(ProductOnlineProfilePersistenceAdapter::normalizeAllowedDomain)
+                .filter(domain -> domain != null && !domain.isBlank())
+                .forEach(domain -> allowedPredicates.add(criteriaBuilder.or(
+                        criteriaBuilder.like(assetUrl, "https://" + domain + "/%"),
+                        criteriaBuilder.like(assetUrl, "https://%." + domain + "/%")
+                )));
+
+        return criteriaBuilder.and(
+                criteriaBuilder.not(isBlank(asset.get("assetUrl"), criteriaBuilder)),
+                criteriaBuilder.or(allowedPredicates.toArray(Predicate[]::new))
+        );
+    }
+
+    private static String normalizeAllowedDomain(String rawDomain) {
+        if (rawDomain == null || rawDomain.isBlank()) {
+            return null;
+        }
+        String domain = rawDomain.trim().toLowerCase(Locale.ROOT)
+                .replaceFirst("^https://", "")
+                .replaceFirst("^http://", "");
+        int slashIndex = domain.indexOf('/');
+        if (slashIndex >= 0) {
+            domain = domain.substring(0, slashIndex);
+        }
+        int portIndex = domain.indexOf(':');
+        if (portIndex >= 0) {
+            domain = domain.substring(0, portIndex);
+        }
+        return domain;
     }
 
     private Predicate existsCompleteSeo(

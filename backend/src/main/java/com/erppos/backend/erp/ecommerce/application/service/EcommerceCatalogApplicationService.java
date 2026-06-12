@@ -68,6 +68,7 @@ public class EcommerceCatalogApplicationService implements EcommerceCatalogUseCa
     private final ProductAssetRepositoryPort productAssetRepositoryPort;
     private final OnlinePriceOverrideRepositoryPort onlinePriceOverrideRepositoryPort;
     private final AuditUserProvider auditUserProvider;
+    private final PublicImageUrlPolicy publicImageUrlPolicy;
 
     public EcommerceCatalogApplicationService(
             ProductOnlineProfileRepositoryPort profileRepositoryPort,
@@ -77,7 +78,8 @@ public class EcommerceCatalogApplicationService implements EcommerceCatalogUseCa
             EcommerceSeoMetadataRepositoryPort seoMetadataRepositoryPort,
             ProductAssetRepositoryPort productAssetRepositoryPort,
             OnlinePriceOverrideRepositoryPort onlinePriceOverrideRepositoryPort,
-            AuditUserProvider auditUserProvider
+            AuditUserProvider auditUserProvider,
+            PublicImageUrlPolicy publicImageUrlPolicy
     ) {
         this.profileRepositoryPort = profileRepositoryPort;
         this.productReadPort = productReadPort;
@@ -87,6 +89,7 @@ public class EcommerceCatalogApplicationService implements EcommerceCatalogUseCa
         this.productAssetRepositoryPort = productAssetRepositoryPort;
         this.onlinePriceOverrideRepositoryPort = onlinePriceOverrideRepositoryPort;
         this.auditUserProvider = auditUserProvider;
+        this.publicImageUrlPolicy = publicImageUrlPolicy;
     }
 
     @Override
@@ -571,6 +574,10 @@ public class EcommerceCatalogApplicationService implements EcommerceCatalogUseCa
         if (assetUrl == null) {
             throw new EcommerceBusinessRuleException("Asset URL is required");
         }
+        PublicImageUrlPolicy.ValidationResult imageUrlValidation = publicImageUrlPolicy.validate(assetUrl);
+        if (!imageUrlValidation.valid()) {
+            throw new EcommerceBusinessRuleException(imageUrlValidation.message());
+        }
         if (command.source() == null) {
             throw new EcommerceBusinessRuleException("Asset source is required");
         }
@@ -830,6 +837,10 @@ public class EcommerceCatalogApplicationService implements EcommerceCatalogUseCa
             if (!primaryAsset.rightsConfirmed()) {
                 errors.add("Primary asset rights must be confirmed");
             }
+            PublicImageUrlPolicy.ValidationResult imageUrlValidation = publicImageUrlPolicy.validate(primaryAsset.assetUrl());
+            if (!imageUrlValidation.valid()) {
+                errors.add(imageUrlValidation.message());
+            }
         }
 
         EcommerceSeoMetadata seoMetadata = seoMetadataRepositoryPort.findByProductOnlineProfileId(profile.id()).orElse(null);
@@ -1003,7 +1014,8 @@ public class EcommerceCatalogApplicationService implements EcommerceCatalogUseCa
         } else {
             if (primaryAsset.assetType() != AssetType.PRODUCT_IMAGE ||
                 trimToNull(primaryAsset.altText()) == null ||
-                !primaryAsset.rightsConfirmed()) {
+                !primaryAsset.rightsConfirmed() ||
+                !publicImageUrlPolicy.validate(primaryAsset.assetUrl()).valid()) {
                 missing.add(MissingRequirement.ASSET_INVALID);
             }
         }

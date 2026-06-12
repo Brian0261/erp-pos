@@ -267,7 +267,7 @@ class EcommerceAdminTaxonomyIntegrationTest extends AbstractHttpIntegrationTest 
 
         ObjectNode assetPayload = objectMapper.createObjectNode();
         assetPayload.put("assetType", "PRODUCT_IMAGE");
-        assetPayload.put("assetUrl", "https://cdn.example.test/published-" + suffix + ".jpg");
+        assetPayload.put("assetUrl", "/images/products/published-" + suffix + ".jpg");
         assetPayload.put("altText", "Principal " + suffix);
         assetPayload.put("source", "OWN");
         assetPayload.put("rightsConfirmed", true);

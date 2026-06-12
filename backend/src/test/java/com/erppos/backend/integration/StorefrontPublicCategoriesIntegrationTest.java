@@ -307,7 +307,7 @@ class StorefrontPublicCategoriesIntegrationTest extends AbstractHttpIntegrationT
 
         ObjectNode assetPayload = objectMapper.createObjectNode();
         assetPayload.put("assetType", "PRODUCT_IMAGE");
-        assetPayload.put("assetUrl", "https://cdn.example.test/category-" + suffix + ".jpg");
+        assetPayload.put("assetUrl", "/images/products/category-" + suffix + ".jpg");
         assetPayload.put("altText", "Imagen categoria " + suffix);
         assetPayload.put("source", "OWN");
         assetPayload.put("rightsConfirmed", true);

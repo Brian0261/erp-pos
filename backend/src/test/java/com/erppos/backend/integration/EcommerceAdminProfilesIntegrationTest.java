@@ -134,7 +134,7 @@ class EcommerceAdminProfilesIntegrationTest extends AbstractHttpIntegrationTest 
 
         ObjectNode assetPayload = objectMapper.createObjectNode();
         assetPayload.put("assetType", "PRODUCT_IMAGE");
-        assetPayload.put("assetUrl", "https://cdn.example.test/product-" + suffix + ".jpg");
+        assetPayload.put("assetUrl", "/images/products/product-" + suffix + ".jpg");
         assetPayload.put("altText", "Lapicero principal " + suffix);
         assetPayload.put("source", "OWN");
         assetPayload.put("rightsConfirmed", true);
@@ -745,7 +745,7 @@ class EcommerceAdminProfilesIntegrationTest extends AbstractHttpIntegrationTest 
     private void upsertAssetForPublish(String adminToken, long productId, String suffix) throws Exception {
         ObjectNode payload = objectMapper.createObjectNode();
         payload.put("assetType", "PRODUCT_IMAGE");
-        payload.put("assetUrl", "https://cdn.example.test/product-" + suffix + ".jpg");
+        payload.put("assetUrl", "/images/products/product-" + suffix + ".jpg");
         payload.put("altText", "Lapicero principal " + suffix);
         payload.put("source", "OWN");
         payload.put("rightsConfirmed", true);
