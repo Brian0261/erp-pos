@@ -837,3 +837,32 @@ Solo crear tag cuando se cumpla todo:
   - Datos historicos con URLs absolutas invalidas requieren limpieza antes de indexacion.
 - Documentacion creada: `docs/qa/PHASE2S8A_PUBLIC_IMAGE_URL_POLICY_QA.md`.
 - Pendiente recomendado: decision de storage/CDN o fase Storefront-safe para dominios de imagen aprobados, sin activar indexacion.
+
+### Fase 2S.8B Storefront safe image render
+
+- Tipo: implementacion Storefront Next.js + documentacion QA.
+- Alcance: render seguro de `primaryImage.url` y OG image usando allowlist Storefront.
+- Storefront:
+  - Nueva variable `STOREFRONT_IMAGE_ALLOWED_DOMAINS` documentada en `.env.local.example`.
+  - `next.config.ts` configura `images.remotePatterns` desde la allowlist.
+  - Nuevo helper central `storefront/lib/images.ts`.
+  - Home, Productos, Detalle producto y Detalle categoria usan helper central para render de imagenes.
+  - Metadata/OG image usa helper seguro y omite imagen no permitida.
+- Politica Storefront:
+  - Permitido: path relativo publico que empieza con `/`.
+  - Permitido: URL `https` en dominio allowlisted o subdominio.
+  - Bloqueado: `http`, `file`, `data`, `ftp`, credenciales, strings vacios, whitespace/control chars, localhost, `127.0.0.1`, `0.0.0.0`, IPs privadas, `.test`, `.example`, `.example.com`, `.example.test`.
+  - Default restrictivo: allowlist vacia no permite dominios externos.
+- Exclusiones confirmadas:
+  - Sin backend.
+  - Sin Angular admin.
+  - Sin Producto ERP/POS/stock/inventario/unidad/costo/precio ERP.
+  - Sin base de datos, Flyway, Docker, auth/security ni indexacion.
+  - Sin upload/storage/CDN/ZIP/importacion masiva de imagenes/galeria.
+  - Sin structured data, Merchant Center, buscador, filtros, carrito, checkout ni pagos.
+- Validaciones:
+  - `npm run build` en Storefront: OK.
+  - `npm run lint` en Storefront: OK.
+  - `git diff --check`: OK.
+- Documentacion creada: `docs/qa/PHASE2S8B_STOREFRONT_SAFE_IMAGE_RENDER_QA.md`.
+- Pendiente recomendado: 2S.8C — Decision e implementacion controlada de storage/CDN o carga manual inicial de imagenes, sin activar indexacion.

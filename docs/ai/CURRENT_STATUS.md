@@ -407,7 +407,7 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
 
 ## Fase 2S.8A Public image URL policy
 
-- Fase 2S.8A implementada y validada localmente, pendiente de commit/push.
+- Fase 2S.8A cerrada funcional y documentalmente, con commit/push a `master`.
 - Se mantuvo la imagen publica ecommerce como `ProductAsset` asociado al Perfil online.
 - No se movio imagen al Producto ERP.
 - No se tocaron POS, stock, inventario, unidad, costo, precio ERP, importacion ERP, Storefront, `next.config.ts`, `remotePatterns`, Docker, Flyway, seguridad ni indexacion.
@@ -422,4 +422,22 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
 - Validaciones: `mvn -DskipTests compile` OK, `EcommerceCatalogApplicationServiceTest` 27/27 OK, integracion ecommerce/storefront focalizada 79/79 OK, `npm run build` frontend OK.
 - Documentacion QA creada: `docs/qa/PHASE2S8A_PUBLIC_IMAGE_URL_POLICY_QA.md`.
 - Riesgos pendientes: sin upload/storage/CDN/ZIP/galeria/metadatos tecnicos, Storefront aun no renderiza dominios externos sin fase posterior, datos historicos con URLs invalidas requieren limpieza antes de indexacion.
-- Pendiente recomendado: decision de storage/CDN o fase Storefront-safe para dominios de imagen aprobados, sin activar indexacion.
+- Pendiente recomendado: 2S.8B — Storefront render seguro de imagenes permitidas.
+
+## Fase 2S.8B Storefront safe image render
+
+- Fase 2S.8B implementada y validada localmente; sin commit/push por instruccion explicita.
+- Se agrego `STOREFRONT_IMAGE_ALLOWED_DOMAINS` para dominios `https` permitidos de imagenes publicas en Storefront.
+- Default restrictivo: sin dominios externos permitidos cuando la variable esta vacia.
+- `storefront/next.config.ts` genera `images.remotePatterns` estrictos desde la allowlist, sin wildcard global y sin `http`.
+- Se creo helper central `storefront/lib/images.ts` para validar/renderizar imagenes publicas.
+- El helper permite paths relativos publicos que empiezan con `/` y URLs `https` de dominio permitido.
+- El helper bloquea localhost, `127.0.0.1`, `0.0.0.0`, IPs privadas, `.test`, `.example`, `.example.com`, `.example.test`, protocolos inseguros, credenciales, strings vacios y whitespace/control chars.
+- Se actualizaron Home, Productos, Detalle producto y Detalle categoria para usar el helper con `primaryImage.url`.
+- Metadata/OG image de producto/categoria usa validacion segura y omite imagen si no esta permitida.
+- Fallback visual actual se mantiene cuando la imagen no es segura o no esta permitida.
+- No se tocaron backend, Angular admin, Producto ERP, POS, base de datos, Flyway, Docker, auth/security ni indexacion.
+- No se implemento upload, storage/CDN, ZIP, importacion masiva de imagenes, galeria, structured data, Merchant Center, buscador, filtros, carrito, checkout ni pagos.
+- Validaciones: `npm run build` Storefront OK, `npm run lint` Storefront OK, `git diff --check` OK.
+- Documentacion QA creada: `docs/qa/PHASE2S8B_STOREFRONT_SAFE_IMAGE_RENDER_QA.md`.
+- Pendiente recomendado: 2S.8C — Decision e implementacion controlada de storage/CDN o carga manual inicial de imagenes, sin activar indexacion.
