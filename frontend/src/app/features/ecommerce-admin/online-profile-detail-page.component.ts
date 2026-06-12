@@ -357,6 +357,9 @@ interface DetailTab {
               <label class="field field--full">
                 <span>URL de imagen</span>
                 <input type="text" formControlName="assetUrl" maxlength="500" />
+                <small class="field-help">
+                  Usa una ruta publica aprobada o una URL https de un dominio permitido. No se permiten localhost, test ni example.
+                </small>
                 <small class="field-help" *ngIf="isAssetInvalid('assetUrl')">
                   La URL es obligatoria para guardar la imagen principal.
                 </small>
@@ -365,6 +368,7 @@ interface DetailTab {
               <label class="field">
                 <span>Texto alternativo</span>
                 <input type="text" formControlName="altText" maxlength="250" />
+                <small class="field-help">Requerido para publicar; describe el producto de forma clara.</small>
               </label>
 
               <p class="form-group-label form-group-label--full">Origen y derechos</p>
@@ -381,6 +385,7 @@ interface DetailTab {
               <label class="field field--checkbox">
                 <input type="checkbox" formControlName="rightsConfirmed" />
                 <span>Derechos confirmados</span>
+                <small class="field-help">Requerido para publicar la imagen en ecommerce.</small>
               </label>
 
               <p class="form-group-label form-group-label--full">Configuración</p>
@@ -1424,9 +1429,6 @@ export class OnlineProfileDetailPageComponent implements OnInit {
   ];
   readonly assetTypes: AssetType[] = [
     "PRODUCT_IMAGE",
-    "BRAND_LOGO",
-    "CATEGORY_IMAGE",
-    "OPEN_GRAPH_IMAGE",
   ];
   readonly assetSources: AssetSource[] = ["SUPPLIER", "OWN", "GENERATED", "OTHER"];
   readonly brandAbsencePolicies: BrandAbsencePolicy[] = ["GENERIC", "UNBRANDED"];
