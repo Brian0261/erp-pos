@@ -6,6 +6,7 @@ import { StorefrontFooter } from "@/components/layout/storefront-footer";
 import { StorefrontHeader } from "@/components/layout/storefront-header";
 import { Button, SectionHeading } from "@/components/ui";
 import { getStorefrontCategories, getStorefrontProducts } from "@/lib/api";
+import { getSafeImageAlt, getSafeImageSrc } from "@/lib/images";
 import { buildStorefrontPublicUrl, getStorefrontRobotsMetadata } from "@/lib/seo";
 import type { PublicCategoryListItemResponse, PublicProductListItemResponse } from "@/types/storefront";
 
@@ -35,14 +36,6 @@ const benefits = [
     title: "Consulta en tienda",
   },
 ];
-
-function getSafeImageSrc(src?: string | null) {
-  if (!src) {
-    return null;
-  }
-
-  return src.startsWith("/") ? src : null;
-}
 
 function getAvailabilityVariant(product: PublicProductListItemResponse) {
   const status = product.availability.status.toLowerCase();
@@ -205,7 +198,7 @@ export default async function Home() {
                   availability={getAvailabilityVariant(product)}
                   brand={product.brand?.name}
                   detailHref={`/productos/${product.slug}`}
-                  imageAlt={product.primaryImage?.altText ?? product.name}
+                  imageAlt={getSafeImageAlt(product.primaryImage?.altText, product.name)}
                   imageSrc={getSafeImageSrc(product.primaryImage?.url)}
                   key={product.slug}
                   name={product.name}

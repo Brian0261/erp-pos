@@ -6,6 +6,7 @@ import { StorefrontFooter } from "@/components/layout/storefront-footer";
 import { StorefrontHeader } from "@/components/layout/storefront-header";
 import { Accordion, Badge, Breadcrumbs, ProductImageFrame, SectionHeading } from "@/components/ui";
 import { getStorefrontProductBySlug, StorefrontApiError } from "@/lib/api";
+import { getSafeImageAlt, getSafeImageSrc, getSafeOpenGraphImage } from "@/lib/images";
 import { canStorefrontAllowIndexing } from "@/lib/seo";
 import type { PublicProductDetailResponse } from "@/types/storefront";
 
@@ -23,14 +24,6 @@ function isIndexableProduct(product: PublicProductDetailResponse) {
 
 function getCanonicalUrl(product: PublicProductDetailResponse) {
   return product.seo?.canonicalUrl ?? product.canonicalUrl ?? undefined;
-}
-
-function getSafeImageSrc(src?: string | null) {
-  if (!src) {
-    return null;
-  }
-
-  return src.startsWith("/") ? src : null;
 }
 
 function getAvailabilityVariant(product: PublicProductDetailResponse) {
@@ -85,7 +78,7 @@ export async function generateMetadata({ params }: ProductDetailPageProps): Prom
   const title = product.seo?.title ?? product.name;
   const description = product.seo?.description ?? product.description ?? "Producto disponible en InkToy.";
   const canonical = getCanonicalUrl(product);
-  const ogImage = product.seo?.ogImageUrl ?? product.primaryImage?.url ?? undefined;
+  const ogImage = getSafeOpenGraphImage(product.seo?.ogImageUrl) ?? getSafeOpenGraphImage(product.primaryImage?.url);
   const indexable = isIndexableProduct(product);
 
   return {
@@ -110,7 +103,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
   const product = await loadProduct(slug);
   const categoryName = product.category?.name;
   const brandName = product.brand?.name;
-  const imageAlt = product.primaryImage?.altText ?? product.name;
+  const imageAlt = getSafeImageAlt(product.primaryImage?.altText, product.name);
   const imageSrc = getSafeImageSrc(product.primaryImage?.url);
   const description = product.description ?? "Producto disponible para consulta en tiendas InkToy.";
   const availabilityVariant = getAvailabilityVariant(product);

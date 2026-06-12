@@ -6,6 +6,7 @@ import { StorefrontFooter } from "@/components/layout/storefront-footer";
 import { StorefrontHeader } from "@/components/layout/storefront-header";
 import { Breadcrumbs, SectionHeading } from "@/components/ui";
 import { getStorefrontCategoryBySlug, getStorefrontProducts, StorefrontApiError } from "@/lib/api";
+import { getSafeImageAlt, getSafeImageSrc, getSafeOpenGraphImage } from "@/lib/images";
 import { canStorefrontAllowIndexing } from "@/lib/seo";
 import type { PublicCategoryDetailResponse, PublicProductListItemResponse } from "@/types/storefront";
 
@@ -23,14 +24,6 @@ function isIndexableCategory(category: PublicCategoryDetailResponse) {
 
 function getCanonicalUrl(category: PublicCategoryDetailResponse) {
   return category.seo?.canonicalUrl ?? category.canonicalUrl ?? undefined;
-}
-
-function getSafeImageSrc(src?: string | null) {
-  if (!src) {
-    return null;
-  }
-
-  return src.startsWith("/") ? src : null;
 }
 
 function getAvailabilityVariant(product: PublicProductListItemResponse) {
@@ -85,7 +78,7 @@ export async function generateMetadata({ params }: CategoryDetailPageProps): Pro
   const title = category.seo?.title ?? `${category.name} | InkToy`;
   const description = category.seo?.description ?? category.description ?? "Categoria publica del catalogo InkToy.";
   const canonical = getCanonicalUrl(category);
-  const ogImage = category.seo?.ogImageUrl ?? undefined;
+  const ogImage = getSafeOpenGraphImage(category.seo?.ogImageUrl);
   const indexable = isIndexableCategory(category);
 
   return {
@@ -144,7 +137,7 @@ export default async function CategoryDetailPage({ params }: CategoryDetailPageP
                   availability={getAvailabilityVariant(product)}
                   brand={product.brand?.name}
                   detailHref={`/productos/${product.slug}`}
-                  imageAlt={product.primaryImage?.altText ?? product.name}
+                  imageAlt={getSafeImageAlt(product.primaryImage?.altText, product.name)}
                   imageSrc={getSafeImageSrc(product.primaryImage?.url)}
                   key={product.slug}
                   name={product.name}
