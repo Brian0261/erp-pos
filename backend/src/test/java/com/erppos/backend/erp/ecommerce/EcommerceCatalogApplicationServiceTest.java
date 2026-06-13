@@ -2,12 +2,14 @@ package com.erppos.backend.erp.ecommerce;
 
 import com.erppos.backend.erp.ecommerce.application.service.AuditUserProvider;
 import com.erppos.backend.erp.ecommerce.application.service.EcommerceCatalogApplicationService;
+import com.erppos.backend.erp.ecommerce.application.service.EcommerceImageStorageProperties;
 import com.erppos.backend.erp.ecommerce.application.service.PublicImageUrlPolicy;
 import com.erppos.backend.erp.ecommerce.application.service.PublicImageUrlProperties;
 import com.erppos.backend.erp.ecommerce.application.usecase.CreateProductOnlineProfileCommand;
 import com.erppos.backend.erp.ecommerce.application.usecase.EffectiveOnlinePriceResult;
 import com.erppos.backend.erp.ecommerce.application.usecase.PublicationValidationResult;
 import com.erppos.backend.erp.ecommerce.application.usecase.UpdateProductOnlineProfileCommand;
+import com.erppos.backend.erp.ecommerce.application.usecase.UploadPrimaryProductAssetCommand;
 import com.erppos.backend.erp.ecommerce.application.usecase.UpsertOnlinePriceOverrideCommand;
 import com.erppos.backend.erp.ecommerce.application.usecase.UpsertProductAssetCommand;
 import com.erppos.backend.erp.ecommerce.application.usecase.UpsertProductSeoMetadataCommand;
@@ -28,6 +30,7 @@ import com.erppos.backend.erp.ecommerce.domain.model.ProductOnlineProfile;
 import com.erppos.backend.erp.ecommerce.domain.model.RobotsPolicy;
 import com.erppos.backend.erp.ecommerce.domain.port.EcommerceBrandRepositoryPort;
 import com.erppos.backend.erp.ecommerce.domain.port.EcommerceCatalogProductReadPort;
+import com.erppos.backend.erp.ecommerce.domain.port.EcommerceImageStoragePort;
 import com.erppos.backend.erp.ecommerce.domain.port.EcommerceOnlineCategoryRepositoryPort;
 import com.erppos.backend.erp.ecommerce.domain.port.EcommerceSeoMetadataRepositoryPort;
 import com.erppos.backend.erp.ecommerce.domain.port.OnlinePriceOverrideRepositoryPort;
@@ -40,6 +43,10 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.HashMap;
@@ -62,6 +69,8 @@ class EcommerceCatalogApplicationServiceTest {
     private InMemorySeoMetadataRepository seoRepository;
     private InMemoryProductAssetRepository assetRepository;
     private InMemoryOnlinePriceOverrideRepository overrideRepository;
+    private InMemoryImageStoragePort imageStoragePort;
+    private EcommerceImageStorageProperties imageStorageProperties;
     private EcommerceCatalogApplicationService service;
 
     @BeforeEach
@@ -73,6 +82,8 @@ class EcommerceCatalogApplicationServiceTest {
         seoRepository = new InMemorySeoMetadataRepository();
         assetRepository = new InMemoryProductAssetRepository();
         overrideRepository = new InMemoryOnlinePriceOverrideRepository();
+        imageStoragePort = new InMemoryImageStoragePort("https://cdn.inktoy.pe");
+        imageStorageProperties = imageStorageProperties();
         service = new EcommerceCatalogApplicationService(
                 profileRepository,
                 productReadPort,
@@ -82,7 +93,9 @@ class EcommerceCatalogApplicationServiceTest {
                 assetRepository,
                 overrideRepository,
                 new AuditUserProvider(),
-                publicImageUrlPolicy(List.of("cdn.inktoy.pe"))
+                publicImageUrlPolicy(List.of("cdn.inktoy.pe")),
+                imageStoragePort,
+                imageStorageProperties
         );
     }
 
@@ -347,7 +360,9 @@ class EcommerceCatalogApplicationServiceTest {
                 assetRepository,
                 overrideRepository,
                 new AuditUserProvider(),
-                new PublicImageUrlPolicy(properties)
+                new PublicImageUrlPolicy(properties),
+                imageStoragePort,
+                imageStorageProperties
         );
 
         EcommerceBusinessRuleException ex = assertThrows(EcommerceBusinessRuleException.class, () ->
@@ -382,6 +397,55 @@ class EcommerceCatalogApplicationServiceTest {
         assertFalse(result.publishable());
         assertTrue(result.errors().stream().anyMatch(msg -> msg.contains("test")));
         assertTrue(result.missingRequirements().contains(com.erppos.backend.erp.ecommerce.application.usecase.MissingRequirement.ASSET_INVALID));
+    }
+
+    @Test
+    void shouldUploadPrimaryProductImageAndStoreMetadata() throws IOException {
+        PreparedData data = prepareBaseDraftProfile();
+        byte[] imageBytes = pngImageBytes(2, 3);
+
+        ProductAsset asset = service.uploadPrimaryProductAsset(new UploadPrimaryProductAssetCommand(
+                data.productId(),
+                imageBytes,
+                "lapicero-azul.png",
+                "image/png",
+                "Lapicero azul",
+                AssetSource.OWN,
+                true,
+                4
+        ));
+
+        assertEquals("S3", asset.storageProvider());
+        assertEquals("inktoy-test-bucket", asset.storageBucket());
+        assertEquals("image/png", asset.mimeType());
+        assertEquals(2, asset.width());
+        assertEquals(3, asset.height());
+        assertEquals(imageBytes.length, asset.sizeBytes());
+        assertEquals(64, asset.checksumSha256().length());
+        assertEquals("lapicero-azul.png", asset.originalFilename());
+        assertTrue(asset.storageKey().startsWith("inktoy-dev/ecommerce/products/"));
+        assertTrue(asset.assetUrl().startsWith("https://cdn.inktoy.pe/inktoy-dev/ecommerce/products/"));
+        assertEquals(imageBytes.length, imageStoragePort.lastObject().sizeBytes());
+    }
+
+    @Test
+    void shouldRejectSvgProductImageUpload() {
+        PreparedData data = prepareBaseDraftProfile();
+        byte[] svgBytes = "<svg xmlns=\"http://www.w3.org/2000/svg\"></svg>".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+
+        EcommerceBusinessRuleException ex = assertThrows(EcommerceBusinessRuleException.class, () ->
+                service.uploadPrimaryProductAsset(new UploadPrimaryProductAssetCommand(
+                        data.productId(),
+                        svgBytes,
+                        "product.svg",
+                        "image/svg+xml",
+                        "Vector",
+                        AssetSource.OWN,
+                        true,
+                        0
+                )));
+
+        assertTrue(ex.getMessage().contains("JPEG and PNG"));
     }
 
     @Test
@@ -568,6 +632,25 @@ class EcommerceCatalogApplicationServiceTest {
         PublicImageUrlProperties properties = new PublicImageUrlProperties();
         properties.setAllowedDomains(allowedDomains);
         return new PublicImageUrlPolicy(properties);
+    }
+
+    private EcommerceImageStorageProperties imageStorageProperties() {
+        EcommerceImageStorageProperties properties = new EcommerceImageStorageProperties();
+        properties.setProvider("s3");
+        properties.setBucket("inktoy-test-bucket");
+        properties.setPrefix("inktoy-dev");
+        properties.setPublicBaseUrl("https://cdn.inktoy.pe");
+        properties.setMaxSizeBytes(1024 * 1024);
+        properties.setMaxWidth(1000);
+        properties.setMaxHeight(1000);
+        return properties;
+    }
+
+    private byte[] pngImageBytes(int width, int height) throws IOException {
+        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        ImageIO.write(image, "png", output);
+        return output.toByteArray();
     }
 
     private record PreparedData(Long productId, Long brandId, Long categoryId) {
@@ -877,6 +960,15 @@ class EcommerceCatalogApplicationServiceTest {
                     asset.primary(),
                     asset.active(),
                     asset.displayOrder(),
+                    asset.storageProvider(),
+                    asset.storageBucket(),
+                    asset.storageKey(),
+                    asset.mimeType(),
+                    asset.width(),
+                    asset.height(),
+                    asset.sizeBytes(),
+                    asset.checksumSha256(),
+                    asset.originalFilename(),
                     asset.createdAt(),
                     asset.updatedAt(),
                     asset.createdBy(),
@@ -911,6 +1003,30 @@ class EcommerceCatalogApplicationServiceTest {
                     .filter(java.util.Objects::nonNull)
                     .filter(asset -> asset.primary() && asset.active())
                     .toList();
+        }
+    }
+
+    private static final class InMemoryImageStoragePort implements EcommerceImageStoragePort {
+        private final String publicBaseUrl;
+        private EcommerceImageStorageObject lastObject;
+
+        private InMemoryImageStoragePort(String publicBaseUrl) {
+            this.publicBaseUrl = publicBaseUrl;
+        }
+
+        @Override
+        public StoredEcommerceImage store(EcommerceImageStorageObject object) {
+            lastObject = object;
+            return new StoredEcommerceImage(
+                    "S3",
+                    "inktoy-test-bucket",
+                    object.storageKey(),
+                    publicBaseUrl + "/" + object.storageKey()
+            );
+        }
+
+        private EcommerceImageStorageObject lastObject() {
+            return lastObject;
         }
     }
 

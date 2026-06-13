@@ -31,10 +31,12 @@ import com.erppos.backend.erp.ecommerce.application.usecase.ReadinessStatus;
 import com.erppos.backend.erp.ecommerce.application.usecase.UpdateEcommerceBrandCommand;
 import com.erppos.backend.erp.ecommerce.application.usecase.UpdateEcommerceOnlineCategoryCommand;
 import com.erppos.backend.erp.ecommerce.application.usecase.UpdateProductOnlineProfileCommand;
+import com.erppos.backend.erp.ecommerce.application.usecase.UploadPrimaryProductAssetCommand;
 import com.erppos.backend.erp.ecommerce.application.usecase.UpsertOnlinePriceOverrideCommand;
 import com.erppos.backend.erp.ecommerce.application.usecase.UpsertProductAssetCommand;
 import com.erppos.backend.erp.ecommerce.application.usecase.UpsertProductSeoMetadataCommand;
 import com.erppos.backend.erp.ecommerce.domain.exception.EcommerceBusinessRuleException;
+import com.erppos.backend.erp.ecommerce.domain.model.AssetSource;
 import com.erppos.backend.erp.ecommerce.domain.model.EcommerceBrand;
 import com.erppos.backend.erp.ecommerce.domain.model.EcommerceCatalogProductSnapshot;
 import com.erppos.backend.erp.ecommerce.domain.model.EcommerceOnlineCategory;
@@ -51,6 +53,7 @@ import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -61,9 +64,12 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.io.IOException;
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
@@ -303,6 +309,36 @@ public class EcommerceAdminController {
         return ResponseEntity.ok(toPrimaryAssetResponse(updated));
     }
 
+    @PostMapping(value = "/products/{productId}/primary-asset/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<EcommerceAdminPrimaryAssetResponse> uploadPrimaryAsset(
+            @PathVariable Long productId,
+            @RequestPart("file") MultipartFile file,
+            @RequestParam(required = false) String altText,
+            @RequestParam(required = false) AssetSource source,
+            @RequestParam(defaultValue = "false") boolean rightsConfirmed,
+            @RequestParam(required = false) Integer displayOrder
+    ) {
+        byte[] fileBytes;
+        try {
+            fileBytes = file.getBytes();
+        } catch (IOException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Image file could not be read");
+        }
+
+        ProductAsset updated = ecommerceCatalogUseCase.uploadPrimaryProductAsset(new UploadPrimaryProductAssetCommand(
+                productId,
+                fileBytes,
+                file.getOriginalFilename(),
+                file.getContentType(),
+                altText,
+                source,
+                rightsConfirmed,
+                displayOrder == null ? 0 : displayOrder
+        ));
+        return ResponseEntity.ok(toPrimaryAssetResponse(updated));
+    }
+
     @PutMapping("/products/{productId}/price-override")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<EcommerceAdminPriceOverrideResponse> upsertPriceOverride(
@@ -507,6 +543,15 @@ public class EcommerceAdminController {
                 asset.rightsConfirmed(),
                 asset.displayOrder(),
                 asset.active(),
+                asset.storageProvider(),
+                asset.storageBucket(),
+                asset.storageKey(),
+                asset.mimeType(),
+                asset.width(),
+                asset.height(),
+                asset.sizeBytes(),
+                asset.checksumSha256(),
+                asset.originalFilename(),
                 asset.updatedAt()
         );
     }

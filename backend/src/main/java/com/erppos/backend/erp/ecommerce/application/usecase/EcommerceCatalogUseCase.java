@@ -38,6 +38,7 @@ public interface EcommerceCatalogUseCase {
     ProductOnlineProfile updateProfile(UpdateProductOnlineProfileCommand command);
     EcommerceSeoMetadata upsertSeoMetadata(UpsertProductSeoMetadataCommand command);
     ProductAsset upsertPrimaryProductAsset(UpsertProductAssetCommand command);
+    ProductAsset uploadPrimaryProductAsset(UploadPrimaryProductAssetCommand command);
     OnlinePriceOverride upsertOnlinePriceOverride(UpsertOnlinePriceOverrideCommand command);
     EffectiveOnlinePriceResult calculateEffectiveOnlinePrice(Long productId);
     PublicationValidationResult validatePublication(Long productId);
