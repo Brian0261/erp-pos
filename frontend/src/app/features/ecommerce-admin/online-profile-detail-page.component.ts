@@ -351,7 +351,73 @@ interface DetailTab {
               </div>
             </header>
 
+            <article class="asset-current-card" *ngIf="profile.primaryAsset as primaryAsset">
+              <div>
+                <p class="overview-kicker">Imagen activa</p>
+                <a
+                  class="asset-url-link"
+                  [href]="primaryAsset.assetUrl"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {{ primaryAsset.assetUrl }}
+                </a>
+              </div>
+              <div class="asset-metadata-grid">
+                <span *ngIf="primaryAsset.storageProvider">{{ primaryAsset.storageProvider }}</span>
+                <span *ngIf="primaryAsset.mimeType">{{ primaryAsset.mimeType }}</span>
+                <span *ngIf="primaryAsset.width && primaryAsset.height">
+                  {{ primaryAsset.width }}x{{ primaryAsset.height }} px
+                </span>
+                <span *ngIf="primaryAsset.sizeBytes">{{ formatFileSize(primaryAsset.sizeBytes) }}</span>
+                <span *ngIf="primaryAsset.originalFilename">{{ primaryAsset.originalFilename }}</span>
+              </div>
+            </article>
+
             <form [formGroup]="assetForm" class="form-grid" (ngSubmit)="saveAsset()">
+              <div class="asset-upload-card field--full">
+                <div>
+                  <p class="form-group-label">Upload manual</p>
+                  <p class="upload-help">
+                    Sube JPEG o PNG. El backend valida MIME real, peso, dimensiones y publica la URL final de CloudFront/S3 configurada.
+                  </p>
+                </div>
+
+                <label class="field field--full">
+                  <span>Archivo de imagen</span>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png"
+                    (change)="onAssetFileSelected($event)"
+                    [disabled]="!canManage || assetUploading || assetSaving"
+                  />
+                </label>
+
+                <div class="asset-file-summary" *ngIf="selectedAssetFile">
+                  <span>{{ selectedAssetFile.name }}</span>
+                  <strong>{{ formatFileSize(selectedAssetFile.size) }}</strong>
+                </div>
+
+                <div class="asset-upload-actions" *ngIf="canManage">
+                  <button
+                    type="button"
+                    class="ui-button ui-button--secondary"
+                    (click)="uploadAssetFile()"
+                    [disabled]="!canUploadAssetFile()"
+                  >
+                    {{ assetUploading ? "Subiendo..." : "Subir imagen" }}
+                  </button>
+                  <button
+                    type="button"
+                    class="ui-button ui-button--secondary"
+                    (click)="clearSelectedAssetFile()"
+                    [disabled]="assetUploading || assetSaving || !selectedAssetFile"
+                  >
+                    Limpiar archivo
+                  </button>
+                </div>
+              </div>
+
               <p class="form-group-label form-group-label--full">Datos de imagen</p>
 
               <label class="field field--full">
@@ -405,7 +471,7 @@ interface DetailTab {
               </label>
 
               <div class="section-actions" *ngIf="canManage">
-                <button type="submit" class="ui-button ui-button--primary" [disabled]="assetSaving">
+                <button type="submit" class="ui-button ui-button--primary" [disabled]="assetSaving || assetUploading">
                   Guardar imagen principal
                 </button>
               </div>
@@ -413,6 +479,9 @@ interface DetailTab {
 
             <p class="ui-alert ui-alert--error" *ngIf="assetErrorMessage">
               {{ assetErrorMessage }}
+            </p>
+            <p class="ui-alert ui-alert--error" *ngIf="assetUploadErrorMessage">
+              {{ assetUploadErrorMessage }}
             </p>
           </section>
 
@@ -992,6 +1061,74 @@ interface DetailTab {
         font-size: var(--font-size-xs);
       }
 
+      .asset-current-card,
+      .asset-upload-card {
+        grid-column: 1 / -1;
+        display: grid;
+        gap: var(--space-2);
+        margin-bottom: var(--space-2);
+        padding: var(--space-2);
+        border: 1px solid color-mix(in srgb, var(--color-border-default) 82%, transparent);
+        border-radius: var(--radius-md);
+        background: color-mix(in srgb, var(--color-bg-soft) 56%, transparent);
+      }
+
+      .asset-current-card {
+        margin-bottom: var(--space-3);
+      }
+
+      .asset-url-link {
+        display: inline-block;
+        max-width: 100%;
+        color: var(--color-text-primary);
+        font-family: var(--font-family-mono);
+        font-size: var(--font-size-xs);
+        overflow-wrap: anywhere;
+      }
+
+      .asset-metadata-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+      }
+
+      .asset-metadata-grid span,
+      .asset-file-summary {
+        border: 1px solid color-mix(in srgb, var(--color-border-default) 86%, transparent);
+        border-radius: 999px;
+        padding: 0.22rem 0.55rem;
+        background: var(--color-bg-surface);
+        color: color-mix(in srgb, var(--color-text-secondary) 86%, var(--color-text-primary));
+        font-size: var(--font-size-xs);
+        font-weight: 700;
+      }
+
+      .upload-help {
+        margin: 0.15rem 0 0;
+        color: var(--color-text-secondary);
+        font-size: var(--font-size-xs);
+        line-height: 1.35;
+      }
+
+      .asset-file-summary {
+        display: flex;
+        justify-content: space-between;
+        gap: var(--space-2);
+        border-radius: var(--radius-md);
+        overflow-wrap: anywhere;
+      }
+
+      .asset-file-summary strong {
+        color: var(--color-text-primary);
+        white-space: nowrap;
+      }
+
+      .asset-upload-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-2);
+      }
+
       .section-actions {
         display: flex;
         justify-content: flex-start;
@@ -1553,6 +1690,7 @@ export class OnlineProfileDetailPageComponent implements OnInit {
   profileSaving = false;
   seoSaving = false;
   assetSaving = false;
+  assetUploading = false;
   priceSaving = false;
 
   permissionMessage = "";
@@ -1561,7 +1699,10 @@ export class OnlineProfileDetailPageComponent implements OnInit {
   profileErrorMessage = "";
   seoErrorMessage = "";
   assetErrorMessage = "";
+  assetUploadErrorMessage = "";
   priceErrorMessage = "";
+
+  selectedAssetFile: File | null = null;
 
   constructor(
     private readonly formBuilder: FormBuilder,
@@ -1734,6 +1875,76 @@ export class OnlineProfileDetailPageComponent implements OnInit {
           this.assetErrorMessage = toHttpErrorMessage(
             error,
             "No se pudo actualizar la imagen principal.",
+          );
+        },
+      });
+  }
+
+  onAssetFileSelected(event: Event): void {
+    const input = event.target as HTMLInputElement | null;
+    this.selectedAssetFile = input?.files?.item(0) ?? null;
+    this.assetUploadErrorMessage = "";
+  }
+
+  clearSelectedAssetFile(): void {
+    this.selectedAssetFile = null;
+    this.assetUploadErrorMessage = "";
+  }
+
+  canUploadAssetFile(): boolean {
+    return !!this.selectedAssetFile && this.canManage && !this.assetUploading && !this.assetSaving;
+  }
+
+  uploadAssetFile(): void {
+    if (!this.canManage || !this.productId || !this.selectedAssetFile) {
+      return;
+    }
+
+    this.assetUploadErrorMessage = "";
+    this.assetErrorMessage = "";
+    this.successMessage = "";
+
+    const altTextControl = this.assetForm.get("altText");
+    const sourceControl = this.assetForm.get("source");
+    if ((altTextControl && altTextControl.invalid) || (sourceControl && sourceControl.invalid)) {
+      altTextControl?.markAsTouched();
+      sourceControl?.markAsTouched();
+      return;
+    }
+
+    const raw = this.assetForm.getRawValue();
+    this.assetUploading = true;
+
+    this.ecommerceAdminService
+      .uploadPrimaryAsset(this.productId, this.selectedAssetFile, {
+        altText: this.trimToNull(raw.altText),
+        source: raw.source ?? "OWN",
+        rightsConfirmed: !!raw.rightsConfirmed,
+        displayOrder: Math.max(Number(raw.displayOrder ?? 0), 0),
+      })
+      .subscribe({
+        next: (primaryAsset) => {
+          this.assetUploading = false;
+          this.selectedAssetFile = null;
+          if (this.profile) {
+            this.profile = { ...this.profile, primaryAsset };
+          }
+          this.assetForm.patchValue({
+            assetType: primaryAsset.assetType,
+            assetUrl: primaryAsset.assetUrl,
+            altText: primaryAsset.altText || "",
+            source: primaryAsset.source,
+            rightsConfirmed: primaryAsset.rightsConfirmed,
+            displayOrder: primaryAsset.displayOrder,
+          });
+          this.successMessage = "Imagen subida correctamente.";
+          this.refreshValidation();
+        },
+        error: (error: unknown) => {
+          this.assetUploading = false;
+          this.assetUploadErrorMessage = toHttpErrorMessage(
+            error,
+            "No se pudo subir la imagen principal.",
           );
         },
       });
@@ -2247,6 +2458,20 @@ export class OnlineProfileDetailPageComponent implements OnInit {
       minute: "2-digit",
       hour12: false,
     }).format(new Date(value));
+  }
+
+  formatFileSize(bytes: number | null | undefined): string {
+    const value = Number(bytes ?? 0);
+    if (!Number.isFinite(value) || value <= 0) {
+      return "-";
+    }
+    if (value < 1024) {
+      return `${value} B`;
+    }
+    if (value < 1024 * 1024) {
+      return `${(value / 1024).toFixed(1)} KB`;
+    }
+    return `${(value / (1024 * 1024)).toFixed(1)} MB`;
   }
 
   private loadInitialData(showSuccess = false): void {

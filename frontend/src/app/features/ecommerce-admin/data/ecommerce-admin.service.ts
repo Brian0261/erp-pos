@@ -4,6 +4,7 @@ import { Observable } from "rxjs";
 
 import { environment } from "../../../../environments/environment";
 import {
+  AssetSource,
   EcommerceAdminBrandRequest,
   EcommerceAdminBrandResponse,
   EcommerceAdminBrandStatusRequest,
@@ -27,6 +28,13 @@ import {
   OnlinePublicationStatus,
   ReadinessStatus,
 } from "./ecommerce-admin.models";
+
+export interface EcommerceAdminUploadPrimaryAssetOptions {
+  altText: string | null;
+  source: AssetSource;
+  rightsConfirmed: boolean;
+  displayOrder: number;
+}
 
 export interface OnlineProfileListFilters {
   q?: string;
@@ -136,6 +144,27 @@ export class EcommerceAdminService {
     return this.http.put<EcommerceAdminPrimaryAssetResponse>(
       `${this.endpoint}/products/${productId}/primary-asset`,
       payload,
+    );
+  }
+
+  uploadPrimaryAsset(
+    productId: number,
+    file: File,
+    options: EcommerceAdminUploadPrimaryAssetOptions,
+  ): Observable<EcommerceAdminPrimaryAssetResponse> {
+    const formData = new FormData();
+    formData.append("file", file);
+    const altText = options.altText?.trim();
+    if (altText) {
+      formData.append("altText", altText);
+    }
+    formData.append("source", options.source);
+    formData.append("rightsConfirmed", String(options.rightsConfirmed));
+    formData.append("displayOrder", String(options.displayOrder));
+
+    return this.http.post<EcommerceAdminPrimaryAssetResponse>(
+      `${this.endpoint}/products/${productId}/primary-asset/upload`,
+      formData,
     );
   }
 

@@ -117,6 +117,15 @@ export interface EcommerceAdminPrimaryAssetResponse {
   rightsConfirmed: boolean;
   displayOrder: number;
   active: boolean;
+  storageProvider: string | null;
+  storageBucket: string | null;
+  storageKey: string | null;
+  mimeType: string | null;
+  width: number | null;
+  height: number | null;
+  sizeBytes: number | null;
+  checksumSha256: string | null;
+  originalFilename: string | null;
   updatedAt: string;
 }
 
