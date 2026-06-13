@@ -14,6 +14,15 @@ public record EcommerceAdminPrimaryAssetResponse(
         boolean rightsConfirmed,
         int displayOrder,
         boolean active,
+        String storageProvider,
+        String storageBucket,
+        String storageKey,
+        String mimeType,
+        Integer width,
+        Integer height,
+        Long sizeBytes,
+        String checksumSha256,
+        String originalFilename,
         Instant updatedAt
 ) {
 }

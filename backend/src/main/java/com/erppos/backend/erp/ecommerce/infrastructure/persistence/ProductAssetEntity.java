@@ -51,6 +51,33 @@ public class ProductAssetEntity {
     @Column(name = "display_order", nullable = false)
     private int displayOrder;
 
+    @Column(name = "storage_provider", length = 30)
+    private String storageProvider;
+
+    @Column(name = "storage_bucket", length = 255)
+    private String storageBucket;
+
+    @Column(name = "storage_key", length = 1000)
+    private String storageKey;
+
+    @Column(name = "mime_type", length = 100)
+    private String mimeType;
+
+    @Column(name = "width")
+    private Integer width;
+
+    @Column(name = "height")
+    private Integer height;
+
+    @Column(name = "size_bytes")
+    private Long sizeBytes;
+
+    @Column(name = "checksum_sha256", length = 64)
+    private String checksumSha256;
+
+    @Column(name = "original_filename", length = 255)
+    private String originalFilename;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -94,6 +121,24 @@ public class ProductAssetEntity {
     public void setActive(boolean active) { this.active = active; }
     public int getDisplayOrder() { return displayOrder; }
     public void setDisplayOrder(int displayOrder) { this.displayOrder = displayOrder; }
+    public String getStorageProvider() { return storageProvider; }
+    public void setStorageProvider(String storageProvider) { this.storageProvider = storageProvider; }
+    public String getStorageBucket() { return storageBucket; }
+    public void setStorageBucket(String storageBucket) { this.storageBucket = storageBucket; }
+    public String getStorageKey() { return storageKey; }
+    public void setStorageKey(String storageKey) { this.storageKey = storageKey; }
+    public String getMimeType() { return mimeType; }
+    public void setMimeType(String mimeType) { this.mimeType = mimeType; }
+    public Integer getWidth() { return width; }
+    public void setWidth(Integer width) { this.width = width; }
+    public Integer getHeight() { return height; }
+    public void setHeight(Integer height) { this.height = height; }
+    public Long getSizeBytes() { return sizeBytes; }
+    public void setSizeBytes(Long sizeBytes) { this.sizeBytes = sizeBytes; }
+    public String getChecksumSha256() { return checksumSha256; }
+    public void setChecksumSha256(String checksumSha256) { this.checksumSha256 = checksumSha256; }
+    public String getOriginalFilename() { return originalFilename; }
+    public void setOriginalFilename(String originalFilename) { this.originalFilename = originalFilename; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
     public String getCreatedBy() { return createdBy; }
