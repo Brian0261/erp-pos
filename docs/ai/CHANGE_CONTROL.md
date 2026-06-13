@@ -866,3 +866,51 @@ Solo crear tag cuando se cumpla todo:
   - `git diff --check`: OK.
 - Documentacion creada: `docs/qa/PHASE2S8B_STOREFRONT_SAFE_IMAGE_RENDER_QA.md`.
 - Pendiente recomendado: 2S.8C — Decision e implementacion controlada de storage/CDN o carga manual inicial de imagenes, sin activar indexacion.
+
+### Fase 2S.8D AWS S3 + CloudFront image upload manual
+
+- Tipo: implementacion backend Spring Boot + Angular admin + Flyway + documentacion QA.
+- Alcance real implementado:
+  - Upload manual de imagen principal ecommerce via backend.
+  - `ProductAsset` sigue siendo la entidad de imagen publica del Perfil online.
+  - Endpoint nuevo `POST /api/v1/ecommerce-admin/products/{productId}/primary-asset/upload` con `multipart/form-data`.
+  - Endpoint URL manual existente `PUT /api/v1/ecommerce-admin/products/{productId}/primary-asset` se mantiene compatible.
+- Backend:
+  - Nuevo comando `UploadPrimaryProductAssetCommand`.
+  - Nuevo port `EcommerceImageStoragePort`.
+  - Adapter S3 con AWS SDK v2 y `cache-control` configurable.
+  - Adapter deshabilitado por defecto con `ECOMMERCE_IMAGE_STORAGE_PROVIDER=none`.
+  - Validacion binaria JPEG/PNG, firma, MIME declarado, peso, dimensiones, checksum SHA-256 y URL publica allowlisted.
+  - Naming de storage key por producto/perfil/checksum.
+- Flyway/DB:
+  - `V18__ecommerce_product_asset_storage_metadata.sql` agrega metadata nullable a `ecommerce_product_assets`.
+  - Assets historicos URL-only siguen soportados.
+- Angular:
+  - Perfil online detalle agrega selector de archivo JPEG/PNG.
+  - Upload usa alt text, fuente, derechos y orden existentes.
+  - Se muestra metadata tecnica devuelta cuando existe.
+  - Guardado por URL manual se mantiene intacto.
+- Configuracion/env:
+  - `.env.example` documenta `ECOMMERCE_IMAGE_STORAGE_PROVIDER`, `AWS_REGION`, `ECOMMERCE_IMAGE_S3_BUCKET`, `ECOMMERCE_IMAGE_S3_PREFIX`, `ECOMMERCE_IMAGE_PUBLIC_BASE_URL`, cache-control y limites.
+  - `storefront/.env.local.example` recuerda alinear `STOREFRONT_IMAGE_ALLOWED_DOMAINS` con el host CDN publico.
+  - No se agregaron secretos ni access keys.
+- Validaciones:
+  - `mvn -DskipTests compile`: OK.
+  - `mvn -Dtest=EcommerceCatalogApplicationServiceTest test`: 29 tests, 0 failures, BUILD SUCCESS.
+  - `mvn "-Dtest=EcommerceCatalogPersistenceIntegrationTest,EcommerceAdminProfilesIntegrationTest" test`: 29 tests, 0 failures, BUILD SUCCESS.
+  - `npm run build` en frontend: OK.
+  - `git diff --check`: OK con warnings CRLF normales en Windows.
+- Exclusiones confirmadas:
+  - Sin recursos AWS reales.
+  - Sin credenciales/access keys.
+  - Sin presigned URL.
+  - Sin ZIP ni importacion masiva de imagenes.
+  - Sin columna imagen Excel 2S.7A.
+  - Sin galeria, WebP obligatorio, AVIF ni antivirus avanzado.
+  - Sin cambios en Producto ERP, POS, stock, inventario, unidad, costo, precio ERP, Storefront funcional, `next.config.ts`, Docker, auth/security ni indexacion.
+  - Sin structured data, Merchant Center, buscador, filtros, carrito, checkout ni pagos.
+- Riesgos pendientes:
+  - No se hizo smoke manual porque no hay servidores locales activos.
+  - Adapter S3 no probado contra AWS real por restriccion de no tocar/crear recursos AWS.
+  - No hay cleanup automatico del objeto S3 si S3 sube correctamente pero DB falla despues.
+- Documentacion creada: `docs/qa/PHASE2S8D_AWS_S3_CLOUDFRONT_IMAGE_UPLOAD_QA.md`.

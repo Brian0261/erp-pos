@@ -441,3 +441,25 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
 - Validaciones: `npm run build` Storefront OK, `npm run lint` Storefront OK, `git diff --check` OK.
 - Documentacion QA creada: `docs/qa/PHASE2S8B_STOREFRONT_SAFE_IMAGE_RENDER_QA.md`.
 - Pendiente recomendado: 2S.8C — Decision e implementacion controlada de storage/CDN o carga manual inicial de imagenes, sin activar indexacion.
+
+## Fase 2S.8D AWS S3 + CloudFront image upload manual
+
+- Fase 2S.8D implementada localmente; sin commit/push.
+- Se mantiene `ProductAsset` como entidad de imagen publica del Perfil online ecommerce.
+- Backend agrega endpoint ADMIN multipart:
+  - `POST /api/v1/ecommerce-admin/products/{productId}/primary-asset/upload`
+- El endpoint URL manual existente se conserva:
+  - `PUT /api/v1/ecommerce-admin/products/{productId}/primary-asset`
+- Se agrego storage port testeable y adapter S3 real, desactivado por defecto con `ECOMMERCE_IMAGE_STORAGE_PROVIDER=none`.
+- No se crearon recursos AWS reales ni se agregaron credenciales/access keys.
+- Configuracion backend documentada en `.env.example`: bucket, prefix, public base URL CloudFront/CDN, region, cache-control, limites de peso/dimensiones y limites multipart.
+- Flyway `V18__ecommerce_product_asset_storage_metadata.sql` agrega metadata nullable a `ecommerce_product_assets`: provider, bucket, key, MIME, dimensiones, size, SHA-256 y nombre original.
+- Validacion binaria MVP: JPEG/PNG, firma binaria, MIME declarado, peso maximo, dimensiones reales con ImageIO, checksum SHA-256 y key segura.
+- URL publica final se valida con `PublicImageUrlPolicy`; `ECOMMERCE_PUBLIC_IMAGE_ALLOWED_DOMAINS` debe incluir el host de `ECOMMERCE_IMAGE_PUBLIC_BASE_URL`.
+- `storefront/.env.local.example` recuerda alinear `STOREFRONT_IMAGE_ALLOWED_DOMAINS` con el host CDN del backend.
+- Angular detalle de Perfil online agrega selector de archivo JPEG/PNG, usa alt/fuente/derechos/orden existentes y muestra metadata tecnica devuelta.
+- Validaciones: `mvn -DskipTests compile` OK, `EcommerceCatalogApplicationServiceTest` 29/29 OK, integracion `EcommerceCatalogPersistenceIntegrationTest,EcommerceAdminProfilesIntegrationTest` 29/29 OK, `npm run build` frontend OK, `git diff --check` OK con warnings CRLF normales.
+- No se toco Producto ERP, POS, stock, inventario, unidad, costo, precio ERP, importacion masiva 2S.7A, Storefront funcional, `next.config.ts`, Docker, seguridad ni indexacion.
+- No se implemento presigned URL, ZIP, importacion masiva de imagenes, columna imagen Excel, galeria, WebP obligatorio, antivirus avanzado, structured data, Merchant Center, carrito, checkout ni pagos.
+- Documentacion QA creada: `docs/qa/PHASE2S8D_AWS_S3_CLOUDFRONT_IMAGE_UPLOAD_QA.md`.
+- Riesgos pendientes: sin smoke manual por servidores locales no activos; adapter S3 no probado contra AWS real; no hay cleanup automatico del objeto S3 si falla el guardado DB posterior.
