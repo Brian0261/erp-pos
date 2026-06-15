@@ -463,3 +463,18 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
 - No se implemento presigned URL, ZIP, importacion masiva de imagenes, columna imagen Excel, galeria, WebP obligatorio, antivirus avanzado, structured data, Merchant Center, carrito, checkout ni pagos.
 - Documentacion QA creada: `docs/qa/PHASE2S8D_AWS_S3_CLOUDFRONT_IMAGE_UPLOAD_QA.md`.
 - Riesgos pendientes: sin smoke manual por servidores locales no activos; adapter S3 no probado contra AWS real; no hay cleanup automatico del objeto S3 si falla el guardado DB posterior.
+
+## Fase 2S.8E AWS staging smoke validation
+
+- Fase 2S.8E cerrada documentalmente con validacion manual reportada por el operador.
+- Opencode NO ejecuto el smoke real ni verifico directamente la infraestructura cloud.
+- Lightsail staging actualizado desde `origin/master` con Docker Compose, Caddy, backend, Angular y PostgreSQL.
+- Flyway aplicado hasta V18 inclusive.
+- Login staging 200, health 200, puertos seguros (Caddy 80/443, Angular 127.0.0.1:4200, backend 8080 no publico, PostgreSQL 5432 no publico).
+- Upload manual de imagen principal desde Angular Admin funciona end-to-end: Angular Admin -> Backend -> S3 privado -> CloudFront.
+- Imagen servida desde `cdn-staging.inktoy.pe` con patron `staging/ecommerce/ecommerce/products/...`.
+- Storefront Next.js aun no desplegado en Lightsail; render end-to-end Storefront -> CloudFront queda pendiente.
+- Detalle tecnico observado: ruta contiene segmento duplicado `/staging/ecommerce/ecommerce/...`; funcional pero a revisar antes de produccion.
+- Credenciales AWS solo en `.env` del servidor, no en repo.
+- Documentacion QA creada: `docs/qa/PHASE2S8E_AWS_STAGING_SMOKE_QA.md`.
+- Pendiente recomendado: 2S.8F -- Importacion masiva de imagen principal por URL publica.

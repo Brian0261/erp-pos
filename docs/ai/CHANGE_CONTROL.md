@@ -914,3 +914,41 @@ Solo crear tag cuando se cumpla todo:
   - Adapter S3 no probado contra AWS real por restriccion de no tocar/crear recursos AWS.
   - No hay cleanup automatico del objeto S3 si S3 sube correctamente pero DB falla despues.
 - Documentacion creada: `docs/qa/PHASE2S8D_AWS_S3_CLOUDFRONT_IMAGE_UPLOAD_QA.md`.
+
+### Cierre Fase 2S.8E AWS staging smoke validation
+
+- Tipo: cierre documental con validacion manual reportada por el operador.
+- Opencode NO ejecuto el smoke real ni verifico directamente AWS/Lightsail/S3/CloudFront/IAM.
+- Alcance validado manualmente por el operador:
+  - Lightsail staging actualizado desde `origin/master`.
+  - Docker Compose con backend, Angular y PostgreSQL operativo.
+  - Flyway aplicado hasta V18.
+  - Login 200, health 200, puertos seguros.
+  - Upload manual de imagen principal funciona end-to-end.
+  - Imagen servida desde CloudFront `cdn-staging.inktoy.pe`.
+- Infraestructura:
+  - Lightsail staging, Docker Compose, Caddy.
+  - S3 privado `inktoy-ecommerce-images-staging`, region `us-east-1`, prefix `staging/ecommerce`.
+  - CloudFront con CNAME `cdn-staging.inktoy.pe`.
+  - Swap 2 GB para builds Docker.
+- Exclusiones confirmadas:
+  - Sin cambios en codigo backend/frontend/Storefront.
+  - Sin cambios en Flyway ni docker-compose.
+  - Sin creacion de recursos AWS.
+  - Sin credenciales en repo.
+  - Sin commit ni push.
+  - Sin activacion de indexacion.
+- No validado en esta fase:
+  - Storefront Next.js desplegado en Lightsail.
+  - Render end-to-end Storefront -> CloudFront.
+  - Acceso S3 directo anonimo 403.
+  - Importacion masiva por URL publica.
+  - Excel + ZIP de imagenes.
+- Riesgos pendientes:
+  - Confirmar evidencia de S3 directo 403.
+  - Ruta duplicada `/staging/ecommerce/ecommerce/...` a revisar antes de produccion.
+  - Mantener secretos solo en `.env` del servidor.
+  - Formalizar overrides de staging para docker-compose/puertos/env_file.
+  - Disenar consistencia DB/S3 para cargas masivas.
+- Documentacion creada: `docs/qa/PHASE2S8E_AWS_STAGING_SMOKE_QA.md`.
+- Pendiente recomendado: 2S.8F -- Importacion masiva de imagen principal por URL publica.
