@@ -19,6 +19,7 @@ import { EcommerceOnlineCategoriesPageComponent } from "./features/ecommerce-adm
 import { OnlineProfileImportPageComponent } from "./features/ecommerce-admin/online-profile-import-page.component";
 import { OnlineProfileDetailPageComponent } from "./features/ecommerce-admin/online-profile-detail-page.component";
 import { OnlineProfilesPageComponent } from "./features/ecommerce-admin/online-profiles-page.component";
+import { PrimaryImageUrlImportPageComponent } from "./features/ecommerce-admin/primary-image-url-import-page.component";
 import { OutboxEventDetailPageComponent } from "./features/integrations/outbox-event-detail-page.component";
 import { OutboxEventsPageComponent } from "./features/integrations/outbox-events-page.component";
 import { AdjustmentsPageComponent } from "./features/inventory/adjustments-page.component";
@@ -157,6 +158,11 @@ export const routes: Routes = [
       {
         path: "ecommerce-admin/perfiles/importar",
         component: OnlineProfileImportPageComponent,
+        data: { allowedRoles: ROLES_ADMIN },
+      },
+      {
+        path: "ecommerce-admin/perfiles/imagenes/importar",
+        component: PrimaryImageUrlImportPageComponent,
         data: { allowedRoles: ROLES_ADMIN },
       },
       {

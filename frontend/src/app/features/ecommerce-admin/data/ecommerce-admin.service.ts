@@ -25,6 +25,8 @@ import {
   EcommerceAdminUpsertSeoRequest,
   EcommerceOnlineProfileImportConfirmResponse,
   EcommerceOnlineProfileImportPreviewResponse,
+  EcommercePrimaryImageUrlImportConfirmResponse,
+  EcommercePrimaryImageUrlImportPreviewResponse,
   OnlinePublicationStatus,
   ReadinessStatus,
 } from "./ecommerce-admin.models";
@@ -50,6 +52,9 @@ export interface OnlineProfileListFilters {
 export class EcommerceAdminService {
   private readonly endpoint = `${environment.apiUrl}/ecommerce-admin`;
   private readonly onlineProfilesImportEndpoint = `${this.endpoint}/products/online-profiles/import`;
+  private readonly primaryImageUrlImportTemplateEndpoint = `${this.endpoint}/products/online-profiles/primary-images/import/template`;
+  private readonly primaryImageUrlImportPreviewEndpoint = `${this.endpoint}/products/online-profiles/primary-images/import/preview`;
+  private readonly primaryImageUrlImportConfirmFileEndpoint = `${this.endpoint}/products/online-profiles/primary-images/import/confirm-file`;
 
   constructor(private readonly http: HttpClient) {}
 
@@ -218,6 +223,30 @@ export class EcommerceAdminService {
     formData.append("file", file);
     return this.http.post<EcommerceOnlineProfileImportConfirmResponse>(
       `${this.onlineProfilesImportEndpoint}/confirm-file`,
+      formData,
+    );
+  }
+
+  downloadPrimaryImageUrlImportTemplate(): Observable<Blob> {
+    return this.http.get(this.primaryImageUrlImportTemplateEndpoint, {
+      responseType: "blob",
+    });
+  }
+
+  previewPrimaryImageUrlImport(file: File): Observable<EcommercePrimaryImageUrlImportPreviewResponse> {
+    const formData = new FormData();
+    formData.append("file", file);
+    return this.http.post<EcommercePrimaryImageUrlImportPreviewResponse>(
+      this.primaryImageUrlImportPreviewEndpoint,
+      formData,
+    );
+  }
+
+  confirmPrimaryImageUrlImportFile(file: File): Observable<EcommercePrimaryImageUrlImportConfirmResponse> {
+    const formData = new FormData();
+    formData.append("file", file);
+    return this.http.post<EcommercePrimaryImageUrlImportConfirmResponse>(
+      this.primaryImageUrlImportConfirmFileEndpoint,
       formData,
     );
   }

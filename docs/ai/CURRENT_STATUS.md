@@ -478,3 +478,30 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
 - Credenciales AWS solo en `.env` del servidor, no en repo.
 - Documentacion QA creada: `docs/qa/PHASE2S8E_AWS_STAGING_SMOKE_QA.md`.
 - Pendiente recomendado: 2S.8F -- Importacion masiva de imagen principal por URL publica.
+
+## Fase 2S.8F importacion masiva de imagen principal por URL publica
+
+- Fase 2S.8F implementada localmente; sin commit/push.
+- Se agrego flujo separado para importar imagen principal URL-only de perfiles online existentes por SKU.
+- Formato MVP: solo `.xlsx`; sin CSV.
+- Endpoints ADMIN nuevos:
+  - `GET /api/v1/ecommerce-admin/products/online-profiles/primary-images/import/template`
+  - `POST /api/v1/ecommerce-admin/products/online-profiles/primary-images/import/preview`
+  - `POST /api/v1/ecommerce-admin/products/online-profiles/primary-images/import/confirm-file`
+- Backend agrega use case, service, workbook port, adapter POI, controller y DTOs separados para 2S.8F.
+- Preview no persiste cambios; confirm-file revalida el archivo completo y aplica solo filas validas `CREATE`/`UPDATE`.
+- `NO_CHANGE` queda sin cambios y `REJECT` se reporta como importacion parcial si hay filas validas aplicadas.
+- `ProductAsset` se crea/actualiza como URL-only: `PRODUCT_IMAGE`, primary, active, `assetUrl` validada, metadata storage nula.
+- Se reutiliza `PublicImageUrlPolicy`; no se duplican reglas de URL publica.
+- Se respeta `ECOMMERCE_PUBLIC_IMAGE_ALLOWED_DOMAINS`.
+- Validaciones por fila: SKU requerido/existente/no duplicado, perfil online existente, producto activo, `imageUrl` valida, `altText` requerido max 250, `source` valido, `rightsConfirmed=true`, `assetType` solo `PRODUCT_IMAGE`, `displayOrder` entero no negativo.
+- Perfiles `PUBLISHED` con cambio requieren `publishedUpdateConfirmed=true`; si se confirma, se permite con warning.
+- Warnings: overwrite, cambio visible en publicado, metadata S3 limpiada sin borrar objeto S3, URL no verificada por HEAD/GET, Storefront staging no validado, allowlists backend/Storefront alineadas.
+- Angular Admin agrega pantalla `/ecommerce-admin/perfiles/imagenes/importar`, navegacion en Catalogo online y acceso desde Perfiles online.
+- Angular incluye descarga de plantilla, selector `.xlsx`, preview, filtros por todas/validas/errores/warnings, conteos y confirm dialog.
+- No se toco Storefront Next.js, Flyway, docker-compose, AWS/Lightsail/S3/CloudFront/IAM ni `.env` real.
+- No se implemento CSV, ZIP, carga binaria masiva, presigned URL, galeria, Merchant Center, structured data, indexacion, carrito, checkout ni pagos.
+- No se toco Producto ERP, POS, stock, inventario, unidades, costos, precios ERP ni categorias ERP.
+- Validaciones: `./mvnw -DskipTests compile` OK, `EcommercePrimaryImageUrlImportIntegrationTest` 8/8 OK, `EcommerceCatalogApplicationServiceTest` 29/29 OK, `npm run build` frontend OK.
+- Documentacion QA creada: `docs/qa/PHASE2S8F_PRIMARY_IMAGE_URL_IMPORT_QA.md`.
+- Riesgos pendientes: Storefront Next.js staging no desplegado, URL remota no verificada por contenido, posible orphan S3 si se reemplaza asset S3, 2S.9 ZIP requiere consistencia DB/S3.

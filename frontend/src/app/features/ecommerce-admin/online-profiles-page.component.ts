@@ -44,6 +44,13 @@ const NONE_VALUE = "__NONE__";
           >
             Importar perfiles
           </a>
+          <a
+            *ngIf="canManage"
+            routerLink="/ecommerce-admin/perfiles/imagenes/importar"
+            class="ui-button ui-button--secondary"
+          >
+            Importar imagenes
+          </a>
           <button
             type="button"
             class="ui-button ui-button--secondary"

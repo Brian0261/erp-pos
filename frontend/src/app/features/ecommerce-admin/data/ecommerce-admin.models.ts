@@ -51,6 +51,12 @@ export type EcommerceOnlineProfileImportAction =
   | "NO_CHANGE"
   | "REJECT";
 
+export type EcommercePrimaryImageUrlImportAction =
+  | "CREATE"
+  | "UPDATE"
+  | "NO_CHANGE"
+  | "REJECT";
+
 export interface EcommerceAdminPageResponse<T> {
   items: T[];
   page: number;
@@ -294,4 +300,55 @@ export interface EcommerceOnlineProfileImportConfirmResponse {
   unchangedRows: number;
   rejectedRows: number;
   rows: EcommerceOnlineProfileImportConfirmRowResponse[];
+}
+
+export interface EcommercePrimaryImageUrlImportPreviewRow {
+  rowNumber: number;
+  sku: string | null;
+  productId: number | null;
+  profileId: number | null;
+  productName: string | null;
+  publicationStatus: OnlinePublicationStatus | null;
+  currentAssetUrl: string | null;
+  imageUrl: string | null;
+  altText: string | null;
+  source: AssetSource | null;
+  rightsConfirmed: boolean | null;
+  assetType: AssetType | null;
+  displayOrder: number | null;
+  action: EcommercePrimaryImageUrlImportAction;
+  valid: boolean;
+  errors: string[];
+  warnings: string[];
+}
+
+export interface EcommercePrimaryImageUrlImportPreviewResponse {
+  totalRows: number;
+  createRows: number;
+  updateRows: number;
+  unchangedRows: number;
+  rejectedRows: number;
+  warningRows: number;
+  rows: EcommercePrimaryImageUrlImportPreviewRow[];
+}
+
+export interface EcommercePrimaryImageUrlImportConfirmRowResponse {
+  rowNumber: number;
+  sku: string | null;
+  productId: number | null;
+  profileId: number | null;
+  action: EcommercePrimaryImageUrlImportAction;
+  applied: boolean;
+  errors: string[];
+  warnings: string[];
+}
+
+export interface EcommercePrimaryImageUrlImportConfirmResponse {
+  totalRows: number;
+  createdRows: number;
+  updatedRows: number;
+  unchangedRows: number;
+  rejectedRows: number;
+  warningRows: number;
+  rows: EcommercePrimaryImageUrlImportConfirmRowResponse[];
 }

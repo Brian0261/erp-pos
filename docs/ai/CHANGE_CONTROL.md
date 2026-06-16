@@ -952,3 +952,66 @@ Solo crear tag cuando se cumpla todo:
   - Disenar consistencia DB/S3 para cargas masivas.
 - Documentacion creada: `docs/qa/PHASE2S8E_AWS_STAGING_SMOKE_QA.md`.
 - Pendiente recomendado: 2S.8F -- Importacion masiva de imagen principal por URL publica.
+
+### Implementacion Fase 2S.8F primary image URL import
+
+- Tipo: feature backend/frontend + QA documental.
+- Objetivo: importacion masiva separada de imagen principal URL-only para perfiles online ecommerce existentes, usando SKU como clave humana principal.
+- Backend:
+  - Nuevo use case `EcommercePrimaryImageUrlImportUseCase`.
+  - Nuevo enum `EcommercePrimaryImageUrlImportAction`.
+  - Nuevo port `EcommercePrimaryImageUrlImportWorkbookPort`.
+  - Nuevo service `EcommercePrimaryImageUrlImportApplicationService`.
+  - Nuevo adapter POI `PoiEcommercePrimaryImageUrlImportWorkbookAdapter`.
+  - Nuevo controller `EcommercePrimaryImageUrlImportController`.
+  - Nuevos DTOs de preview/confirm.
+- Endpoints nuevos:
+  - `GET /api/v1/ecommerce-admin/products/online-profiles/primary-images/import/template`.
+  - `POST /api/v1/ecommerce-admin/products/online-profiles/primary-images/import/preview`.
+  - `POST /api/v1/ecommerce-admin/products/online-profiles/primary-images/import/confirm-file`.
+- Contrato XLSX:
+  - Requeridas: `sku`, `imageUrl`, `altText`, `source`, `rightsConfirmed`.
+  - Opcionales: `assetType`, `displayOrder`, `publishedUpdateConfirmed`, `productName`, `publicationStatus`, `currentImageUrl`.
+  - `productName`, `publicationStatus` y `currentImageUrl` son informativas.
+- Reglas:
+  - Preview sin persistencia.
+  - Confirm-file revalida todo antes de aplicar.
+  - Aplica solo filas validas `CREATE`/`UPDATE`.
+  - `NO_CHANGE` no modifica DB.
+  - `REJECT` se reporta y permite importacion parcial.
+  - `PublicImageUrlPolicy` valida `imageUrl` sin duplicar reglas.
+  - No hay HEAD/GET ni descarga remota de imagenes.
+  - `ProductAsset` queda URL-only con metadata storage nula.
+  - Perfil `PUBLISHED` con cambio requiere `publishedUpdateConfirmed=true`.
+- Angular:
+  - Nueva pantalla standalone `primary-image-url-import-page.component.ts`.
+  - Nueva ruta `/ecommerce-admin/perfiles/imagenes/importar`.
+  - Nuevos modelos y metodos en `EcommerceAdminService`.
+  - Navegacion agregada en Catalogo online y acceso desde Perfiles online.
+  - Preview con filtros todas/validas/errores/warnings y confirm dialog.
+- Tests:
+  - Nuevo `EcommercePrimaryImageUrlImportIntegrationTest` con template, preview no persistente, confirm parcial, validaciones, perfiles publicados, `PUBLISHED + NO_CHANGE` y reemplazo URL-only de asset con metadata S3.
+- Validaciones:
+  - `./mvnw -DskipTests compile`: OK.
+  - `./mvnw -Dtest=EcommercePrimaryImageUrlImportIntegrationTest test`: 8 tests, 0 failures, BUILD SUCCESS.
+  - `./mvnw -Dtest=EcommerceCatalogApplicationServiceTest test`: 29 tests, 0 failures, BUILD SUCCESS.
+  - `npm run build` en frontend: OK.
+- Exclusiones confirmadas:
+  - Sin CSV.
+  - Sin ZIP ni carga binaria masiva.
+  - Sin presigned URL.
+  - Sin galeria.
+  - Sin Storefront Next.js.
+  - Sin Flyway ni docker-compose.
+  - Sin AWS/Lightsail/S3/CloudFront/IAM ni `.env` real.
+  - Sin secretos/access keys/tokens/passwords.
+  - Sin Merchant Center, structured data, indexacion, carrito, checkout ni pagos.
+  - Sin cambios en Producto ERP, POS, stock, inventario, unidades, costos, precios ERP ni categorias ERP.
+  - Sin commit, push ni tag.
+- Riesgos pendientes:
+  - URL remota no verificada por existencia/MIME/dimensiones/peso.
+  - Si reemplaza asset S3, no se borra objeto S3 previo.
+  - Mantener alineadas allowlists backend/Storefront.
+  - Storefront Next.js staging no desplegado.
+  - 2S.9 Excel + ZIP requiere estrategia DB/S3 y validacion binaria.
+- Documentacion creada: `docs/qa/PHASE2S8F_PRIMARY_IMAGE_URL_IMPORT_QA.md`.
