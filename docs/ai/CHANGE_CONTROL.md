@@ -1077,18 +1077,27 @@ Solo crear tag cuando se cumpla todo:
   - Sin CSV.
   - Sin ZIP ni carga binaria masiva.
   - Sin presigned URL.
-  - Sin galeria.
-  - Sin Storefront Next.js.
-  - Sin Flyway ni docker-compose.
-  - Sin AWS/Lightsail/S3/CloudFront/IAM ni `.env` real.
+
+### Cierre Fase 2S.8K Storefront Lightsail Docker tunnel smoke
+
+- Tipo: cierre documental de smoke visual en Lightsail staging mediante tunel SSH, sin configuracion de host publico.
+- Archivo creado:
+  - `docs/qa/PHASE2S8K_STOREFRONT_LIGHTSAIL_DOCKER_TUNNEL_SMOKE_QA.md`.
+- Evidencia resumida:
+  - Docker Compose con backend, frontend, postgres y storefront en estado esperado.
+  - HTTP 200 en `/`, `/productos` y `/productos/cuaderno-a4`.
+  - Validacion visual en navegador via `http://localhost:3001/` con tunel SSH.
+  - Producto `Cuaderno A4` e imagen principal importada visibles.
+- Limitacion explicita:
+  - No se configuro host publico ni Caddy para Storefront en esta fase.
+- Recomendacion:
+  - Tratar Caddy/host publico como fase separada si se decide exponer Storefront staging publicamente.
+- Sin cambios funcionales en backend, frontend, Storefront, Docker, Caddy, AWS, Lightsail, S3, CloudFront, IAM ni `.env` reales.
+- Restricciones confirmadas:
   - Sin secretos/access keys/tokens/passwords.
   - Sin Merchant Center, structured data, indexacion, carrito, checkout ni pagos.
-  - Sin cambios en Producto ERP, POS, stock, inventario, unidades, costos, precios ERP ni categorias ERP.
-  - Sin commit, push ni tag.
-- Riesgos pendientes:
-  - URL remota no verificada por existencia/MIME/dimensiones/peso.
-  - Si reemplaza asset S3, no se borra objeto S3 previo.
-  - Mantener alineadas allowlists backend/Storefront.
+  - Sin cambios en Producto ERP, POS, stock, inventario, unidades, costos ni precios ERP.
+  - Sin cambios en Caddy, DNS ni exposicion publica del Storefront.
   - Storefront Next.js staging no desplegado.
   - 2S.9 Excel + ZIP requiere estrategia DB/S3 y validacion binaria.
 - Documentacion creada: `docs/qa/PHASE2S8F_PRIMARY_IMAGE_URL_IMPORT_QA.md`.

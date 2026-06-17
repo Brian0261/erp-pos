@@ -557,5 +557,31 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
 - Las variables se pasan como build args y runtime env porque `remotePatterns` se calcula en build y el helper seguro valida en runtime.
 - QA documental creada: `docs/qa/PHASE2S8J_STOREFRONT_DOCKER_LOCAL_QA.md`.
 - Validaciones CLI Docker locales OK: `docker compose config`, `docker compose build storefront`, `docker compose --profile storefront up -d storefront`, `docker compose ps`, logs Storefront, `curl -I http://localhost:3000/` y `curl -I http://localhost:4200/`.
-- Pendiente: validacion manual en navegador para confirmar producto e imagen renderizada desde `cdn-staging.inktoy.pe` y posterior plan separado para Caddy/Lightsail.
-- Proximo paso recomendado: `2S.8H -- Storefront local image render smoke/diagnostic`.
+- Esta fase quedo validada posteriormente en Lightsail mediante el smoke documental `2S.8K`.
+- Pendiente separado: definir en otra fase si Storefront staging necesitara exposicion publica con Caddy/host dedicado.
+
+## Fase 2S.8K Storefront Lightsail Docker tunnel smoke
+
+- Fase 2S.8K cerrada documentalmente con smoke visual PASS en Lightsail staging.
+- Commit desplegado en Lightsail: `f87f401 chore(storefront): add Docker local support`.
+- Evidencia Docker en Lightsail:
+  - backend `Up` en `127.0.0.1:8080->8080/tcp`
+  - frontend `Up` en `127.0.0.1:4200->80/tcp`
+  - postgres `Up healthy` sin puerto publico
+  - storefront `Up` en `127.0.0.1:3000->3000/tcp`
+- Evidencia HTTP en Lightsail:
+  - `/` HTTP 200
+  - `/productos` HTTP 200
+  - `/productos/cuaderno-a4` HTTP 200
+- Evidencia visual manual via tunel SSH:
+  - `http://localhost:3001/` OK
+  - `http://localhost:3001/productos` OK
+  - `http://localhost:3001/productos/cuaderno-a4` OK
+  - producto `Cuaderno A4` visible
+  - imagen principal importada visible
+  - sin fallback de imagen
+  - sin error de API
+  - sin error de Next/Image por dominio no permitido
+- Limitacion explicita: no se configuro host publico/Caddy para Storefront en esta fase.
+- Recomendacion: tratar Caddy/host publico como fase separada si se decide exponer Storefront staging publicamente.
+- Siguiente paso sugerido: mantener 2S.9 bloqueado hasta definir si se requiere exposicion publica adicional para Storefront staging.
