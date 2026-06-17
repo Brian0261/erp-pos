@@ -505,3 +505,41 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
 - Validaciones: `./mvnw -DskipTests compile` OK, `EcommercePrimaryImageUrlImportIntegrationTest` 8/8 OK, `EcommerceCatalogApplicationServiceTest` 29/29 OK, `npm run build` frontend OK.
 - Documentacion QA creada: `docs/qa/PHASE2S8F_PRIMARY_IMAGE_URL_IMPORT_QA.md`.
 - Riesgos pendientes: Storefront Next.js staging no desplegado, URL remota no verificada por contenido, posible orphan S3 si se reemplaza asset S3, 2S.9 ZIP requiere consistencia DB/S3.
+
+## Fase 2S.8G staging smoke de importacion masiva de imagen principal por URL publica
+
+- Fase 2S.8G cerrada documentalmente con evidencia manual reportada por el operador en Lightsail staging.
+- Commit validado en staging: `ebb1726 feat(ecommerce-admin): add primary image URL import`.
+- Infraestructura staging usada: Lightsail con Docker Compose, Caddy, backend, Angular y PostgreSQL.
+- Pasos ejecutados por operador: `docker compose config`, `docker compose build backend`, `docker compose build frontend`, `docker compose up -d` y `docker compose ps`.
+- Resultado de arranque: postgres healthy, backend up, frontend up en `127.0.0.1:4200`.
+- Backend inicio correctamente y Flyway valido 18 migraciones sin migraciones pendientes.
+- HTTP staging: `https://staging.inktoy.pe/login` respondio 200 y `https://staging.inktoy.pe/api/v1/health` respondio 200.
+- Flujo validado en staging: Catalogo online -> Importar imagenes.
+- La plantilla `.xlsx` se descargo correctamente desde staging.
+- La importacion con Excel funciono correctamente.
+- El preview uso el endpoint correcto: `POST /api/v1/ecommerce-admin/products/online-profiles/primary-images/import/preview`.
+- La imagen se importo correctamente.
+- El producto pudo colocarse en linea dentro del ERP.
+- La pantalla post-confirmacion funciono correctamente.
+- No quedo activo el boton para reimportar el mismo archivo.
+- `Nueva importacion` limpio correctamente el flujo.
+- No se detectaron errores visuales o funcionales relevantes en el smoke staging.
+- Lo no validado en esta fase: Storefront desplegado en Lightsail, Storefront Docker, Excel + ZIP, carga binaria masiva, presigned URLs, galeria, Merchant Center, structured data, indexacion, carrito/checkout/pagos.
+- Riesgo pendiente: en Storefront local el producto aparece, pero la imagen aun no se muestra; se trata como fase posterior corta fuera de 2S.8G.
+
+## Fase 2S.8H Storefront local image render smoke/diagnostic
+
+- Fase 2S.8H cerrada documentalmente con validacion manual reportada por el operador.
+- Causa confirmada: backend publico y Storefront usan el mismo contrato `primaryImage.url`; el problema era configuracion local de Storefront.
+- Validacion manual reportada por el operador:
+  - Se agrego `STOREFRONT_IMAGE_ALLOWED_DOMAINS=cdn-staging.inktoy.pe` en `storefront/.env.local`.
+  - Se reinicio `npm run dev`.
+  - Se valido `http://localhost:3000/`.
+  - El producto publicado ya muestra correctamente la imagen importada desde `cdn-staging.inktoy.pe`.
+- No se requirio cambiar backend, contratos API ni logica del Storefront.
+- Storefront sigue sin estar desplegado en Docker ni en Lightsail.
+- Recomendacion antes de 2S.9: no iniciar 2S.9 sin validar el render basico de imagen en Storefront local.
+- Ejemplo no sensible actualizado: `storefront/.env.local.example` documenta `STOREFRONT_IMAGE_ALLOWED_DOMAINS=cdn-staging.inktoy.pe` y la necesidad de reiniciar Next.js tras cambiarlo.
+- Proximo paso recomendado: revisar si hace falta un smoke documental corto para Storefront local antes de avanzar a 2S.9.
+- Proximo paso recomendado: `2S.8H -- Storefront local image render smoke/diagnostic`.
