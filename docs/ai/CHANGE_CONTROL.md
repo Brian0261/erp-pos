@@ -1036,6 +1036,32 @@ Solo crear tag cuando se cumpla todo:
 - `storefront/.env.local.example` documenta un ejemplo no sensible y la necesidad de reiniciar Next.js tras cambiar `STOREFRONT_IMAGE_ALLOWED_DOMAINS`.
 - Recomendacion operativa: no iniciar 2S.9 sin validar el render basico de imagen en Storefront local.
 - Proximo paso recomendado: revisar si hace falta un smoke documental corto para Storefront local antes de avanzar a 2S.9.
+
+### Implementacion Fase 2S.8J Storefront Docker local support
+
+- Tipo: soporte Docker local para Storefront Next.js, sin despliegue Lightsail.
+- Archivos creados:
+  - `storefront/Dockerfile`.
+  - `storefront/.dockerignore`.
+  - `docs/qa/PHASE2S8J_STOREFRONT_DOCKER_LOCAL_QA.md`.
+- Archivo actualizado:
+  - `docker-compose.yml`.
+- Arquitectura:
+  - Servicio Docker `storefront` separado de Angular Admin.
+  - Profile `storefront` para levantarlo solo con `docker compose --profile storefront up -d storefront`.
+  - Puerto interno Storefront 3000, publicado en `127.0.0.1:3000:3000`.
+  - Angular Admin mantiene `127.0.0.1:4200:80`.
+  - Backend queda ligado a loopback y PostgreSQL queda solo en la red interna Docker.
+- Variables Storefront Docker:
+  - `STOREFRONT_API_BASE_URL=http://backend:8080`.
+  - `STOREFRONT_PUBLIC_BASE_URL=http://localhost:3000`.
+  - `STOREFRONT_INDEXING_ENABLED=false`.
+  - `STOREFRONT_IMAGE_ALLOWED_DOMAINS=cdn-staging.inktoy.pe`.
+- Decision tecnica: variables pasadas como build args y runtime env para cubrir `next.config.ts`/`remotePatterns` en build y helper seguro en runtime.
+- Validaciones CLI Docker locales OK: Compose config/build/up/ps/logs, Storefront HTTP 200 en `http://localhost:3000/` y Angular Admin HTTP 200 en `http://localhost:4200/`.
+- Pendiente: validacion manual en navegador para producto e imagen renderizada antes de 2S.9.
+- Sin cambios backend, contratos API, logica Storefront, `next.config.ts`, Caddy, Lightsail, AWS, S3, CloudFront, IAM ni `.env` reales.
+- 2S.9 sigue bloqueado hasta validar smoke Docker local basico de Storefront con imagen renderizada.
   - Nueva ruta `/ecommerce-admin/perfiles/imagenes/importar`.
   - Nuevos modelos y metodos en `EcommerceAdminService`.
   - Navegacion agregada en Catalogo online y acceso desde Perfiles online.

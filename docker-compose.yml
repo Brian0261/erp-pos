@@ -6,8 +6,6 @@ services:
       POSTGRES_DB: ${DB_NAME}
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
-    ports:
-      - "${DB_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -33,7 +31,7 @@ services:
       HARDEN_DEFAULT_SEED_USERS: ${HARDEN_DEFAULT_SEED_USERS:-false}
       HARDEN_DEFAULT_SEED_USERS_INCLUDE_ADMIN: ${HARDEN_DEFAULT_SEED_USERS_INCLUDE_ADMIN:-false}
     ports:
-      - "${SERVER_PORT:-8080}:8080"
+      - "127.0.0.1:${SERVER_PORT:-8080}:8080"
     depends_on:
       postgres:
         condition: service_healthy
@@ -44,9 +42,33 @@ services:
       dockerfile: Dockerfile
     container_name: erp-pos-frontend
     ports:
-      - "4200:80"
+      - "127.0.0.1:4200:80"
     depends_on:
       - backend
+
+  storefront:
+    profiles: ["storefront"]
+    build:
+      context: ./storefront
+      dockerfile: Dockerfile
+      args:
+        STOREFRONT_API_BASE_URL: ${STOREFRONT_API_BASE_URL:-http://backend:8080}
+        STOREFRONT_PUBLIC_BASE_URL: ${STOREFRONT_PUBLIC_BASE_URL:-http://localhost:3000}
+        STOREFRONT_INDEXING_ENABLED: ${STOREFRONT_INDEXING_ENABLED:-false}
+        STOREFRONT_IMAGE_ALLOWED_DOMAINS: ${STOREFRONT_IMAGE_ALLOWED_DOMAINS:-cdn-staging.inktoy.pe}
+    container_name: erp-pos-storefront
+    environment:
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+      STOREFRONT_API_BASE_URL: ${STOREFRONT_API_BASE_URL:-http://backend:8080}
+      STOREFRONT_PUBLIC_BASE_URL: ${STOREFRONT_PUBLIC_BASE_URL:-http://localhost:3000}
+      STOREFRONT_INDEXING_ENABLED: ${STOREFRONT_INDEXING_ENABLED:-false}
+      STOREFRONT_IMAGE_ALLOWED_DOMAINS: ${STOREFRONT_IMAGE_ALLOWED_DOMAINS:-cdn-staging.inktoy.pe}
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      backend:
+        condition: service_started
 
 volumes:
   postgres_data:

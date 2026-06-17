@@ -542,4 +542,20 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
 - Recomendacion antes de 2S.9: no iniciar 2S.9 sin validar el render basico de imagen en Storefront local.
 - Ejemplo no sensible actualizado: `storefront/.env.local.example` documenta `STOREFRONT_IMAGE_ALLOWED_DOMAINS=cdn-staging.inktoy.pe` y la necesidad de reiniciar Next.js tras cambiarlo.
 - Proximo paso recomendado: revisar si hace falta un smoke documental corto para Storefront local antes de avanzar a 2S.9.
+
+## Fase 2S.8J Storefront Docker local support
+
+- Fase 2S.8J implementada localmente sin desplegar en Lightsail.
+- Se agrego `storefront/Dockerfile` para Next.js standalone.
+- Se agrego `storefront/.dockerignore` para excluir dependencias, builds, caches y `.env` reales del contexto Docker.
+- `docker-compose.yml` agrega servicio `storefront` con `profiles: ["storefront"]` para evitar que se levante automaticamente con `docker compose up -d` normal.
+- Storefront Docker usa puerto interno 3000 y se expone localmente como `127.0.0.1:3000:3000`.
+- Angular Admin queda en `127.0.0.1:4200:80`.
+- Backend queda ligado a loopback y PostgreSQL queda solo en la red interna Docker para no exponerse publicamente desde host.
+- Storefront dentro de Docker consume backend por red interna: `STOREFRONT_API_BASE_URL=http://backend:8080`.
+- Storefront Docker configura `STOREFRONT_IMAGE_ALLOWED_DOMAINS=cdn-staging.inktoy.pe` y `STOREFRONT_INDEXING_ENABLED=false`.
+- Las variables se pasan como build args y runtime env porque `remotePatterns` se calcula en build y el helper seguro valida en runtime.
+- QA documental creada: `docs/qa/PHASE2S8J_STOREFRONT_DOCKER_LOCAL_QA.md`.
+- Validaciones CLI Docker locales OK: `docker compose config`, `docker compose build storefront`, `docker compose --profile storefront up -d storefront`, `docker compose ps`, logs Storefront, `curl -I http://localhost:3000/` y `curl -I http://localhost:4200/`.
+- Pendiente: validacion manual en navegador para confirmar producto e imagen renderizada desde `cdn-staging.inktoy.pe` y posterior plan separado para Caddy/Lightsail.
 - Proximo paso recomendado: `2S.8H -- Storefront local image render smoke/diagnostic`.
