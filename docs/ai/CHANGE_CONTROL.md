@@ -1119,3 +1119,31 @@ Solo crear tag cuando se cumpla todo:
   - No hay indexacion activa.
   - No se implemento checkout ni pagos.
 - Sin cambios funcionales en backend, frontend, Storefront, Docker, Caddy, AWS, Lightsail, S3, CloudFront, IAM ni `.env` reales.
+
+### Cierre Fase 2S.9C Binary Image Import Local QA
+
+- Tipo: cierre documental de QA local para importacion masiva de imagen principal ecommerce mediante Excel + ZIP.
+- Fases previas:
+  - `e6edb50 feat(ecommerce): add binary primary image import backend` — 2S.9A backend/contracts.
+  - `36156a2 feat(ecommerce-admin): add binary image import UI` — 2S.9B frontend Admin UX.
+- Archivo creado:
+  - `docs/qa/PHASE2S9C_BINARY_IMAGE_IMPORT_LOCAL_QA.md`.
+- Validaciones automaticas:
+  - Backend compile: OK.
+  - Backend tests focalizados: 43/43 OK.
+  - Frontend build: OK.
+  - Navegacion y rutas: OK.
+- Evidencia manual reportada por operador:
+  - La pantalla Importar Excel + ZIP carga correctamente.
+  - El Excel y el ZIP fueron leidos correctamente.
+  - El preview mostro 3 filas validas con advertencias y 0 rechazadas.
+  - Los filtros, detalle de fila, advertencias y resumen funcionan.
+  - Al confirmar en local, las filas no se aplicaron porque el storage ecommerce no esta configurado.
+  - Mensaje observado: `Ecommerce image storage is not configured.`
+  - Resultado seguro: no se subieron imagenes ni se modificaron datos.
+  - La pantalla Importar imagenes por URL sigue disponible.
+  - La pantalla Importar perfiles sigue disponible.
+- Resultado: PASS local con limitacion.
+- Limitacion aceptada: la confirmacion real con subida a storage queda pendiente para 2S.9D staging smoke.
+- Sin cambios funcionales en backend, frontend, Storefront, Docker, Caddy, AWS, Lightsail, S3, CloudFront, IAM ni `.env` reales.
+

@@ -615,3 +615,26 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
   - No hay indexacion activa.
   - No se implemento checkout ni pagos.
 - Siguiente paso sugerido: mantener 2S.9 bloqueado hasta que exista una decision explicita sobre la siguiente fase de ecommerce.
+
+## Fase 2S.9C Binary Image Import Local QA
+
+- Fase 2S.9C cerrada documentalmente con PASS local con limitacion.
+- Backend compile: OK.
+- Backend tests focalizados: 43/43 OK.
+- Frontend build: OK.
+- Navegacion y rutas: OK.
+- Preview local: OK.
+- Confirmacion local: bloqueada de forma segura por storage no configurado.
+- Evidencia reportada por operador:
+  - La pantalla Importar Excel + ZIP carga correctamente.
+  - El Excel y el ZIP fueron leidos correctamente.
+  - El preview mostro 3 filas validas con advertencias y 0 rechazadas.
+  - Los filtros, detalle de fila, advertencias y resumen funcionan.
+  - Al confirmar en local, las filas no se aplicaron porque el storage ecommerce no esta configurado.
+  - Mensaje observado: `Ecommerce image storage is not configured.`
+  - Resultado seguro: no se subieron imagenes ni se modificaron datos.
+  - La pantalla Importar imagenes por URL sigue disponible.
+  - La pantalla Importar perfiles sigue disponible.
+- Limitacion aceptada: la confirmacion real con subida a storage queda pendiente para 2S.9D staging smoke.
+- Documento QA creado: `docs/qa/PHASE2S9C_BINARY_IMAGE_IMPORT_LOCAL_QA.md`.
+
