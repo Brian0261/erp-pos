@@ -1098,6 +1098,24 @@ Solo crear tag cuando se cumpla todo:
   - Sin Merchant Center, structured data, indexacion, carrito, checkout ni pagos.
   - Sin cambios en Producto ERP, POS, stock, inventario, unidades, costos ni precios ERP.
   - Sin cambios en Caddy, DNS ni exposicion publica del Storefront.
-  - Storefront Next.js staging no desplegado.
-  - 2S.9 Excel + ZIP requiere estrategia DB/S3 y validacion binaria.
-- Documentacion creada: `docs/qa/PHASE2S8F_PRIMARY_IMAGE_URL_IMPORT_QA.md`.
+
+### Cierre Fase 2S.8L Storefront public Caddy staging
+
+- Tipo: cierre documental de Storefront staging publico por HTTPS en host separado, sin tocar codigo funcional.
+- Archivo creado:
+  - `docs/qa/PHASE2S8L_STOREFRONT_PUBLIC_CADDY_STAGING_QA.md`.
+- Evidencia resumida:
+  - DNS resuelve correctamente a `52.205.169.234`.
+  - Caddy validate/reload OK y servicio activo.
+  - Storefront responde `200` en `/`, `/productos` y `/productos/cuaderno-a4` sobre HTTPS publico.
+  - Admin Angular sigue respondiendo `200` en `https://staging.inktoy.pe/`.
+  - `robots.txt` mantiene `Disallow: /`.
+  - Smoke visual publico PASS con producto e imagen importada visibles.
+- Confirmaciones:
+  - Admin no fue afectado.
+  - Indexacion desactivada.
+- Limitaciones:
+  - No es produccion.
+  - No hay indexacion activa.
+  - No se implemento checkout ni pagos.
+- Sin cambios funcionales en backend, frontend, Storefront, Docker, Caddy, AWS, Lightsail, S3, CloudFront, IAM ni `.env` reales.

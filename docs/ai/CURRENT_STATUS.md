@@ -585,3 +585,33 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
 - Limitacion explicita: no se configuro host publico/Caddy para Storefront en esta fase.
 - Recomendacion: tratar Caddy/host publico como fase separada si se decide exponer Storefront staging publicamente.
 - Siguiente paso sugerido: mantener 2S.9 bloqueado hasta definir si se requiere exposicion publica adicional para Storefront staging.
+
+## Fase 2S.8L Storefront public Caddy staging
+
+- Fase 2S.8L cerrada documentalmente con smoke visual PASS en HTTPS publico.
+- Storefront expuesto en `https://storefront-staging.inktoy.pe` sin afectar el Admin Angular existente.
+- Evidencia funcional reportada por el operador:
+  - DNS resuelve a `52.205.169.234`.
+  - Caddy backup creado.
+  - `caddy validate` OK.
+  - `systemctl reload caddy` OK.
+  - Caddy activo.
+  - `https://storefront-staging.inktoy.pe/` HTTP 200.
+  - `https://storefront-staging.inktoy.pe/productos` HTTP 200.
+  - `https://storefront-staging.inktoy.pe/productos/cuaderno-a4` HTTP 200.
+  - `https://staging.inktoy.pe/` HTTP 200.
+  - `robots.txt` con `User-Agent: *` y `Disallow: /`.
+  - Home, catalogo y producto visibles.
+  - Imagen principal importada visible.
+  - Sin fallback de imagen.
+  - Sin error de API.
+  - Sin error de Next/Image.
+  - Admin Angular no afectado.
+- Evidencia de logs:
+  - `docker compose logs storefront --since=5m` sin errores.
+  - `journalctl` de Caddy sin entradas recientes.
+- Limitaciones confirmadas:
+  - No es produccion.
+  - No hay indexacion activa.
+  - No se implemento checkout ni pagos.
+- Siguiente paso sugerido: mantener 2S.9 bloqueado hasta que exista una decision explicita sobre la siguiente fase de ecommerce.
