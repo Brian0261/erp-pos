@@ -49,7 +49,14 @@ const NONE_VALUE = "__NONE__";
             routerLink="/ecommerce-admin/perfiles/imagenes/importar"
             class="ui-button ui-button--secondary"
           >
-            Importar imagenes
+            Importar imagenes por URL
+          </a>
+          <a
+            *ngIf="canManage"
+            routerLink="/ecommerce-admin/perfiles/imagenes/importar-zip"
+            class="ui-button ui-button--secondary"
+          >
+            Importar Excel + ZIP
           </a>
           <button
             type="button"

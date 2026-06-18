@@ -25,6 +25,8 @@ import {
   EcommerceAdminUpsertSeoRequest,
   EcommerceOnlineProfileImportConfirmResponse,
   EcommerceOnlineProfileImportPreviewResponse,
+  EcommercePrimaryImageBinaryImportConfirmResponse,
+  EcommercePrimaryImageBinaryImportPreviewResponse,
   EcommercePrimaryImageUrlImportConfirmResponse,
   EcommercePrimaryImageUrlImportPreviewResponse,
   OnlinePublicationStatus,
@@ -55,6 +57,9 @@ export class EcommerceAdminService {
   private readonly primaryImageUrlImportTemplateEndpoint = `${this.endpoint}/products/online-profiles/primary-images/import/template`;
   private readonly primaryImageUrlImportPreviewEndpoint = `${this.endpoint}/products/online-profiles/primary-images/import/preview`;
   private readonly primaryImageUrlImportConfirmFileEndpoint = `${this.endpoint}/products/online-profiles/primary-images/import/confirm-file`;
+  private readonly primaryImageBinaryImportTemplateEndpoint = `${this.endpoint}/products/online-profiles/primary-images/binary-import/template`;
+  private readonly primaryImageBinaryImportPreviewEndpoint = `${this.endpoint}/products/online-profiles/primary-images/binary-import/preview`;
+  private readonly primaryImageBinaryImportConfirmFileEndpoint = `${this.endpoint}/products/online-profiles/primary-images/binary-import/confirm-file`;
 
   constructor(private readonly http: HttpClient) {}
 
@@ -247,6 +252,38 @@ export class EcommerceAdminService {
     formData.append("file", file);
     return this.http.post<EcommercePrimaryImageUrlImportConfirmResponse>(
       this.primaryImageUrlImportConfirmFileEndpoint,
+      formData,
+    );
+  }
+
+  downloadPrimaryImageBinaryImportTemplate(): Observable<Blob> {
+    return this.http.get(this.primaryImageBinaryImportTemplateEndpoint, {
+      responseType: "blob",
+    });
+  }
+
+  previewPrimaryImageBinaryImport(
+    workbook: File,
+    archive: File,
+  ): Observable<EcommercePrimaryImageBinaryImportPreviewResponse> {
+    const formData = new FormData();
+    formData.append("workbook", workbook);
+    formData.append("archive", archive);
+    return this.http.post<EcommercePrimaryImageBinaryImportPreviewResponse>(
+      this.primaryImageBinaryImportPreviewEndpoint,
+      formData,
+    );
+  }
+
+  confirmPrimaryImageBinaryImportFile(
+    workbook: File,
+    archive: File,
+  ): Observable<EcommercePrimaryImageBinaryImportConfirmResponse> {
+    const formData = new FormData();
+    formData.append("workbook", workbook);
+    formData.append("archive", archive);
+    return this.http.post<EcommercePrimaryImageBinaryImportConfirmResponse>(
+      this.primaryImageBinaryImportConfirmFileEndpoint,
       formData,
     );
   }

@@ -944,9 +944,17 @@ export class LayoutComponent implements OnInit, OnDestroy {
         {
           kind: "link",
           id: "importar-imagenes-online",
-          label: "Importar imagenes",
+          label: "Importar imagenes por URL",
           route: "/ecommerce-admin/perfiles/imagenes/importar",
           icon: "II",
+          allowedRoles: ROLES_ADMIN,
+        },
+        {
+          kind: "link",
+          id: "importar-imagenes-zip-online",
+          label: "Importar Excel + ZIP",
+          route: "/ecommerce-admin/perfiles/imagenes/importar-zip",
+          icon: "IZ",
           allowedRoles: ROLES_ADMIN,
         },
         {

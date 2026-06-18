@@ -57,6 +57,8 @@ export type EcommercePrimaryImageUrlImportAction =
   | "NO_CHANGE"
   | "REJECT";
 
+export type EcommercePrimaryImageBinaryImportAction = EcommercePrimaryImageUrlImportAction;
+
 export interface EcommerceAdminPageResponse<T> {
   items: T[];
   page: number;
@@ -351,4 +353,62 @@ export interface EcommercePrimaryImageUrlImportConfirmResponse {
   rejectedRows: number;
   warningRows: number;
   rows: EcommercePrimaryImageUrlImportConfirmRowResponse[];
+}
+
+export interface EcommercePrimaryImageBinaryImportPreviewRow {
+  rowNumber: number;
+  sku: string | null;
+  productId: number | null;
+  profileId: number | null;
+  productName: string | null;
+  publicationStatus: OnlinePublicationStatus | null;
+  currentAssetUrl: string | null;
+  imageFile: string | null;
+  altText: string | null;
+  source: AssetSource | null;
+  rightsConfirmed: boolean | null;
+  assetType: AssetType | null;
+  displayOrder: number | null;
+  mimeType: string | null;
+  width: number | null;
+  height: number | null;
+  sizeBytes: number | null;
+  checksumSha256: string | null;
+  action: EcommercePrimaryImageBinaryImportAction;
+  valid: boolean;
+  errors: string[];
+  warnings: string[];
+}
+
+export interface EcommercePrimaryImageBinaryImportPreviewResponse {
+  totalRows: number;
+  createRows: number;
+  updateRows: number;
+  unchangedRows: number;
+  rejectedRows: number;
+  warningRows: number;
+  rows: EcommercePrimaryImageBinaryImportPreviewRow[];
+}
+
+export interface EcommercePrimaryImageBinaryImportConfirmRowResponse {
+  rowNumber: number;
+  sku: string | null;
+  productId: number | null;
+  profileId: number | null;
+  action: EcommercePrimaryImageBinaryImportAction;
+  applied: boolean;
+  assetUrl: string | null;
+  storageKey: string | null;
+  errors: string[];
+  warnings: string[];
+}
+
+export interface EcommercePrimaryImageBinaryImportConfirmResponse {
+  totalRows: number;
+  createdRows: number;
+  updatedRows: number;
+  unchangedRows: number;
+  rejectedRows: number;
+  warningRows: number;
+  rows: EcommercePrimaryImageBinaryImportConfirmRowResponse[];
 }
