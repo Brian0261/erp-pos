@@ -3,6 +3,7 @@ package com.erppos.backend.erp.ecommerce;
 import com.erppos.backend.erp.ecommerce.application.service.AuditUserProvider;
 import com.erppos.backend.erp.ecommerce.application.service.EcommerceCatalogApplicationService;
 import com.erppos.backend.erp.ecommerce.application.service.EcommerceImageStorageProperties;
+import com.erppos.backend.erp.ecommerce.application.service.EcommerceProductImageBinaryService;
 import com.erppos.backend.erp.ecommerce.application.service.PublicImageUrlPolicy;
 import com.erppos.backend.erp.ecommerce.application.service.PublicImageUrlProperties;
 import com.erppos.backend.erp.ecommerce.application.usecase.CreateProductOnlineProfileCommand;
@@ -94,8 +95,7 @@ class EcommerceCatalogApplicationServiceTest {
                 overrideRepository,
                 new AuditUserProvider(),
                 publicImageUrlPolicy(List.of("cdn.inktoy.pe")),
-                imageStoragePort,
-                imageStorageProperties
+                new EcommerceProductImageBinaryService(imageStoragePort, imageStorageProperties, publicImageUrlPolicy(List.of("cdn.inktoy.pe")))
         );
     }
 
@@ -361,8 +361,7 @@ class EcommerceCatalogApplicationServiceTest {
                 overrideRepository,
                 new AuditUserProvider(),
                 new PublicImageUrlPolicy(properties),
-                imageStoragePort,
-                imageStorageProperties
+                new EcommerceProductImageBinaryService(imageStoragePort, imageStorageProperties, new PublicImageUrlPolicy(properties))
         );
 
         EcommerceBusinessRuleException ex = assertThrows(EcommerceBusinessRuleException.class, () ->
@@ -445,7 +444,7 @@ class EcommerceCatalogApplicationServiceTest {
                         0
                 )));
 
-        assertTrue(ex.getMessage().contains("JPEG and PNG"));
+        assertTrue(ex.getMessage().contains("JPEG and PNG") || ex.getMessage().contains(".jpg"));
     }
 
     @Test

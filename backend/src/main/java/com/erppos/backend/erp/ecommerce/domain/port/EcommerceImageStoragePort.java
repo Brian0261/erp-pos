@@ -3,6 +3,9 @@ package com.erppos.backend.erp.ecommerce.domain.port;
 public interface EcommerceImageStoragePort {
     StoredEcommerceImage store(EcommerceImageStorageObject object);
 
+    default void delete(String storageKey) {
+    }
+
     record EcommerceImageStorageObject(
             String storageKey,
             byte[] bytes,

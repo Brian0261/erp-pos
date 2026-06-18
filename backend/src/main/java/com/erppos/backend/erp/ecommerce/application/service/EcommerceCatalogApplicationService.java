@@ -35,7 +35,6 @@ import com.erppos.backend.erp.ecommerce.domain.model.ProductOnlineProfile;
 import com.erppos.backend.erp.ecommerce.domain.model.RobotsPolicy;
 import com.erppos.backend.erp.ecommerce.domain.port.EcommerceBrandRepositoryPort;
 import com.erppos.backend.erp.ecommerce.domain.port.EcommerceCatalogProductReadPort;
-import com.erppos.backend.erp.ecommerce.domain.port.EcommerceImageStoragePort;
 import com.erppos.backend.erp.ecommerce.domain.port.EcommerceOnlineCategoryRepositoryPort;
 import com.erppos.backend.erp.ecommerce.domain.port.EcommerceSeoMetadataRepositoryPort;
 import com.erppos.backend.erp.ecommerce.domain.port.OnlinePriceOverrideRepositoryPort;
@@ -46,17 +45,10 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
-import javax.imageio.ImageIO;
-import java.awt.image.BufferedImage;
 import java.math.BigDecimal;
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.text.Normalizer;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -69,10 +61,6 @@ import java.util.stream.Collectors;
 public class EcommerceCatalogApplicationService implements EcommerceCatalogUseCase {
     private static final String PEN_CURRENCY = "PEN";
     private static final int READINESS_TOTAL = 11;
-    private static final long DEFAULT_IMAGE_MAX_SIZE_BYTES = 5L * 1024L * 1024L;
-    private static final int DEFAULT_IMAGE_MAX_DIMENSION = 6000;
-    private static final int CHECKSUM_STORAGE_SUFFIX_LENGTH = 12;
-    private static final Set<String> ALLOWED_UPLOAD_MIME_TYPES = Set.of("image/jpeg", "image/png");
 
     private final ProductOnlineProfileRepositoryPort profileRepositoryPort;
     private final EcommerceCatalogProductReadPort productReadPort;
@@ -83,8 +71,7 @@ public class EcommerceCatalogApplicationService implements EcommerceCatalogUseCa
     private final OnlinePriceOverrideRepositoryPort onlinePriceOverrideRepositoryPort;
     private final AuditUserProvider auditUserProvider;
     private final PublicImageUrlPolicy publicImageUrlPolicy;
-    private final EcommerceImageStoragePort imageStoragePort;
-    private final EcommerceImageStorageProperties imageStorageProperties;
+    private final EcommerceProductImageBinaryService productImageBinaryService;
 
     public EcommerceCatalogApplicationService(
             ProductOnlineProfileRepositoryPort profileRepositoryPort,
@@ -96,8 +83,7 @@ public class EcommerceCatalogApplicationService implements EcommerceCatalogUseCa
             OnlinePriceOverrideRepositoryPort onlinePriceOverrideRepositoryPort,
             AuditUserProvider auditUserProvider,
             PublicImageUrlPolicy publicImageUrlPolicy,
-            EcommerceImageStoragePort imageStoragePort,
-            EcommerceImageStorageProperties imageStorageProperties
+            EcommerceProductImageBinaryService productImageBinaryService
     ) {
         this.profileRepositoryPort = profileRepositoryPort;
         this.productReadPort = productReadPort;
@@ -108,8 +94,7 @@ public class EcommerceCatalogApplicationService implements EcommerceCatalogUseCa
         this.onlinePriceOverrideRepositoryPort = onlinePriceOverrideRepositoryPort;
         this.auditUserProvider = auditUserProvider;
         this.publicImageUrlPolicy = publicImageUrlPolicy;
-        this.imageStoragePort = imageStoragePort;
-        this.imageStorageProperties = imageStorageProperties;
+        this.productImageBinaryService = productImageBinaryService;
     }
 
     @Override
@@ -627,31 +612,13 @@ public class EcommerceCatalogApplicationService implements EcommerceCatalogUseCa
     public ProductAsset uploadPrimaryProductAsset(UploadPrimaryProductAssetCommand command) {
         ProductOnlineProfile profile = getProfileByProductId(requireProductId(command.productId()));
         EcommerceCatalogProductSnapshot productSnapshot = requireProductSnapshot(profile.productId());
-        ValidatedProductImage image = validateProductImage(command.fileBytes(), command.contentType());
-        String checksumSha256 = sha256Hex(command.fileBytes());
-        String originalFilename = sanitizeOriginalFilename(command.originalFilename());
-        String storageKey = buildStorageKey(profile, productSnapshot, checksumSha256, image.extension());
-
-        validateExpectedPublicImageUrl(storageKey);
-        EcommerceImageStoragePort.StoredEcommerceImage storedImage = imageStoragePort.store(new EcommerceImageStoragePort.EcommerceImageStorageObject(
-                storageKey,
+        EcommerceProductImageBinaryService.StoredProductImage storedImage = productImageBinaryService.store(
+                profile,
+                productSnapshot.name(),
                 command.fileBytes(),
-                image.mimeType(),
-                image.sizeBytes(),
-                checksumSha256,
-                originalFilename
-        ));
-        if (storedImage == null) {
-            throw new EcommerceBusinessRuleException("Image storage did not return a result");
-        }
-        String assetUrl = trimToNull(storedImage.publicUrl());
-        if (assetUrl == null) {
-            throw new EcommerceBusinessRuleException("Image storage did not return a public URL");
-        }
-        PublicImageUrlPolicy.ValidationResult imageUrlValidation = publicImageUrlPolicy.validate(assetUrl);
-        if (!imageUrlValidation.valid()) {
-            throw new EcommerceBusinessRuleException(imageUrlValidation.message());
-        }
+                command.originalFilename(),
+                command.contentType()
+        );
 
         ProductAsset currentPrimary = productAssetRepositoryPort.findPrimaryActiveByProductOnlineProfileId(profile.id()).orElse(null);
         String actor = auditUserProvider.currentUsername();
@@ -659,28 +626,33 @@ public class EcommerceCatalogApplicationService implements EcommerceCatalogUseCa
                 currentPrimary == null ? null : currentPrimary.id(),
                 profile.id(),
                 AssetType.PRODUCT_IMAGE,
-                assetUrl,
+                storedImage.publicUrl(),
                 trimToNull(command.altText()),
                 command.source() == null ? AssetSource.OWN : command.source(),
                 command.rightsConfirmed(),
                 true,
                 true,
                 Math.max(command.displayOrder(), 0),
-                trimToNull(storedImage.provider()),
-                trimToNull(storedImage.bucket()),
-                trimToNull(storedImage.storageKey()),
-                image.mimeType(),
-                image.width(),
-                image.height(),
-                image.sizeBytes(),
-                checksumSha256,
-                originalFilename,
+                storedImage.provider(),
+                storedImage.bucket(),
+                storedImage.storageKey(),
+                storedImage.mimeType(),
+                storedImage.width(),
+                storedImage.height(),
+                storedImage.sizeBytes(),
+                storedImage.checksumSha256(),
+                storedImage.originalFilename(),
                 currentPrimary == null ? null : currentPrimary.createdAt(),
                 currentPrimary == null ? null : currentPrimary.updatedAt(),
                 currentPrimary == null ? actor : currentPrimary.createdBy(),
                 actor
         );
-        return productAssetRepositoryPort.save(asset);
+        try {
+            return productAssetRepositoryPort.save(asset);
+        } catch (RuntimeException ex) {
+            productImageBinaryService.cleanupBestEffort(storedImage.storageKey());
+            throw ex;
+        }
     }
 
     @Override
@@ -1032,213 +1004,6 @@ public class EcommerceCatalogApplicationService implements EcommerceCatalogUseCa
         return trimmed.isEmpty() ? null : trimmed;
     }
 
-    private ValidatedProductImage validateProductImage(byte[] fileBytes, String declaredContentType) {
-        if (fileBytes == null || fileBytes.length == 0) {
-            throw new EcommerceBusinessRuleException("Image file is required");
-        }
-        long maxSizeBytes = configuredMaxImageSizeBytes();
-        if (fileBytes.length > maxSizeBytes) {
-            throw new EcommerceBusinessRuleException("Image file max size is " + maxSizeBytes + " bytes");
-        }
-
-        String declaredMimeType = normalizeMimeType(declaredContentType);
-        if (declaredMimeType != null && !ALLOWED_UPLOAD_MIME_TYPES.contains(declaredMimeType)) {
-            throw new EcommerceBusinessRuleException("Only JPEG and PNG product images are supported");
-        }
-        String detectedMimeType = detectImageMimeType(fileBytes);
-        if (detectedMimeType == null) {
-            throw new EcommerceBusinessRuleException("Only JPEG and PNG product images are supported");
-        }
-        if (declaredMimeType != null && !declaredMimeType.equals(detectedMimeType)) {
-            throw new EcommerceBusinessRuleException("Image content type does not match file content");
-        }
-
-        BufferedImage image;
-        try {
-            image = ImageIO.read(new ByteArrayInputStream(fileBytes));
-        } catch (IOException ex) {
-            throw new EcommerceBusinessRuleException("Image file is invalid");
-        }
-        if (image == null || image.getWidth() <= 0 || image.getHeight() <= 0) {
-            throw new EcommerceBusinessRuleException("Image dimensions could not be read");
-        }
-        int maxWidth = configuredMaxImageWidth();
-        int maxHeight = configuredMaxImageHeight();
-        if (image.getWidth() > maxWidth || image.getHeight() > maxHeight) {
-            throw new EcommerceBusinessRuleException("Image dimensions max are " + maxWidth + "x" + maxHeight + " px");
-        }
-
-        return new ValidatedProductImage(
-                detectedMimeType,
-                extensionForMimeType(detectedMimeType),
-                image.getWidth(),
-                image.getHeight(),
-                fileBytes.length
-        );
-    }
-
-    private String detectImageMimeType(byte[] fileBytes) {
-        if (startsWith(fileBytes, 0xFF, 0xD8, 0xFF)) {
-            return "image/jpeg";
-        }
-        if (startsWith(fileBytes, 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A)) {
-            return "image/png";
-        }
-        return null;
-    }
-
-    private boolean startsWith(byte[] bytes, int... signature) {
-        if (bytes.length < signature.length) {
-            return false;
-        }
-        for (int i = 0; i < signature.length; i++) {
-            if ((bytes[i] & 0xFF) != signature[i]) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private String normalizeMimeType(String contentType) {
-        String value = trimToNull(contentType);
-        if (value == null) {
-            return null;
-        }
-        int semicolonIndex = value.indexOf(';');
-        if (semicolonIndex >= 0) {
-            value = value.substring(0, semicolonIndex);
-        }
-        value = value.trim().toLowerCase(Locale.ROOT);
-        if ("image/jpg".equals(value) || "image/pjpeg".equals(value)) {
-            return "image/jpeg";
-        }
-        if ("image/x-png".equals(value)) {
-            return "image/png";
-        }
-        return value;
-    }
-
-    private String extensionForMimeType(String mimeType) {
-        return "image/png".equals(mimeType) ? "png" : "jpg";
-    }
-
-    private String sha256Hex(byte[] bytes) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            return HexFormat.of().formatHex(digest.digest(bytes));
-        } catch (NoSuchAlgorithmException ex) {
-            throw new IllegalStateException("SHA-256 digest is not available", ex);
-        }
-    }
-
-    private String buildStorageKey(
-            ProductOnlineProfile profile,
-            EcommerceCatalogProductSnapshot productSnapshot,
-            String checksumSha256,
-            String extension
-    ) {
-        String baseSlug = normalizeSlug(firstNonBlank(profile.slug(), profile.onlineName(), productSnapshot.name(), "main"));
-        if (baseSlug == null) {
-            baseSlug = "main";
-        }
-        String checksumSuffix = checksumSha256.substring(0, Math.min(CHECKSUM_STORAGE_SUFFIX_LENGTH, checksumSha256.length()));
-        String key = "ecommerce/products/%d/profiles/%d/main/%s-%s.%s".formatted(
-                profile.productId(),
-                profile.id(),
-                baseSlug,
-                checksumSuffix,
-                extension
-        );
-        String prefix = normalizeStoragePrefix(imageStorageProperties.getPrefix());
-        return prefix == null ? key : prefix + "/" + key;
-    }
-
-    private String firstNonBlank(String... values) {
-        for (String value : values) {
-            String normalized = trimToNull(value);
-            if (normalized != null) {
-                return normalized;
-            }
-        }
-        return null;
-    }
-
-    private String normalizeStoragePrefix(String prefix) {
-        String normalized = trimToNull(prefix);
-        if (normalized == null) {
-            return null;
-        }
-        normalized = normalized.replace('\\', '/');
-        while (normalized.startsWith("/")) {
-            normalized = normalized.substring(1);
-        }
-        while (normalized.endsWith("/")) {
-            normalized = normalized.substring(0, normalized.length() - 1);
-        }
-        if (normalized.isBlank()) {
-            return null;
-        }
-        if (normalized.contains("..") || normalized.contains("//") || !normalized.matches("[A-Za-z0-9/_-]+")) {
-            throw new EcommerceBusinessRuleException("ECOMMERCE_IMAGE_S3_PREFIX is invalid");
-        }
-        return normalized;
-    }
-
-    private String sanitizeOriginalFilename(String originalFilename) {
-        String value = trimToNull(originalFilename);
-        if (value == null) {
-            return null;
-        }
-        value = value.replace('\\', '/');
-        int slashIndex = value.lastIndexOf('/');
-        if (slashIndex >= 0) {
-            value = value.substring(slashIndex + 1);
-        }
-        value = value.replaceAll("\\p{Cntrl}", "").trim();
-        if (value.length() > 255) {
-            value = value.substring(0, 255);
-        }
-        return trimToNull(value);
-    }
-
-    private void validateExpectedPublicImageUrl(String storageKey) {
-        String publicBaseUrl = trimToNull(imageStorageProperties.getPublicBaseUrl());
-        if (publicBaseUrl == null) {
-            return;
-        }
-        String expectedUrl = buildPublicUrl(publicBaseUrl, storageKey);
-        PublicImageUrlPolicy.ValidationResult validation = publicImageUrlPolicy.validate(expectedUrl);
-        if (!validation.valid()) {
-            throw new EcommerceBusinessRuleException(validation.message());
-        }
-    }
-
-    private String buildPublicUrl(String publicBaseUrl, String storageKey) {
-        String base = trimToNull(publicBaseUrl);
-        if (base == null) {
-            return storageKey;
-        }
-        while (base.endsWith("/")) {
-            base = base.substring(0, base.length() - 1);
-        }
-        return base + "/" + storageKey;
-    }
-
-    private long configuredMaxImageSizeBytes() {
-        long configured = imageStorageProperties.getMaxSizeBytes();
-        return configured > 0 ? configured : DEFAULT_IMAGE_MAX_SIZE_BYTES;
-    }
-
-    private int configuredMaxImageWidth() {
-        int configured = imageStorageProperties.getMaxWidth();
-        return configured > 0 ? configured : DEFAULT_IMAGE_MAX_DIMENSION;
-    }
-
-    private int configuredMaxImageHeight() {
-        int configured = imageStorageProperties.getMaxHeight();
-        return configured > 0 ? configured : DEFAULT_IMAGE_MAX_DIMENSION;
-    }
-
     private List<MissingRequirement> calculateMissingRequirements(
             ProductOnlineProfile profile,
             EcommerceCatalogProductSnapshot productSnapshot,
@@ -1349,8 +1114,5 @@ public class EcommerceCatalogApplicationService implements EcommerceCatalogUseCa
             return ReadinessStatus.INCOMPLETE;
         }
         return ReadinessStatus.NEEDS_ATTENTION;
-    }
-
-    private record ValidatedProductImage(String mimeType, String extension, int width, int height, long sizeBytes) {
     }
 }

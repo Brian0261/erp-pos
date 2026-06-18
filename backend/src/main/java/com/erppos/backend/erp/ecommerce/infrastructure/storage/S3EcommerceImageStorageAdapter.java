@@ -7,6 +7,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 import java.util.HashMap;
@@ -42,6 +43,16 @@ public class S3EcommerceImageStorageAdapter implements EcommerceImageStoragePort
 
         s3Client.putObject(request.build(), RequestBody.fromBytes(object.bytes()));
         return new StoredEcommerceImage("S3", bucket, object.storageKey(), buildPublicUrl(publicBaseUrl, object.storageKey()));
+    }
+
+    @Override
+    public void delete(String storageKey) {
+        String key = trimToNull(storageKey);
+        if (key == null) {
+            return;
+        }
+        String bucket = requireConfigured(properties.getBucket(), "ECOMMERCE_IMAGE_S3_BUCKET is required");
+        s3Client.deleteObject(DeleteObjectRequest.builder().bucket(bucket).key(key).build());
     }
 
     private Map<String, String> buildMetadata(EcommerceImageStorageObject object) {
