@@ -638,3 +638,27 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
 - Limitacion aceptada: la confirmacion real con subida a storage queda pendiente para 2S.9D staging smoke.
 - Documento QA creado: `docs/qa/PHASE2S9C_BINARY_IMAGE_IMPORT_LOCAL_QA.md`.
 
+## Fase 2S.9D Binary Image Import Staging Smoke
+
+- Fase 2S.9D cerrada documentalmente con PASS en staging.
+- HEAD staging: `8ebaa9f docs(ecommerce): close binary image import local QA`.
+- Admin staging responde 200.
+- Storefront staging responde 200.
+- `robots.txt` mantiene `Disallow: /`.
+- docker compose ps muestra backend, frontend, postgres y storefront arriba.
+- git status final limpio: `## master...origin/master`.
+- SKU controlado usado: `CUAD`.
+- Slug validado: `cuaderno-a4`.
+- URL validada: `https://storefront-staging.inktoy.pe/productos/cuaderno-a4`.
+- Excel + ZIP con una sola fila y una imagen PNG valida.
+- Preview valido 1 fila aplicable y 0 rechazadas.
+- Confirmacion real funciono en staging.
+- Se genero `assetUrl`/`storageKey`.
+- La imagen se actualizo correctamente.
+- La nueva imagen ya se visualiza en Storefront staging publico.
+- Logs recientes sin errores criticos.
+- Observacion: se valido previamente que un archivo con formato real incorrecto fue rechazado con el mensaje "Solo se aceptan imagenes JPEG o PNG", validando control por formato real.
+- Riesgos pendientes: objeto S3 anterior puede quedar como orphan, cache CDN/Next/Image puede retrasar visibilidad, no se probo con multiples filas, no se valido WebP.
+- Recomendacion: considerar fase futura para politica unificada de formatos de imagen y limpieza automatica de objetos orphan.
+- Documento QA creado: `docs/qa/PHASE2S9D_BINARY_IMAGE_IMPORT_STAGING_SMOKE_QA.md`.
+
