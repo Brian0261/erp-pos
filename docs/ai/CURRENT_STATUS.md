@@ -662,3 +662,26 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
 - Recomendacion: considerar fase futura para politica unificada de formatos de imagen y limpieza automatica de objetos orphan.
 - Documento QA creado: `docs/qa/PHASE2S9D_BINARY_IMAGE_IMPORT_STAGING_SMOKE_QA.md`.
 
+## Fase 2S.10A Image Policy Plan
+
+- Fase 2S.10A cerrada documentalmente en Plan Mode.
+- No se implemento codigo ni cambios de infraestructura.
+- Se definio politica unificada de imagenes ecommerce para fases futuras.
+- Formatos actuales: JPEG/PNG.
+- Formatos recomendados para 2S.10B: JPEG/PNG/WebP con validacion real, sin conversion.
+- Riesgo tecnico principal: WebP requiere validacion real de dimensiones; ImageIO estandar no lo soporta de forma confiable.
+- Orden de ejecucion recomendado:
+  1. 2S.10B: aceptar WebP con validacion real, sin conversion.
+  2. 2S.10C: conservar original y generar derivados WebP.
+  3. 2S.10D: responsive images, AVIF y estrategia avanzada de cache.
+  4. Fase posterior: limpieza segura de objetos orphan S3.
+- Decisiones clave:
+  - No descargar imagenes remotas en URL import.
+  - No convertir imagenes en 2S.10B.
+  - Dejar derivados WebP para 2S.10C.
+  - Dejar AVIF/responsive/cache avanzada para 2S.10D.
+- Documentos creados:
+  - `docs/ecommerce/ECOMMERCE_IMAGE_POLICY.md`
+  - `docs/qa/PHASE2S10A_IMAGE_POLICY_PLAN_QA.md`
+- Siguiente fase recomendada: 2S.10B Plan Mode antes de Build.
+

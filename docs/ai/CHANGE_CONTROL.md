@@ -1179,3 +1179,40 @@ Solo crear tag cuando se cumpla todo:
 - Recomendacion: considerar fase futura para politica unificada de formatos de imagen y limpieza automatica de objetos orphan.
 - Sin cambios funcionales en backend, frontend, Storefront, Docker, Caddy, AWS, Lightsail, S3, CloudFront, IAM ni `.env` reales.
 
+### Cierre Fase 2S.10A Image Policy Plan
+
+- Tipo: plan documental de politica unificada de imagenes ecommerce.
+- Fase ejecutada en Plan Mode (solo lectura).
+- Fases previas:
+  - `e6edb50 feat(ecommerce): add binary primary image import backend` — 2S.9A backend/contracts.
+  - `36156a2 feat(ecommerce-admin): add binary image import UI` — 2S.9B frontend Admin UX.
+  - `8ebaa9f docs(ecommerce): close binary image import local QA` — 2S.9C QA local.
+  - `153adda docs(ecommerce): close binary image import staging smoke` — 2S.9D staging smoke.
+- Archivos creados:
+  - `docs/ecommerce/ECOMMERCE_IMAGE_POLICY.md`
+  - `docs/qa/PHASE2S10A_IMAGE_POLICY_PLAN_QA.md`
+- Diagnostico actual:
+  - Formatos soportados: JPEG, PNG.
+  - WebP no soportado todavia.
+  - URL import solo valida politica de URL, no descarga imagen remota.
+  - Excel + ZIP valida binario completo antes de preview/confirm.
+  - Storage S3 con metadata completa (mimeType, width, height, sizeBytes, checksumSha256).
+  - Storefront renderiza con next/image y validacion de dominio.
+- Decisiones aprobadas:
+  - 2S.10B: aceptar WebP con validacion real, sin conversion.
+  - 2S.10C: conservar original y generar derivados WebP.
+  - 2S.10D: responsive images, AVIF y estrategia avanzada de cache.
+  - No descargar imagenes remotas en URL import.
+  - No convertir imagenes en 2S.10B.
+- Riesgos identificados:
+  - WebP requiere parser minimo o dependencia explicita (ImageIO estandar no confiable).
+  - Objetos S3 anteriores pueden quedar orphan al reemplazar imagen.
+  - Atomicidad S3/DB: si upload S3 exitoso pero guardado DB falla, cleanup best-effort.
+- Orden de ejecucion recomendado:
+  1. 2S.10B: WebP passthrough con validacion real y smoke staging.
+  2. 2S.10C: derivados WebP conservando original, con decision DB previa.
+  3. 2S.10D: responsive images, AVIF y cache avanzada.
+  4. Fase posterior: limpieza segura de objetos orphan S3.
+- Siguiente fase recomendada: 2S.10B Plan Mode antes de Build.
+- Sin cambios funcionales en backend, frontend, Storefront, Docker, Caddy, AWS, Lightsail, S3, CloudFront, IAM ni `.env` reales.
+
