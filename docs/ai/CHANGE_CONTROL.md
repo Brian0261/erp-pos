@@ -1216,3 +1216,61 @@ Solo crear tag cuando se cumpla todo:
 - Siguiente fase recomendada: 2S.10B Plan Mode antes de Build.
 - Sin cambios funcionales en backend, frontend, Storefront, Docker, Caddy, AWS, Lightsail, S3, CloudFront, IAM ni `.env` reales.
 
+### Cierre Fase 2S.10B WebP Support Build
+
+- Tipo: implementación de soporte WebP en flujos ecommerce de imagen principal.
+- Fase ejecutada en Build Mode tras auditoría APTO PARA COMMIT/PUSH.
+- Fases previas:
+  - `e6edb50 feat(ecommerce): add binary primary image import backend` — 2S.9A backend/contracts.
+  - `36156a2 feat(ecommerce-admin): add binary image import UI` — 2S.9B frontend Admin UX.
+  - `8ebaa9f docs(ecommerce): close binary image import local QA` — 2S.9C QA local.
+  - `153adda docs(ecommerce): close binary image import staging smoke` — 2S.9D staging smoke.
+  - `04a23fa docs(ecommerce): define unified image policy` — 2S.10A Plan Mode.
+- Archivos funcionales modificados:
+  - `backend/src/main/java/com/erppos/backend/erp/ecommerce/application/service/EcommerceProductImageBinaryService.java`
+  - `backend/src/main/java/com/erppos/backend/erp/ecommerce/application/service/EcommercePrimaryImageBinaryImportApplicationService.java`
+  - `backend/src/test/java/com/erppos/backend/erp/ecommerce/EcommerceCatalogApplicationServiceTest.java`
+  - `backend/src/test/java/com/erppos/backend/integration/EcommercePrimaryImageBinaryImportIntegrationTest.java`
+  - `frontend/src/app/features/ecommerce-admin/online-profile-detail-page.component.ts`
+  - `frontend/src/app/features/ecommerce-admin/primary-image-binary-import-page.component.ts`
+- Archivos de documentación creados/actualizados:
+  - `docs/qa/PHASE2S10B_WEBP_LOCAL_QA.md`
+  - `docs/ai/CURRENT_STATUS.md`
+  - `docs/ai/CHANGE_CONTROL.md`
+  - `docs/ecommerce/ECOMMERCE_IMAGE_POLICY.md`
+- Implementación:
+  - Backend acepta `image/webp` junto con `image/jpeg` y `image/png`.
+  - Parser WebP propio para leer dimensiones reales de VP8, VP8L y VP8X.
+  - `ImageIO` se mantiene solo para JPEG/PNG.
+  - WebP genera `storageKey` con extensión `.webp`.
+  - WebP pasa `Content-Type: image/webp` al storage S3.
+  - Admin Angular acepta `image/webp` y actualiza textos.
+- Validaciones de seguridad:
+  - Firma RIFF/WEBP validada.
+  - Chunks leídos con bounds checks y `long` para offsets/tamaños.
+  - Padding par RIFF respetado.
+  - WebP truncado rechazado.
+  - VP8X mal ubicado rechazado.
+  - Dimensiones `<= 0` rechazadas.
+  - Dimensiones máximas respetadas.
+- Correcciones durante auditoría:
+  - Rechazo de cola RIFF truncada.
+  - Rechazo de VP8X mal ubicado.
+- Pruebas ejecutadas:
+  - Backend focalizado: 40 tests PASS.
+  - Backend completo: 407 tests PASS.
+  - Frontend build: PASS.
+  - `git diff --check`: sin errores, solo warnings CRLF.
+- Restricciones cumplidas:
+  - No se tocó Storefront.
+  - No se cambió contrato público Storefront.
+  - No se tocó `docker-compose.yml`, Dockerfile, `.env`.
+  - No se crearon migraciones.
+  - No se tocó Caddy, DNS, AWS, S3, CloudFront, IAM ni secretos.
+  - No hubo deploy.
+  - No se implementaron derivados WebP, conversión, AVIF ni responsive images.
+- Riesgos residuales:
+  - Parser valida contenedor, chunks y dimensiones, pero no decodifica pixeles completos WebP.
+  - Falta staging smoke con WebP real servido por CDN/Storefront.
+- Sin cambios funcionales en Storefront, Docker, Caddy, AWS, Lightsail, S3, CloudFront, IAM ni `.env` reales.
+

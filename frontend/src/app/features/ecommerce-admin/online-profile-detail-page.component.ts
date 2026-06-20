@@ -379,7 +379,7 @@ interface DetailTab {
                 <div>
                   <p class="form-group-label">Upload manual</p>
                   <p class="upload-help">
-                    Sube JPEG o PNG. El backend valida MIME real, peso, dimensiones y publica la URL final de CloudFront/S3 configurada.
+                    Sube JPEG, PNG o WebP. El backend valida MIME real, peso, dimensiones y publica la URL final de CloudFront/S3 configurada.
                   </p>
                 </div>
 
@@ -387,7 +387,7 @@ interface DetailTab {
                   <span>Archivo de imagen</span>
                   <input
                     type="file"
-                    accept="image/jpeg,image/png"
+                    accept="image/jpeg,image/png,image/webp"
                     (change)="onAssetFileSelected($event)"
                     [disabled]="!canManage || assetUploading || assetSaving"
                   />

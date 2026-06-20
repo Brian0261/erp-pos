@@ -685,3 +685,24 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
   - `docs/qa/PHASE2S10A_IMAGE_POLICY_PLAN_QA.md`
 - Siguiente fase recomendada: 2S.10B Plan Mode antes de Build.
 
+## Fase 2S.10B WebP Support Build
+
+- Fase 2S.10B cerrada localmente con PASS.
+- Backend acepta WebP junto con JPEG/PNG.
+- Parser WebP propio para VP8, VP8L y VP8X.
+- ImageIO se mantiene solo para JPEG/PNG.
+- WebP genera storageKey .webp y Content-Type image/webp.
+- Admin Angular acepta image/webp y actualiza textos.
+- No se tocó Storefront, Docker, .env, migraciones ni infraestructura.
+- Auditoría final: APTO PARA COMMIT/PUSH.
+- Correcciones durante auditoría:
+  - Rechazo de cola RIFF truncada.
+  - Rechazo de VP8X mal ubicado.
+- Pruebas ejecutadas:
+  - Backend focalizado: 40 tests PASS.
+  - Backend completo: 407 tests PASS.
+  - Frontend build: PASS.
+- Documentos creados:
+  - `docs/qa/PHASE2S10B_WEBP_LOCAL_QA.md`
+- Pendiente: staging smoke con WebP real servido por CDN/Storefront.
+

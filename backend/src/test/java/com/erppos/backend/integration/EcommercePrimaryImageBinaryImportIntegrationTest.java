@@ -17,6 +17,7 @@ import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -34,6 +35,8 @@ import java.util.zip.ZipOutputStream;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasItem;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -174,6 +177,97 @@ class EcommercePrimaryImageBinaryImportIntegrationTest extends AbstractHttpInteg
     }
 
     @Test
+    void previewShouldValidateWebpDimensionsForVp8Vp8lAndVp8x() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = Long.toString(System.nanoTime(), 36);
+        long vp8ProductId = createCatalogProduct(adminToken, suffix + "vp8", BigDecimal.valueOf(10.00));
+        long vp8lProductId = createCatalogProduct(adminToken, suffix + "vp8l", BigDecimal.valueOf(10.00));
+        long vp8xProductId = createCatalogProduct(adminToken, suffix + "vp8x", BigDecimal.valueOf(10.00));
+        createDraftProfile(vp8ProductId);
+        createDraftProfile(vp8lProductId);
+        createDraftProfile(vp8xProductId);
+
+        MockMultipartFile workbook = workbookFile(new String[][]{
+                {productSku(suffix + "vp8"), "images/lossy.webp", "Lossy WebP", "OWN", "true", "", "0", "", "", "", ""},
+                {productSku(suffix + "vp8l"), "images/lossless.webp", "Lossless WebP", "OWN", "true", "", "0", "", "", "", ""},
+                {productSku(suffix + "vp8x"), "images/extended.webp", "Extended WebP", "OWN", "true", "", "0", "", "", "", ""}
+        });
+        MockMultipartFile archive = archiveFile(
+                new ZipItem("images/lossy.webp", webpVp8Bytes(1, 1)),
+                new ZipItem("images/lossless.webp", webpVp8lBytes(1, 1)),
+                new ZipItem("images/extended.webp", webpVp8xBytes(1, 1))
+        );
+
+        mockMvc.perform(multipart("/api/v1/ecommerce-admin/products/online-profiles/primary-images/binary-import/preview")
+                        .file(workbook)
+                        .file(archive)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.createRows").value(3))
+                .andExpect(jsonPath("$.rejectedRows").value(0))
+                .andExpect(jsonPath("$.rows[0].mimeType").value("image/webp"))
+                .andExpect(jsonPath("$.rows[0].width").value(1))
+                .andExpect(jsonPath("$.rows[0].height").value(1))
+                .andExpect(jsonPath("$.rows[1].mimeType").value("image/webp"))
+                .andExpect(jsonPath("$.rows[1].width").value(1))
+                .andExpect(jsonPath("$.rows[1].height").value(1))
+                .andExpect(jsonPath("$.rows[2].mimeType").value("image/webp"))
+                .andExpect(jsonPath("$.rows[2].width").value(1))
+                .andExpect(jsonPath("$.rows[2].height").value(1));
+
+        verify(imageStoragePort, never()).store(any());
+    }
+
+    @Test
+    void confirmFileShouldStoreWebpWithWebpContentTypeAndStorageKey() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = Long.toString(System.nanoTime(), 36);
+        long productId = createCatalogProduct(adminToken, suffix + "webp", BigDecimal.valueOf(12.00));
+        createDraftProfile(productId);
+
+        MockMultipartFile workbook = workbookFile(new String[][]{{
+                productSku(suffix + "webp"),
+                "images/valid.webp",
+                "Imported WebP alt",
+                "SUPPLIER",
+                "true",
+                "",
+                "2",
+                "",
+                "",
+                "",
+                ""
+        }});
+        MockMultipartFile archive = archiveFile(new ZipItem("images/valid.webp", webpVp8Bytes(1, 1)));
+
+        mockMvc.perform(multipart("/api/v1/ecommerce-admin/products/online-profiles/primary-images/binary-import/confirm-file")
+                        .file(workbook)
+                        .file(archive)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.createdRows").value(1))
+                .andExpect(jsonPath("$.rejectedRows").value(0))
+                .andExpect(jsonPath("$.rows[0].applied").value(true))
+                .andExpect(jsonPath("$.rows[0].assetUrl", containsString("https://cdn-staging.inktoy.pe/")))
+                .andExpect(jsonPath("$.rows[0].storageKey", containsString(".webp")));
+
+        ArgumentCaptor<EcommerceImageStoragePort.EcommerceImageStorageObject> storageObject = ArgumentCaptor.forClass(EcommerceImageStoragePort.EcommerceImageStorageObject.class);
+        verify(imageStoragePort).store(storageObject.capture());
+        assertEquals("image/webp", storageObject.getValue().mimeType());
+        assertTrue(storageObject.getValue().storageKey().endsWith(".webp"));
+
+        mockMvc.perform(get("/api/v1/ecommerce-admin/products/{productId}/online-profile", productId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.primaryAsset.assetUrl", containsString("https://cdn-staging.inktoy.pe/")))
+                .andExpect(jsonPath("$.primaryAsset.mimeType").value("image/webp"))
+                .andExpect(jsonPath("$.primaryAsset.width").value(1))
+                .andExpect(jsonPath("$.primaryAsset.height").value(1))
+                .andExpect(jsonPath("$.primaryAsset.storageKey", containsString(".webp")))
+                .andExpect(jsonPath("$.primaryAsset.originalFilename").value("valid.webp"));
+    }
+
+    @Test
     void previewShouldRejectRowLevelValidationErrors() throws Exception {
         String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
         String suffix = Long.toString(System.nanoTime(), 36);
@@ -222,9 +316,67 @@ class EcommercePrimaryImageBinaryImportIntegrationTest extends AbstractHttpInteg
                 .andExpect(jsonPath("$.rows[0].errors", hasItem("imageFile is duplicated in workbook")))
                 .andExpect(jsonPath("$.rows[2].errors", hasItem("imageFile not found in ZIP")))
                 .andExpect(jsonPath("$.rows[3].errors", hasItem("Image extension does not match file content")))
-                .andExpect(jsonPath("$.rows[4].errors", hasItem("Only JPEG and PNG product images are supported")))
+                .andExpect(jsonPath("$.rows[4].errors", hasItem("Only JPEG, PNG and WebP product images are supported")))
                 .andExpect(jsonPath("$.rows[5].errors", hasItem("Image file max size is 1000 bytes")))
                 .andExpect(jsonPath("$.rows[6].errors", hasItem("Image dimensions max are 1x1 px")));
+    }
+
+    @Test
+    void previewShouldRejectInvalidWebpMismatchesUnsupportedFormatsAndOversizedDimensions() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = Long.toString(System.nanoTime(), 36);
+        long falseWebpProductId = createCatalogProduct(adminToken, suffix + "fw", BigDecimal.valueOf(10.00));
+        long webpWithPngProductId = createCatalogProduct(adminToken, suffix + "wp", BigDecimal.valueOf(10.00));
+        long pngWithWebpProductId = createCatalogProduct(adminToken, suffix + "pw", BigDecimal.valueOf(10.00));
+        long jpgWithWebpProductId = createCatalogProduct(adminToken, suffix + "jw", BigDecimal.valueOf(10.00));
+        long gifProductId = createCatalogProduct(adminToken, suffix + "gf", BigDecimal.valueOf(10.00));
+        long avifProductId = createCatalogProduct(adminToken, suffix + "av", BigDecimal.valueOf(10.00));
+        long wideWebpProductId = createCatalogProduct(adminToken, suffix + "ww", BigDecimal.valueOf(10.00));
+        long truncatedWebpProductId = createCatalogProduct(adminToken, suffix + "tr", BigDecimal.valueOf(10.00));
+        createDraftProfile(falseWebpProductId);
+        createDraftProfile(webpWithPngProductId);
+        createDraftProfile(pngWithWebpProductId);
+        createDraftProfile(jpgWithWebpProductId);
+        createDraftProfile(gifProductId);
+        createDraftProfile(avifProductId);
+        createDraftProfile(wideWebpProductId);
+        createDraftProfile(truncatedWebpProductId);
+
+        MockMultipartFile workbook = workbookFile(new String[][]{
+                {productSku(suffix + "fw"), "images/not-webp.webp", "Alt", "OWN", "true", "", "0", "", "", "", ""},
+                {productSku(suffix + "wp"), "images/png-content.webp", "Alt", "OWN", "true", "", "0", "", "", "", ""},
+                {productSku(suffix + "pw"), "images/webp-content.png", "Alt", "OWN", "true", "", "0", "", "", "", ""},
+                {productSku(suffix + "jw"), "images/webp-content.jpg", "Alt", "OWN", "true", "", "0", "", "", "", ""},
+                {productSku(suffix + "gf"), "images/animated.gif", "Alt", "OWN", "true", "", "0", "", "", "", ""},
+                {productSku(suffix + "av"), "images/picture.avif", "Alt", "OWN", "true", "", "0", "", "", "", ""},
+                {productSku(suffix + "ww"), "images/too-wide.webp", "Alt", "OWN", "true", "", "0", "", "", "", ""},
+                {productSku(suffix + "tr"), "images/truncated.webp", "Alt", "OWN", "true", "", "0", "", "", "", ""}
+        });
+        MockMultipartFile archive = archiveFile(
+                new ZipItem("images/not-webp.webp", new byte[]{1, 2, 3, 4}),
+                new ZipItem("images/png-content.webp", pngBytes(1, 1)),
+                new ZipItem("images/webp-content.png", webpVp8Bytes(1, 1)),
+                new ZipItem("images/webp-content.jpg", webpVp8Bytes(1, 1)),
+                new ZipItem("images/animated.gif", gifBytes()),
+                new ZipItem("images/picture.avif", avifBytes()),
+                new ZipItem("images/too-wide.webp", webpVp8xBytes(2, 1)),
+                new ZipItem("images/truncated.webp", truncatedWebpAfterImageChunkBytes())
+        );
+
+        mockMvc.perform(multipart("/api/v1/ecommerce-admin/products/online-profiles/primary-images/binary-import/preview")
+                        .file(workbook)
+                .file(archive)
+                .header(HttpHeaders.AUTHORIZATION, bearer(adminToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.rejectedRows").value(8))
+                .andExpect(jsonPath("$.rows[0].errors", hasItem("Only JPEG, PNG and WebP product images are supported")))
+                .andExpect(jsonPath("$.rows[1].errors", hasItem("Image extension does not match file content")))
+                .andExpect(jsonPath("$.rows[2].errors", hasItem("Image extension does not match file content")))
+                .andExpect(jsonPath("$.rows[3].errors", hasItem("Image extension does not match file content")))
+                .andExpect(jsonPath("$.rows[4].errors", hasItem("Only .jpg, .jpeg, .png and .webp image files are supported")))
+                .andExpect(jsonPath("$.rows[5].errors", hasItem("Only .jpg, .jpeg, .png and .webp image files are supported")))
+                .andExpect(jsonPath("$.rows[6].errors", hasItem("Image dimensions max are 1x1 px")))
+                .andExpect(jsonPath("$.rows[7].errors", hasItem("Image file is invalid")));
     }
 
     @Test
@@ -360,6 +512,101 @@ class EcommercePrimaryImageBinaryImportIntegrationTest extends AbstractHttpInteg
         return imageBytes(width, height, "jpg");
     }
 
+    private byte[] webpVp8Bytes(int width, int height) {
+        byte[] data = new byte[10];
+        data[3] = (byte) 0x9D;
+        data[4] = 0x01;
+        data[5] = 0x2A;
+        writeShortLittleEndian(data, 6, width);
+        writeShortLittleEndian(data, 8, height);
+        return riffWebpChunk("VP8 ", data);
+    }
+
+    private byte[] webpVp8lBytes(int width, int height) {
+        return riffWebpChunk("VP8L", webpVp8lData(width, height));
+    }
+
+    private byte[] webpVp8lData(int width, int height) {
+        int packedDimensions = ((height - 1) << 14) | (width - 1);
+        byte[] data = new byte[5];
+        data[0] = 0x2F;
+        writeIntLittleEndian(data, 1, packedDimensions);
+        return data;
+    }
+
+    private byte[] webpVp8xBytes(int width, int height) {
+        byte[] data = new byte[10];
+        write24LittleEndian(data, 4, width - 1);
+        write24LittleEndian(data, 7, height - 1);
+        return riffWebpChunks(new WebpChunk("VP8X", data), new WebpChunk("VP8L", webpVp8lData(width, height)));
+    }
+
+    private byte[] riffWebpChunk(String fourCc, byte[] data) {
+        return riffWebpChunks(new WebpChunk(fourCc, data));
+    }
+
+    private byte[] riffWebpChunks(WebpChunk... chunks) {
+        int chunksSize = 0;
+        for (WebpChunk chunk : chunks) {
+            chunksSize += 8 + chunk.data().length + (chunk.data().length % 2);
+        }
+        int riffSize = 4 + chunksSize;
+        byte[] bytes = new byte[8 + riffSize];
+        writeFourCc(bytes, 0, "RIFF");
+        writeIntLittleEndian(bytes, 4, riffSize);
+        writeFourCc(bytes, 8, "WEBP");
+        int offset = 12;
+        for (WebpChunk chunk : chunks) {
+            writeFourCc(bytes, offset, chunk.fourCc());
+            writeIntLittleEndian(bytes, offset + 4, chunk.data().length);
+            System.arraycopy(chunk.data(), 0, bytes, offset + 8, chunk.data().length);
+            offset += 8 + chunk.data().length + (chunk.data().length % 2);
+        }
+        return bytes;
+    }
+
+    private void writeFourCc(byte[] bytes, int offset, String value) {
+        for (int index = 0; index < value.length(); index++) {
+            bytes[offset + index] = (byte) value.charAt(index);
+        }
+    }
+
+    private void writeIntLittleEndian(byte[] bytes, int offset, int value) {
+        bytes[offset] = (byte) value;
+        bytes[offset + 1] = (byte) (value >> 8);
+        bytes[offset + 2] = (byte) (value >> 16);
+        bytes[offset + 3] = (byte) (value >> 24);
+    }
+
+    private void writeShortLittleEndian(byte[] bytes, int offset, int value) {
+        bytes[offset] = (byte) value;
+        bytes[offset + 1] = (byte) (value >> 8);
+    }
+
+    private void write24LittleEndian(byte[] bytes, int offset, int value) {
+        bytes[offset] = (byte) value;
+        bytes[offset + 1] = (byte) (value >> 8);
+        bytes[offset + 2] = (byte) (value >> 16);
+    }
+
+    private byte[] gifBytes() {
+        return new byte[]{'G', 'I', 'F', '8', '9', 'a', 1, 0, 1, 0};
+    }
+
+    private byte[] avifBytes() {
+        return new byte[]{0, 0, 0, 24, 'f', 't', 'y', 'p', 'a', 'v', 'i', 'f'};
+    }
+
+    private byte[] truncatedWebpAfterImageChunkBytes() {
+        byte[] bytes = java.util.Arrays.copyOf(webpVp8Bytes(1, 1), 34);
+        writeIntLittleEndian(bytes, 4, 26);
+        bytes[30] = 'B';
+        bytes[31] = 'A';
+        bytes[32] = 'D';
+        bytes[33] = '!';
+        return bytes;
+    }
+
     private byte[] imageBytes(int width, int height, String format) throws Exception {
         BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
         try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
@@ -443,5 +690,8 @@ class EcommercePrimaryImageBinaryImportIntegrationTest extends AbstractHttpInteg
     }
 
     private record ZipItem(String name, byte[] bytes) {
+    }
+
+    private record WebpChunk(String fourCc, byte[] data) {
     }
 }

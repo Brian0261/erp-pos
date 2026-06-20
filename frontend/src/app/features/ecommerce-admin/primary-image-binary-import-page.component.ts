@@ -1139,7 +1139,7 @@ export class PrimaryImageBinaryImportPageComponent {
       "imageFile is required": "imageFile es obligatorio.",
       "imageFile is duplicated in file": "imageFile está duplicado en el Excel.",
       "Image file not found in ZIP": "La imagen indicada no existe en el ZIP.",
-      "Only JPEG and PNG product images are supported": "Solo se aceptan imágenes JPEG o PNG.",
+      "Only JPEG, PNG and WebP product images are supported": "Solo se aceptan imágenes JPEG, PNG o WebP.",
       "Image extension does not match file content": "La extensión no coincide con el contenido real del archivo.",
       "altText is required": "El texto alternativo es obligatorio.",
       "altText max length is 180": "El texto alternativo supera el máximo de 180 caracteres.",

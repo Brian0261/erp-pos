@@ -428,6 +428,57 @@ class EcommerceCatalogApplicationServiceTest {
     }
 
     @Test
+    void shouldUploadWebpPrimaryProductImageAndStoreMetadata() {
+        PreparedData data = prepareBaseDraftProfile();
+        byte[] imageBytes = webpVp8xBytes(2, 3);
+
+        ProductAsset asset = service.uploadPrimaryProductAsset(new UploadPrimaryProductAssetCommand(
+                data.productId(),
+                imageBytes,
+                "lapicero-azul.webp",
+                "image/webp",
+                "Lapicero azul",
+                AssetSource.OWN,
+                true,
+                4
+        ));
+
+        assertEquals("S3", asset.storageProvider());
+        assertEquals("inktoy-test-bucket", asset.storageBucket());
+        assertEquals("image/webp", asset.mimeType());
+        assertEquals(2, asset.width());
+        assertEquals(3, asset.height());
+        assertEquals(imageBytes.length, asset.sizeBytes());
+        assertEquals(64, asset.checksumSha256().length());
+        assertEquals("lapicero-azul.webp", asset.originalFilename());
+        assertTrue(asset.storageKey().startsWith("inktoy-dev/ecommerce/products/"));
+        assertTrue(asset.storageKey().endsWith(".webp"));
+        assertTrue(asset.assetUrl().startsWith("https://cdn.inktoy.pe/inktoy-dev/ecommerce/products/"));
+        assertEquals("image/webp", imageStoragePort.lastObject().mimeType());
+        assertEquals(imageBytes.length, imageStoragePort.lastObject().sizeBytes());
+    }
+
+    @Test
+    void shouldRejectWebpProductImageUploadWithIncorrectDeclaredMimeType() {
+        PreparedData data = prepareBaseDraftProfile();
+        byte[] imageBytes = webpVp8Bytes(2, 3);
+
+        EcommerceBusinessRuleException ex = assertThrows(EcommerceBusinessRuleException.class, () ->
+                service.uploadPrimaryProductAsset(new UploadPrimaryProductAssetCommand(
+                        data.productId(),
+                        imageBytes,
+                        "product.webp",
+                        "image/png",
+                        "WebP",
+                        AssetSource.OWN,
+                        true,
+                        0
+                )));
+
+        assertEquals("Image content type does not match file content", ex.getMessage());
+    }
+
+    @Test
     void shouldRejectSvgProductImageUpload() {
         PreparedData data = prepareBaseDraftProfile();
         byte[] svgBytes = "<svg xmlns=\"http://www.w3.org/2000/svg\"></svg>".getBytes(java.nio.charset.StandardCharsets.UTF_8);
@@ -444,7 +495,7 @@ class EcommerceCatalogApplicationServiceTest {
                         0
                 )));
 
-        assertTrue(ex.getMessage().contains("JPEG and PNG") || ex.getMessage().contains(".jpg"));
+        assertTrue(ex.getMessage().contains("JPEG, PNG and WebP") || ex.getMessage().contains(".jpg"));
     }
 
     @Test
@@ -652,7 +703,83 @@ class EcommerceCatalogApplicationServiceTest {
         return output.toByteArray();
     }
 
+    private byte[] webpVp8Bytes(int width, int height) {
+        byte[] data = new byte[10];
+        data[3] = (byte) 0x9D;
+        data[4] = 0x01;
+        data[5] = 0x2A;
+        writeShortLittleEndian(data, 6, width);
+        writeShortLittleEndian(data, 8, height);
+        return riffWebpChunk("VP8 ", data);
+    }
+
+    private byte[] webpVp8lData(int width, int height) {
+        int packedDimensions = ((height - 1) << 14) | (width - 1);
+        byte[] data = new byte[5];
+        data[0] = 0x2F;
+        writeIntLittleEndian(data, 1, packedDimensions);
+        return data;
+    }
+
+    private byte[] webpVp8xBytes(int width, int height) {
+        byte[] data = new byte[10];
+        write24LittleEndian(data, 4, width - 1);
+        write24LittleEndian(data, 7, height - 1);
+        return riffWebpChunks(new WebpChunk("VP8X", data), new WebpChunk("VP8L", webpVp8lData(width, height)));
+    }
+
+    private byte[] riffWebpChunk(String fourCc, byte[] data) {
+        return riffWebpChunks(new WebpChunk(fourCc, data));
+    }
+
+    private byte[] riffWebpChunks(WebpChunk... chunks) {
+        int chunksSize = 0;
+        for (WebpChunk chunk : chunks) {
+            chunksSize += 8 + chunk.data().length + (chunk.data().length % 2);
+        }
+        int riffSize = 4 + chunksSize;
+        byte[] bytes = new byte[8 + riffSize];
+        writeFourCc(bytes, 0, "RIFF");
+        writeIntLittleEndian(bytes, 4, riffSize);
+        writeFourCc(bytes, 8, "WEBP");
+        int offset = 12;
+        for (WebpChunk chunk : chunks) {
+            writeFourCc(bytes, offset, chunk.fourCc());
+            writeIntLittleEndian(bytes, offset + 4, chunk.data().length);
+            System.arraycopy(chunk.data(), 0, bytes, offset + 8, chunk.data().length);
+            offset += 8 + chunk.data().length + (chunk.data().length % 2);
+        }
+        return bytes;
+    }
+
+    private void writeFourCc(byte[] bytes, int offset, String value) {
+        for (int index = 0; index < value.length(); index++) {
+            bytes[offset + index] = (byte) value.charAt(index);
+        }
+    }
+
+    private void writeIntLittleEndian(byte[] bytes, int offset, int value) {
+        bytes[offset] = (byte) value;
+        bytes[offset + 1] = (byte) (value >> 8);
+        bytes[offset + 2] = (byte) (value >> 16);
+        bytes[offset + 3] = (byte) (value >> 24);
+    }
+
+    private void writeShortLittleEndian(byte[] bytes, int offset, int value) {
+        bytes[offset] = (byte) value;
+        bytes[offset + 1] = (byte) (value >> 8);
+    }
+
+    private void write24LittleEndian(byte[] bytes, int offset, int value) {
+        bytes[offset] = (byte) value;
+        bytes[offset + 1] = (byte) (value >> 8);
+        bytes[offset + 2] = (byte) (value >> 16);
+    }
+
     private record PreparedData(Long productId, Long brandId, Long categoryId) {
+    }
+
+    private record WebpChunk(String fourCc, byte[] data) {
     }
 
     private static final class InMemoryProductReadPort implements EcommerceCatalogProductReadPort {

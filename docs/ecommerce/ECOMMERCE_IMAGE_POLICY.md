@@ -5,16 +5,21 @@
 ### Formatos Soportados
 - **JPEG** (`.jpg`, `.jpeg`)
 - **PNG** (`.png`)
-- **WebP**: No soportado todavía (pendiente 2S.10B)
+- **WebP** (`.webp`) — implementado en 2S.10B
 
 ### Validación Actual
-- **Firma binaria**: JPEG (`FF D8 FF`), PNG (`89 50 4E 47 0D 0A 1A 0A`)
+- **Firma binaria**:
+  - JPEG: `FF D8 FF`
+  - PNG: `89 50 4E 47 0D 0A 1A 0A`
+  - WebP: `RIFF....WEBP` (4 bytes RIFF, 4 bytes tamaño, 4 bytes WEBP)
 - **Extensión**: Debe coincidir con contenido real
 - **MIME declarado**: Si existe, debe coincidir con contenido detectado
 - **Peso máximo**: Configurable via `ECOMMERCE_IMAGE_MAX_SIZE_BYTES` (default: 5 MiB)
 - **Dimensiones máximas**: Configurable via `ECOMMERCE_IMAGE_MAX_WIDTH/HEIGHT` (default: 6000x6000)
 - **Checksum**: SHA-256 obligatorio para uploads/storage
-- **Dimensiones reales**: Lectura via `ImageIO.read()` (solo JPEG/PNG)
+- **Dimensiones reales**:
+  - JPEG/PNG: Lectura via `ImageIO.read()`
+  - WebP: Parser propio para VP8, VP8L y VP8X
 
 ### Diferencia entre URL Import y Excel + ZIP
 
@@ -59,17 +64,18 @@
 
 ## Política Recomendada
 
-### 2S.10B: Aceptar WebP (Próxima Fase)
+### 2S.10B: Aceptar WebP (Implementado)
 - **Objetivo**: Aceptar JPEG/PNG/WebP con validación real, sin conversión
+- **Estado**: Implementado localmente en 2S.10B
 - **Formatos**: JPEG, PNG, WebP
 - **Validación**: Firma binaria + extensión + MIME declarado + peso + dimensiones + checksum
 - **WebP firma**: `RIFF....WEBP` (4 bytes RIFF, 4 bytes tamaño, 4 bytes WEBP)
-- **Dimensiones WebP**: Requiere parser WebP mínimo o dependencia explícita (ImageIO estándar no confiable)
+- **Dimensiones WebP**: Parser propio para VP8, VP8L y VP8X (ImageIO estándar no confiable)
 - **Content-Type**: `image/webp` para WebP
 - **storageKey**: Extensión `.webp` para WebP
 - **No convertir**: Mantener formato original del proveedor
 - **DB**: No requiere cambio (solo `mimeType=image/webp` y `storageKey` `.webp`)
-- **Storefront**: Probablemente no requiere cambio si `next/image` acepta WebP y dominio está allowlisted
+- **Storefront**: No requiere cambio; `next/image` acepta WebP y dominio está allowlisted
 
 ### 2S.10C: Derivados WebP (Fase Posterior)
 - **Objetivo**: Conservar original y generar derivado WebP optimizado

@@ -21,7 +21,8 @@ public class EcommerceProductImageBinaryService {
     private static final long DEFAULT_IMAGE_MAX_SIZE_BYTES = 5L * 1024L * 1024L;
     private static final int DEFAULT_IMAGE_MAX_DIMENSION = 6000;
     private static final int CHECKSUM_STORAGE_SUFFIX_LENGTH = 12;
-    private static final Set<String> ALLOWED_UPLOAD_MIME_TYPES = Set.of("image/jpeg", "image/png");
+    private static final String SUPPORTED_IMAGE_TYPES_MESSAGE = "Only JPEG, PNG and WebP product images are supported";
+    private static final Set<String> ALLOWED_UPLOAD_MIME_TYPES = Set.of("image/jpeg", "image/png", "image/webp");
 
     private final EcommerceImageStoragePort imageStoragePort;
     private final EcommerceImageStorageProperties imageStorageProperties;
@@ -48,16 +49,16 @@ public class EcommerceProductImageBinaryService {
 
         String extension = extensionFromFilename(originalFilename);
         if (extension == null) {
-            throw new EcommerceBusinessRuleException("Only .jpg, .jpeg and .png image files are supported");
+            throw new EcommerceBusinessRuleException("Only .jpg, .jpeg, .png and .webp image files are supported");
         }
 
         String declaredMimeType = normalizeMimeType(declaredContentType);
         if (declaredMimeType != null && !ALLOWED_UPLOAD_MIME_TYPES.contains(declaredMimeType)) {
-            throw new EcommerceBusinessRuleException("Only JPEG and PNG product images are supported");
+            throw new EcommerceBusinessRuleException(SUPPORTED_IMAGE_TYPES_MESSAGE);
         }
         String detectedMimeType = detectImageMimeType(fileBytes);
         if (detectedMimeType == null) {
-            throw new EcommerceBusinessRuleException("Only JPEG and PNG product images are supported");
+            throw new EcommerceBusinessRuleException(SUPPORTED_IMAGE_TYPES_MESSAGE);
         }
         if (declaredMimeType != null && !declaredMimeType.equals(detectedMimeType)) {
             throw new EcommerceBusinessRuleException("Image content type does not match file content");
@@ -66,26 +67,18 @@ public class EcommerceProductImageBinaryService {
             throw new EcommerceBusinessRuleException("Image extension does not match file content");
         }
 
-        BufferedImage image;
-        try {
-            image = ImageIO.read(new ByteArrayInputStream(fileBytes));
-        } catch (IOException ex) {
-            throw new EcommerceBusinessRuleException("Image file is invalid");
-        }
-        if (image == null || image.getWidth() <= 0 || image.getHeight() <= 0) {
-            throw new EcommerceBusinessRuleException("Image dimensions could not be read");
-        }
+        ImageDimensions dimensions = readImageDimensions(fileBytes, detectedMimeType);
         int maxWidth = configuredMaxImageWidth();
         int maxHeight = configuredMaxImageHeight();
-        if (image.getWidth() > maxWidth || image.getHeight() > maxHeight) {
+        if (dimensions.width() > maxWidth || dimensions.height() > maxHeight) {
             throw new EcommerceBusinessRuleException("Image dimensions max are " + maxWidth + "x" + maxHeight + " px");
         }
 
         return new ValidatedProductImage(
                 detectedMimeType,
                 extension,
-                image.getWidth(),
-                image.getHeight(),
+                dimensions.width(),
+                dimensions.height(),
                 fileBytes.length,
                 sha256Hex(fileBytes),
                 sanitizeOriginalFilename(originalFilename)
@@ -152,19 +145,162 @@ public class EcommerceProductImageBinaryService {
         if (startsWith(fileBytes, 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A)) {
             return "image/png";
         }
+        if (isWebpContainer(fileBytes)) {
+            return "image/webp";
+        }
         return null;
     }
 
+    private ImageDimensions readImageDimensions(byte[] fileBytes, String mimeType) {
+        if ("image/webp".equals(mimeType)) {
+            return readWebpDimensions(fileBytes);
+        }
+        return readImageIoDimensions(fileBytes);
+    }
+
+    private ImageDimensions readImageIoDimensions(byte[] fileBytes) {
+        BufferedImage image;
+        try {
+            image = ImageIO.read(new ByteArrayInputStream(fileBytes));
+        } catch (IOException ex) {
+            throw new EcommerceBusinessRuleException("Image file is invalid");
+        }
+        if (image == null || image.getWidth() <= 0 || image.getHeight() <= 0) {
+            throw new EcommerceBusinessRuleException("Image dimensions could not be read");
+        }
+        return new ImageDimensions(image.getWidth(), image.getHeight());
+    }
+
+    private ImageDimensions readWebpDimensions(byte[] fileBytes) {
+        if (!isWebpContainer(fileBytes)) {
+            throw new EcommerceBusinessRuleException("Image file is invalid");
+        }
+        long riffSize = readUnsignedInt32LittleEndian(fileBytes, 4);
+        long riffEnd = 8L + riffSize;
+        if (riffEnd < 12L || riffEnd > fileBytes.length) {
+            throw new EcommerceBusinessRuleException("Image file is invalid");
+        }
+
+        int offset = 12;
+        int limit = (int) riffEnd;
+        ImageDimensions extendedCanvasDimensions = null;
+        ImageDimensions imageDimensions = null;
+        while (offset <= limit - 8) {
+            long chunkSize = readUnsignedInt32LittleEndian(fileBytes, offset + 4);
+            long dataOffset = offset + 8L;
+            long dataEnd = dataOffset + chunkSize;
+            long nextOffset = dataEnd + (chunkSize % 2L);
+            if (dataEnd > limit || nextOffset > limit) {
+                throw new EcommerceBusinessRuleException("Image file is invalid");
+            }
+
+            if (matchesFourCc(fileBytes, offset, 'V', 'P', '8', ' ')) {
+                if (imageDimensions != null) {
+                    throw new EcommerceBusinessRuleException("Image file is invalid");
+                }
+                ImageDimensions dimensions = readWebpVp8Dimensions(fileBytes, (int) dataOffset, chunkSize);
+                imageDimensions = extendedCanvasDimensions == null ? dimensions : extendedCanvasDimensions;
+            }
+            if (matchesFourCc(fileBytes, offset, 'V', 'P', '8', 'L')) {
+                if (imageDimensions != null) {
+                    throw new EcommerceBusinessRuleException("Image file is invalid");
+                }
+                ImageDimensions dimensions = readWebpVp8lDimensions(fileBytes, (int) dataOffset, chunkSize);
+                imageDimensions = extendedCanvasDimensions == null ? dimensions : extendedCanvasDimensions;
+            }
+            if (matchesFourCc(fileBytes, offset, 'V', 'P', '8', 'X')) {
+                if (extendedCanvasDimensions != null || imageDimensions != null) {
+                    throw new EcommerceBusinessRuleException("Image file is invalid");
+                }
+                extendedCanvasDimensions = readWebpVp8xDimensions(fileBytes, (int) dataOffset, chunkSize);
+            }
+
+            offset = (int) nextOffset;
+        }
+        if (offset != limit) {
+            throw new EcommerceBusinessRuleException("Image file is invalid");
+        }
+        if (imageDimensions != null) {
+            return imageDimensions;
+        }
+        throw new EcommerceBusinessRuleException("Image dimensions could not be read");
+    }
+
+    private ImageDimensions readWebpVp8Dimensions(byte[] fileBytes, int dataOffset, long chunkSize) {
+        if (chunkSize < 10
+                || !startsWithAt(fileBytes, dataOffset + 3, 0x9D, 0x01, 0x2A)) {
+            throw new EcommerceBusinessRuleException("Image file is invalid");
+        }
+        int width = readUnsignedShortLittleEndian(fileBytes, dataOffset + 6) & 0x3FFF;
+        int height = readUnsignedShortLittleEndian(fileBytes, dataOffset + 8) & 0x3FFF;
+        return positiveDimensions(width, height);
+    }
+
+    private ImageDimensions readWebpVp8lDimensions(byte[] fileBytes, int dataOffset, long chunkSize) {
+        if (chunkSize < 5 || (fileBytes[dataOffset] & 0xFF) != 0x2F) {
+            throw new EcommerceBusinessRuleException("Image file is invalid");
+        }
+        long bits = readUnsignedInt32LittleEndian(fileBytes, dataOffset + 1);
+        int width = (int) (bits & 0x3FFFL) + 1;
+        int height = (int) ((bits >> 14) & 0x3FFFL) + 1;
+        return positiveDimensions(width, height);
+    }
+
+    private ImageDimensions readWebpVp8xDimensions(byte[] fileBytes, int dataOffset, long chunkSize) {
+        if (chunkSize < 10) {
+            throw new EcommerceBusinessRuleException("Image file is invalid");
+        }
+        int width = readUnsigned24LittleEndian(fileBytes, dataOffset + 4) + 1;
+        int height = readUnsigned24LittleEndian(fileBytes, dataOffset + 7) + 1;
+        return positiveDimensions(width, height);
+    }
+
+    private ImageDimensions positiveDimensions(int width, int height) {
+        if (width <= 0 || height <= 0) {
+            throw new EcommerceBusinessRuleException("Image dimensions could not be read");
+        }
+        return new ImageDimensions(width, height);
+    }
+
+    private boolean isWebpContainer(byte[] bytes) {
+        return bytes.length >= 12
+                && startsWithAt(bytes, 0, 'R', 'I', 'F', 'F')
+                && startsWithAt(bytes, 8, 'W', 'E', 'B', 'P');
+    }
+
+    private boolean matchesFourCc(byte[] bytes, int offset, char first, char second, char third, char fourth) {
+        return startsWithAt(bytes, offset, first, second, third, fourth);
+    }
+
     private boolean startsWith(byte[] bytes, int... signature) {
-        if (bytes.length < signature.length) {
+        return startsWithAt(bytes, 0, signature);
+    }
+
+    private boolean startsWithAt(byte[] bytes, int offset, int... signature) {
+        if (offset < 0 || bytes.length - offset < signature.length) {
             return false;
         }
         for (int i = 0; i < signature.length; i++) {
-            if ((bytes[i] & 0xFF) != signature[i]) {
+            if ((bytes[offset + i] & 0xFF) != signature[i]) {
                 return false;
             }
         }
         return true;
+    }
+
+    private long readUnsignedInt32LittleEndian(byte[] bytes, int offset) {
+        return ((long) bytes[offset] & 0xFF)
+                | (((long) bytes[offset + 1] & 0xFF) << 8)
+                | (((long) bytes[offset + 2] & 0xFF) << 16)
+                | (((long) bytes[offset + 3] & 0xFF) << 24);
+    }
+
+    private int readUnsignedShortLittleEndian(byte[] bytes, int offset) {
+        return (bytes[offset] & 0xFF) | ((bytes[offset + 1] & 0xFF) << 8);
+    }
+
+    private int readUnsigned24LittleEndian(byte[] bytes, int offset) {
+        return (bytes[offset] & 0xFF) | ((bytes[offset + 1] & 0xFF) << 8) | ((bytes[offset + 2] & 0xFF) << 16);
     }
 
     private String normalizeMimeType(String contentType) {
@@ -203,11 +339,17 @@ public class EcommerceProductImageBinaryService {
         if ("jpeg".equals(extension)) {
             return "jpg";
         }
-        return "jpg".equals(extension) || "png".equals(extension) ? extension : null;
+        return "jpg".equals(extension) || "png".equals(extension) || "webp".equals(extension) ? extension : null;
     }
 
     private String extensionForMimeType(String mimeType) {
-        return "image/png".equals(mimeType) ? "png" : "jpg";
+        if ("image/png".equals(mimeType)) {
+            return "png";
+        }
+        if ("image/webp".equals(mimeType)) {
+            return "webp";
+        }
+        return "jpg";
     }
 
     private String sha256Hex(byte[] bytes) {
@@ -344,6 +486,9 @@ public class EcommerceProductImageBinaryService {
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private record ImageDimensions(int width, int height) {
     }
 
     public record ValidatedProductImage(

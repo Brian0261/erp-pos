@@ -173,7 +173,7 @@ public class EcommercePrimaryImageBinaryImportApplicationService implements Ecom
                 "No crea productos ERP ni perfiles online; solo usa SKU existentes con perfil online existente.",
                 "No modifica stock, inventario, unidades, costos, precios ERP ni categorias ERP.",
                 "sku, imageFile, altText, source y rightsConfirmed son obligatorios.",
-                "imageFile debe apuntar a un JPEG/PNG dentro del ZIP, por ejemplo images/sku.jpg.",
+                "imageFile debe apuntar a un JPEG/PNG/WebP dentro del ZIP, por ejemplo images/sku.webp.",
                 "El ZIP no puede contener rutas absolutas, .., backslashes, entradas duplicadas ni archivos vacios.",
                 "rightsConfirmed debe ser true.",
                 "source acepta SUPPLIER, OWN, GENERATED u OTHER.",
