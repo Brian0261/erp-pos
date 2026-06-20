@@ -64,9 +64,9 @@
 
 ## Política Recomendada
 
-### 2S.10B: Aceptar WebP (Implementado)
+### 2S.10B: Aceptar WebP (Implementado y Validado)
 - **Objetivo**: Aceptar JPEG/PNG/WebP con validación real, sin conversión
-- **Estado**: Implementado localmente en 2S.10B
+- **Estado**: Implementado localmente en 2S.10B, validado en staging en 2S.10B-S
 - **Formatos**: JPEG, PNG, WebP
 - **Validación**: Firma binaria + extensión + MIME declarado + peso + dimensiones + checksum
 - **WebP firma**: `RIFF....WEBP` (4 bytes RIFF, 4 bytes tamaño, 4 bytes WEBP)
@@ -76,6 +76,7 @@
 - **No convertir**: Mantener formato original del proveedor
 - **DB**: No requiere cambio (solo `mimeType=image/webp` y `storageKey` `.webp`)
 - **Storefront**: No requiere cambio; `next/image` acepta WebP y dominio está allowlisted
+- **Validación staging**: WebP real servido por CDN/Storefront con Content-Type correcto
 
 ### 2S.10C: Derivados WebP (Fase Posterior)
 - **Objetivo**: Conservar original y generar derivado WebP optimizado

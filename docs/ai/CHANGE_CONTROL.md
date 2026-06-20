@@ -1274,3 +1274,84 @@ Solo crear tag cuando se cumpla todo:
   - Falta staging smoke con WebP real servido por CDN/Storefront.
 - Sin cambios funcionales en Storefront, Docker, Caddy, AWS, Lightsail, S3, CloudFront, IAM ni `.env` reales.
 
+### Cierre Fase 2S.10B-S WebP Staging Smoke
+
+- Tipo: validación staging de soporte WebP en flujos ecommerce de imagen principal.
+- Fase ejecutada en Build Mode con deploy mínimo y smoke manual.
+- Fases previas:
+  - `e6edb50 feat(ecommerce): add binary primary image import backend` — 2S.9A backend/contracts.
+  - `36156a2 feat(ecommerce-admin): add binary image import UI` — 2S.9B frontend Admin UX.
+  - `8ebaa9f docs(ecommerce): close binary image import local QA` — 2S.9C QA local.
+  - `153adda docs(ecommerce): close binary image import staging smoke` — 2S.9D staging smoke PNG.
+  - `04a23fa docs(ecommerce): define unified image policy` — 2S.10A Plan Mode.
+  - `ef81154 feat(ecommerce): support WebP primary image uploads` — 2S.10B Build.
+- Commit desplegado:
+  - `ef81154 feat(ecommerce): support WebP primary image uploads`
+- Deploy mínimo ejecutado:
+  - `git pull --ff-only origin master`
+  - `docker compose up -d --build backend frontend`
+  - Storefront no reconstruido (allowlist ya configurada).
+- SKU controlado usado: `CUAD` (Cuaderno A4).
+- Slug validado: `cuaderno-a4`.
+- URL validada: `https://storefront-staging.inktoy.pe/productos/cuaderno-a4`.
+- Artefactos QA:
+  - Excel `.xlsx` con 1 sola fila.
+  - ZIP `.zip` con 1 sola imagen WebP real.
+  - imageFile: `images/cuad.webp`.
+  - Dimensiones: 1200 x 1200 px.
+  - Peso: 48.1 KB (49,212 bytes).
+- Resultado preview/confirmación:
+  - Total filas: 1.
+  - Válidas: 1.
+  - Rechazadas: 0.
+  - Actualizadas: 1.
+  - mimeType detectado: `image/webp`.
+  - Dimensiones: 1200 x 1200 px.
+  - Peso: 48.1 KB.
+  - checksumSha256: presente.
+  - assetUrl generado.
+  - storageKey termina en `.webp`.
+- Validación CDN:
+  - HTTP/2 200.
+  - Content-Type: image/webp.
+  - Content-Length: 49212.
+  - Cache-Control: public, max-age=31536000, immutable.
+  - x-amz-meta-checksum-sha256 presente.
+  - x-cache: Miss from cloudfront.
+- Validación Storefront:
+  - Imagen WebP visible.
+  - Sin fallback.
+  - Sin error Next/Image.
+  - Sin error API.
+  - robots.txt mantiene Disallow: /.
+- Post-checks:
+  - Backend health HTTP 200.
+  - Admin staging HTTP 200.
+  - Storefront home HTTP 200.
+  - Storefront product HTTP 200.
+  - docker compose ps: postgres healthy, backend up, frontend up, storefront up.
+  - Logs recientes sin errores críticos.
+- Warnings no bloqueantes observados:
+  - Warning PageImpl serialization (deuda técnica preexistente).
+  - Nginx multipart body buffered to temporary file (warning operativo esperado).
+- git status final limpio: `## master...origin/master`.
+- Documento QA creado:
+  - `docs/qa/PHASE2S10B_WEBP_STAGING_SMOKE_QA.md`
+- Restricciones cumplidas:
+  - No se tocó código funcional.
+  - No se tocó Storefront.
+  - No se tocó Caddy, DNS, AWS, S3, CloudFront, IAM ni secretos.
+  - No se tocó docker-compose.yml, Dockerfile, .env.
+  - No se crearon migraciones.
+  - No se hicieron nuevas importaciones.
+  - No se borraron objetos S3.
+  - No se inició 2S.10C.
+  - No se creó tag.
+- Resultado: PASS.
+- Riesgos residuales:
+  - Cache CDN/Next puede retrasar visibilidad en algunos casos.
+  - Objetos S3 anteriores pueden quedar orphan al reemplazar imagen.
+  - Parser WebP valida contenedor/chunks/dimensiones, pero no decodifica pixeles completos.
+- Siguiente fase sugerida: 2S.10C Derivados WebP conservando original (fase posterior).
+- Sin cambios funcionales en backend, frontend, Storefront, Docker, Caddy, AWS, Lightsail, S3, CloudFront, IAM ni `.env` reales.
+

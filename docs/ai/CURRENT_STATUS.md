@@ -706,3 +706,47 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
   - `docs/qa/PHASE2S10B_WEBP_LOCAL_QA.md`
 - Pendiente: staging smoke con WebP real servido por CDN/Storefront.
 
+## Fase 2S.10B-S WebP Staging Smoke
+
+- Fase 2S.10B-S cerrada con PASS en staging.
+- Commit desplegado: `ef81154 feat(ecommerce): support WebP primary image uploads`.
+- Deploy mínimo ejecutado: backend + frontend reconstruidos, Storefront no tocado.
+- SKU controlado usado: `CUAD` (Cuaderno A4).
+- Slug validado: `cuaderno-a4`.
+- URL validada: `https://storefront-staging.inktoy.pe/productos/cuaderno-a4`.
+- Importación Excel + ZIP con WebP real ejecutada correctamente.
+- Total filas: 1, Actualizadas: 1, Rechazadas: 0.
+- mimeType detectado: `image/webp`.
+- Dimensiones: 1200 x 1200 px.
+- Peso: 48.1 KB (49,212 bytes).
+- checksumSha256: presente.
+- assetUrl generado con dominio CDN esperado.
+- storageKey termina en `.webp`.
+- Validación CDN con curl -I:
+  - HTTP/2 200
+  - Content-Type: image/webp
+  - Content-Length: 49212
+  - Cache-Control: public, max-age=31536000, immutable
+  - x-amz-meta-checksum-sha256 presente
+  - x-cache: Miss from cloudfront
+- Imagen WebP se visualiza correctamente en Storefront staging.
+- Sin fallback de imagen.
+- Sin error Next/Image.
+- Sin error API.
+- robots.txt mantiene Disallow: /.
+- docker compose ps muestra postgres healthy, backend up, frontend up, storefront up.
+- Backend health HTTP 200.
+- Admin staging HTTP 200.
+- Storefront home HTTP 200.
+- Logs recientes sin errores críticos asociados al smoke.
+- Warnings no bloqueantes observados:
+  - Warning PageImpl serialization (deuda técnica preexistente).
+  - Nginx multipart body buffered to temporary file (warning operativo esperado).
+- git status final limpio: `## master...origin/master`.
+- Documento QA creado: `docs/qa/PHASE2S10B_WEBP_STAGING_SMOKE_QA.md`.
+- Riesgos residuales:
+  - Cache CDN/Next puede retrasar visibilidad en algunos casos.
+  - Objetos S3 anteriores pueden quedar orphan al reemplazar imagen.
+  - Parser WebP valida contenedor/chunks/dimensiones, pero no decodifica pixeles completos.
+- Siguiente fase sugerida: 2S.10C Derivados WebP conservando original (fase posterior).
+
