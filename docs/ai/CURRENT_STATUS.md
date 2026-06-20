@@ -750,3 +750,47 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
   - Parser WebP valida contenedor/chunks/dimensiones, pero no decodifica pixeles completos.
 - Siguiente fase sugerida: 2S.10C Derivados WebP conservando original (fase posterior).
 
+## Fase 2S.10C-B/B2 WebP Conversion Spike
+
+- Fase 2S.10C-B/B2 cerrada localmente con PASS.
+- Objetivo: validar viabilidad técnica de conversión WebP antes de implementar derivados.
+- Dependencia evaluada: `org.sejda.imageio:webp-imageio:0.1.6` (scope test).
+- Validación local (Windows): PASS.
+- Validación Docker/Linux Java 17 (eclipse-temurin:17-jdk-jammy): PASS.
+- Archivos creados:
+  - `backend/src/test/java/com/erppos/backend/erp/ecommerce/WebpConversionSpikeService.java`
+  - `backend/src/test/java/com/erppos/backend/erp/ecommerce/WebpConversionSpikeServiceTest.java`
+- Resultados JPEG → WebP:
+  - Conversión exitosa.
+  - Reducción de tamaño: 49.2% (1501 → 762 bytes).
+  - Dimensiones preservadas: 96x72.
+  - Tiempo ejecución: 8-10ms.
+- Resultados PNG transparente → WebP:
+  - Conversión exitosa.
+  - Alpha preservado correctamente.
+  - Aumento de tamaño: 13.9% (402 → 458 bytes) para PNG pequeño.
+  - Tiempo ejecución: 18-27ms.
+- Parser WebP existente (2S.10B) lee WebP generado correctamente.
+- Tests ejecutados:
+  - WebpConversionSpikeServiceTest: 3 tests PASS.
+  - EcommercePrimaryImageBinaryImportIntegrationTest: 9 tests PASS.
+  - EcommerceCatalogApplicationServiceTest: 31 tests PASS.
+  - Total: 43 tests PASS, 0 failures.
+- Restricciones cumplidas:
+  - No se tocó DB, migraciones, ProductAsset, ProductAssetEntity.
+  - No se tocó Storefront, Dockerfile, docker-compose.yml, .env.
+  - No se tocó S3, staging, infraestructura.
+  - Dependencia webp-imageio en scope test (NO runtime).
+  - No se implementó AVIF, responsive images, srcset.
+  - No se integró al flujo ecommerce real.
+- Riesgos residuales:
+  - webp-imageio 0.1.6 no mantenida activamente (última versión 2020).
+  - Binarios nativos embebidos requieren validación adicional.
+  - PNG pequeño puede crecer en WebP.
+  - No se evaluó calidad visual (PSNR/SSIM).
+  - No se probó con imágenes grandes reales.
+- Conclusión: APTO para pasar a 2S.10C-C.
+- Advertencia: Dependencia webp-imageio NO aprobada todavía como dependencia runtime/productiva.
+- Documento QA creado: `docs/qa/PHASE2S10C_WEBP_CONVERSION_SPIKE_QA.md`.
+- Siguiente fase: 2S.10C-C (migración + modelo variants + repositorio + tests).
+

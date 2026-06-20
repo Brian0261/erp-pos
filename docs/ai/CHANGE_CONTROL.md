@@ -1355,3 +1355,57 @@ Solo crear tag cuando se cumpla todo:
 - Siguiente fase sugerida: 2S.10C Derivados WebP conservando original (fase posterior).
 - Sin cambios funcionales en backend, frontend, Storefront, Docker, Caddy, AWS, Lightsail, S3, CloudFront, IAM ni `.env` reales.
 
+### Cierre Fase 2S.10C-B/B2 WebP Conversion Spike
+
+- Tipo: spike local y Docker de conversión WebP.
+- Fase ejecutada en Build Mode con validación local y Docker.
+- Fases previas:
+  - `e6edb50 feat(ecommerce): add binary primary image import backend` — 2S.9A backend/contracts.
+  - `36156a2 feat(ecommerce-admin): add binary image import UI` — 2S.9B frontend Admin UX.
+  - `8ebaa9f docs(ecommerce): close binary image import local QA` — 2S.9C QA local.
+  - `153adda docs(ecommerce): close binary image import staging smoke` — 2S.9D staging smoke PNG.
+  - `04a23fa docs(ecommerce): define unified image policy` — 2S.10A Plan Mode.
+  - `ef81154 feat(ecommerce): support WebP primary image uploads` — 2S.10B Build.
+  - `0afb46e docs(ecommerce): close WebP staging smoke` — 2S.10B-S staging smoke.
+- Objetivo: validar viabilidad técnica de conversión WebP antes de implementar derivados.
+- Dependencia evaluada:
+  - `org.sejda.imageio:webp-imageio:0.1.6`
+  - Scope: `test` (NO runtime/productivo)
+  - Plugin ImageIO para WebP con binarios nativos embebidos
+  - Licencia Apache 2.0
+- Archivos creados:
+  - `backend/src/test/java/com/erppos/backend/erp/ecommerce/WebpConversionSpikeService.java`
+  - `backend/src/test/java/com/erppos/backend/erp/ecommerce/WebpConversionSpikeServiceTest.java`
+- Archivos modificados:
+  - `backend/pom.xml` (agregada dependencia webp-imageio scope test)
+- Validación local (Windows):
+  - Conversión JPEG → WebP: PASS (reducción 49.2%, 1501 → 762 bytes)
+  - Conversión PNG transparente → WebP: PASS (alpha preservado, aumento 13.9% en PNG pequeño)
+  - Parser WebP existente (2S.10B) lee WebP generado: PASS
+  - Tests: 43 tests PASS, 0 failures
+- Validación Docker/Linux Java 17:
+  - Imagen: `eclipse-temurin:17-jdk-jammy`
+  - Conversión JPEG → WebP: PASS
+  - Conversión PNG transparente → WebP: PASS
+  - Alpha preservado: PASS
+  - Tests: 3 tests PASS, 0 failures
+- Restricciones cumplidas:
+  - No se tocó DB, migraciones, ProductAsset, ProductAssetEntity.
+  - No se tocó Storefront, Dockerfile, docker-compose.yml, .env.
+  - No se tocó S3, staging, infraestructura.
+  - Dependencia webp-imageio en scope test (NO runtime).
+  - No se implementó AVIF, responsive images, srcset.
+  - No se integró al flujo ecommerce real.
+- Riesgos residuales:
+  - webp-imageio 0.1.6 no mantenida activamente (última versión 2020).
+  - Binarios nativos embebidos requieren validación adicional antes de producción.
+  - PNG pequeño puede crecer en WebP.
+  - No se evaluó calidad visual (PSNR/SSIM).
+  - No se probó con imágenes grandes reales.
+- Conclusión: APTO para pasar a 2S.10C-C.
+- Advertencia: Dependencia webp-imageio NO aprobada todavía como dependencia runtime/productiva.
+- Documento QA creado:
+  - `docs/qa/PHASE2S10C_WEBP_CONVERSION_SPIKE_QA.md`
+- Siguiente fase: 2S.10C-C (migración + modelo variants + repositorio + tests).
+- Sin cambios funcionales en backend, frontend, Storefront, Docker, Caddy, AWS, Lightsail, S3, CloudFront, IAM ni `.env` reales.
+
