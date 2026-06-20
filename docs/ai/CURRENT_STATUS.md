@@ -794,3 +794,42 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
 - Documento QA creado: `docs/qa/PHASE2S10C_WEBP_CONVERSION_SPIKE_QA.md`.
 - Siguiente fase: 2S.10C-C (migración + modelo variants + repositorio + tests).
 
+## Fase 2S.10C-C Asset Variants Model
+
+- Fase 2S.10C-C implementada con PASS.
+- Objetivo: crear modelo persistente para variantes/derivados ecommerce, preservando `ProductAsset` como original.
+- Migracion creada: `V19__ecommerce_product_asset_variants.sql`.
+- Tabla nueva: `ecommerce_product_asset_variants`.
+- Variante inicial modelada: `PRIMARY_OPTIMIZED_WEBP`.
+- Archivos creados:
+  - `backend/src/main/resources/db/migration/V19__ecommerce_product_asset_variants.sql`
+  - `backend/src/main/java/com/erppos/backend/erp/ecommerce/domain/model/ProductAssetVariantKind.java`
+  - `backend/src/main/java/com/erppos/backend/erp/ecommerce/infrastructure/persistence/ProductAssetVariantEntity.java`
+  - `backend/src/main/java/com/erppos/backend/erp/ecommerce/infrastructure/persistence/ProductAssetVariantJpaRepository.java`
+  - `backend/src/test/java/com/erppos/backend/integration/ProductAssetVariantPersistenceIntegrationTest.java`
+- Constraints principales:
+  - FK a `ecommerce_product_assets(id)` con `ON DELETE CASCADE`.
+  - `variant_kind IN ('PRIMARY_OPTIMIZED_WEBP')`.
+  - `mime_type = 'image/webp'`.
+  - `width > 0`, `height > 0`, `size_bytes > 0`.
+  - checks de checksum SHA-256 de 64 caracteres.
+  - `preferred=true` solo si `active=true`.
+- Indices creados:
+  - `idx_ecommerce_asset_variants_asset`.
+  - `idx_ecommerce_asset_variants_storage_key`.
+  - `uq_ecommerce_asset_variants_active_kind`.
+  - `uq_ecommerce_asset_variants_preferred_active`.
+- Tests ejecutados:
+  - `ProductAssetVariantPersistenceIntegrationTest`: 10 tests PASS.
+  - Regresion ecommerce requerida: 53 tests PASS.
+  - Backend completo: 420 tests PASS.
+- Restricciones cumplidas:
+  - No se integro conversion WebP real.
+  - No se generaron derivados.
+  - No se modificaron upload manual ni Excel + ZIP.
+  - No se modifico Storefront ni contrato publico.
+  - No se cambio `primaryImage.url`.
+  - No se toco S3, staging, infraestructura, Dockerfile, docker-compose.yml ni `.env`.
+  - `webp-imageio` sigue en `scope test`.
+- Documento QA creado: `docs/qa/PHASE2S10C_ASSET_VARIANTS_MODEL_QA.md`.
+- Siguiente fase sugerida: integrar seleccion/registro de variantes en servicios reales solo cuando se apruebe explicitamente pipeline de conversion runtime.

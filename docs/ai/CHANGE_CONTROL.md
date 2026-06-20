@@ -1409,3 +1409,49 @@ Solo crear tag cuando se cumpla todo:
 - Siguiente fase: 2S.10C-C (migración + modelo variants + repositorio + tests).
 - Sin cambios funcionales en backend, frontend, Storefront, Docker, Caddy, AWS, Lightsail, S3, CloudFront, IAM ni `.env` reales.
 
+### Cierre Fase 2S.10C-C Asset Variants Model
+
+- Tipo: implementacion backend persistente aditiva + tests + documentacion QA.
+- Base: 2S.10C-B/B2 cerrado en commit `fd8428b test(ecommerce): validate WebP conversion spike`.
+- Objetivo: crear modelo persistente para registrar variantes/derivados de imagen ecommerce, preservando `ProductAsset` como original.
+- Migracion creada:
+  - `backend/src/main/resources/db/migration/V19__ecommerce_product_asset_variants.sql`
+- Modelo persistente creado:
+  - Tabla `ecommerce_product_asset_variants`.
+  - Enum `ProductAssetVariantKind.PRIMARY_OPTIMIZED_WEBP`.
+  - Entidad `ProductAssetVariantEntity`.
+  - Repositorio `ProductAssetVariantJpaRepository`.
+- Constraints relevantes:
+  - FK a `ecommerce_product_assets(id)` con `ON DELETE CASCADE`.
+  - `variant_kind IN ('PRIMARY_OPTIMIZED_WEBP')`.
+  - `mime_type = 'image/webp'`.
+  - dimensiones y `size_bytes` positivos.
+  - checks de checksum SHA-256 de 64 caracteres.
+  - `preferred=true` solo si `active=true`.
+- Indices relevantes:
+  - Por `product_asset_id`.
+  - Por `storage_key`.
+  - Unico parcial para variante activa por asset y tipo.
+  - Unico parcial para variante preferred activa por asset.
+- Tests nuevos:
+  - `ProductAssetVariantPersistenceIntegrationTest`.
+- Validaciones:
+  - Test focalizado variantes: 10 tests PASS.
+  - Regresion ecommerce requerida: 53 tests PASS.
+  - Backend completo: 420 tests PASS.
+- Restricciones cumplidas:
+  - No se integro conversion WebP real.
+  - No se generaron derivados.
+  - No se modificaron flujos Excel + ZIP ni upload manual.
+  - No se modifico Storefront, contrato publico ni `primaryImage.url`.
+  - No se toco S3, staging, Caddy, DNS, AWS, CloudFront, IAM ni secretos.
+  - No se modifico Dockerfile, `docker-compose.yml` ni `.env` reales.
+  - `webp-imageio` permanece en `scope test`.
+  - No se implemento AVIF, responsive images, `srcset` ni cleanup masivo de objetos orphan.
+- Documento QA creado:
+  - `docs/qa/PHASE2S10C_ASSET_VARIANTS_MODEL_QA.md`
+- Resultado: PASS.
+- Riesgos residuales:
+  - La tabla existe pero no hay generacion productiva de variantes todavia.
+  - La seleccion de derivado preferido queda pendiente de fase posterior.
+  - `webp-imageio` no esta aprobado como dependencia runtime/productiva.

@@ -78,12 +78,14 @@
 - **Storefront**: No requiere cambio; `next/image` acepta WebP y dominio está allowlisted
 - **Validación staging**: WebP real servido por CDN/Storefront con Content-Type correcto
 
-### 2S.10C: Derivados WebP (Fase Posterior)
+### 2S.10C: Derivados WebP
 - **Objetivo**: Conservar original y generar derivado WebP optimizado
 - **Entrada**: Imagen original (JPEG/PNG/WebP)
 - **Salida**: Original preservado + derivado WebP
-- **DB**: Requiere cambio (columnas para `optimized_asset_url`, `optimized_storage_key`, `optimized_mime_type`, `optimized_width`, `optimized_height`, `optimized_size_bytes`, `optimized_checksum_sha256` o tabla `ecommerce_product_asset_variants`)
-- **Storefront**: Requiere cambio si se expone derivado preferente o variantes
+- **DB**: Tabla `ecommerce_product_asset_variants` creada en 2S.10C-C para registrar derivados; `ProductAsset` sigue representando el original preservado
+- **Variante inicial**: `PRIMARY_OPTIMIZED_WEBP`, limitada por constraint a `mime_type = 'image/webp'`
+- **Estado 2S.10C-C**: Modelo persistente listo, pero generacion de derivados aun no integrada
+- **Storefront**: Sin cambios en 2S.10C-C; el contrato publico mantiene `primaryImage.url`
 - **Riesgos**: Calidad, CPU/memoria, orphan cleanup, atomicidad S3/DB
 
 ### 2S.10D: Responsive + AVIF + Caché Avanzada (Fase Final)
