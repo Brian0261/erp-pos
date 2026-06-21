@@ -1613,3 +1613,45 @@ Solo crear tag cuando se cumpla todo:
   - Storefront todavia no consume variantes.
   - E2 debe preferir variantes solo si pertenecen al `ProductAsset` primario activo vigente.
   - Objetos storage anteriores pueden quedar orphan hasta una fase futura de limpieza segura.
+
+### Cierre Fase 2S.10C-E2 Public Image Variant Preference
+
+- Tipo: implementacion backend read-only publica + tests + documentacion QA.
+- Base: E1 cerrado en commit `5d2e7df fix(ecommerce): deactivate stale WebP variants for URL assets`.
+- Objetivo: preferir `ProductAssetVariant.PRIMARY_OPTIMIZED_WEBP` active/preferred como `primaryImage.url` en API publica ecommerce, con fallback seguro al original.
+- Cambios backend:
+  - `StorefrontProductReadAdapter.findPublishedProducts(...)` usa variante WebP valida del mismo `ProductAsset` cuando existe.
+  - `StorefrontProductReadAdapter.findPublishedProductDetailBySlug(...)` aplica la misma regla.
+- Regla implementada:
+  - Primero se identifica `ProductAsset` primario activo vigente.
+  - Variante valida requiere mismo `product_asset_id`, `variant_kind = PRIMARY_OPTIMIZED_WEBP`, `active = true`, `preferred = true`, `asset_url` no blank.
+  - Si no existe variante valida, se devuelve `ProductAsset.assetUrl` original.
+  - `altText`, `type` y `displayOrder` permanecen desde `ProductAsset`.
+- Contrato publico:
+  - `PublicImageResponse(url, altText, type, displayOrder)` sin cambios.
+  - No se agregan campos de variantes, `mimeType`, `width`, `height`, `srcset` ni metadata.
+- Validaciones:
+  - Listado y detalle devuelven WebP cuando existe variante active/preferred valida.
+  - Listado y detalle devuelven original sin variante.
+  - Variante inactive se ignora.
+  - Variante `preferred=false` se ignora.
+  - Variante de otro `ProductAsset` se ignora.
+  - Variante con URL blank se ignora.
+  - Variante stale tras reemplazo URL-only no se devuelve.
+  - Regresion E1/D1/D2 y persistencia de variantes: PASS.
+- Tests ejecutados:
+  - Focalizados E2 + regresion E1/D1/D2: 94 tests PASS.
+  - Backend completo: 449 tests PASS.
+- Restricciones cumplidas:
+  - No se modifico `storefront/`, contrato publico Storefront ni Admin UI.
+  - No se toco staging, deploy, Caddy, DNS, AWS/S3/CloudFront/IAM ni secretos.
+  - No se modificaron `.env`, Dockerfile ni `docker-compose.yml`.
+  - No se modifico generacion de derivados, upload manual, Excel + ZIP ni URL import.
+  - No se implemento AVIF, responsive images ni `srcset`.
+- Documento QA creado:
+  - `docs/qa/PHASE2S10C_E2_PUBLIC_IMAGE_VARIANT_PREFERENCE_QA.md`
+- Resultado: PASS.
+- Riesgos residuales:
+  - Objetos storage anteriores pueden quedar orphan hasta una fase futura de limpieza segura.
+  - Cache CDN/Next/Image puede retrasar visibilidad en ambientes reales.
+  - `webp-imageio` 0.1.6 sigue siendo dependencia runtime no mantenida activamente.

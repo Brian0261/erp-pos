@@ -944,3 +944,32 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
   - E2 debe preferir variantes solo si pertenecen al `ProductAsset` primario activo vigente.
   - Objetos storage anteriores pueden quedar orphan hasta una fase futura de limpieza segura.
 - Conclusión: riesgo anti-stale URL-only corregido. Listo para plan/build 2S.10C-E2 cuando se autorice.
+
+## Fase 2S.10C-E2 Public Image Variant Preference
+
+- Fase 2S.10C-E2 implementada con PASS.
+- Objetivo: API publica ecommerce prefiere `ProductAssetVariant.PRIMARY_OPTIMIZED_WEBP` active/preferred como `primaryImage.url` cuando existe variante valida, con fallback al `ProductAsset.assetUrl` original.
+- Flujos publicos cubiertos:
+  - `GET /api/v1/storefront/catalog/products`.
+  - `GET /api/v1/storefront/catalog/products/{slug}`.
+- Regla implementada:
+  - Primero se selecciona el `ProductAsset` primario activo vigente.
+  - Si hay variante del mismo `ProductAsset`, kind `PRIMARY_OPTIMIZED_WEBP`, `active=true`, `preferred=true` y `asset_url` no blank, se devuelve esa URL.
+  - Si no hay variante valida, se devuelve la URL original del `ProductAsset`.
+  - `altText`, `type` y `displayOrder` siguen saliendo del `ProductAsset` original.
+- Contrato publico sin cambios:
+  - `PublicImageResponse(url, altText, type, displayOrder)`.
+  - No se exponen variantes, `mimeType`, `width`, `height`, `srcset` ni metadata.
+- Tests ejecutados:
+  - Focalizados E2 + regresion E1/D1/D2: 94 tests PASS.
+  - Backend completo: 449 tests PASS.
+- Documento QA creado: `docs/qa/PHASE2S10C_E2_PUBLIC_IMAGE_VARIANT_PREFERENCE_QA.md`.
+- Restricciones cumplidas:
+  - No se modifico `storefront/`, Admin UI, contrato publico, staging, deploy, Dockerfile, `docker-compose.yml`, `.env`, Caddy, DNS, AWS/S3/CloudFront/IAM ni infraestructura.
+  - No se modifico generacion de derivados, upload manual, Excel + ZIP ni URL import.
+  - No se implemento AVIF, responsive images ni `srcset`.
+- Riesgos residuales:
+  - Objetos storage anteriores pueden quedar orphan hasta una fase futura de limpieza segura.
+  - Cache CDN/Next/Image puede retrasar visibilidad de cambios en ambientes reales.
+  - `webp-imageio` 0.1.6 sigue siendo dependencia runtime no mantenida activamente.
+- Conclusión: API publica lista para servir WebP optimizado con fallback seguro sin cambiar contrato.

@@ -4,9 +4,14 @@ import com.erppos.backend.erp.ecommerce.application.usecase.CreateProductOnlineP
 import com.erppos.backend.erp.ecommerce.application.usecase.EcommerceCatalogUseCase;
 import com.erppos.backend.erp.ecommerce.domain.model.EcommerceOnlineCategory;
 import com.erppos.backend.erp.ecommerce.domain.model.OnlinePublicationStatus;
+import com.erppos.backend.erp.ecommerce.domain.model.ProductAsset;
+import com.erppos.backend.erp.ecommerce.domain.model.ProductAssetVariantKind;
 import com.erppos.backend.erp.ecommerce.domain.model.ProductOnlineProfile;
 import com.erppos.backend.erp.ecommerce.domain.port.EcommerceOnlineCategoryRepositoryPort;
+import com.erppos.backend.erp.ecommerce.domain.port.ProductAssetRepositoryPort;
 import com.erppos.backend.erp.ecommerce.domain.port.ProductOnlineProfileRepositoryPort;
+import com.erppos.backend.erp.ecommerce.infrastructure.persistence.ProductAssetVariantEntity;
+import com.erppos.backend.erp.ecommerce.infrastructure.persistence.ProductAssetVariantJpaRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.Test;
@@ -34,6 +39,12 @@ class StorefrontPublicProductsIntegrationTest extends AbstractHttpIntegrationTes
 
     @Autowired
     private ProductOnlineProfileRepositoryPort productOnlineProfileRepositoryPort;
+
+    @Autowired
+    private ProductAssetRepositoryPort productAssetRepositoryPort;
+
+    @Autowired
+    private ProductAssetVariantJpaRepository productAssetVariantJpaRepository;
 
     @Test
     void shouldAllowPublicProductsGetWithoutToken() throws Exception {
@@ -358,6 +369,112 @@ class StorefrontPublicProductsIntegrationTest extends AbstractHttpIntegrationTes
                 .andExpect(jsonPath("$.indexable").value(true));
     }
 
+    @Test
+    void shouldPreferActivePreferredWebpVariantInListAndDetailPrimaryImageUrl() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = String.valueOf(System.nanoTime()) + "-vpref";
+        ProductFixture product = createPublishedProfile(adminToken, suffix, BigDecimal.valueOf(71.00), null);
+        ProductAsset asset = primaryAsset(product);
+        String variantUrl = "https://cdn.inktoy.pe/ecommerce/products/variants/" + suffix + ".webp";
+        saveVariant(asset.id(), suffix, variantUrl, true, true);
+
+        JsonNode listImage = listPrimaryImage(product);
+        assertPublicImage(listImage, variantUrl, "Imagen storefront " + suffix, "PRODUCT_IMAGE", 0);
+        assertPublicImageContract(listImage);
+
+        JsonNode detailImage = detailPrimaryImage(product);
+        assertPublicImage(detailImage, variantUrl, "Imagen storefront " + suffix, "PRODUCT_IMAGE", 0);
+        assertPublicImageContract(detailImage);
+    }
+
+    @Test
+    void shouldFallbackToOriginalImageUrlWhenProductHasNoVariant() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = String.valueOf(System.nanoTime()) + "-novar";
+        ProductFixture product = createPublishedProfile(adminToken, suffix, BigDecimal.valueOf(72.00), null);
+        String originalUrl = "/images/products/storefront-" + suffix + ".jpg";
+
+        assertPublicImage(listPrimaryImage(product), originalUrl, "Imagen storefront " + suffix, "PRODUCT_IMAGE", 0);
+        assertPublicImage(detailPrimaryImage(product), originalUrl, "Imagen storefront " + suffix, "PRODUCT_IMAGE", 0);
+    }
+
+    @Test
+    void shouldIgnoreInactiveWebpVariantAndReturnOriginalImageUrl() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = String.valueOf(System.nanoTime()) + "-inactivevar";
+        ProductFixture product = createPublishedProfile(adminToken, suffix, BigDecimal.valueOf(73.00), null);
+        ProductAsset asset = primaryAsset(product);
+        saveVariant(asset.id(), suffix, "https://cdn.inktoy.pe/ecommerce/products/variants/inactive-" + suffix + ".webp", false, false);
+
+        String originalUrl = "/images/products/storefront-" + suffix + ".jpg";
+        assertPublicImage(listPrimaryImage(product), originalUrl, "Imagen storefront " + suffix, "PRODUCT_IMAGE", 0);
+        assertPublicImage(detailPrimaryImage(product), originalUrl, "Imagen storefront " + suffix, "PRODUCT_IMAGE", 0);
+    }
+
+    @Test
+    void shouldIgnoreNonPreferredWebpVariantAndReturnOriginalImageUrl() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = String.valueOf(System.nanoTime()) + "-nonprefvar";
+        ProductFixture product = createPublishedProfile(adminToken, suffix, BigDecimal.valueOf(74.00), null);
+        ProductAsset asset = primaryAsset(product);
+        saveVariant(asset.id(), suffix, "https://cdn.inktoy.pe/ecommerce/products/variants/nonpreferred-" + suffix + ".webp", true, false);
+
+        String originalUrl = "/images/products/storefront-" + suffix + ".jpg";
+        assertPublicImage(listPrimaryImage(product), originalUrl, "Imagen storefront " + suffix, "PRODUCT_IMAGE", 0);
+        assertPublicImage(detailPrimaryImage(product), originalUrl, "Imagen storefront " + suffix, "PRODUCT_IMAGE", 0);
+    }
+
+    @Test
+    void shouldIgnoreVariantAssociatedToAnotherProductAsset() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = String.valueOf(System.nanoTime()) + "-othervar";
+        ProductFixture targetProduct = createPublishedProfile(adminToken, suffix + "-target", BigDecimal.valueOf(75.00), null);
+        ProductFixture otherProduct = createPublishedProfile(adminToken, suffix + "-other", BigDecimal.valueOf(76.00), null);
+        ProductAsset otherAsset = primaryAsset(otherProduct);
+        saveVariant(otherAsset.id(), suffix, "https://cdn.inktoy.pe/ecommerce/products/variants/other-" + suffix + ".webp", true, true);
+
+        String originalUrl = "/images/products/storefront-" + suffix + "-target.jpg";
+        assertPublicImage(listPrimaryImage(targetProduct), originalUrl, "Imagen storefront " + suffix + "-target", "PRODUCT_IMAGE", 0);
+        assertPublicImage(detailPrimaryImage(targetProduct), originalUrl, "Imagen storefront " + suffix + "-target", "PRODUCT_IMAGE", 0);
+    }
+
+    @Test
+    void shouldIgnoreBlankVariantUrlAndReturnOriginalImageUrl() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = String.valueOf(System.nanoTime()) + "-blankvar";
+        ProductFixture product = createPublishedProfile(adminToken, suffix, BigDecimal.valueOf(77.00), null);
+        ProductAsset asset = primaryAsset(product);
+        saveVariant(asset.id(), suffix, "   ", true, true);
+
+        String originalUrl = "/images/products/storefront-" + suffix + ".jpg";
+        assertPublicImage(listPrimaryImage(product), originalUrl, "Imagen storefront " + suffix, "PRODUCT_IMAGE", 0);
+        assertPublicImage(detailPrimaryImage(product), originalUrl, "Imagen storefront " + suffix, "PRODUCT_IMAGE", 0);
+    }
+
+    @Test
+    void shouldNotReturnStaleVariantAfterUrlOnlyReplacement() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = String.valueOf(System.nanoTime()) + "-stalevar";
+        ProductFixture product = createPublishedProfile(adminToken, suffix, BigDecimal.valueOf(78.00), null);
+        ProductAsset asset = primaryAsset(product);
+        ProductAssetVariantEntity variant = saveVariant(
+                asset.id(),
+                suffix,
+                "https://cdn.inktoy.pe/ecommerce/products/variants/stale-" + suffix + ".webp",
+                true,
+                true
+        );
+        String newOriginalUrl = "/images/products/replaced-" + suffix + ".jpg";
+
+        upsertPrimaryAsset(adminToken, product.productId(), newOriginalUrl, "Imagen reemplazada " + suffix, 1);
+
+        ProductAssetVariantEntity currentVariant = productAssetVariantJpaRepository.findById(variant.getId()).orElseThrow();
+        org.junit.jupiter.api.Assertions.assertFalse(currentVariant.isActive());
+        org.junit.jupiter.api.Assertions.assertFalse(currentVariant.isPreferred());
+        assertPublicImage(listPrimaryImage(product), newOriginalUrl, "Imagen reemplazada " + suffix, "PRODUCT_IMAGE", 1);
+        assertPublicImage(detailPrimaryImage(product), newOriginalUrl, "Imagen reemplazada " + suffix, "PRODUCT_IMAGE", 1);
+    }
+
     private ProductFixture createPublishedProfile(String adminToken, String suffix, BigDecimal salePrice, BigDecimal overrideAmount) throws Exception {
         ProductFixture product = createProductFixture(adminToken, suffix, salePrice);
 
@@ -418,19 +535,7 @@ class StorefrontPublicProductsIntegrationTest extends AbstractHttpIntegrationTes
                         .content(seoPayload.toString()))
                 .andExpect(status().isOk());
 
-        ObjectNode assetPayload = objectMapper.createObjectNode();
-        assetPayload.put("assetType", "PRODUCT_IMAGE");
-        assetPayload.put("assetUrl", "/images/products/storefront-" + suffix + ".jpg");
-        assetPayload.put("altText", "Imagen storefront " + suffix);
-        assetPayload.put("source", "OWN");
-        assetPayload.put("rightsConfirmed", true);
-        assetPayload.put("displayOrder", 0);
-
-        mockMvc.perform(put("/api/v1/ecommerce-admin/products/{productId}/primary-asset", product.productId())
-                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(assetPayload.toString()))
-                .andExpect(status().isOk());
+        upsertPrimaryAsset(adminToken, product.productId(), "/images/products/storefront-" + suffix + ".jpg", "Imagen storefront " + suffix, 0);
 
         if (overrideAmount != null) {
             ObjectNode pricePayload = objectMapper.createObjectNode();
@@ -554,6 +659,85 @@ class StorefrontPublicProductsIntegrationTest extends AbstractHttpIntegrationTes
             }
         }
         return null;
+    }
+
+    private JsonNode listPrimaryImage(ProductFixture product) throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/v1/storefront/catalog/products").param("size", "50"))
+                .andExpect(status().isOk())
+                .andReturn();
+        JsonNode target = findBySlug(readJson(result).path("items"), product.slug());
+        org.junit.jupiter.api.Assertions.assertNotNull(target);
+        return target.path("primaryImage");
+    }
+
+    private JsonNode detailPrimaryImage(ProductFixture product) throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/v1/storefront/catalog/products/{slug}", product.slug()))
+                .andExpect(status().isOk())
+                .andReturn();
+        return readJson(result).path("primaryImage");
+    }
+
+    private void assertPublicImage(JsonNode image, String url, String altText, String type, int displayOrder) {
+        org.junit.jupiter.api.Assertions.assertEquals(url, image.path("url").asText());
+        org.junit.jupiter.api.Assertions.assertEquals(altText, image.path("altText").asText());
+        org.junit.jupiter.api.Assertions.assertEquals(type, image.path("type").asText());
+        org.junit.jupiter.api.Assertions.assertEquals(displayOrder, image.path("displayOrder").asInt());
+    }
+
+    private void assertPublicImageContract(JsonNode image) {
+        org.junit.jupiter.api.Assertions.assertTrue(image.has("url"));
+        org.junit.jupiter.api.Assertions.assertTrue(image.has("altText"));
+        org.junit.jupiter.api.Assertions.assertTrue(image.has("type"));
+        org.junit.jupiter.api.Assertions.assertTrue(image.has("displayOrder"));
+        org.junit.jupiter.api.Assertions.assertEquals(4, image.size());
+        org.junit.jupiter.api.Assertions.assertFalse(image.has("variants"));
+        org.junit.jupiter.api.Assertions.assertFalse(image.has("mimeType"));
+        org.junit.jupiter.api.Assertions.assertFalse(image.has("width"));
+        org.junit.jupiter.api.Assertions.assertFalse(image.has("height"));
+        org.junit.jupiter.api.Assertions.assertFalse(image.has("srcset"));
+        org.junit.jupiter.api.Assertions.assertFalse(image.has("metadata"));
+    }
+
+    private ProductAsset primaryAsset(ProductFixture product) {
+        ProductOnlineProfile profile = productOnlineProfileRepositoryPort.findByProductId(product.productId()).orElseThrow();
+        return productAssetRepositoryPort.findPrimaryActiveByProductOnlineProfileId(profile.id()).orElseThrow();
+    }
+
+    private ProductAssetVariantEntity saveVariant(Long productAssetId, String keySuffix, String assetUrl, boolean active, boolean preferred) {
+        ProductAssetVariantEntity variant = new ProductAssetVariantEntity();
+        variant.setProductAssetId(productAssetId);
+        variant.setVariantKind(ProductAssetVariantKind.PRIMARY_OPTIMIZED_WEBP);
+        variant.setAssetUrl(assetUrl);
+        variant.setStorageProvider("S3");
+        variant.setStorageBucket("inktoy-test-bucket");
+        variant.setStorageKey("ecommerce/products/assets/" + productAssetId + "/variants/" + keySuffix + ".webp");
+        variant.setMimeType("image/webp");
+        variant.setWidth(96);
+        variant.setHeight(72);
+        variant.setSizeBytes(762L);
+        variant.setChecksumSha256("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
+        variant.setSourceChecksumSha256("abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789");
+        variant.setActive(active);
+        variant.setPreferred(preferred);
+        variant.setCreatedBy("it");
+        variant.setUpdatedBy("it");
+        return productAssetVariantJpaRepository.saveAndFlush(variant);
+    }
+
+    private void upsertPrimaryAsset(String adminToken, long productId, String assetUrl, String altText, int displayOrder) throws Exception {
+        ObjectNode assetPayload = objectMapper.createObjectNode();
+        assetPayload.put("assetType", "PRODUCT_IMAGE");
+        assetPayload.put("assetUrl", assetUrl);
+        assetPayload.put("altText", altText);
+        assetPayload.put("source", "OWN");
+        assetPayload.put("rightsConfirmed", true);
+        assetPayload.put("displayOrder", displayOrder);
+
+        mockMvc.perform(put("/api/v1/ecommerce-admin/products/{productId}/primary-asset", productId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(assetPayload.toString()))
+                .andExpect(status().isOk());
     }
 
     private void deactivateProduct(String adminToken, ProductFixture product) throws Exception {

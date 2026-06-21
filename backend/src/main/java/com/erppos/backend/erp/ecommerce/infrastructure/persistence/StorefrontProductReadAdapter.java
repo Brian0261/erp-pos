@@ -64,11 +64,22 @@ public class StorefrontProductReadAdapter implements StorefrontProductReadPort {
                                on b.id = pop.brand_id and b.active = true
                         left join lateral (
                             select
-                                pa.asset_url,
+                                coalesce(nullif(trim(pav.asset_url), ''), pa.asset_url) as asset_url,
                                 pa.alt_text,
                                 pa.asset_type,
                                 pa.display_order
                             from ecommerce_product_assets pa
+                            left join lateral (
+                                select pav.asset_url
+                                from ecommerce_product_asset_variants pav
+                                where pav.product_asset_id = pa.id
+                                  and pav.variant_kind = 'PRIMARY_OPTIMIZED_WEBP'
+                                  and pav.active = true
+                                  and pav.preferred = true
+                                  and nullif(trim(pav.asset_url), '') is not null
+                                order by pav.updated_at desc, pav.id desc
+                                limit 1
+                            ) pav on true
                             where pa.product_online_profile_id = pop.id
                               and pa.is_primary = true
                               and pa.active = true
@@ -169,11 +180,22 @@ public class StorefrontProductReadAdapter implements StorefrontProductReadPort {
                                on sm.product_online_profile_id = pop.id
                         left join lateral (
                             select
-                                pa.asset_url,
+                                coalesce(nullif(trim(pav.asset_url), ''), pa.asset_url) as asset_url,
                                 pa.alt_text,
                                 pa.asset_type,
                                 pa.display_order
                             from ecommerce_product_assets pa
+                            left join lateral (
+                                select pav.asset_url
+                                from ecommerce_product_asset_variants pav
+                                where pav.product_asset_id = pa.id
+                                  and pav.variant_kind = 'PRIMARY_OPTIMIZED_WEBP'
+                                  and pav.active = true
+                                  and pav.preferred = true
+                                  and nullif(trim(pav.asset_url), '') is not null
+                                order by pav.updated_at desc, pav.id desc
+                                limit 1
+                            ) pav on true
                             where pa.product_online_profile_id = pop.id
                               and pa.is_primary = true
                               and pa.active = true
