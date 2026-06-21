@@ -1655,3 +1655,43 @@ Solo crear tag cuando se cumpla todo:
   - Objetos storage anteriores pueden quedar orphan hasta una fase futura de limpieza segura.
   - Cache CDN/Next/Image puede retrasar visibilidad en ambientes reales.
   - `webp-imageio` 0.1.6 sigue siendo dependencia runtime no mantenida activamente.
+
+### Cierre Fase 2S.10C-E3 Local Public API QA
+
+- Tipo: validacion local y documentacion QA.
+- Base: E2 cerrado en commit `b054487 feat(ecommerce): prefer WebP variant in public image response`.
+- Objetivo: validar localmente que la API publica ecommerce devuelve correctamente la URL WebP preferida cuando existe variante valida y mantiene fallback seguro al original.
+- No se implemento nueva funcionalidad.
+- Solo se ejecutaron pruebas y se documento evidencia.
+- Endpoints validados:
+  - `GET /api/v1/storefront/catalog/products`
+  - `GET /api/v1/storefront/catalog/products/{slug}`
+- Regla validada:
+  - Si existe variante `PRIMARY_OPTIMIZED_WEBP` active/preferred valida del mismo `ProductAsset`, se devuelve esa URL.
+  - Si no existe variante valida, se devuelve URL original del `ProductAsset`.
+  - `altText`, `type` y `displayOrder` siguen saliendo del `ProductAsset` original.
+- Casos validados:
+  - Producto con variante active/preferred valida: devuelve URL WebP en listado y detalle.
+  - Producto sin variante: devuelve URL original en listado y detalle.
+  - Variante inactive: se ignora y devuelve original.
+  - Variante preferred=false: se ignora y devuelve original.
+  - Variante asociada a otro ProductAsset: se ignora y devuelve original.
+  - Variante stale despues de reemplazo URL-only: no se devuelve.
+  - Contrato publico: mantiene solo 4 campos sin metadata adicional.
+- Tests ejecutados:
+  - Focalizados E2 + regresion E1/D1/D2: 103 tests PASS.
+  - Backend completo: 449 tests PASS.
+- Restricciones cumplidas:
+  - No se modifico `storefront/`, Admin UI, contrato publico, staging, deploy, Dockerfile, `docker-compose.yml`, `.env`, Caddy, DNS, AWS/S3/CloudFront/IAM ni infraestructura.
+  - No se modifico generacion de derivados, upload manual, Excel + ZIP ni URL import.
+  - No se implemento AVIF, responsive images ni `srcset`.
+  - Solo cambios documentales en E3.
+- Documento QA creado:
+  - `docs/qa/PHASE2S10C_E3_LOCAL_PUBLIC_API_QA.md`
+- Resultado: PASS.
+- Riesgos residuales:
+  - Objetos storage anteriores pueden quedar orphan hasta una fase futura de limpieza segura.
+  - Cache CDN/Next/Image puede retrasar visibilidad de cambios en ambientes reales.
+  - `webp-imageio` 0.1.6 sigue siendo dependencia runtime no mantenida activamente.
+  - No se ha validado con data real de productos en staging.
+- Conclusión: API publica lista para staging smoke. Todos los casos criticos cubiertos por tests de integracion.
