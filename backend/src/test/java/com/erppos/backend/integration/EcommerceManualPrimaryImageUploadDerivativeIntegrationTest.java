@@ -3,8 +3,11 @@ package com.erppos.backend.integration;
 import com.erppos.backend.erp.ecommerce.application.usecase.CreateProductOnlineProfileCommand;
 import com.erppos.backend.erp.ecommerce.application.usecase.EcommerceCatalogUseCase;
 import com.erppos.backend.erp.ecommerce.domain.model.ProductAsset;
+import com.erppos.backend.erp.ecommerce.domain.model.ProductAssetVariantFormat;
 import com.erppos.backend.erp.ecommerce.domain.model.ProductAssetVariantKind;
+import com.erppos.backend.erp.ecommerce.domain.model.ProductAssetVariantPurpose;
 import com.erppos.backend.erp.ecommerce.domain.port.EcommerceImageStoragePort;
+import com.erppos.backend.erp.ecommerce.infrastructure.persistence.ProductAssetVariantEntity;
 import com.erppos.backend.erp.ecommerce.infrastructure.persistence.ProductAssetVariantJpaRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -22,8 +25,10 @@ import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
@@ -104,6 +109,61 @@ class EcommerceManualPrimaryImageUploadDerivativeIntegrationTest extends Abstrac
         verify(imageStoragePort, org.mockito.Mockito.times(2)).store(storageObjects.capture());
         assertTrue(storageObjects.getAllValues().stream().anyMatch(object -> "image/jpeg".equals(object.mimeType())));
         assertTrue(storageObjects.getAllValues().stream().anyMatch(object -> "image/webp".equals(object.mimeType())));
+    }
+
+    @Test
+    void manualUploadShouldPersistResponsiveWebpVariantsAsNonPreferred() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = Long.toString(System.nanoTime(), 36);
+        long categoryId = createCategory(adminToken, suffix);
+        long unitId = createUnit(adminToken, suffix);
+        long productId = createProduct(adminToken, categoryId, unitId, suffix, BigDecimal.TEN);
+        ecommerceCatalogUseCase.createDraftProfile(new CreateProductOnlineProfileCommand(productId));
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "manual-primary-large.jpg",
+                "image/jpeg",
+                jpegGradientBytes(1000, 750)
+        );
+
+        mockMvc.perform(multipart("/api/v1/ecommerce-admin/products/{productId}/primary-asset/upload", productId)
+                        .file(file)
+                        .param("altText", "Manual large JPEG")
+                        .param("source", "OWN")
+                        .param("rightsConfirmed", "true")
+                        .param("displayOrder", "0")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken)))
+                .andExpect(status().isOk());
+
+        ProductAsset asset = ecommerceCatalogUseCase.getPrimaryAssetByProductId(productId).orElseThrow();
+        List<ProductAssetVariantEntity> responsiveVariants = variantJpaRepository.findAll().stream()
+                .filter(variant -> asset.id().equals(variant.getProductAssetId()))
+                .filter(variant -> variant.getVariantKind() == ProductAssetVariantKind.PRIMARY_RESPONSIVE_WEBP)
+                .filter(ProductAssetVariantEntity::isActive)
+                .toList();
+
+        assertEquals(List.of(320, 640, 960), responsiveVariants.stream().map(ProductAssetVariantEntity::getTargetWidth).sorted().toList());
+        for (ProductAssetVariantEntity variant : responsiveVariants) {
+            assertEquals(ProductAssetVariantFormat.WEBP, variant.getFormat());
+            assertEquals(ProductAssetVariantPurpose.RESPONSIVE, variant.getPurpose());
+            assertEquals("image/webp", variant.getMimeType());
+            assertEquals(asset.checksumSha256(), variant.getSourceChecksumSha256());
+            assertEquals(variant.getTargetWidth(), variant.getWidth());
+            assertTrue(variant.getStorageKey().contains("/variants/responsive/"));
+            assertTrue(variant.isActive());
+            assertFalse(variant.isPreferred());
+        }
+
+        var preferredVariant = variantJpaRepository.findFirstByProductAssetIdAndVariantKindAndActiveTrueAndPreferredTrue(
+                asset.id(), ProductAssetVariantKind.PRIMARY_OPTIMIZED_WEBP).orElseThrow();
+        assertEquals("image/webp", preferredVariant.getMimeType());
+
+        ArgumentCaptor<EcommerceImageStoragePort.EcommerceImageStorageObject> storageObjects = ArgumentCaptor.forClass(EcommerceImageStoragePort.EcommerceImageStorageObject.class);
+        verify(imageStoragePort, org.mockito.Mockito.times(5)).store(storageObjects.capture());
+        assertEquals(3, storageObjects.getAllValues().stream()
+                .filter(object -> object.storageKey().contains("/variants/responsive/"))
+                .count());
     }
 
     private byte[] jpegGradientBytes(int width, int height) throws Exception {

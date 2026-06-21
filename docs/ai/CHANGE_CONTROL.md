@@ -1822,3 +1822,38 @@ Solo crear tag cuando se cumpla todo:
   - Al generar responsive, URL import/Admin URL upsert deberan desactivar tambien variantes responsive activas para evitar stale variants.
   - Cleanup best-effort debe cubrir multiples objetos nuevos por fila.
 - Recomendacion siguiente: avanzar a 2S.10D-D WebP Responsive Generation en Build separado, sin API publica responsive, Storefront ni AVIF.
+
+### Cierre Fase 2S.10D-D1 Manual Upload Responsive WebP
+
+- Tipo: backend funcional + tests + documentacion QA.
+- Base: 2S.10D-C cerrado en commit `7dad4a8 feat(ecommerce): extend image variants model for responsive WebP`.
+- Objetivo: generar variantes `PRIMARY_RESPONSIVE_WEBP` solo para upload manual ecommerce, sin contrato publico responsive.
+- Alcance real implementado:
+  - Servicio productivo `EcommerceResponsiveWebpVariantGenerationService`.
+  - Targets responsive `320w`, `640w`, `960w`, `1280w`.
+  - JPEG/PNG only; WebP original se conserva sin responsive.
+  - No-upscaling por target.
+  - Storage key bajo `/variants/responsive/` con target width y checksums fuente/derivado.
+  - Persistencia `PRIMARY_RESPONSIVE_WEBP` con `format=WEBP`, `purpose=RESPONSIVE`, `targetWidth`, `sortOrder`, `active=true`, `preferred=false`.
+  - Desactivacion de responsive previas en reemplazo manual.
+  - Cleanup best-effort de original, optimized y responsive nuevos ante fallos storage/DB.
+- Compatibilidad preservada:
+  - `PRIMARY_OPTIMIZED_WEBP` sigue siendo la unica variante `preferred=true`.
+  - API publica sigue usando solo `PRIMARY_OPTIMIZED_WEBP active/preferred` para `primaryImage.url`.
+  - `PublicImageResponse(url, altText, type, displayOrder)` no cambio.
+  - Excel + ZIP y URL import no generan responsive.
+- Tests ejecutados:
+  - Focalizados iniciales: 47 tests PASS.
+  - Regresion ecommerce focalizada: 104 tests PASS.
+  - Backend completo: 465 tests PASS.
+- Documento QA creado:
+  - `docs/qa/PHASE2S10D_D1_MANUAL_UPLOAD_RESPONSIVE_WEBP_QA.md`
+- Resultado: PASS local.
+- Restricciones cumplidas:
+  - No se toco Storefront, Admin UI, contrato publico, `PublicImageResponse`, API publica responsive, Excel + ZIP, URL import, staging/deploy, Dockerfile, `docker-compose.yml`, `.env`, Caddy, DNS, AWS/S3/CloudFront/IAM ni infraestructura.
+  - No se implemento AVIF ni se permitio `image/avif`.
+- Riesgos residuales:
+  - Calidad visual responsive requiere validacion con imagenes reales.
+  - `webp-imageio` 0.1.6 sigue siendo dependencia runtime no mantenida activamente.
+  - Objetos storage anteriores pueden quedar orphan hasta fase futura de limpieza segura.
+- Recomendacion siguiente: cerrar commit D1; no iniciar 2S.10D-D2 sin autorizacion explicita.

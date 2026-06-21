@@ -39,11 +39,14 @@
 
 ### Storage
 - **Backend**: S3 vía `EcommerceImageStoragePort`
-- **Content-Type**: `image/jpeg`, `image/png` según contenido detectado
+- **Content-Type**: `image/jpeg`, `image/png`, `image/webp` según contenido detectado o variante generada
 - **Cache-Control**: `public, max-age=31536000, immutable`
 - **Metadata S3**: `checksum-sha256`
 - **storageKey**: `{prefix}/ecommerce/products/{productId}/profiles/{profileId}/main/{slug}-{sha256-12}.{ext}`
-- **DB**: `ecommerce_product_assets` con columnas: `storage_provider`, `storage_bucket`, `storage_key`, `mime_type`, `width`, `height`, `size_bytes`, `checksum_sha256`, `original_filename`
+- **storageKey variante optimized**: `{prefix}/ecommerce/products/{productId}/profiles/{profileId}/variants/{slug}-{sourceSha256-12}-{derivativeSha256-12}.webp`
+- **storageKey variante responsive**: `{prefix}/ecommerce/products/{productId}/profiles/{profileId}/variants/responsive/{slug}-{targetWidth}w-{sourceSha256-12}-{derivativeSha256-12}.webp`
+- **DB original**: `ecommerce_product_assets` con columnas: `storage_provider`, `storage_bucket`, `storage_key`, `mime_type`, `width`, `height`, `size_bytes`, `checksum_sha256`, `original_filename`
+- **DB variantes**: `ecommerce_product_asset_variants` con `variant_kind`, `format`, `purpose`, `target_width`, `sort_order`, metadata storage/checksum y flags `active/preferred`
 
 ### Storefront
 - **Render**: `next/image` con validación de dominio vía `STOREFRONT_IMAGE_ALLOWED_DOMAINS`
@@ -104,9 +107,10 @@
 - **DB**: Requiere modelo de variantes si no se hizo en 2S.10C
 - **Estado 2S.10D-B**: Spike test-only PASS para WebP responsive en local y Docker/Linux; AVIF BLOQUEADO por falta de writer/reader ImageIO seguro sin tocar Dockerfile/infraestructura
 - **Estado 2S.10D-C**: Modelo extendido con V20 para WebP responsive; `PRIMARY_RESPONSIVE_WEBP`, `format=WEBP`, `purpose=RESPONSIVE`, `target_width` y `sort_order` listos, sin generacion responsive todavia
-- **Storefront**: Requiere cambios en tipos públicos, `ProductImageFrame`, SEO/OG, `next/image` config
-- **Responsive**: `srcSet` con múltiples resoluciones
-- **AVIF**: Formato moderno con mejor compresión (requiere soporte backend)
+- **Estado 2S.10D-D1**: Upload manual genera `PRIMARY_RESPONSIVE_WEBP` para JPEG/PNG con targets `320w`, `640w`, `960w`, `1280w`, no-upscaling y `preferred=false`; WebP original no genera responsive
+- **Storefront**: Sin cambios en D1; cambios en tipos publicos, `ProductImageFrame`, SEO/OG y `next/image` config quedan diferidos
+- **Responsive API**: Sin `srcset`, `sizes`, `sources` ni metadata publica en D1
+- **AVIF**: Bloqueado/no apto por ahora; no se permite `image/avif`
 - **Caché**: Estrategia avanzada (stale-while-revalidate, CDN invalidation)
 - **Riesgos**: Complejidad alta, cache invalidation, contrato público más amplio
 

@@ -164,6 +164,31 @@ public class EcommerceProductImageBinaryService {
         return prefix == null ? key : prefix + "/" + key;
     }
 
+    public String buildPrimaryResponsiveWebpVariantStorageKey(
+            ProductOnlineProfile profile,
+            String productName,
+            int targetWidth,
+            String sourceChecksumSha256,
+            String derivativeChecksumSha256
+    ) {
+        String baseSlug = normalizeSlug(firstNonBlank(profile.slug(), profile.onlineName(), productName, "main"));
+        if (baseSlug == null) {
+            baseSlug = "main";
+        }
+        String sourceSuffix = sourceChecksumSha256.substring(0, Math.min(CHECKSUM_STORAGE_SUFFIX_LENGTH, sourceChecksumSha256.length()));
+        String derivativeSuffix = derivativeChecksumSha256.substring(0, Math.min(CHECKSUM_STORAGE_SUFFIX_LENGTH, derivativeChecksumSha256.length()));
+        String key = "ecommerce/products/%d/profiles/%d/variants/responsive/%s-%dw-%s-%s.webp".formatted(
+                profile.productId(),
+                profile.id(),
+                baseSlug,
+                targetWidth,
+                sourceSuffix,
+                derivativeSuffix
+        );
+        String prefix = normalizeStoragePrefix(imageStorageProperties.getPrefix());
+        return prefix == null ? key : prefix + "/" + key;
+    }
+
     public void cleanupBestEffort(String storageKey) {
         try {
             imageStoragePort.delete(storageKey);

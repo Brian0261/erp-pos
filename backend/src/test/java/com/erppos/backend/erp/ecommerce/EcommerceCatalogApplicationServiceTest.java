@@ -4,6 +4,7 @@ import com.erppos.backend.erp.ecommerce.application.service.AuditUserProvider;
 import com.erppos.backend.erp.ecommerce.application.service.EcommerceCatalogApplicationService;
 import com.erppos.backend.erp.ecommerce.application.service.EcommerceImageStorageProperties;
 import com.erppos.backend.erp.ecommerce.application.service.EcommerceProductImageBinaryService;
+import com.erppos.backend.erp.ecommerce.application.service.EcommerceResponsiveWebpVariantGenerationService;
 import com.erppos.backend.erp.ecommerce.application.service.EcommerceWebpDerivativeGenerationService;
 import com.erppos.backend.erp.ecommerce.application.service.PublicImageUrlPolicy;
 import com.erppos.backend.erp.ecommerce.application.service.PublicImageUrlProperties;
@@ -29,7 +30,9 @@ import com.erppos.backend.erp.ecommerce.domain.model.OnlinePriceOverride;
 import com.erppos.backend.erp.ecommerce.domain.model.OnlinePublicationStatus;
 import com.erppos.backend.erp.ecommerce.domain.model.ProductAsset;
 import com.erppos.backend.erp.ecommerce.domain.model.ProductAssetVariant;
+import com.erppos.backend.erp.ecommerce.domain.model.ProductAssetVariantFormat;
 import com.erppos.backend.erp.ecommerce.domain.model.ProductAssetVariantKind;
+import com.erppos.backend.erp.ecommerce.domain.model.ProductAssetVariantPurpose;
 import com.erppos.backend.erp.ecommerce.domain.model.ProductOnlineProfile;
 import com.erppos.backend.erp.ecommerce.domain.model.RobotsPolicy;
 import com.erppos.backend.erp.ecommerce.domain.port.EcommerceBrandRepositoryPort;
@@ -108,7 +111,8 @@ class EcommerceCatalogApplicationServiceTest {
                 new AuditUserProvider(),
                 publicImageUrlPolicy(List.of("cdn.inktoy.pe")),
                 imageBinaryService,
-                new EcommerceWebpDerivativeGenerationService(imageBinaryService)
+                new EcommerceWebpDerivativeGenerationService(imageBinaryService),
+                new EcommerceResponsiveWebpVariantGenerationService(imageBinaryService)
         );
     }
 
@@ -395,6 +399,11 @@ class EcommerceCatalogApplicationServiceTest {
     void shouldRejectHttpsAssetUrlWhenAllowlistIsEmpty() {
         PreparedData data = prepareBaseDraftProfile();
         PublicImageUrlProperties properties = new PublicImageUrlProperties();
+        EcommerceProductImageBinaryService restrictedImageBinaryService = new EcommerceProductImageBinaryService(
+                imageStoragePort,
+                imageStorageProperties,
+                new PublicImageUrlPolicy(properties)
+        );
         EcommerceCatalogApplicationService restrictedService = new EcommerceCatalogApplicationService(
                 profileRepository,
                 productReadPort,
@@ -406,8 +415,9 @@ class EcommerceCatalogApplicationServiceTest {
                 overrideRepository,
                 new AuditUserProvider(),
                 new PublicImageUrlPolicy(properties),
-                new EcommerceProductImageBinaryService(imageStoragePort, imageStorageProperties, new PublicImageUrlPolicy(properties)),
-                new EcommerceWebpDerivativeGenerationService(new EcommerceProductImageBinaryService(imageStoragePort, imageStorageProperties, new PublicImageUrlPolicy(properties)))
+                restrictedImageBinaryService,
+                new EcommerceWebpDerivativeGenerationService(restrictedImageBinaryService),
+                new EcommerceResponsiveWebpVariantGenerationService(restrictedImageBinaryService)
         );
 
         EcommerceBusinessRuleException ex = assertThrows(EcommerceBusinessRuleException.class, () ->
@@ -503,6 +513,44 @@ class EcommerceCatalogApplicationServiceTest {
     }
 
     @Test
+    void shouldUploadJpegPrimaryProductImageAndStoreResponsiveWebpVariants() throws IOException {
+        PreparedData data = prepareBaseDraftProfile();
+        byte[] imageBytes = jpegGradientBytes(1000, 750);
+
+        ProductAsset asset = service.uploadPrimaryProductAsset(new UploadPrimaryProductAssetCommand(
+                data.productId(),
+                imageBytes,
+                "lapicero-azul.jpg",
+                "image/jpeg",
+                "Lapicero azul",
+                AssetSource.OWN,
+                true,
+                4
+        ));
+
+        List<ProductAssetVariant> responsiveVariants = assetVariantRepository.findActiveByKind(
+                        asset.id(), ProductAssetVariantKind.PRIMARY_RESPONSIVE_WEBP)
+                .stream()
+                .sorted(java.util.Comparator.comparingInt(ProductAssetVariant::targetWidth))
+                .toList();
+        assertEquals(List.of(320, 640, 960), responsiveVariants.stream().map(ProductAssetVariant::targetWidth).toList());
+        for (ProductAssetVariant variant : responsiveVariants) {
+            assertEquals(ProductAssetVariantFormat.WEBP, variant.format());
+            assertEquals(ProductAssetVariantPurpose.RESPONSIVE, variant.purpose());
+            assertEquals("image/webp", variant.mimeType());
+            assertEquals(asset.checksumSha256(), variant.sourceChecksumSha256());
+            assertEquals(variant.targetWidth(), variant.width());
+            assertTrue(variant.storageKey().contains("/variants/responsive/"));
+            assertTrue(variant.active());
+            assertFalse(variant.preferred());
+        }
+        ProductAssetVariant preferredVariant = assetVariantRepository.findActiveByProductAssetIdAndVariantKind(
+                asset.id(), ProductAssetVariantKind.PRIMARY_OPTIMIZED_WEBP).orElseThrow();
+        assertTrue(preferredVariant.preferred());
+        assertEquals(5, imageStoragePort.storedObjects().size());
+    }
+
+    @Test
     void shouldDiscardManualUploadDerivativeWhenWebpIsNotSmaller() throws IOException {
         PreparedData data = prepareBaseDraftProfile();
         byte[] imageBytes = transparentPngImageBytes(1, 1);
@@ -594,6 +642,44 @@ class EcommerceCatalogApplicationServiceTest {
     }
 
     @Test
+    void shouldDeactivatePreviousResponsiveVariantsWhenReplacingManualUploadImage() throws IOException {
+        PreparedData data = prepareBaseDraftProfile();
+        ProductAsset first = service.uploadPrimaryProductAsset(new UploadPrimaryProductAssetCommand(
+                data.productId(),
+                jpegGradientBytes(1000, 750),
+                "lapicero-azul.jpg",
+                "image/jpeg",
+                "Lapicero azul",
+                AssetSource.OWN,
+                true,
+                4
+        ));
+        List<Long> firstResponsiveVariantIds = assetVariantRepository.findActiveByKind(
+                        first.id(), ProductAssetVariantKind.PRIMARY_RESPONSIVE_WEBP)
+                .stream()
+                .map(ProductAssetVariant::id)
+                .toList();
+
+        ProductAsset second = service.uploadPrimaryProductAsset(new UploadPrimaryProductAssetCommand(
+                data.productId(),
+                jpegGradientBytes(1000, 750),
+                "lapicero-rojo.jpg",
+                "image/jpeg",
+                "Lapicero rojo",
+                AssetSource.OWN,
+                true,
+                4
+        ));
+
+        assertEquals(first.id(), second.id());
+        assertFalse(firstResponsiveVariantIds.isEmpty());
+        for (Long variantId : firstResponsiveVariantIds) {
+            assertFalse(assetVariantRepository.findById(variantId).orElseThrow().active());
+        }
+        assertEquals(3, assetVariantRepository.findActiveByKind(second.id(), ProductAssetVariantKind.PRIMARY_RESPONSIVE_WEBP).size());
+    }
+
+    @Test
     void shouldCleanupOriginalWhenDerivativeUploadFails() throws IOException {
         PreparedData data = prepareBaseDraftProfile();
         imageStoragePort.failStoreWhenKeyContains("/variants/");
@@ -632,6 +718,28 @@ class EcommerceCatalogApplicationServiceTest {
         assertEquals(2, imageStoragePort.deletedKeys().size());
         assertTrue(imageStoragePort.deletedKeys().stream().anyMatch(key -> key.contains("/main/")));
         assertTrue(imageStoragePort.deletedKeys().stream().anyMatch(key -> key.contains("/variants/")));
+    }
+
+    @Test
+    void shouldCleanupOriginalDerivativeAndResponsiveVariantsWhenPersistenceFails() throws IOException {
+        PreparedData data = prepareBaseDraftProfile();
+        assetVariantRepository.failOnSave(true);
+
+        assertThrows(EcommerceBusinessRuleException.class, () -> service.uploadPrimaryProductAsset(new UploadPrimaryProductAssetCommand(
+                data.productId(),
+                jpegGradientBytes(1000, 750),
+                "lapicero-azul.jpg",
+                "image/jpeg",
+                "Lapicero azul",
+                AssetSource.OWN,
+                true,
+                4
+        )));
+
+        assertEquals(5, imageStoragePort.deletedKeys().size());
+        assertTrue(imageStoragePort.deletedKeys().stream().anyMatch(key -> key.contains("/main/")));
+        assertEquals(4, imageStoragePort.deletedKeys().stream().filter(key -> key.contains("/variants/")).count());
+        assertEquals(3, imageStoragePort.deletedKeys().stream().filter(key -> key.contains("/variants/responsive/")).count());
     }
 
     @Test
@@ -1400,6 +1508,10 @@ class EcommerceCatalogApplicationServiceTest {
                     id,
                     variant.productAssetId(),
                     variant.variantKind(),
+                    variant.format(),
+                    variant.purpose(),
+                    variant.targetWidth(),
+                    variant.sortOrder(),
                     variant.assetUrl(),
                     variant.storageProvider(),
                     variant.storageBucket(),
@@ -1440,6 +1552,10 @@ class EcommerceCatalogApplicationServiceTest {
                             variant.id(),
                             variant.productAssetId(),
                             variant.variantKind(),
+                            variant.format(),
+                            variant.purpose(),
+                            variant.targetWidth(),
+                            variant.sortOrder(),
                             variant.assetUrl(),
                             variant.storageProvider(),
                             variant.storageBucket(),
@@ -1467,6 +1583,14 @@ class EcommerceCatalogApplicationServiceTest {
 
         private void failOnSave(boolean failOnSave) {
             this.failOnSave = failOnSave;
+        }
+
+        private List<ProductAssetVariant> findActiveByKind(Long productAssetId, ProductAssetVariantKind variantKind) {
+            return variantsById.values().stream()
+                    .filter(ProductAssetVariant::active)
+                    .filter(variant -> variant.productAssetId().equals(productAssetId))
+                    .filter(variant -> variant.variantKind() == variantKind)
+                    .toList();
         }
     }
 

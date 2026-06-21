@@ -32,7 +32,9 @@ import com.erppos.backend.erp.ecommerce.domain.model.OnlinePublicationStatus;
 import com.erppos.backend.erp.ecommerce.domain.model.OnlinePriceOverride;
 import com.erppos.backend.erp.ecommerce.domain.model.ProductAsset;
 import com.erppos.backend.erp.ecommerce.domain.model.ProductAssetVariant;
+import com.erppos.backend.erp.ecommerce.domain.model.ProductAssetVariantFormat;
 import com.erppos.backend.erp.ecommerce.domain.model.ProductAssetVariantKind;
+import com.erppos.backend.erp.ecommerce.domain.model.ProductAssetVariantPurpose;
 import com.erppos.backend.erp.ecommerce.domain.model.ProductOnlineProfile;
 import com.erppos.backend.erp.ecommerce.domain.model.RobotsPolicy;
 import com.erppos.backend.erp.ecommerce.domain.port.EcommerceBrandRepositoryPort;
@@ -78,6 +80,7 @@ public class EcommerceCatalogApplicationService implements EcommerceCatalogUseCa
     private final PublicImageUrlPolicy publicImageUrlPolicy;
     private final EcommerceProductImageBinaryService productImageBinaryService;
     private final EcommerceWebpDerivativeGenerationService webpDerivativeGenerationService;
+    private final EcommerceResponsiveWebpVariantGenerationService responsiveWebpVariantGenerationService;
 
     public EcommerceCatalogApplicationService(
             ProductOnlineProfileRepositoryPort profileRepositoryPort,
@@ -91,7 +94,8 @@ public class EcommerceCatalogApplicationService implements EcommerceCatalogUseCa
             AuditUserProvider auditUserProvider,
             PublicImageUrlPolicy publicImageUrlPolicy,
             EcommerceProductImageBinaryService productImageBinaryService,
-            EcommerceWebpDerivativeGenerationService webpDerivativeGenerationService
+            EcommerceWebpDerivativeGenerationService webpDerivativeGenerationService,
+            EcommerceResponsiveWebpVariantGenerationService responsiveWebpVariantGenerationService
     ) {
         this.profileRepositoryPort = profileRepositoryPort;
         this.productReadPort = productReadPort;
@@ -105,6 +109,7 @@ public class EcommerceCatalogApplicationService implements EcommerceCatalogUseCa
         this.publicImageUrlPolicy = publicImageUrlPolicy;
         this.productImageBinaryService = productImageBinaryService;
         this.webpDerivativeGenerationService = webpDerivativeGenerationService;
+        this.responsiveWebpVariantGenerationService = responsiveWebpVariantGenerationService;
     }
 
     @Override
@@ -638,6 +643,10 @@ public class EcommerceCatalogApplicationService implements EcommerceCatalogUseCa
                 command.fileBytes(),
                 originalImage
         );
+        List<EcommerceResponsiveWebpVariantGenerationService.GeneratedResponsiveWebpVariant> responsiveVariants = responsiveWebpVariantGenerationService.generateResponsiveVariants(
+                command.fileBytes(),
+                originalImage
+        );
 
         String originalStorageKey = productImageBinaryService.buildPrimaryStorageKey(profile, productSnapshot.name(), originalImage);
         EcommerceProductImageBinaryService.StoredProductImage storedImage = productImageBinaryService.storeValidated(
@@ -646,6 +655,7 @@ public class EcommerceCatalogApplicationService implements EcommerceCatalogUseCa
                 originalImage
         );
         EcommerceProductImageBinaryService.StoredProductImage storedDerivative = null;
+        List<StoredResponsiveWebpVariant> storedResponsiveVariants = new ArrayList<>();
         EcommerceWebpDerivativeGenerationService.GeneratedWebpDerivative derivative = webpDerivative.orElse(null);
         try {
             if (derivative != null) {
@@ -670,8 +680,36 @@ public class EcommerceCatalogApplicationService implements EcommerceCatalogUseCa
                         derivativeImage
                 );
             }
+            for (EcommerceResponsiveWebpVariantGenerationService.GeneratedResponsiveWebpVariant responsiveVariant : responsiveVariants) {
+                String responsiveStorageKey = productImageBinaryService.buildPrimaryResponsiveWebpVariantStorageKey(
+                        profile,
+                        productSnapshot.name(),
+                        responsiveVariant.targetWidth(),
+                        responsiveVariant.sourceChecksumSha256(),
+                        responsiveVariant.checksumSha256()
+                );
+                EcommerceProductImageBinaryService.ValidatedProductImage responsiveImage = new EcommerceProductImageBinaryService.ValidatedProductImage(
+                        responsiveVariant.mimeType(),
+                        "webp",
+                        responsiveVariant.width(),
+                        responsiveVariant.height(),
+                        responsiveVariant.sizeBytes(),
+                        responsiveVariant.checksumSha256(),
+                        responsiveVariant.originalFilename()
+                );
+                EcommerceProductImageBinaryService.StoredProductImage storedResponsiveVariant = productImageBinaryService.storeValidated(
+                        responsiveStorageKey,
+                        responsiveVariant.bytes(),
+                        responsiveImage
+                );
+                storedResponsiveVariants.add(new StoredResponsiveWebpVariant(responsiveVariant, storedResponsiveVariant));
+            }
         } catch (RuntimeException ex) {
             productImageBinaryService.cleanupBestEffort(storedImage.storageKey());
+            if (storedDerivative != null) {
+                productImageBinaryService.cleanupBestEffort(storedDerivative.storageKey());
+            }
+            cleanupStoredResponsiveVariants(storedResponsiveVariants);
             throw ex;
         }
 
@@ -709,6 +747,11 @@ public class EcommerceCatalogApplicationService implements EcommerceCatalogUseCa
                     ProductAssetVariantKind.PRIMARY_OPTIMIZED_WEBP,
                     actor
             );
+            productAssetVariantRepositoryPort.deactivateActiveByProductAssetIdAndVariantKind(
+                    saved.id(),
+                    ProductAssetVariantKind.PRIMARY_RESPONSIVE_WEBP,
+                    actor
+            );
             if (storedDerivative != null && derivative != null) {
                 productAssetVariantRepositoryPort.save(new ProductAssetVariant(
                         null,
@@ -732,14 +775,56 @@ public class EcommerceCatalogApplicationService implements EcommerceCatalogUseCa
                         actor
                 ));
             }
+            for (StoredResponsiveWebpVariant storedResponsiveVariant : storedResponsiveVariants) {
+                EcommerceResponsiveWebpVariantGenerationService.GeneratedResponsiveWebpVariant responsiveVariant = storedResponsiveVariant.variant();
+                EcommerceProductImageBinaryService.StoredProductImage storedResponsiveImage = storedResponsiveVariant.storedImage();
+                productAssetVariantRepositoryPort.save(new ProductAssetVariant(
+                        null,
+                        saved.id(),
+                        ProductAssetVariantKind.PRIMARY_RESPONSIVE_WEBP,
+                        ProductAssetVariantFormat.WEBP,
+                        ProductAssetVariantPurpose.RESPONSIVE,
+                        responsiveVariant.targetWidth(),
+                        responsiveVariant.sortOrder(),
+                        storedResponsiveImage.publicUrl(),
+                        storedResponsiveImage.provider(),
+                        storedResponsiveImage.bucket(),
+                        storedResponsiveImage.storageKey(),
+                        responsiveVariant.mimeType(),
+                        responsiveVariant.width(),
+                        responsiveVariant.height(),
+                        responsiveVariant.sizeBytes(),
+                        responsiveVariant.checksumSha256(),
+                        responsiveVariant.sourceChecksumSha256(),
+                        true,
+                        false,
+                        null,
+                        null,
+                        actor,
+                        actor
+                ));
+            }
             return saved;
         } catch (RuntimeException ex) {
             productImageBinaryService.cleanupBestEffort(storedImage.storageKey());
             if (storedDerivative != null) {
                 productImageBinaryService.cleanupBestEffort(storedDerivative.storageKey());
             }
+            cleanupStoredResponsiveVariants(storedResponsiveVariants);
             throw ex;
         }
+    }
+
+    private void cleanupStoredResponsiveVariants(List<StoredResponsiveWebpVariant> storedResponsiveVariants) {
+        for (StoredResponsiveWebpVariant storedResponsiveVariant : storedResponsiveVariants) {
+            productImageBinaryService.cleanupBestEffort(storedResponsiveVariant.storedImage().storageKey());
+        }
+    }
+
+    private record StoredResponsiveWebpVariant(
+            EcommerceResponsiveWebpVariantGenerationService.GeneratedResponsiveWebpVariant variant,
+            EcommerceProductImageBinaryService.StoredProductImage storedImage
+    ) {
     }
 
     @Override
