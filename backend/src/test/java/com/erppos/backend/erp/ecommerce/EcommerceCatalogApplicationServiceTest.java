@@ -279,6 +279,37 @@ class EcommerceCatalogApplicationServiceTest {
     }
 
     @Test
+    void shouldDeactivateStaleWebpVariantWhenAdminUrlAssetIsUpserted() {
+        PreparedData data = prepareBaseDraftProfile();
+        ProductAsset first = service.upsertPrimaryProductAsset(validAssetCommand(
+                data.productId(),
+                "https://cdn.inktoy.pe/products/lapicero-old.jpg"
+        ));
+        ProductAssetVariant staleVariant = assetVariantRepository.save(activePreferredVariant(first.id(), "old"));
+
+        long otherProductId = 11L;
+        productReadPort.add(new EcommerceCatalogProductSnapshot(otherProductId, "SKU-OTHER", "Borrador", BigDecimal.ONE, true));
+        service.createDraftProfile(new CreateProductOnlineProfileCommand(otherProductId));
+        ProductAsset otherAsset = service.upsertPrimaryProductAsset(validAssetCommand(
+                otherProductId,
+                "https://cdn.inktoy.pe/products/other.jpg"
+        ));
+        ProductAssetVariant otherVariant = assetVariantRepository.save(activePreferredVariant(otherAsset.id(), "other"));
+
+        ProductAsset updated = service.upsertPrimaryProductAsset(validAssetCommand(
+                data.productId(),
+                "https://cdn.inktoy.pe/products/lapicero-new.jpg"
+        ));
+
+        assertEquals(first.id(), updated.id());
+        assertEquals("https://cdn.inktoy.pe/products/lapicero-new.jpg", updated.assetUrl());
+        assertFalse(assetVariantRepository.findById(staleVariant.id()).orElseThrow().active());
+        assertFalse(assetVariantRepository.findById(staleVariant.id()).orElseThrow().preferred());
+        assertTrue(assetVariantRepository.findById(otherVariant.id()).orElseThrow().active());
+        assertTrue(assetVariantRepository.findById(otherVariant.id()).orElseThrow().preferred());
+    }
+
+    @Test
     void shouldRejectBlankAssetUrl() {
         PreparedData data = prepareBaseDraftProfile();
 
@@ -841,6 +872,30 @@ class EcommerceCatalogApplicationServiceTest {
                 AssetSource.OWN,
                 true,
                 0
+        );
+    }
+
+    private ProductAssetVariant activePreferredVariant(Long productAssetId, String suffix) {
+        return new ProductAssetVariant(
+                null,
+                productAssetId,
+                ProductAssetVariantKind.PRIMARY_OPTIMIZED_WEBP,
+                "https://cdn.inktoy.pe/products/variants/" + suffix + ".webp",
+                "S3",
+                "inktoy-test-bucket",
+                "inktoy-dev/ecommerce/products/variants/" + suffix + ".webp",
+                "image/webp",
+                96,
+                72,
+                700L,
+                "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789",
+                true,
+                true,
+                null,
+                null,
+                "it",
+                "it"
         );
     }
 

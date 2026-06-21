@@ -1574,3 +1574,42 @@ Solo crear tag cuando se cumpla todo:
   - Objetos orphan de reemplazos anteriores.
   - Cleanup best-effort puede fallar.
 - Conclusión: D1 y D2 conviven correctamente. Listo para 2S.10C-E.
+
+### Cierre Fase 2S.10C-E1 URL Stale Variants
+
+- Tipo: implementacion backend + tests + documentacion QA.
+- Base: D3 cerrado en commit `c3803da docs(ecommerce): close local WebP derivatives QA`.
+- Objetivo: corregir riesgo anti-stale antes de habilitar preferencia publica de variantes WebP.
+- Cambios backend:
+  - `EcommercePrimaryImageUrlImportApplicationService.confirmFile(...)` desactiva `PRIMARY_OPTIMIZED_WEBP` activa del `ProductAsset` guardado cuando la fila aplica CREATE/UPDATE.
+  - `EcommerceCatalogApplicationService.upsertPrimaryProductAsset(...)` desactiva `PRIMARY_OPTIMIZED_WEBP` activa del `ProductAsset` guardado.
+- Reglas preservadas:
+  - URL import `NO_CHANGE` no desactiva variantes.
+  - URL import preview no cambia y sigue sin efectos secundarios.
+  - No se generan derivados WebP nuevos en URL import.
+  - No se crean `ProductAssetVariant` nuevas en E1.
+  - No se borran objetos storage.
+  - Partial success por fila se mantiene.
+- Validaciones:
+  - URL import UPDATE desactiva variante stale del asset afectado.
+  - URL import NO_CHANGE conserva variante activa.
+  - Admin URL upsert desactiva variante stale del asset afectado.
+  - No se desactivan variantes de otro `ProductAsset`.
+  - Regresion upload manual D1, Excel + ZIP D2, persistencia de variantes y Storefront contract: PASS.
+- Tests ejecutados:
+  - Focalizados E1 + regresion D1/D2/Storefront: 87 tests PASS.
+  - Backend completo: 442 tests PASS.
+- Restricciones cumplidas:
+  - No se modifico Storefront, contrato publico ni `primaryImage.url`.
+  - No se modifico Admin UI.
+  - No se toco staging, deploy, Caddy, DNS, AWS/S3/CloudFront/IAM ni secretos.
+  - No se modificaron `.env`, Dockerfile ni `docker-compose.yml`.
+  - No se implemento AVIF, responsive images ni `srcset`.
+  - No se inicio 2S.10C-E2.
+- Documento QA creado:
+  - `docs/qa/PHASE2S10C_E1_URL_STALE_VARIANTS_QA.md`
+- Resultado: PASS.
+- Riesgos residuales:
+  - Storefront todavia no consume variantes.
+  - E2 debe preferir variantes solo si pertenecen al `ProductAsset` primario activo vigente.
+  - Objetos storage anteriores pueden quedar orphan hasta una fase futura de limpieza segura.

@@ -615,7 +615,13 @@ public class EcommerceCatalogApplicationService implements EcommerceCatalogUseCa
                 currentPrimary == null ? actor : currentPrimary.createdBy(),
                 actor
         );
-        return productAssetRepositoryPort.save(asset);
+        ProductAsset saved = productAssetRepositoryPort.save(asset);
+        productAssetVariantRepositoryPort.deactivateActiveByProductAssetIdAndVariantKind(
+                saved.id(),
+                ProductAssetVariantKind.PRIMARY_OPTIMIZED_WEBP,
+                actor
+        );
+        return saved;
     }
 
     @Override

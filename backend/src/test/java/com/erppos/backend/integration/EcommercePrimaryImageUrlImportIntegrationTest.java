@@ -9,9 +9,12 @@ import com.erppos.backend.erp.ecommerce.domain.model.AssetSource;
 import com.erppos.backend.erp.ecommerce.domain.model.AssetType;
 import com.erppos.backend.erp.ecommerce.domain.model.BrandAbsencePolicy;
 import com.erppos.backend.erp.ecommerce.domain.model.ProductAsset;
+import com.erppos.backend.erp.ecommerce.domain.model.ProductAssetVariantKind;
 import com.erppos.backend.erp.ecommerce.domain.model.ProductOnlineProfile;
 import com.erppos.backend.erp.ecommerce.domain.model.RobotsPolicy;
 import com.erppos.backend.erp.ecommerce.domain.port.ProductAssetRepositoryPort;
+import com.erppos.backend.erp.ecommerce.infrastructure.persistence.ProductAssetVariantEntity;
+import com.erppos.backend.erp.ecommerce.infrastructure.persistence.ProductAssetVariantJpaRepository;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
@@ -43,6 +46,9 @@ class EcommercePrimaryImageUrlImportIntegrationTest extends AbstractHttpIntegrat
 
     @Autowired
     private ProductAssetRepositoryPort productAssetRepositoryPort;
+
+    @Autowired
+    private ProductAssetVariantJpaRepository productAssetVariantJpaRepository;
 
     @Test
     void shouldDownloadPrimaryImageUrlTemplate() throws Exception {
@@ -141,6 +147,102 @@ class EcommercePrimaryImageUrlImportIntegrationTest extends AbstractHttpIntegrat
                 .andExpect(jsonPath("$.categoryId").value(categoryId))
                 .andExpect(jsonPath("$.unitId").value(unitId))
                 .andExpect(jsonPath("$.salePrice").value(19.90));
+    }
+
+    @Test
+    void confirmFileUpdateShouldDeactivateStaleWebpVariantForUpdatedAssetOnly() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = Long.toString(System.nanoTime(), 36);
+        long updateProductId = createCatalogProduct(adminToken, suffix + "updvar", BigDecimal.valueOf(10.00));
+        long otherProductId = createCatalogProduct(adminToken, suffix + "othvar", BigDecimal.valueOf(11.00));
+        createDraftProfile(updateProductId);
+        createDraftProfile(otherProductId);
+        ProductAsset updateAsset = ecommerceCatalogUseCase.upsertPrimaryProductAsset(assetCommand(
+                updateProductId,
+                "/images/products/old-" + suffix + ".jpg",
+                "Old alt",
+                AssetSource.OWN,
+                0
+        ));
+        ProductAsset otherAsset = ecommerceCatalogUseCase.upsertPrimaryProductAsset(assetCommand(
+                otherProductId,
+                "/images/products/other-" + suffix + ".jpg",
+                "Other alt",
+                AssetSource.OWN,
+                0
+        ));
+        ProductAssetVariantEntity staleVariant = productAssetVariantJpaRepository.saveAndFlush(validVariant(updateAsset.id(), suffix + "-stale"));
+        ProductAssetVariantEntity otherVariant = productAssetVariantJpaRepository.saveAndFlush(validVariant(otherAsset.id(), suffix + "-other"));
+
+        MockMultipartFile file = workbookFile(new String[][]{{
+                productSku(suffix + "updvar"),
+                "/images/products/new-" + suffix + ".jpg",
+                "New alt",
+                "SUPPLIER",
+                "true",
+                "PRODUCT_IMAGE",
+                "1",
+                "",
+                "",
+                "",
+                ""
+        }});
+
+        mockMvc.perform(multipart("/api/v1/ecommerce-admin/products/online-profiles/primary-images/import/confirm-file")
+                        .file(file)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.updatedRows").value(1))
+                .andExpect(jsonPath("$.rejectedRows").value(0));
+
+        ProductAsset updatedAsset = productAssetRepositoryPort.findPrimaryActiveByProductOnlineProfileId(updateAsset.productOnlineProfileId()).orElseThrow();
+        org.junit.jupiter.api.Assertions.assertEquals(updateAsset.id(), updatedAsset.id());
+        org.junit.jupiter.api.Assertions.assertFalse(productAssetVariantJpaRepository.findById(staleVariant.getId()).orElseThrow().isActive());
+        org.junit.jupiter.api.Assertions.assertFalse(productAssetVariantJpaRepository.findById(staleVariant.getId()).orElseThrow().isPreferred());
+        org.junit.jupiter.api.Assertions.assertTrue(productAssetVariantJpaRepository.findById(otherVariant.getId()).orElseThrow().isActive());
+        org.junit.jupiter.api.Assertions.assertTrue(productAssetVariantJpaRepository.findById(otherVariant.getId()).orElseThrow().isPreferred());
+    }
+
+    @Test
+    void confirmFileNoChangeShouldKeepExistingWebpVariantActive() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = Long.toString(System.nanoTime(), 36);
+        long productId = createCatalogProduct(adminToken, suffix + "samevar", BigDecimal.valueOf(10.00));
+        createDraftProfile(productId);
+        ProductAsset asset = ecommerceCatalogUseCase.upsertPrimaryProductAsset(assetCommand(
+                productId,
+                "/images/products/same-" + suffix + ".jpg",
+                "Same alt",
+                AssetSource.SUPPLIER,
+                2
+        ));
+        ProductAssetVariantEntity variant = productAssetVariantJpaRepository.saveAndFlush(validVariant(asset.id(), suffix + "-same"));
+
+        MockMultipartFile file = workbookFile(new String[][]{{
+                productSku(suffix + "samevar"),
+                "/images/products/same-" + suffix + ".jpg",
+                "Same alt",
+                "SUPPLIER",
+                "true",
+                "PRODUCT_IMAGE",
+                "2",
+                "",
+                "",
+                "",
+                ""
+        }});
+
+        mockMvc.perform(multipart("/api/v1/ecommerce-admin/products/online-profiles/primary-images/import/confirm-file")
+                        .file(file)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.updatedRows").value(0))
+                .andExpect(jsonPath("$.unchangedRows").value(1))
+                .andExpect(jsonPath("$.rows[0].action").value("NO_CHANGE"));
+
+        ProductAssetVariantEntity current = productAssetVariantJpaRepository.findById(variant.getId()).orElseThrow();
+        org.junit.jupiter.api.Assertions.assertTrue(current.isActive());
+        org.junit.jupiter.api.Assertions.assertTrue(current.isPreferred());
     }
 
     @Test
@@ -450,6 +552,27 @@ class EcommercePrimaryImageUrlImportIntegrationTest extends AbstractHttpIntegrat
                 true,
                 displayOrder
         );
+    }
+
+    private ProductAssetVariantEntity validVariant(Long productAssetId, String keySuffix) {
+        ProductAssetVariantEntity variant = new ProductAssetVariantEntity();
+        variant.setProductAssetId(productAssetId);
+        variant.setVariantKind(ProductAssetVariantKind.PRIMARY_OPTIMIZED_WEBP);
+        variant.setAssetUrl("https://cdn.inktoy.pe/ecommerce/products/assets/" + productAssetId + "/" + keySuffix + ".webp");
+        variant.setStorageProvider("S3");
+        variant.setStorageBucket("inktoy-test-bucket");
+        variant.setStorageKey("ecommerce/products/assets/" + productAssetId + "/variants/" + keySuffix + ".webp");
+        variant.setMimeType("image/webp");
+        variant.setWidth(96);
+        variant.setHeight(72);
+        variant.setSizeBytes(762L);
+        variant.setChecksumSha256("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
+        variant.setSourceChecksumSha256("abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789");
+        variant.setActive(true);
+        variant.setPreferred(true);
+        variant.setCreatedBy("it");
+        variant.setUpdatedBy("it");
+        return variant;
     }
 
     private long createOnlineCategory(String token, String name, String slug) throws Exception {

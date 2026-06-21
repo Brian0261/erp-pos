@@ -919,3 +919,28 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
   - No se inició 2S.10C-E todavía.
   - Solo cambios documentales en D3.
 - Conclusión: D1 y D2 conviven correctamente. Listo para 2S.10C-E.
+
+## Fase 2S.10C-E1 URL Stale Variants
+
+- Fase 2S.10C-E1 implementada con PASS.
+- Objetivo: evitar variantes WebP stale cuando la imagen original se reemplaza mediante flujos URL-only antes de 2S.10C-E2.
+- Flujos corregidos:
+  - URL import `confirm-file` desactiva variantes activas `PRIMARY_OPTIMIZED_WEBP` del `ProductAsset` guardado en CREATE/UPDATE.
+  - Admin URL upsert desactiva variantes activas `PRIMARY_OPTIMIZED_WEBP` del `ProductAsset` guardado.
+- Reglas preservadas:
+  - URL import `NO_CHANGE` no toca variantes.
+  - Preview URL import sigue sin efectos secundarios.
+  - No se generan derivados WebP nuevos en URL import.
+  - No se borran objetos storage.
+  - `ProductAsset` sigue representando la imagen original.
+  - Storefront, contrato publico y `primaryImage.url` no cambian.
+- Tests ejecutados:
+  - Focalizados E1 + regresion D1/D2/Storefront: 87 tests PASS.
+  - Backend completo: 442 tests PASS.
+- Documento QA creado: `docs/qa/PHASE2S10C_E1_URL_STALE_VARIANTS_QA.md`.
+- Riesgos residuales:
+  - Storefront todavia no consume variantes.
+  - `primaryImage.url` todavia devuelve el original hasta E2.
+  - E2 debe preferir variantes solo si pertenecen al `ProductAsset` primario activo vigente.
+  - Objetos storage anteriores pueden quedar orphan hasta una fase futura de limpieza segura.
+- Conclusión: riesgo anti-stale URL-only corregido. Listo para plan/build 2S.10C-E2 cuando se autorice.

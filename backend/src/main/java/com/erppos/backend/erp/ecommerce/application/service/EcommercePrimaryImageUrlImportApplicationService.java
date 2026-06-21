@@ -9,8 +9,10 @@ import com.erppos.backend.erp.ecommerce.domain.model.AssetSource;
 import com.erppos.backend.erp.ecommerce.domain.model.AssetType;
 import com.erppos.backend.erp.ecommerce.domain.model.OnlinePublicationStatus;
 import com.erppos.backend.erp.ecommerce.domain.model.ProductAsset;
+import com.erppos.backend.erp.ecommerce.domain.model.ProductAssetVariantKind;
 import com.erppos.backend.erp.ecommerce.domain.model.ProductOnlineProfile;
 import com.erppos.backend.erp.ecommerce.domain.port.ProductAssetRepositoryPort;
+import com.erppos.backend.erp.ecommerce.domain.port.ProductAssetVariantRepositoryPort;
 import com.erppos.backend.erp.ecommerce.domain.port.ProductOnlineProfileRepositoryPort;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -41,6 +43,7 @@ public class EcommercePrimaryImageUrlImportApplicationService implements Ecommer
     private final ProductRepositoryPort productRepositoryPort;
     private final ProductOnlineProfileRepositoryPort profileRepositoryPort;
     private final ProductAssetRepositoryPort assetRepositoryPort;
+    private final ProductAssetVariantRepositoryPort assetVariantRepositoryPort;
     private final PublicImageUrlPolicy publicImageUrlPolicy;
     private final AuditUserProvider auditUserProvider;
 
@@ -49,6 +52,7 @@ public class EcommercePrimaryImageUrlImportApplicationService implements Ecommer
             ProductRepositoryPort productRepositoryPort,
             ProductOnlineProfileRepositoryPort profileRepositoryPort,
             ProductAssetRepositoryPort assetRepositoryPort,
+            ProductAssetVariantRepositoryPort assetVariantRepositoryPort,
             PublicImageUrlPolicy publicImageUrlPolicy,
             AuditUserProvider auditUserProvider
     ) {
@@ -56,6 +60,7 @@ public class EcommercePrimaryImageUrlImportApplicationService implements Ecommer
         this.productRepositoryPort = productRepositoryPort;
         this.profileRepositoryPort = profileRepositoryPort;
         this.assetRepositoryPort = assetRepositoryPort;
+        this.assetVariantRepositoryPort = assetVariantRepositoryPort;
         this.publicImageUrlPolicy = publicImageUrlPolicy;
         this.auditUserProvider = auditUserProvider;
     }
@@ -98,6 +103,11 @@ public class EcommercePrimaryImageUrlImportApplicationService implements Ecommer
             }
 
             ProductAsset saved = assetRepositoryPort.save(toProductAsset(row));
+            assetVariantRepositoryPort.deactivateActiveByProductAssetIdAndVariantKind(
+                    saved.id(),
+                    ProductAssetVariantKind.PRIMARY_OPTIMIZED_WEBP,
+                    auditUserProvider.currentUsername()
+            );
             if (row.action() == EcommercePrimaryImageUrlImportAction.CREATE) {
                 createdRows += 1;
             } else if (row.action() == EcommercePrimaryImageUrlImportAction.UPDATE) {
