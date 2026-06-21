@@ -102,6 +102,7 @@
 - **Entrada**: Imagen original
 - **Salida**: Múltiples variantes por tamaño/formato (WebP, AVIF, JPEG fallback)
 - **DB**: Requiere modelo de variantes si no se hizo en 2S.10C
+- **Estado 2S.10D-B**: Spike test-only PASS para WebP responsive en local y Docker/Linux; AVIF BLOQUEADO por falta de writer/reader ImageIO seguro sin tocar Dockerfile/infraestructura
 - **Storefront**: Requiere cambios en tipos públicos, `ProductImageFrame`, SEO/OG, `next/image` config
 - **Responsive**: `srcSet` con múltiples resoluciones
 - **AVIF**: Formato moderno con mejor compresión (requiere soporte backend)

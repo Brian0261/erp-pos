@@ -1045,3 +1045,37 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
   - Calidad de conversion WebP depende de `webp-imageio`.
 - Recomendacion siguiente: iniciar 2S.10D en Plan Mode, no Build directo.
 - Conclusion: Staging smoke PASS. Flujo completo de derivados WebP validado en staging.
+
+## Fase 2S.10D-B Responsive WebP and AVIF Spike
+
+- Fase 2S.10D-B implementada como spike test-only con PASS y AVIF BLOQUEADO.
+- Objetivo: validar resize responsive WebP y evaluar viabilidad AVIF sin tocar infraestructura, Dockerfile, docker-compose, staging ni contrato publico.
+- Cambios realizados solo en `backend/src/test/java` y documentacion.
+- No se modifico codigo productivo backend, Storefront, Admin UI, migraciones, `PublicImageResponse`, upload manual, Excel + ZIP, URL import, `.env`, Dockerfile, `docker-compose.yml`, Caddy, DNS, AWS/S3/CloudFront/IAM ni infraestructura.
+- Tests agregados:
+  - `ResponsiveImageResizeSpikeServiceTest`.
+  - `AvifResponsiveSpikeTest`.
+- Servicio experimental test-only agregado:
+  - `ResponsiveImageResizeSpikeService`.
+- WebP responsive validado:
+  - JPEG 1600x1200 genera `320w`, `640w`, `960w`, `1280w`.
+  - PNG transparente 800x800 genera `320w`, `640w` preservando alpha.
+  - No-upscaling: JPEG 240x180 no genera `320w` ni `640w`.
+  - Variantes validadas con `EcommerceProductImageBinaryService.validate(...)`.
+  - Checksums SHA-256 y `sizeBytes` consistentes.
+- Resultado local:
+  - `./mvnw.cmd "-Dtest=ResponsiveImageResizeSpikeServiceTest,AvifResponsiveSpikeTest" test`: 5 tests PASS.
+- Resultado Docker/Linux:
+  - `docker run --rm -v "${PWD}:/workspace" -w /workspace/backend eclipse-temurin:17-jdk-jammy sh ./mvnw "-Dtest=ResponsiveImageResizeSpikeServiceTest,AvifResponsiveSpikeTest" test`: 5 tests PASS.
+- AVIF:
+  - Estado: BLOQUEADO/NO APTO por ahora.
+  - No hay writer/reader ImageIO AVIF en classpath actual.
+  - No se agrego dependencia AVIF runtime ni test-scope.
+  - No se debe tocar Dockerfile ni instalar paquetes del sistema para habilitar AVIF en 2S.10D-B.
+- Documento QA creado: `docs/qa/PHASE2S10D_RESPONSIVE_AVIF_SPIKE_QA.md`.
+- Riesgos residuales:
+  - `webp-imageio` 0.1.6 sigue siendo dependencia no mantenida activamente.
+  - Uso de memoria/CPU debe controlarse en implementacion productiva.
+  - Calidad visual requiere validacion con imagenes reales.
+  - AVIF requiere decision tecnica posterior o queda fuera de 2S.10D.
+- Recomendacion siguiente: avanzar a 2S.10D-C Modelo para soportar multiples tamanos WebP activos. Continuar 2S.10D con WebP responsive primero y dejar AVIF para fase posterior.
