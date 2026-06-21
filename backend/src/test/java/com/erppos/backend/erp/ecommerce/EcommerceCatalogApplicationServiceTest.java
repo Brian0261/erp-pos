@@ -4,6 +4,7 @@ import com.erppos.backend.erp.ecommerce.application.service.AuditUserProvider;
 import com.erppos.backend.erp.ecommerce.application.service.EcommerceCatalogApplicationService;
 import com.erppos.backend.erp.ecommerce.application.service.EcommerceImageStorageProperties;
 import com.erppos.backend.erp.ecommerce.application.service.EcommerceProductImageBinaryService;
+import com.erppos.backend.erp.ecommerce.application.service.EcommerceWebpDerivativeGenerationService;
 import com.erppos.backend.erp.ecommerce.application.service.PublicImageUrlPolicy;
 import com.erppos.backend.erp.ecommerce.application.service.PublicImageUrlProperties;
 import com.erppos.backend.erp.ecommerce.application.usecase.CreateProductOnlineProfileCommand;
@@ -27,6 +28,8 @@ import com.erppos.backend.erp.ecommerce.domain.model.EcommerceSeoMetadata;
 import com.erppos.backend.erp.ecommerce.domain.model.OnlinePriceOverride;
 import com.erppos.backend.erp.ecommerce.domain.model.OnlinePublicationStatus;
 import com.erppos.backend.erp.ecommerce.domain.model.ProductAsset;
+import com.erppos.backend.erp.ecommerce.domain.model.ProductAssetVariant;
+import com.erppos.backend.erp.ecommerce.domain.model.ProductAssetVariantKind;
 import com.erppos.backend.erp.ecommerce.domain.model.ProductOnlineProfile;
 import com.erppos.backend.erp.ecommerce.domain.model.RobotsPolicy;
 import com.erppos.backend.erp.ecommerce.domain.port.EcommerceBrandRepositoryPort;
@@ -36,6 +39,7 @@ import com.erppos.backend.erp.ecommerce.domain.port.EcommerceOnlineCategoryRepos
 import com.erppos.backend.erp.ecommerce.domain.port.EcommerceSeoMetadataRepositoryPort;
 import com.erppos.backend.erp.ecommerce.domain.port.OnlinePriceOverrideRepositoryPort;
 import com.erppos.backend.erp.ecommerce.domain.port.ProductAssetRepositoryPort;
+import com.erppos.backend.erp.ecommerce.domain.port.ProductAssetVariantRepositoryPort;
 import com.erppos.backend.erp.ecommerce.domain.port.ProductOnlineProfileRepositoryPort;
 import com.erppos.backend.erp.ecommerce.domain.port.ProductOnlineProfileSearchCriteria;
 import org.junit.jupiter.api.BeforeEach;
@@ -45,11 +49,15 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 
 import javax.imageio.ImageIO;
+import java.awt.Color;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -69,6 +77,7 @@ class EcommerceCatalogApplicationServiceTest {
     private InMemoryOnlineCategoryRepository categoryRepository;
     private InMemorySeoMetadataRepository seoRepository;
     private InMemoryProductAssetRepository assetRepository;
+    private InMemoryProductAssetVariantRepository assetVariantRepository;
     private InMemoryOnlinePriceOverrideRepository overrideRepository;
     private InMemoryImageStoragePort imageStoragePort;
     private EcommerceImageStorageProperties imageStorageProperties;
@@ -82,9 +91,11 @@ class EcommerceCatalogApplicationServiceTest {
         categoryRepository = new InMemoryOnlineCategoryRepository();
         seoRepository = new InMemorySeoMetadataRepository();
         assetRepository = new InMemoryProductAssetRepository();
+        assetVariantRepository = new InMemoryProductAssetVariantRepository();
         overrideRepository = new InMemoryOnlinePriceOverrideRepository();
         imageStoragePort = new InMemoryImageStoragePort("https://cdn.inktoy.pe");
         imageStorageProperties = imageStorageProperties();
+        EcommerceProductImageBinaryService imageBinaryService = new EcommerceProductImageBinaryService(imageStoragePort, imageStorageProperties, publicImageUrlPolicy(List.of("cdn.inktoy.pe")));
         service = new EcommerceCatalogApplicationService(
                 profileRepository,
                 productReadPort,
@@ -92,10 +103,12 @@ class EcommerceCatalogApplicationServiceTest {
                 categoryRepository,
                 seoRepository,
                 assetRepository,
+                assetVariantRepository,
                 overrideRepository,
                 new AuditUserProvider(),
                 publicImageUrlPolicy(List.of("cdn.inktoy.pe")),
-                new EcommerceProductImageBinaryService(imageStoragePort, imageStorageProperties, publicImageUrlPolicy(List.of("cdn.inktoy.pe")))
+                imageBinaryService,
+                new EcommerceWebpDerivativeGenerationService(imageBinaryService)
         );
     }
 
@@ -358,10 +371,12 @@ class EcommerceCatalogApplicationServiceTest {
                 categoryRepository,
                 seoRepository,
                 assetRepository,
+                assetVariantRepository,
                 overrideRepository,
                 new AuditUserProvider(),
                 new PublicImageUrlPolicy(properties),
-                new EcommerceProductImageBinaryService(imageStoragePort, imageStorageProperties, new PublicImageUrlPolicy(properties))
+                new EcommerceProductImageBinaryService(imageStoragePort, imageStorageProperties, new PublicImageUrlPolicy(properties)),
+                new EcommerceWebpDerivativeGenerationService(new EcommerceProductImageBinaryService(imageStoragePort, imageStorageProperties, new PublicImageUrlPolicy(properties)))
         );
 
         EcommerceBusinessRuleException ex = assertThrows(EcommerceBusinessRuleException.class, () ->
@@ -424,7 +439,58 @@ class EcommerceCatalogApplicationServiceTest {
         assertEquals("lapicero-azul.png", asset.originalFilename());
         assertTrue(asset.storageKey().startsWith("inktoy-dev/ecommerce/products/"));
         assertTrue(asset.assetUrl().startsWith("https://cdn.inktoy.pe/inktoy-dev/ecommerce/products/"));
-        assertEquals(imageBytes.length, imageStoragePort.lastObject().sizeBytes());
+        assertEquals(imageBytes.length, imageStoragePort.storedObjects().get(0).sizeBytes());
+    }
+
+    @Test
+    void shouldUploadJpegPrimaryProductImageAndStorePreferredWebpVariant() throws IOException {
+        PreparedData data = prepareBaseDraftProfile();
+        byte[] imageBytes = jpegGradientBytes(96, 72);
+
+        ProductAsset asset = service.uploadPrimaryProductAsset(new UploadPrimaryProductAssetCommand(
+                data.productId(),
+                imageBytes,
+                "lapicero-azul.jpg",
+                "image/jpeg",
+                "Lapicero azul",
+                AssetSource.OWN,
+                true,
+                4
+        ));
+
+        ProductAssetVariant variant = assetVariantRepository.findActiveByProductAssetIdAndVariantKind(
+                asset.id(), ProductAssetVariantKind.PRIMARY_OPTIMIZED_WEBP).orElseThrow();
+        assertEquals("image/jpeg", asset.mimeType());
+        assertEquals("image/webp", variant.mimeType());
+        assertEquals(asset.width().intValue(), variant.width());
+        assertEquals(asset.height().intValue(), variant.height());
+        assertTrue(variant.sizeBytes() < asset.sizeBytes());
+        assertEquals(asset.checksumSha256(), variant.sourceChecksumSha256());
+        assertTrue(variant.preferred());
+        assertTrue(variant.storageKey().contains("/variants/"));
+        assertEquals(2, imageStoragePort.storedObjects().size());
+    }
+
+    @Test
+    void shouldDiscardManualUploadDerivativeWhenWebpIsNotSmaller() throws IOException {
+        PreparedData data = prepareBaseDraftProfile();
+        byte[] imageBytes = transparentPngImageBytes(1, 1);
+
+        ProductAsset asset = service.uploadPrimaryProductAsset(new UploadPrimaryProductAssetCommand(
+                data.productId(),
+                imageBytes,
+                "lapicero-azul.png",
+                "image/png",
+                "Lapicero azul",
+                AssetSource.OWN,
+                true,
+                4
+        ));
+
+        assertEquals("image/png", asset.mimeType());
+        assertTrue(assetVariantRepository.findActiveByProductAssetIdAndVariantKind(
+                asset.id(), ProductAssetVariantKind.PRIMARY_OPTIMIZED_WEBP).isEmpty());
+        assertEquals(1, imageStoragePort.storedObjects().size());
     }
 
     @Test
@@ -456,6 +522,106 @@ class EcommerceCatalogApplicationServiceTest {
         assertTrue(asset.assetUrl().startsWith("https://cdn.inktoy.pe/inktoy-dev/ecommerce/products/"));
         assertEquals("image/webp", imageStoragePort.lastObject().mimeType());
         assertEquals(imageBytes.length, imageStoragePort.lastObject().sizeBytes());
+        assertTrue(assetVariantRepository.findActiveByProductAssetIdAndVariantKind(
+                asset.id(), ProductAssetVariantKind.PRIMARY_OPTIMIZED_WEBP).isEmpty());
+        assertEquals(1, imageStoragePort.storedObjects().size());
+    }
+
+    @Test
+    void shouldDeactivatePreviousVariantWhenReplacingManualUploadImage() throws IOException {
+        PreparedData data = prepareBaseDraftProfile();
+        ProductAsset first = service.uploadPrimaryProductAsset(new UploadPrimaryProductAssetCommand(
+                data.productId(),
+                jpegGradientBytes(96, 72),
+                "lapicero-azul.jpg",
+                "image/jpeg",
+                "Lapicero azul",
+                AssetSource.OWN,
+                true,
+                4
+        ));
+        ProductAssetVariant firstVariant = assetVariantRepository.findActiveByProductAssetIdAndVariantKind(
+                first.id(), ProductAssetVariantKind.PRIMARY_OPTIMIZED_WEBP).orElseThrow();
+
+        ProductAsset second = service.uploadPrimaryProductAsset(new UploadPrimaryProductAssetCommand(
+                data.productId(),
+                jpegGradientBytes(128, 96),
+                "lapicero-rojo.jpg",
+                "image/jpeg",
+                "Lapicero rojo",
+                AssetSource.OWN,
+                true,
+                4
+        ));
+
+        ProductAssetVariant secondVariant = assetVariantRepository.findActiveByProductAssetIdAndVariantKind(
+                second.id(), ProductAssetVariantKind.PRIMARY_OPTIMIZED_WEBP).orElseThrow();
+        assertEquals(first.id(), second.id());
+        assertFalse(assetVariantRepository.findById(firstVariant.id()).orElseThrow().active());
+        assertTrue(secondVariant.active());
+        assertTrue(secondVariant.preferred());
+    }
+
+    @Test
+    void shouldCleanupOriginalWhenDerivativeUploadFails() throws IOException {
+        PreparedData data = prepareBaseDraftProfile();
+        imageStoragePort.failStoreWhenKeyContains("/variants/");
+
+        assertThrows(EcommerceBusinessRuleException.class, () -> service.uploadPrimaryProductAsset(new UploadPrimaryProductAssetCommand(
+                data.productId(),
+                jpegGradientBytes(96, 72),
+                "lapicero-azul.jpg",
+                "image/jpeg",
+                "Lapicero azul",
+                AssetSource.OWN,
+                true,
+                4
+        )));
+
+        assertEquals(1, imageStoragePort.deletedKeys().size());
+        assertTrue(imageStoragePort.deletedKeys().get(0).contains("/main/"));
+    }
+
+    @Test
+    void shouldCleanupOriginalAndDerivativeWhenVariantPersistenceFails() throws IOException {
+        PreparedData data = prepareBaseDraftProfile();
+        assetVariantRepository.failOnSave(true);
+
+        assertThrows(EcommerceBusinessRuleException.class, () -> service.uploadPrimaryProductAsset(new UploadPrimaryProductAssetCommand(
+                data.productId(),
+                jpegGradientBytes(96, 72),
+                "lapicero-azul.jpg",
+                "image/jpeg",
+                "Lapicero azul",
+                AssetSource.OWN,
+                true,
+                4
+        )));
+
+        assertEquals(2, imageStoragePort.deletedKeys().size());
+        assertTrue(imageStoragePort.deletedKeys().stream().anyMatch(key -> key.contains("/main/")));
+        assertTrue(imageStoragePort.deletedKeys().stream().anyMatch(key -> key.contains("/variants/")));
+    }
+
+    @Test
+    void shouldKeepOriginalErrorWhenCleanupFails() throws IOException {
+        PreparedData data = prepareBaseDraftProfile();
+        assetVariantRepository.failOnSave(true);
+        imageStoragePort.failDelete(true);
+
+        EcommerceBusinessRuleException ex = assertThrows(EcommerceBusinessRuleException.class, () -> service.uploadPrimaryProductAsset(new UploadPrimaryProductAssetCommand(
+                data.productId(),
+                jpegGradientBytes(96, 72),
+                "lapicero-azul.jpg",
+                "image/jpeg",
+                "Lapicero azul",
+                AssetSource.OWN,
+                true,
+                4
+        )));
+
+        assertEquals("Variant persistence failed", ex.getMessage());
+        assertEquals(2, imageStoragePort.deletedKeys().size());
     }
 
     @Test
@@ -700,6 +866,38 @@ class EcommerceCatalogApplicationServiceTest {
         BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         ImageIO.write(image, "png", output);
+        return output.toByteArray();
+    }
+
+    private byte[] transparentPngImageBytes(int width, int height) throws IOException {
+        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        ImageIO.write(image, "png", output);
+        return output.toByteArray();
+    }
+
+    private byte[] jpegGradientBytes(int width, int height) throws IOException {
+        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+        Graphics2D graphics = image.createGraphics();
+        try {
+            graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            for (int y = 0; y < image.getHeight(); y++) {
+                for (int x = 0; x < image.getWidth(); x++) {
+                    int red = (x * 255) / image.getWidth();
+                    int green = (y * 255) / image.getHeight();
+                    int blue = ((x + y) * 255) / (image.getWidth() + image.getHeight());
+                    image.setRGB(x, y, new Color(red, green, blue).getRGB());
+                }
+            }
+            graphics.setColor(Color.WHITE);
+            graphics.fillOval(width / 5, height / 5, width / 3, height / 3);
+            graphics.setColor(new Color(20, 65, 140));
+            graphics.fillRect(width / 2, height / 2, Math.max(1, width / 4), Math.max(1, height / 4));
+        } finally {
+            graphics.dispose();
+        }
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        ImageIO.write(image, "jpg", output);
         return output.toByteArray();
     }
 
@@ -1132,9 +1330,98 @@ class EcommerceCatalogApplicationServiceTest {
         }
     }
 
+    private static final class InMemoryProductAssetVariantRepository implements ProductAssetVariantRepositoryPort {
+        private final Map<Long, ProductAssetVariant> variantsById = new HashMap<>();
+        private final AtomicLong sequence = new AtomicLong(1);
+        private boolean failOnSave;
+
+        @Override
+        public ProductAssetVariant save(ProductAssetVariant variant) {
+            if (failOnSave) {
+                throw new EcommerceBusinessRuleException("Variant persistence failed");
+            }
+            Long id = variant.id() == null ? sequence.getAndIncrement() : variant.id();
+            ProductAssetVariant saved = new ProductAssetVariant(
+                    id,
+                    variant.productAssetId(),
+                    variant.variantKind(),
+                    variant.assetUrl(),
+                    variant.storageProvider(),
+                    variant.storageBucket(),
+                    variant.storageKey(),
+                    variant.mimeType(),
+                    variant.width(),
+                    variant.height(),
+                    variant.sizeBytes(),
+                    variant.checksumSha256(),
+                    variant.sourceChecksumSha256(),
+                    variant.active(),
+                    variant.preferred(),
+                    variant.createdAt(),
+                    variant.updatedAt(),
+                    variant.createdBy(),
+                    variant.updatedBy()
+            );
+            variantsById.put(saved.id(), saved);
+            return saved;
+        }
+
+        @Override
+        public Optional<ProductAssetVariant> findActiveByProductAssetIdAndVariantKind(Long productAssetId, ProductAssetVariantKind variantKind) {
+            return variantsById.values().stream()
+                    .filter(ProductAssetVariant::active)
+                    .filter(variant -> variant.productAssetId().equals(productAssetId))
+                    .filter(variant -> variant.variantKind() == variantKind)
+                    .findFirst();
+        }
+
+        @Override
+        public void deactivateActiveByProductAssetIdAndVariantKind(Long productAssetId, ProductAssetVariantKind variantKind, String actor) {
+            List<ProductAssetVariant> updated = variantsById.values().stream()
+                    .filter(ProductAssetVariant::active)
+                    .filter(variant -> variant.productAssetId().equals(productAssetId))
+                    .filter(variant -> variant.variantKind() == variantKind)
+                    .map(variant -> new ProductAssetVariant(
+                            variant.id(),
+                            variant.productAssetId(),
+                            variant.variantKind(),
+                            variant.assetUrl(),
+                            variant.storageProvider(),
+                            variant.storageBucket(),
+                            variant.storageKey(),
+                            variant.mimeType(),
+                            variant.width(),
+                            variant.height(),
+                            variant.sizeBytes(),
+                            variant.checksumSha256(),
+                            variant.sourceChecksumSha256(),
+                            false,
+                            false,
+                            variant.createdAt(),
+                            variant.updatedAt(),
+                            variant.createdBy(),
+                            actor
+                    ))
+                    .toList();
+            updated.forEach(variant -> variantsById.put(variant.id(), variant));
+        }
+
+        private Optional<ProductAssetVariant> findById(Long id) {
+            return Optional.ofNullable(variantsById.get(id));
+        }
+
+        private void failOnSave(boolean failOnSave) {
+            this.failOnSave = failOnSave;
+        }
+    }
+
     private static final class InMemoryImageStoragePort implements EcommerceImageStoragePort {
         private final String publicBaseUrl;
+        private final List<EcommerceImageStorageObject> storedObjects = new ArrayList<>();
+        private final List<String> deletedKeys = new ArrayList<>();
         private EcommerceImageStorageObject lastObject;
+        private String failStoreKeyContains;
+        private boolean failDelete;
 
         private InMemoryImageStoragePort(String publicBaseUrl) {
             this.publicBaseUrl = publicBaseUrl;
@@ -1142,7 +1429,11 @@ class EcommerceCatalogApplicationServiceTest {
 
         @Override
         public StoredEcommerceImage store(EcommerceImageStorageObject object) {
+            if (failStoreKeyContains != null && object.storageKey().contains(failStoreKeyContains)) {
+                throw new EcommerceBusinessRuleException("Image storage failed");
+            }
             lastObject = object;
+            storedObjects.add(object);
             return new StoredEcommerceImage(
                     "S3",
                     "inktoy-test-bucket",
@@ -1153,6 +1444,30 @@ class EcommerceCatalogApplicationServiceTest {
 
         private EcommerceImageStorageObject lastObject() {
             return lastObject;
+        }
+
+        @Override
+        public void delete(String storageKey) {
+            deletedKeys.add(storageKey);
+            if (failDelete) {
+                throw new EcommerceBusinessRuleException("Image cleanup failed");
+            }
+        }
+
+        private List<EcommerceImageStorageObject> storedObjects() {
+            return storedObjects;
+        }
+
+        private List<String> deletedKeys() {
+            return deletedKeys;
+        }
+
+        private void failStoreWhenKeyContains(String value) {
+            failStoreKeyContains = value;
+        }
+
+        private void failDelete(boolean failDelete) {
+            this.failDelete = failDelete;
         }
     }
 

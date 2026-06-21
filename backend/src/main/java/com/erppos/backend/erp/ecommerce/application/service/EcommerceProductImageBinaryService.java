@@ -3,6 +3,8 @@ package com.erppos.backend.erp.ecommerce.application.service;
 import com.erppos.backend.erp.ecommerce.domain.exception.EcommerceBusinessRuleException;
 import com.erppos.backend.erp.ecommerce.domain.model.ProductOnlineProfile;
 import com.erppos.backend.erp.ecommerce.domain.port.EcommerceImageStoragePort;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import javax.imageio.ImageIO;
@@ -18,6 +20,7 @@ import java.util.Set;
 
 @Service
 public class EcommerceProductImageBinaryService {
+    private static final Logger log = LoggerFactory.getLogger(EcommerceProductImageBinaryService.class);
     private static final long DEFAULT_IMAGE_MAX_SIZE_BYTES = 5L * 1024L * 1024L;
     private static final int DEFAULT_IMAGE_MAX_DIMENSION = 6000;
     private static final int CHECKSUM_STORAGE_SUFFIX_LENGTH = 12;
@@ -94,6 +97,10 @@ public class EcommerceProductImageBinaryService {
     ) {
         ValidatedProductImage image = validate(fileBytes, declaredContentType, originalFilename);
         String storageKey = buildStorageKey(profile, productName, image.checksumSha256(), image.extension());
+        return storeValidated(storageKey, fileBytes, image);
+    }
+
+    public StoredProductImage storeValidated(String storageKey, byte[] fileBytes, ValidatedProductImage image) {
         validateExpectedPublicImageUrl(storageKey);
 
         EcommerceImageStoragePort.StoredEcommerceImage storedImage = imageStoragePort.store(new EcommerceImageStoragePort.EcommerceImageStorageObject(
@@ -130,11 +137,38 @@ public class EcommerceProductImageBinaryService {
         );
     }
 
+    public String buildPrimaryStorageKey(ProductOnlineProfile profile, String productName, ValidatedProductImage image) {
+        return buildStorageKey(profile, productName, image.checksumSha256(), image.extension());
+    }
+
+    public String buildPrimaryOptimizedWebpVariantStorageKey(
+            ProductOnlineProfile profile,
+            String productName,
+            String sourceChecksumSha256,
+            String derivativeChecksumSha256
+    ) {
+        String baseSlug = normalizeSlug(firstNonBlank(profile.slug(), profile.onlineName(), productName, "main"));
+        if (baseSlug == null) {
+            baseSlug = "main";
+        }
+        String sourceSuffix = sourceChecksumSha256.substring(0, Math.min(CHECKSUM_STORAGE_SUFFIX_LENGTH, sourceChecksumSha256.length()));
+        String derivativeSuffix = derivativeChecksumSha256.substring(0, Math.min(CHECKSUM_STORAGE_SUFFIX_LENGTH, derivativeChecksumSha256.length()));
+        String key = "ecommerce/products/%d/profiles/%d/variants/%s-%s-%s.webp".formatted(
+                profile.productId(),
+                profile.id(),
+                baseSlug,
+                sourceSuffix,
+                derivativeSuffix
+        );
+        String prefix = normalizeStoragePrefix(imageStorageProperties.getPrefix());
+        return prefix == null ? key : prefix + "/" + key;
+    }
+
     public void cleanupBestEffort(String storageKey) {
         try {
             imageStoragePort.delete(storageKey);
-        } catch (RuntimeException ignored) {
-            // Best-effort cleanup must not hide the original import failure.
+        } catch (RuntimeException ex) {
+            log.warn("Best-effort ecommerce image cleanup failed for storageKey={}", storageKey, ex);
         }
     }
 

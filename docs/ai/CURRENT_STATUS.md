@@ -833,3 +833,35 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
   - `webp-imageio` sigue en `scope test`.
 - Documento QA creado: `docs/qa/PHASE2S10C_ASSET_VARIANTS_MODEL_QA.md`.
 - Siguiente fase sugerida: integrar seleccion/registro de variantes en servicios reales solo cuando se apruebe explicitamente pipeline de conversion runtime.
+
+## Fase 2S.10C-D1 Manual Upload WebP Derivative
+
+- Fase 2S.10C-D1 implementada con PASS.
+- Objetivo: generar derivado WebP real solo para upload manual ecommerce, preservando `ProductAsset` como original.
+- `webp-imageio` pasa de `scope test` a `scope runtime` para habilitar generacion runtime mediante `ImageIO` estandar.
+- Servicio nuevo: `EcommerceWebpDerivativeGenerationService`.
+- Modelo hexagonal agregado para variantes:
+  - `ProductAssetVariant` dominio.
+  - `ProductAssetVariantRepositoryPort`.
+  - `ProductAssetVariantMapper`.
+  - `ProductAssetVariantPersistenceAdapter`.
+- Integracion limitada a `EcommerceCatalogApplicationService.uploadPrimaryProductAsset(...)`.
+- Regla productiva D1: persistir `ProductAssetVariant.PRIMARY_OPTIMIZED_WEBP` active/preferred solo si el WebP generado es valido y pesa menos que el original.
+- Reemplazo de imagen manual desactiva variante WebP active previa antes de guardar la nueva preferred.
+- Cleanup best-effort cubre fallas al subir derivado o persistir DB sin ocultar el error principal.
+- Tests ejecutados:
+  - Unitarios focalizados WebP/upload manual: PASS.
+  - Integracion HTTP/PostgreSQL upload manual: PASS.
+  - Regresion ecommerce requerida: 65 tests PASS.
+  - Backend completo: 432 tests PASS.
+- Restricciones cumplidas:
+  - No se modifico Storefront ni contrato publico.
+  - No se cambio `primaryImage.url`.
+  - No se modifico Excel + ZIP ni `confirm-file`.
+  - No se integro generacion de derivados en importacion masiva.
+  - No se toco Admin UI.
+  - No se toco staging, produccion, Caddy, DNS, AWS, S3 real, CloudFront, IAM ni secretos.
+  - No se modificaron `.env` reales, Dockerfile ni `docker-compose.yml`.
+  - No se implemento AVIF, responsive images, `srcset` ni cleanup masivo de objetos orphan.
+- Documento QA creado: `docs/qa/PHASE2S10C_D1_MANUAL_UPLOAD_WEBP_DERIVATIVE_QA.md`.
+- Riesgos residuales: dependencia `webp-imageio` 0.1.6 no mantenida activamente, falta medicion con imagenes grandes reales, Storefront aun no consume variantes.

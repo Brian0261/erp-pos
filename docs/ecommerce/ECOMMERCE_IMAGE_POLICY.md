@@ -84,8 +84,11 @@
 - **Salida**: Original preservado + derivado WebP
 - **DB**: Tabla `ecommerce_product_asset_variants` creada en 2S.10C-C para registrar derivados; `ProductAsset` sigue representando el original preservado
 - **Variante inicial**: `PRIMARY_OPTIMIZED_WEBP`, limitada por constraint a `mime_type = 'image/webp'`
-- **Estado 2S.10C-C**: Modelo persistente listo, pero generacion de derivados aun no integrada
-- **Storefront**: Sin cambios en 2S.10C-C; el contrato publico mantiene `primaryImage.url`
+- **Estado 2S.10C-C**: Modelo persistente listo
+- **Estado 2S.10C-D1**: Upload manual genera derivado WebP real solo para JPEG/PNG; WebP original no genera derivado adicional
+- **Regla D1**: Registrar `ProductAssetVariant.PRIMARY_OPTIMIZED_WEBP` active/preferred solo si el WebP generado es valido y `size_bytes` es menor que el original
+- **Flujo masivo**: Excel + ZIP no genera derivados en D1
+- **Storefront**: Sin cambios en 2S.10C-D1; el contrato publico mantiene `primaryImage.url` y no expone variantes
 - **Riesgos**: Calidad, CPU/memoria, orphan cleanup, atomicidad S3/DB
 
 ### 2S.10D: Responsive + AVIF + Caché Avanzada (Fase Final)

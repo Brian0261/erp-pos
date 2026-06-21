@@ -31,6 +31,8 @@ import com.erppos.backend.erp.ecommerce.domain.model.EcommerceSeoMetadata;
 import com.erppos.backend.erp.ecommerce.domain.model.OnlinePublicationStatus;
 import com.erppos.backend.erp.ecommerce.domain.model.OnlinePriceOverride;
 import com.erppos.backend.erp.ecommerce.domain.model.ProductAsset;
+import com.erppos.backend.erp.ecommerce.domain.model.ProductAssetVariant;
+import com.erppos.backend.erp.ecommerce.domain.model.ProductAssetVariantKind;
 import com.erppos.backend.erp.ecommerce.domain.model.ProductOnlineProfile;
 import com.erppos.backend.erp.ecommerce.domain.model.RobotsPolicy;
 import com.erppos.backend.erp.ecommerce.domain.port.EcommerceBrandRepositoryPort;
@@ -39,11 +41,13 @@ import com.erppos.backend.erp.ecommerce.domain.port.EcommerceOnlineCategoryRepos
 import com.erppos.backend.erp.ecommerce.domain.port.EcommerceSeoMetadataRepositoryPort;
 import com.erppos.backend.erp.ecommerce.domain.port.OnlinePriceOverrideRepositoryPort;
 import com.erppos.backend.erp.ecommerce.domain.port.ProductAssetRepositoryPort;
+import com.erppos.backend.erp.ecommerce.domain.port.ProductAssetVariantRepositoryPort;
 import com.erppos.backend.erp.ecommerce.domain.port.ProductOnlineProfileRepositoryPort;
 import com.erppos.backend.erp.ecommerce.domain.port.ProductOnlineProfileSearchCriteria;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.text.Normalizer;
@@ -68,10 +72,12 @@ public class EcommerceCatalogApplicationService implements EcommerceCatalogUseCa
     private final EcommerceOnlineCategoryRepositoryPort onlineCategoryRepositoryPort;
     private final EcommerceSeoMetadataRepositoryPort seoMetadataRepositoryPort;
     private final ProductAssetRepositoryPort productAssetRepositoryPort;
+    private final ProductAssetVariantRepositoryPort productAssetVariantRepositoryPort;
     private final OnlinePriceOverrideRepositoryPort onlinePriceOverrideRepositoryPort;
     private final AuditUserProvider auditUserProvider;
     private final PublicImageUrlPolicy publicImageUrlPolicy;
     private final EcommerceProductImageBinaryService productImageBinaryService;
+    private final EcommerceWebpDerivativeGenerationService webpDerivativeGenerationService;
 
     public EcommerceCatalogApplicationService(
             ProductOnlineProfileRepositoryPort profileRepositoryPort,
@@ -80,10 +86,12 @@ public class EcommerceCatalogApplicationService implements EcommerceCatalogUseCa
             EcommerceOnlineCategoryRepositoryPort onlineCategoryRepositoryPort,
             EcommerceSeoMetadataRepositoryPort seoMetadataRepositoryPort,
             ProductAssetRepositoryPort productAssetRepositoryPort,
+            ProductAssetVariantRepositoryPort productAssetVariantRepositoryPort,
             OnlinePriceOverrideRepositoryPort onlinePriceOverrideRepositoryPort,
             AuditUserProvider auditUserProvider,
             PublicImageUrlPolicy publicImageUrlPolicy,
-            EcommerceProductImageBinaryService productImageBinaryService
+            EcommerceProductImageBinaryService productImageBinaryService,
+            EcommerceWebpDerivativeGenerationService webpDerivativeGenerationService
     ) {
         this.profileRepositoryPort = profileRepositoryPort;
         this.productReadPort = productReadPort;
@@ -91,10 +99,12 @@ public class EcommerceCatalogApplicationService implements EcommerceCatalogUseCa
         this.onlineCategoryRepositoryPort = onlineCategoryRepositoryPort;
         this.seoMetadataRepositoryPort = seoMetadataRepositoryPort;
         this.productAssetRepositoryPort = productAssetRepositoryPort;
+        this.productAssetVariantRepositoryPort = productAssetVariantRepositoryPort;
         this.onlinePriceOverrideRepositoryPort = onlinePriceOverrideRepositoryPort;
         this.auditUserProvider = auditUserProvider;
         this.publicImageUrlPolicy = publicImageUrlPolicy;
         this.productImageBinaryService = productImageBinaryService;
+        this.webpDerivativeGenerationService = webpDerivativeGenerationService;
     }
 
     @Override
@@ -609,16 +619,55 @@ public class EcommerceCatalogApplicationService implements EcommerceCatalogUseCa
     }
 
     @Override
+    @Transactional
     public ProductAsset uploadPrimaryProductAsset(UploadPrimaryProductAssetCommand command) {
         ProductOnlineProfile profile = getProfileByProductId(requireProductId(command.productId()));
         EcommerceCatalogProductSnapshot productSnapshot = requireProductSnapshot(profile.productId());
-        EcommerceProductImageBinaryService.StoredProductImage storedImage = productImageBinaryService.store(
-                profile,
-                productSnapshot.name(),
+        EcommerceProductImageBinaryService.ValidatedProductImage originalImage = productImageBinaryService.validate(
                 command.fileBytes(),
-                command.originalFilename(),
-                command.contentType()
+                command.contentType(),
+                command.originalFilename()
         );
+        Optional<EcommerceWebpDerivativeGenerationService.GeneratedWebpDerivative> webpDerivative = webpDerivativeGenerationService.generatePreferredDerivative(
+                command.fileBytes(),
+                originalImage
+        );
+
+        String originalStorageKey = productImageBinaryService.buildPrimaryStorageKey(profile, productSnapshot.name(), originalImage);
+        EcommerceProductImageBinaryService.StoredProductImage storedImage = productImageBinaryService.storeValidated(
+                originalStorageKey,
+                command.fileBytes(),
+                originalImage
+        );
+        EcommerceProductImageBinaryService.StoredProductImage storedDerivative = null;
+        EcommerceWebpDerivativeGenerationService.GeneratedWebpDerivative derivative = webpDerivative.orElse(null);
+        try {
+            if (derivative != null) {
+                String derivativeStorageKey = productImageBinaryService.buildPrimaryOptimizedWebpVariantStorageKey(
+                        profile,
+                        productSnapshot.name(),
+                        derivative.sourceChecksumSha256(),
+                        derivative.checksumSha256()
+                );
+                EcommerceProductImageBinaryService.ValidatedProductImage derivativeImage = new EcommerceProductImageBinaryService.ValidatedProductImage(
+                        derivative.mimeType(),
+                        "webp",
+                        derivative.width(),
+                        derivative.height(),
+                        derivative.sizeBytes(),
+                        derivative.checksumSha256(),
+                        derivative.originalFilename()
+                );
+                storedDerivative = productImageBinaryService.storeValidated(
+                        derivativeStorageKey,
+                        derivative.bytes(),
+                        derivativeImage
+                );
+            }
+        } catch (RuntimeException ex) {
+            productImageBinaryService.cleanupBestEffort(storedImage.storageKey());
+            throw ex;
+        }
 
         ProductAsset currentPrimary = productAssetRepositoryPort.findPrimaryActiveByProductOnlineProfileId(profile.id()).orElse(null);
         String actor = auditUserProvider.currentUsername();
@@ -648,9 +697,41 @@ public class EcommerceCatalogApplicationService implements EcommerceCatalogUseCa
                 actor
         );
         try {
-            return productAssetRepositoryPort.save(asset);
+            ProductAsset saved = productAssetRepositoryPort.save(asset);
+            productAssetVariantRepositoryPort.deactivateActiveByProductAssetIdAndVariantKind(
+                    saved.id(),
+                    ProductAssetVariantKind.PRIMARY_OPTIMIZED_WEBP,
+                    actor
+            );
+            if (storedDerivative != null && derivative != null) {
+                productAssetVariantRepositoryPort.save(new ProductAssetVariant(
+                        null,
+                        saved.id(),
+                        ProductAssetVariantKind.PRIMARY_OPTIMIZED_WEBP,
+                        storedDerivative.publicUrl(),
+                        storedDerivative.provider(),
+                        storedDerivative.bucket(),
+                        storedDerivative.storageKey(),
+                        derivative.mimeType(),
+                        derivative.width(),
+                        derivative.height(),
+                        derivative.sizeBytes(),
+                        derivative.checksumSha256(),
+                        derivative.sourceChecksumSha256(),
+                        true,
+                        true,
+                        null,
+                        null,
+                        actor,
+                        actor
+                ));
+            }
+            return saved;
         } catch (RuntimeException ex) {
             productImageBinaryService.cleanupBestEffort(storedImage.storageKey());
+            if (storedDerivative != null) {
+                productImageBinaryService.cleanupBestEffort(storedDerivative.storageKey());
+            }
             throw ex;
         }
     }
