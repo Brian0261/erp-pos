@@ -865,3 +865,28 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
   - No se implemento AVIF, responsive images, `srcset` ni cleanup masivo de objetos orphan.
 - Documento QA creado: `docs/qa/PHASE2S10C_D1_MANUAL_UPLOAD_WEBP_DERIVATIVE_QA.md`.
 - Riesgos residuales: dependencia `webp-imageio` 0.1.6 no mantenida activamente, falta medicion con imagenes grandes reales, Storefront aun no consume variantes.
+
+## Fase 2S.10C-D2 Binary Import WebP Derivative
+
+- Fase 2S.10C-D2 implementada con PASS.
+- Objetivo: extender generacion real de derivado WebP al flujo Excel + ZIP `confirm-file`, preservando `ProductAsset` como original.
+- Integracion limitada a `EcommercePrimaryImageBinaryImportApplicationService.confirmFile(...)`.
+- Preview se mantiene sin efectos secundarios: no sube storage, no genera derivados, no persiste `ProductAsset` ni `ProductAssetVariant`.
+- Regla productiva D2: persistir variante `PRIMARY_OPTIMIZED_WEBP` active/preferred solo si el WebP generado es valido y pesa menos que el original.
+- WebP original se conserva como original y no genera derivado adicional.
+- Reemplazo de imagen desactiva variante WebP activa previa incluso cuando la nueva imagen no genera variante, evitando WebP stale.
+- Escritura DB por fila usa `TransactionTemplate` para rollback de la fila si falla persistencia, manteniendo partial success del lote.
+- Cleanup best-effort por fila limpia solo objetos nuevos de la operacion cuando falla storage de derivado o DB.
+- Tests ejecutados:
+  - D2 focalizado: 7 tests PASS.
+  - Regresion requerida D2: 67 tests PASS.
+  - Backend completo: 439 tests PASS.
+- Restricciones cumplidas:
+  - No se modifico Storefront, contrato publico ni `primaryImage.url`.
+  - No se modifico Admin UI.
+  - No se toco URL import.
+  - No se toco staging, deploy, Caddy, DNS, AWS, S3 real, CloudFront, IAM ni secretos.
+  - No se modificaron `.env` reales, Dockerfile ni `docker-compose.yml`.
+  - No se implemento AVIF, responsive images, `srcset` ni cleanup masivo de objetos orphan.
+- Documento QA creado: `docs/qa/PHASE2S10C_D2_BINARY_IMPORT_WEBP_DERIVATIVE_QA.md`.
+- Riesgos residuales: dependencia `webp-imageio` 0.1.6 no mantenida activamente, falta medicion con imagenes grandes reales, Storefront aun no consume variantes.

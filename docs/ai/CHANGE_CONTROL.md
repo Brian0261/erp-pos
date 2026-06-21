@@ -1499,3 +1499,45 @@ Solo crear tag cuando se cumpla todo:
   - `webp-imageio` 0.1.6 no mantenida activamente y con binarios nativos embebidos.
   - Storefront todavia no consume variantes.
   - Imagenes grandes reales requieren medicion posterior de CPU/memoria/calidad.
+
+### Cierre Fase 2S.10C-D2 Binary Import WebP Derivative
+
+- Tipo: implementacion backend runtime + tests + documentacion QA.
+- Base: D1 cerrado en commit `836fd78 feat(ecommerce): generate WebP derivative for manual upload`.
+- Objetivo: extender generacion real de derivado WebP a Excel + ZIP `confirm-file`, conservando `ProductAsset` como original.
+- Flujo implementado en `EcommercePrimaryImageBinaryImportApplicationService.confirmFile(...)`:
+  - Validar original por fila.
+  - Generar candidato WebP solo para JPEG/PNG.
+  - No generar derivado para WebP original.
+  - Descartar derivado si `webp.sizeBytes >= original.sizeBytes`.
+  - Subir original preservado.
+  - Subir derivado solo si fue aceptado.
+  - Guardar `ProductAsset` original.
+  - Desactivar variante WebP activa previa.
+  - Guardar nueva `ProductAssetVariant.PRIMARY_OPTIMIZED_WEBP` active/preferred si aplica.
+- Preview preservado sin efectos secundarios:
+  - No sube storage.
+  - No genera derivados.
+  - No persiste `ProductAsset` ni `ProductAssetVariant`.
+- Atomicidad por fila:
+  - Escritura DB de asset + variante usa `TransactionTemplate`.
+  - Si falla DB, la fila hace rollback de DB y limpia objetos nuevos.
+  - Partial success del lote se mantiene porque cada fila captura su error.
+- Validaciones:
+  - D2 focalizado: 7 tests PASS.
+  - Regresion requerida D2: 67 tests PASS.
+  - Backend completo: 439 tests PASS.
+- Restricciones cumplidas:
+  - No se modifico Storefront, contrato publico ni `primaryImage.url`.
+  - No se modifico Admin UI.
+  - No se toco URL import.
+  - No se toco staging, deploy, Caddy, DNS, AWS, S3 real, CloudFront, IAM ni secretos.
+  - No se modificaron `.env` reales, Dockerfile ni `docker-compose.yml`.
+  - No se implemento AVIF, responsive images, `srcset`, cleanup masivo de objetos orphan ni deploy.
+- Documento QA creado:
+  - `docs/qa/PHASE2S10C_D2_BINARY_IMPORT_WEBP_DERIVATIVE_QA.md`
+- Resultado: PASS.
+- Riesgos residuales:
+  - `webp-imageio` 0.1.6 no mantenida activamente y con binarios nativos embebidos.
+  - Storefront todavia no consume variantes.
+  - Imagenes grandes reales requieren medicion posterior de CPU/memoria/calidad.

@@ -86,9 +86,11 @@
 - **Variante inicial**: `PRIMARY_OPTIMIZED_WEBP`, limitada por constraint a `mime_type = 'image/webp'`
 - **Estado 2S.10C-C**: Modelo persistente listo
 - **Estado 2S.10C-D1**: Upload manual genera derivado WebP real solo para JPEG/PNG; WebP original no genera derivado adicional
-- **Regla D1**: Registrar `ProductAssetVariant.PRIMARY_OPTIMIZED_WEBP` active/preferred solo si el WebP generado es valido y `size_bytes` es menor que el original
-- **Flujo masivo**: Excel + ZIP no genera derivados en D1
-- **Storefront**: Sin cambios en 2S.10C-D1; el contrato publico mantiene `primaryImage.url` y no expone variantes
+- **Estado 2S.10C-D2**: Excel + ZIP `confirm-file` genera derivado WebP real con las mismas reglas que D1
+- **Regla D1/D2**: Registrar `ProductAssetVariant.PRIMARY_OPTIMIZED_WEBP` active/preferred solo si el WebP generado es valido y `size_bytes` es menor que el original
+- **Preview Excel + ZIP**: Sin efectos secundarios; no sube storage, no genera derivados y no persiste variantes
+- **URL import**: Fuera del pipeline de derivados; sigue validando solo politica de URL
+- **Storefront**: Sin cambios en 2S.10C-D2; el contrato publico mantiene `primaryImage.url` y no expone variantes
 - **Riesgos**: Calidad, CPU/memoria, orphan cleanup, atomicidad S3/DB
 
 ### 2S.10D: Responsive + AVIF + Caché Avanzada (Fase Final)

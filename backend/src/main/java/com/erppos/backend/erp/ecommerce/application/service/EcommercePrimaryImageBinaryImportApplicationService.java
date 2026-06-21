@@ -11,14 +11,20 @@ import com.erppos.backend.erp.ecommerce.domain.model.AssetSource;
 import com.erppos.backend.erp.ecommerce.domain.model.AssetType;
 import com.erppos.backend.erp.ecommerce.domain.model.OnlinePublicationStatus;
 import com.erppos.backend.erp.ecommerce.domain.model.ProductAsset;
+import com.erppos.backend.erp.ecommerce.domain.model.ProductAssetVariant;
+import com.erppos.backend.erp.ecommerce.domain.model.ProductAssetVariantKind;
 import com.erppos.backend.erp.ecommerce.domain.model.ProductOnlineProfile;
 import com.erppos.backend.erp.ecommerce.domain.port.ProductAssetRepositoryPort;
+import com.erppos.backend.erp.ecommerce.domain.port.ProductAssetVariantRepositoryPort;
 import com.erppos.backend.erp.ecommerce.domain.port.ProductOnlineProfileRepositoryPort;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.ArrayList;
@@ -44,7 +50,10 @@ public class EcommercePrimaryImageBinaryImportApplicationService implements Ecom
     private final ProductRepositoryPort productRepositoryPort;
     private final ProductOnlineProfileRepositoryPort profileRepositoryPort;
     private final ProductAssetRepositoryPort assetRepositoryPort;
+    private final ProductAssetVariantRepositoryPort assetVariantRepositoryPort;
     private final EcommerceProductImageBinaryService productImageBinaryService;
+    private final EcommerceWebpDerivativeGenerationService webpDerivativeGenerationService;
+    private final TransactionTemplate transactionTemplate;
     private final AuditUserProvider auditUserProvider;
 
     public EcommercePrimaryImageBinaryImportApplicationService(
@@ -53,7 +62,10 @@ public class EcommercePrimaryImageBinaryImportApplicationService implements Ecom
             ProductRepositoryPort productRepositoryPort,
             ProductOnlineProfileRepositoryPort profileRepositoryPort,
             ProductAssetRepositoryPort assetRepositoryPort,
+            ProductAssetVariantRepositoryPort assetVariantRepositoryPort,
             EcommerceProductImageBinaryService productImageBinaryService,
+            EcommerceWebpDerivativeGenerationService webpDerivativeGenerationService,
+            PlatformTransactionManager transactionManager,
             AuditUserProvider auditUserProvider
     ) {
         this.workbookPort = workbookPort;
@@ -61,7 +73,11 @@ public class EcommercePrimaryImageBinaryImportApplicationService implements Ecom
         this.productRepositoryPort = productRepositoryPort;
         this.profileRepositoryPort = profileRepositoryPort;
         this.assetRepositoryPort = assetRepositoryPort;
+        this.assetVariantRepositoryPort = assetVariantRepositoryPort;
         this.productImageBinaryService = productImageBinaryService;
+        this.webpDerivativeGenerationService = webpDerivativeGenerationService;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
+        this.transactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         this.auditUserProvider = auditUserProvider;
     }
 
@@ -101,14 +117,7 @@ public class EcommercePrimaryImageBinaryImportApplicationService implements Ecom
             }
 
             try {
-                EcommerceProductImageBinaryService.StoredProductImage storedImage = productImageBinaryService.store(
-                        row.profile(),
-                        row.product().name(),
-                        row.archiveImage().bytes(),
-                        row.archiveImage().normalizedPath(),
-                        null
-                );
-                ProductAsset saved = saveProductAsset(row, storedImage);
+                ProductAsset saved = applyRow(row);
                 if (row.action() == EcommercePrimaryImageUrlImportAction.CREATE) {
                     createdRows += 1;
                 } else if (row.action() == EcommercePrimaryImageUrlImportAction.UPDATE) {
@@ -128,6 +137,109 @@ public class EcommercePrimaryImageBinaryImportApplicationService implements Ecom
                 (int) results.stream().filter(row -> !row.applied()).count(),
                 (int) results.stream().filter(row -> !row.warnings().isEmpty()).count(),
                 results
+        );
+    }
+
+    private ProductAsset applyRow(ValidatedRow row) {
+        EcommerceProductImageBinaryService.ValidatedProductImage originalImage = row.image();
+        EcommerceWebpDerivativeGenerationService.GeneratedWebpDerivative derivative = webpDerivativeGenerationService.generatePreferredDerivative(
+                row.archiveImage().bytes(),
+                originalImage
+        ).orElse(null);
+
+        String originalStorageKey = productImageBinaryService.buildPrimaryStorageKey(row.profile(), row.product().name(), originalImage);
+        EcommerceProductImageBinaryService.StoredProductImage storedImage = productImageBinaryService.storeValidated(
+                originalStorageKey,
+                row.archiveImage().bytes(),
+                originalImage
+        );
+        EcommerceProductImageBinaryService.StoredProductImage storedDerivative = null;
+        try {
+            if (derivative != null) {
+                String derivativeStorageKey = productImageBinaryService.buildPrimaryOptimizedWebpVariantStorageKey(
+                        row.profile(),
+                        row.product().name(),
+                        derivative.sourceChecksumSha256(),
+                        derivative.checksumSha256()
+                );
+                storedDerivative = productImageBinaryService.storeValidated(
+                        derivativeStorageKey,
+                        derivative.bytes(),
+                        toValidatedDerivativeImage(derivative)
+                );
+            }
+        } catch (RuntimeException ex) {
+            productImageBinaryService.cleanupBestEffort(storedImage.storageKey());
+            throw ex;
+        }
+
+        try {
+            EcommerceProductImageBinaryService.StoredProductImage finalStoredDerivative = storedDerivative;
+            EcommerceWebpDerivativeGenerationService.GeneratedWebpDerivative finalDerivative = derivative;
+            ProductAsset saved = transactionTemplate.execute(status -> saveProductAssetAndVariant(row, storedImage, finalStoredDerivative, finalDerivative));
+            if (saved == null) {
+                throw new EcommerceBusinessRuleException("Import row failed");
+            }
+            return saved;
+        } catch (RuntimeException ex) {
+            productImageBinaryService.cleanupBestEffort(storedImage.storageKey());
+            if (storedDerivative != null) {
+                productImageBinaryService.cleanupBestEffort(storedDerivative.storageKey());
+            }
+            throw ex;
+        }
+    }
+
+    private ProductAsset saveProductAssetAndVariant(
+            ValidatedRow row,
+            EcommerceProductImageBinaryService.StoredProductImage storedImage,
+            EcommerceProductImageBinaryService.StoredProductImage storedDerivative,
+            EcommerceWebpDerivativeGenerationService.GeneratedWebpDerivative derivative
+    ) {
+        ProductAsset saved = saveProductAsset(row, storedImage);
+        String actor = auditUserProvider.currentUsername();
+        assetVariantRepositoryPort.deactivateActiveByProductAssetIdAndVariantKind(
+                saved.id(),
+                ProductAssetVariantKind.PRIMARY_OPTIMIZED_WEBP,
+                actor
+        );
+        if (storedDerivative != null && derivative != null) {
+            assetVariantRepositoryPort.save(new ProductAssetVariant(
+                    null,
+                    saved.id(),
+                    ProductAssetVariantKind.PRIMARY_OPTIMIZED_WEBP,
+                    storedDerivative.publicUrl(),
+                    storedDerivative.provider(),
+                    storedDerivative.bucket(),
+                    storedDerivative.storageKey(),
+                    derivative.mimeType(),
+                    derivative.width(),
+                    derivative.height(),
+                    derivative.sizeBytes(),
+                    derivative.checksumSha256(),
+                    derivative.sourceChecksumSha256(),
+                    true,
+                    true,
+                    null,
+                    null,
+                    actor,
+                    actor
+            ));
+        }
+        return saved;
+    }
+
+    private EcommerceProductImageBinaryService.ValidatedProductImage toValidatedDerivativeImage(
+            EcommerceWebpDerivativeGenerationService.GeneratedWebpDerivative derivative
+    ) {
+        return new EcommerceProductImageBinaryService.ValidatedProductImage(
+                derivative.mimeType(),
+                "webp",
+                derivative.width(),
+                derivative.height(),
+                derivative.sizeBytes(),
+                derivative.checksumSha256(),
+                derivative.originalFilename()
         );
     }
 
@@ -379,12 +491,7 @@ public class EcommercePrimaryImageBinaryImportApplicationService implements Ecom
                 current == null ? actor : current.createdBy(),
                 actor
         );
-        try {
-            return assetRepositoryPort.save(asset);
-        } catch (RuntimeException ex) {
-            productImageBinaryService.cleanupBestEffort(storedImage.storageKey());
-            throw ex;
-        }
+        return assetRepositoryPort.save(asset);
     }
 
     private PreviewResult toPreviewResult(List<ValidatedRow> rows) {
