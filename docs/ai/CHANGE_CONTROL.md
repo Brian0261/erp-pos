@@ -1695,3 +1695,40 @@ Solo crear tag cuando se cumpla todo:
   - `webp-imageio` 0.1.6 sigue siendo dependencia runtime no mantenida activamente.
   - No se ha validado con data real de productos en staging.
 - Conclusión: API publica lista para staging smoke. Todos los casos criticos cubiertos por tests de integracion.
+
+### Cierre Fase 2S.10C-S Staging WebP Variant Public API QA
+
+- Tipo: deploy minimo staging + validacion funcional + documentacion QA.
+- Base: E3 cerrado en commit `fb0445f docs(ecommerce): close local public WebP API QA`.
+- Objetivo: validar en staging el flujo completo de derivados WebP ecommerce.
+- No se implemento nueva funcionalidad.
+- Solo se ejecuto deploy minimo y se documento evidencia.
+- Backup DB staging creado: `/home/ubuntu/inktoy-backups/2s10c-staging-smoke/20260621T160535Z/staging-db-before-2s10c-s.sql`.
+- Flyway V19 aplicado correctamente: `success = t`.
+- Tabla `ecommerce_product_asset_variants` existe.
+- SKU usado: `CUAD`, slug `cuaderno-a4`.
+- Upload manual desde Admin staging genero `ProductAssetVariant` WebP.
+- ProductAsset original JPG preservado: 13890 bytes.
+- ProductAssetVariant WebP creado: 4130 bytes (70.3% reduccion).
+- CDN del derivado: HTTP 200, `Content-Type: image/webp`.
+- API publica detalle: `primaryImage.url` apunta al derivado WebP.
+- API publica listado: `primaryImage.url` apunta al derivado WebP.
+- Storefront staging: HTTP 200, imagen visible en incognito.
+- Robots.txt mantiene `Disallow: /`.
+- Backend/Admin/Storefront responden 200.
+- Sin errores criticos en logs.
+- Contrato publico sin cambios: solo `url`, `altText`, `type`, `displayOrder`.
+- Restricciones cumplidas:
+  - No se reconstruyo frontend/Admin ni Storefront.
+  - No se toco Caddy, DNS, AWS/S3/CloudFront/IAM, `.env`, Dockerfile, `docker-compose.yml` ni infraestructura.
+  - Solo deploy minimo backend.
+- Documento QA creado:
+  - `docs/qa/PHASE2S10C_STAGING_WEBP_VARIANT_PUBLIC_API_QA.md`
+- Resultado: PASS.
+- Riesgos residuales:
+  - Objetos storage anteriores pueden quedar orphan hasta una fase futura de limpieza segura.
+  - Cache CDN/Next/Image puede retrasar visibilidad de cambios en ambientes reales.
+  - `webp-imageio` 0.1.6 sigue siendo dependencia runtime no mantenida activamente.
+  - Calidad de conversion WebP depende de `webp-imageio`.
+- Recomendacion siguiente: iniciar 2S.10D en Plan Mode, no Build directo.
+- Conclusion: Staging smoke PASS. Flujo completo de derivados WebP validado en staging.

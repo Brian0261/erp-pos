@@ -89,6 +89,7 @@
 - **Estado 2S.10C-D2**: Excel + ZIP `confirm-file` genera derivado WebP real con las mismas reglas que D1
 - **Estado 2S.10C-E1**: URL import y Admin URL upsert desactivan variantes WebP activas previas del `ProductAsset` afectado para evitar stale variants antes de preferencia publica
 - **Estado 2S.10C-E2**: API publica ecommerce prefiere `ProductAssetVariant.PRIMARY_OPTIMIZED_WEBP` active/preferred como `primaryImage.url` con fallback al `ProductAsset.assetUrl` original
+- **Estado 2S.10C-S**: Staging smoke PASS; migracion V19 aplicada, upload manual genera variante WebP, CDN sirve WebP, API publica devuelve `primaryImage.url` WebP, Storefront renderiza correctamente
 - **Regla D1/D2**: Registrar `ProductAssetVariant.PRIMARY_OPTIMIZED_WEBP` active/preferred solo si el WebP generado es valido y `size_bytes` es menor que el original
 - **Regla E2**: `altText`, `type` y `displayOrder` siguen saliendo del `ProductAsset` original; solo cambia internamente la URL seleccionada
 - **Preview Excel + ZIP**: Sin efectos secundarios; no sube storage, no genera derivados y no persiste variantes
