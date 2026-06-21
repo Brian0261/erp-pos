@@ -89,6 +89,28 @@ class EcommerceBinaryImportWebpDerivativeFailureIntegrationTest extends Abstract
         verify(imageStoragePort, times(2)).delete(anyString());
     }
 
+    @Test
+    void dbFailureAfterResponsiveUploadsShouldCleanOriginalDerivativeAndResponsiveVariants() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = Long.toString(System.nanoTime(), 36);
+        long productId = createCatalogProduct(adminToken, suffix + "rf", BigDecimal.valueOf(19));
+        ecommerceCatalogUseCase.createDraftProfile(new CreateProductOnlineProfileCommand(productId));
+        doThrow(new RuntimeException("Variant DB failed")).when(assetVariantRepositoryPort).save(any(ProductAssetVariant.class));
+
+        mockMvc.perform(multipart("/api/v1/ecommerce-admin/products/online-profiles/primary-images/binary-import/confirm-file")
+                        .file(workbookFile(new String[][]{{productSku(suffix + "rf"), "images/primary-large.jpg", "DB fail alt", "OWN", "true", "", "0", "", "", "", ""}}))
+                        .file(archiveFile(new ZipItem("images/primary-large.jpg", jpegGradientBytes(1000, 750))))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.createdRows").value(0))
+                .andExpect(jsonPath("$.rejectedRows").value(1))
+                .andExpect(jsonPath("$.rows[0].applied").value(false))
+                .andExpect(jsonPath("$.rows[0].errors[0]").value("Variant DB failed"));
+
+        assertFalse(ecommerceCatalogUseCase.getPrimaryAssetByProductId(productId).isPresent());
+        verify(imageStoragePort, times(5)).delete(anyString());
+    }
+
     private long createCatalogProduct(String adminToken, String suffix, BigDecimal salePrice) throws Exception {
         long categoryId = createCategory(adminToken, suffix);
         long unitId = createUnit(adminToken, suffix);

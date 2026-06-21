@@ -108,8 +108,9 @@
 - **Estado 2S.10D-B**: Spike test-only PASS para WebP responsive en local y Docker/Linux; AVIF BLOQUEADO por falta de writer/reader ImageIO seguro sin tocar Dockerfile/infraestructura
 - **Estado 2S.10D-C**: Modelo extendido con V20 para WebP responsive; `PRIMARY_RESPONSIVE_WEBP`, `format=WEBP`, `purpose=RESPONSIVE`, `target_width` y `sort_order` listos, sin generacion responsive todavia
 - **Estado 2S.10D-D1**: Upload manual genera `PRIMARY_RESPONSIVE_WEBP` para JPEG/PNG con targets `320w`, `640w`, `960w`, `1280w`, no-upscaling y `preferred=false`; WebP original no genera responsive
-- **Storefront**: Sin cambios en D1; cambios en tipos publicos, `ProductImageFrame`, SEO/OG y `next/image` config quedan diferidos
-- **Responsive API**: Sin `srcset`, `sizes`, `sources` ni metadata publica en D1
+- **Estado 2S.10D-D2**: Excel + ZIP `confirm-file` genera `PRIMARY_RESPONSIVE_WEBP` con las mismas reglas de D1; preview sigue sin efectos secundarios
+- **Storefront**: Sin cambios en D1/D2; cambios en tipos publicos, `ProductImageFrame`, SEO/OG y `next/image` config quedan diferidos
+- **Responsive API**: Sin `srcset`, `sizes`, `sources` ni metadata publica en D1/D2
 - **AVIF**: Bloqueado/no apto por ahora; no se permite `image/avif`
 - **Caché**: Estrategia avanzada (stale-while-revalidate, CDN invalidation)
 - **Riesgos**: Complejidad alta, cache invalidation, contrato público más amplio

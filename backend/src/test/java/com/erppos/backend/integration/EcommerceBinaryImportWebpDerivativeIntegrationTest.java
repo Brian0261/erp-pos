@@ -3,7 +3,9 @@ package com.erppos.backend.integration;
 import com.erppos.backend.erp.ecommerce.application.usecase.CreateProductOnlineProfileCommand;
 import com.erppos.backend.erp.ecommerce.application.usecase.EcommerceCatalogUseCase;
 import com.erppos.backend.erp.ecommerce.domain.model.ProductAsset;
+import com.erppos.backend.erp.ecommerce.domain.model.ProductAssetVariantFormat;
 import com.erppos.backend.erp.ecommerce.domain.model.ProductAssetVariantKind;
+import com.erppos.backend.erp.ecommerce.domain.model.ProductAssetVariantPurpose;
 import com.erppos.backend.erp.ecommerce.domain.port.EcommerceImageStoragePort;
 import com.erppos.backend.erp.ecommerce.infrastructure.persistence.ProductAssetVariantEntity;
 import com.erppos.backend.erp.ecommerce.infrastructure.persistence.ProductAssetVariantJpaRepository;
@@ -51,8 +53,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "app.ecommerce.public-images.allowed-domains=cdn-staging.inktoy.pe",
         "app.ecommerce.image-storage.public-base-url=https://cdn-staging.inktoy.pe",
         "app.ecommerce.image-storage.max-size-bytes=1048576",
-        "app.ecommerce.image-storage.max-width=1000",
-        "app.ecommerce.image-storage.max-height=1000"
+        "app.ecommerce.image-storage.max-width=2000",
+        "app.ecommerce.image-storage.max-height=2000"
 })
 class EcommerceBinaryImportWebpDerivativeIntegrationTest extends AbstractHttpIntegrationTest {
     @Autowired
@@ -102,6 +104,72 @@ class EcommerceBinaryImportWebpDerivativeIntegrationTest extends AbstractHttpInt
     }
 
     @Test
+    void confirmFileShouldPersistResponsiveWebpVariantsForLargeJpeg() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = Long.toString(System.nanoTime(), 36);
+        long productId = createCatalogProduct(adminToken, suffix + "jpglarge", BigDecimal.valueOf(11));
+        createDraftProfile(productId);
+
+        mockMvc.perform(multipart("/api/v1/ecommerce-admin/products/online-profiles/primary-images/binary-import/confirm-file")
+                        .file(workbookFile(new String[][]{{productSku(suffix + "jpglarge"), "images/primary-large.jpg", "JPEG large alt", "OWN", "true", "", "0", "", "", "", ""}}))
+                        .file(archiveFile(new ZipItem("images/primary-large.jpg", jpegGradientBytes(1600, 1200))))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.createdRows").value(1))
+                .andExpect(jsonPath("$.rejectedRows").value(0))
+                .andExpect(jsonPath("$.rows[0].applied").value(true));
+
+        ProductAsset asset = ecommerceCatalogUseCase.getPrimaryAssetByProductId(productId).orElseThrow();
+        ProductAssetVariantEntity preferredVariant = activePreferredVariant(asset).get(0);
+        List<ProductAssetVariantEntity> responsiveVariants = activeResponsiveVariants(asset);
+
+        assertEquals("image/jpeg", asset.mimeType());
+        assertEquals("image/webp", preferredVariant.getMimeType());
+        assertTrue(preferredVariant.isPreferred());
+        assertEquals(List.of(320, 640, 960, 1280), responsiveVariants.stream().map(ProductAssetVariantEntity::getTargetWidth).sorted().toList());
+        for (ProductAssetVariantEntity variant : responsiveVariants) {
+            assertEquals(ProductAssetVariantFormat.WEBP, variant.getFormat());
+            assertEquals(ProductAssetVariantPurpose.RESPONSIVE, variant.getPurpose());
+            assertEquals("image/webp", variant.getMimeType());
+            assertEquals(asset.checksumSha256(), variant.getSourceChecksumSha256());
+            assertEquals(variant.getTargetWidth(), variant.getWidth());
+            assertTrue(variant.getStorageKey().contains("/variants/responsive/"));
+            assertTrue(variant.isActive());
+            assertFalse(variant.isPreferred());
+        }
+        verify(imageStoragePort, times(6)).store(any());
+    }
+
+    @Test
+    void confirmFileShouldPersistResponsiveWebpVariantsForTransparentPngWithoutUpscaling() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = Long.toString(System.nanoTime(), 36);
+        long productId = createCatalogProduct(adminToken, suffix + "pnglarge", BigDecimal.valueOf(12));
+        createDraftProfile(productId);
+
+        mockMvc.perform(multipart("/api/v1/ecommerce-admin/products/online-profiles/primary-images/binary-import/confirm-file")
+                        .file(workbookFile(new String[][]{{productSku(suffix + "pnglarge"), "images/transparent-large.png", "PNG large alt", "OWN", "true", "", "0", "", "", "", ""}}))
+                        .file(archiveFile(new ZipItem("images/transparent-large.png", transparentPngBytes(800, 800))))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.createdRows").value(1))
+                .andExpect(jsonPath("$.rejectedRows").value(0));
+
+        ProductAsset asset = ecommerceCatalogUseCase.getPrimaryAssetByProductId(productId).orElseThrow();
+        List<ProductAssetVariantEntity> responsiveVariants = activeResponsiveVariants(asset);
+
+        assertEquals("image/png", asset.mimeType());
+        assertEquals(List.of(320, 640), responsiveVariants.stream().map(ProductAssetVariantEntity::getTargetWidth).sorted().toList());
+        for (ProductAssetVariantEntity variant : responsiveVariants) {
+            assertEquals(ProductAssetVariantFormat.WEBP, variant.getFormat());
+            assertEquals(ProductAssetVariantPurpose.RESPONSIVE, variant.getPurpose());
+            assertEquals("image/webp", variant.getMimeType());
+            assertEquals(variant.getTargetWidth(), variant.getWidth());
+            assertFalse(variant.isPreferred());
+        }
+    }
+
+    @Test
     void confirmFileShouldKeepSmallTransparentPngOriginalAndSkipNonReducingVariant() throws Exception {
         String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
         String suffix = Long.toString(System.nanoTime(), 36);
@@ -119,6 +187,7 @@ class EcommerceBinaryImportWebpDerivativeIntegrationTest extends AbstractHttpInt
         ProductAsset asset = ecommerceCatalogUseCase.getPrimaryAssetByProductId(productId).orElseThrow();
         assertEquals("image/png", asset.mimeType());
         assertTrue(activePreferredVariant(asset).isEmpty());
+        assertTrue(activeResponsiveVariants(asset).isEmpty());
     }
 
     @Test
@@ -139,6 +208,7 @@ class EcommerceBinaryImportWebpDerivativeIntegrationTest extends AbstractHttpInt
         ProductAsset asset = ecommerceCatalogUseCase.getPrimaryAssetByProductId(productId).orElseThrow();
         assertEquals("image/webp", asset.mimeType());
         assertTrue(activePreferredVariant(asset).isEmpty());
+        assertTrue(activeResponsiveVariants(asset).isEmpty());
         verify(imageStoragePort, times(1)).store(any());
     }
 
@@ -189,6 +259,41 @@ class EcommerceBinaryImportWebpDerivativeIntegrationTest extends AbstractHttpInt
     }
 
     @Test
+    void replacementShouldDeactivatePreviousResponsiveVariantsAndKeepOtherAssetsUntouched() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = Long.toString(System.nanoTime(), 36);
+        long replaceProductId = createCatalogProduct(adminToken, suffix + "rr", BigDecimal.valueOf(15));
+        long otherProductId = createCatalogProduct(adminToken, suffix + "ro", BigDecimal.valueOf(16));
+        createDraftProfile(replaceProductId);
+        createDraftProfile(otherProductId);
+
+        confirmOne(adminToken, suffix + "rr", "images/first.jpg", jpegGradientBytes(1000, 750), "First alt");
+        ProductAsset firstAsset = ecommerceCatalogUseCase.getPrimaryAssetByProductId(replaceProductId).orElseThrow();
+        List<Long> firstResponsiveVariantIds = activeResponsiveVariants(firstAsset).stream()
+                .map(ProductAssetVariantEntity::getId)
+                .toList();
+
+        confirmOne(adminToken, suffix + "ro", "images/other.jpg", jpegGradientBytes(1000, 750), "Other alt");
+        ProductAsset otherAsset = ecommerceCatalogUseCase.getPrimaryAssetByProductId(otherProductId).orElseThrow();
+        List<Long> otherResponsiveVariantIds = activeResponsiveVariants(otherAsset).stream()
+                .map(ProductAssetVariantEntity::getId)
+                .toList();
+
+        confirmOne(adminToken, suffix + "rr", "images/second.jpg", jpegGradientBytes(1000, 750), "Second alt");
+        ProductAsset secondAsset = ecommerceCatalogUseCase.getPrimaryAssetByProductId(replaceProductId).orElseThrow();
+
+        assertEquals(firstAsset.id(), secondAsset.id());
+        assertFalse(firstResponsiveVariantIds.isEmpty());
+        for (Long variantId : firstResponsiveVariantIds) {
+            assertFalse(variantJpaRepository.findById(variantId).orElseThrow().isActive());
+        }
+        assertEquals(List.of(320, 640, 960), activeResponsiveVariants(secondAsset).stream().map(ProductAssetVariantEntity::getTargetWidth).sorted().toList());
+        for (Long variantId : otherResponsiveVariantIds) {
+            assertTrue(variantJpaRepository.findById(variantId).orElseThrow().isActive());
+        }
+    }
+
+    @Test
     void derivativeStorageFailureShouldCleanNewOriginalAndKeepOtherRowsSuccessful() throws Exception {
         String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
         String suffix = Long.toString(System.nanoTime(), 36);
@@ -226,6 +331,46 @@ class EcommerceBinaryImportWebpDerivativeIntegrationTest extends AbstractHttpInt
         verify(imageStoragePort, times(1)).delete(anyString());
     }
 
+    @Test
+    void responsiveStorageFailureShouldCleanNewObjectsAndKeepOtherRowsSuccessful() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = Long.toString(System.nanoTime(), 36);
+        long failProductId = createCatalogProduct(adminToken, suffix + "respfail", BigDecimal.valueOf(16));
+        long okProductId = createCatalogProduct(adminToken, suffix + "respok", BigDecimal.valueOf(17));
+        createDraftProfile(failProductId);
+        createDraftProfile(okProductId);
+        doAnswer(invocation -> {
+            EcommerceImageStoragePort.EcommerceImageStorageObject object = invocation.getArgument(0);
+            if (object.storageKey().contains("/products/" + failProductId + "/")
+                    && object.storageKey().contains("/variants/responsive/")
+                    && object.storageKey().contains("-640w-")) {
+                throw new RuntimeException("Responsive storage failed");
+            }
+            return new EcommerceImageStoragePort.StoredEcommerceImage("S3", "inktoy-test-bucket", object.storageKey(), "https://cdn-staging.inktoy.pe/" + object.storageKey());
+        }).when(imageStoragePort).store(any());
+
+        mockMvc.perform(multipart("/api/v1/ecommerce-admin/products/online-profiles/primary-images/binary-import/confirm-file")
+                        .file(workbookFile(new String[][]{
+                                {productSku(suffix + "respfail"), "images/fail.jpg", "Fail alt", "OWN", "true", "", "0", "", "", "", ""},
+                                {productSku(suffix + "respok"), "images/ok.jpg", "Ok alt", "OWN", "true", "", "0", "", "", "", ""}
+                        }))
+                        .file(archiveFile(
+                                new ZipItem("images/fail.jpg", jpegGradientBytes(1000, 750)),
+                                new ZipItem("images/ok.jpg", jpegGradientBytes(96, 72))
+                        ))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.createdRows").value(1))
+                .andExpect(jsonPath("$.rejectedRows").value(1))
+                .andExpect(jsonPath("$.rows[0].applied").value(false))
+                .andExpect(jsonPath("$.rows[0].errors[0]").value("Responsive storage failed"))
+                .andExpect(jsonPath("$.rows[1].applied").value(true));
+
+        assertFalse(ecommerceCatalogUseCase.getPrimaryAssetByProductId(failProductId).isPresent());
+        assertTrue(ecommerceCatalogUseCase.getPrimaryAssetByProductId(okProductId).isPresent());
+        verify(imageStoragePort, times(3)).delete(anyString());
+    }
+
     private void confirmOne(String adminToken, String skuSuffix, String imagePath, byte[] imageBytes, String altText) throws Exception {
         mockMvc.perform(multipart("/api/v1/ecommerce-admin/products/online-profiles/primary-images/binary-import/confirm-file")
                         .file(workbookFile(new String[][]{{productSku(skuSuffix), imagePath, altText, "OWN", "true", "", "0", "", "", "", ""}}))
@@ -241,6 +386,14 @@ class EcommerceBinaryImportWebpDerivativeIntegrationTest extends AbstractHttpInt
                 .filter(variant -> variant.getVariantKind() == ProductAssetVariantKind.PRIMARY_OPTIMIZED_WEBP)
                 .filter(ProductAssetVariantEntity::isActive)
                 .filter(ProductAssetVariantEntity::isPreferred)
+                .toList();
+    }
+
+    private List<ProductAssetVariantEntity> activeResponsiveVariants(ProductAsset asset) {
+        return variantJpaRepository.findAll().stream()
+                .filter(variant -> variant.getProductAssetId().equals(asset.id()))
+                .filter(variant -> variant.getVariantKind() == ProductAssetVariantKind.PRIMARY_RESPONSIVE_WEBP)
+                .filter(ProductAssetVariantEntity::isActive)
                 .toList();
     }
 

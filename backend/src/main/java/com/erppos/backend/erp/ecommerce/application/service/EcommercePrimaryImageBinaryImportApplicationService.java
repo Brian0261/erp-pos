@@ -12,7 +12,9 @@ import com.erppos.backend.erp.ecommerce.domain.model.AssetType;
 import com.erppos.backend.erp.ecommerce.domain.model.OnlinePublicationStatus;
 import com.erppos.backend.erp.ecommerce.domain.model.ProductAsset;
 import com.erppos.backend.erp.ecommerce.domain.model.ProductAssetVariant;
+import com.erppos.backend.erp.ecommerce.domain.model.ProductAssetVariantFormat;
 import com.erppos.backend.erp.ecommerce.domain.model.ProductAssetVariantKind;
+import com.erppos.backend.erp.ecommerce.domain.model.ProductAssetVariantPurpose;
 import com.erppos.backend.erp.ecommerce.domain.model.ProductOnlineProfile;
 import com.erppos.backend.erp.ecommerce.domain.port.ProductAssetRepositoryPort;
 import com.erppos.backend.erp.ecommerce.domain.port.ProductAssetVariantRepositoryPort;
@@ -53,6 +55,7 @@ public class EcommercePrimaryImageBinaryImportApplicationService implements Ecom
     private final ProductAssetVariantRepositoryPort assetVariantRepositoryPort;
     private final EcommerceProductImageBinaryService productImageBinaryService;
     private final EcommerceWebpDerivativeGenerationService webpDerivativeGenerationService;
+    private final EcommerceResponsiveWebpVariantGenerationService responsiveWebpVariantGenerationService;
     private final TransactionTemplate transactionTemplate;
     private final AuditUserProvider auditUserProvider;
 
@@ -65,6 +68,7 @@ public class EcommercePrimaryImageBinaryImportApplicationService implements Ecom
             ProductAssetVariantRepositoryPort assetVariantRepositoryPort,
             EcommerceProductImageBinaryService productImageBinaryService,
             EcommerceWebpDerivativeGenerationService webpDerivativeGenerationService,
+            EcommerceResponsiveWebpVariantGenerationService responsiveWebpVariantGenerationService,
             PlatformTransactionManager transactionManager,
             AuditUserProvider auditUserProvider
     ) {
@@ -76,6 +80,7 @@ public class EcommercePrimaryImageBinaryImportApplicationService implements Ecom
         this.assetVariantRepositoryPort = assetVariantRepositoryPort;
         this.productImageBinaryService = productImageBinaryService;
         this.webpDerivativeGenerationService = webpDerivativeGenerationService;
+        this.responsiveWebpVariantGenerationService = responsiveWebpVariantGenerationService;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
         this.transactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         this.auditUserProvider = auditUserProvider;
@@ -146,6 +151,10 @@ public class EcommercePrimaryImageBinaryImportApplicationService implements Ecom
                 row.archiveImage().bytes(),
                 originalImage
         ).orElse(null);
+        List<EcommerceResponsiveWebpVariantGenerationService.GeneratedResponsiveWebpVariant> responsiveVariants = responsiveWebpVariantGenerationService.generateResponsiveVariants(
+                row.archiveImage().bytes(),
+                originalImage
+        );
 
         String originalStorageKey = productImageBinaryService.buildPrimaryStorageKey(row.profile(), row.product().name(), originalImage);
         EcommerceProductImageBinaryService.StoredProductImage storedImage = productImageBinaryService.storeValidated(
@@ -154,6 +163,7 @@ public class EcommercePrimaryImageBinaryImportApplicationService implements Ecom
                 originalImage
         );
         EcommerceProductImageBinaryService.StoredProductImage storedDerivative = null;
+        List<StoredResponsiveWebpVariant> storedResponsiveVariants = new ArrayList<>();
         try {
             if (derivative != null) {
                 String derivativeStorageKey = productImageBinaryService.buildPrimaryOptimizedWebpVariantStorageKey(
@@ -168,15 +178,34 @@ public class EcommercePrimaryImageBinaryImportApplicationService implements Ecom
                         toValidatedDerivativeImage(derivative)
                 );
             }
+            for (EcommerceResponsiveWebpVariantGenerationService.GeneratedResponsiveWebpVariant responsiveVariant : responsiveVariants) {
+                String responsiveStorageKey = productImageBinaryService.buildPrimaryResponsiveWebpVariantStorageKey(
+                        row.profile(),
+                        row.product().name(),
+                        responsiveVariant.targetWidth(),
+                        responsiveVariant.sourceChecksumSha256(),
+                        responsiveVariant.checksumSha256()
+                );
+                EcommerceProductImageBinaryService.StoredProductImage storedResponsiveVariant = productImageBinaryService.storeValidated(
+                        responsiveStorageKey,
+                        responsiveVariant.bytes(),
+                        toValidatedResponsiveImage(responsiveVariant)
+                );
+                storedResponsiveVariants.add(new StoredResponsiveWebpVariant(responsiveVariant, storedResponsiveVariant));
+            }
         } catch (RuntimeException ex) {
             productImageBinaryService.cleanupBestEffort(storedImage.storageKey());
+            if (storedDerivative != null) {
+                productImageBinaryService.cleanupBestEffort(storedDerivative.storageKey());
+            }
+            cleanupStoredResponsiveVariants(storedResponsiveVariants);
             throw ex;
         }
 
         try {
             EcommerceProductImageBinaryService.StoredProductImage finalStoredDerivative = storedDerivative;
             EcommerceWebpDerivativeGenerationService.GeneratedWebpDerivative finalDerivative = derivative;
-            ProductAsset saved = transactionTemplate.execute(status -> saveProductAssetAndVariant(row, storedImage, finalStoredDerivative, finalDerivative));
+            ProductAsset saved = transactionTemplate.execute(status -> saveProductAssetAndVariant(row, storedImage, finalStoredDerivative, finalDerivative, storedResponsiveVariants));
             if (saved == null) {
                 throw new EcommerceBusinessRuleException("Import row failed");
             }
@@ -186,6 +215,7 @@ public class EcommercePrimaryImageBinaryImportApplicationService implements Ecom
             if (storedDerivative != null) {
                 productImageBinaryService.cleanupBestEffort(storedDerivative.storageKey());
             }
+            cleanupStoredResponsiveVariants(storedResponsiveVariants);
             throw ex;
         }
     }
@@ -194,13 +224,19 @@ public class EcommercePrimaryImageBinaryImportApplicationService implements Ecom
             ValidatedRow row,
             EcommerceProductImageBinaryService.StoredProductImage storedImage,
             EcommerceProductImageBinaryService.StoredProductImage storedDerivative,
-            EcommerceWebpDerivativeGenerationService.GeneratedWebpDerivative derivative
+            EcommerceWebpDerivativeGenerationService.GeneratedWebpDerivative derivative,
+            List<StoredResponsiveWebpVariant> storedResponsiveVariants
     ) {
         ProductAsset saved = saveProductAsset(row, storedImage);
         String actor = auditUserProvider.currentUsername();
         assetVariantRepositoryPort.deactivateActiveByProductAssetIdAndVariantKind(
                 saved.id(),
                 ProductAssetVariantKind.PRIMARY_OPTIMIZED_WEBP,
+                actor
+        );
+        assetVariantRepositoryPort.deactivateActiveByProductAssetIdAndVariantKind(
+                saved.id(),
+                ProductAssetVariantKind.PRIMARY_RESPONSIVE_WEBP,
                 actor
         );
         if (storedDerivative != null && derivative != null) {
@@ -226,6 +262,35 @@ public class EcommercePrimaryImageBinaryImportApplicationService implements Ecom
                     actor
             ));
         }
+        for (StoredResponsiveWebpVariant storedResponsiveVariant : storedResponsiveVariants) {
+            EcommerceResponsiveWebpVariantGenerationService.GeneratedResponsiveWebpVariant responsiveVariant = storedResponsiveVariant.variant();
+            EcommerceProductImageBinaryService.StoredProductImage storedResponsiveImage = storedResponsiveVariant.storedImage();
+            assetVariantRepositoryPort.save(new ProductAssetVariant(
+                    null,
+                    saved.id(),
+                    ProductAssetVariantKind.PRIMARY_RESPONSIVE_WEBP,
+                    ProductAssetVariantFormat.WEBP,
+                    ProductAssetVariantPurpose.RESPONSIVE,
+                    responsiveVariant.targetWidth(),
+                    responsiveVariant.sortOrder(),
+                    storedResponsiveImage.publicUrl(),
+                    storedResponsiveImage.provider(),
+                    storedResponsiveImage.bucket(),
+                    storedResponsiveImage.storageKey(),
+                    responsiveVariant.mimeType(),
+                    responsiveVariant.width(),
+                    responsiveVariant.height(),
+                    responsiveVariant.sizeBytes(),
+                    responsiveVariant.checksumSha256(),
+                    responsiveVariant.sourceChecksumSha256(),
+                    true,
+                    false,
+                    null,
+                    null,
+                    actor,
+                    actor
+            ));
+        }
         return saved;
     }
 
@@ -241,6 +306,32 @@ public class EcommercePrimaryImageBinaryImportApplicationService implements Ecom
                 derivative.checksumSha256(),
                 derivative.originalFilename()
         );
+    }
+
+    private EcommerceProductImageBinaryService.ValidatedProductImage toValidatedResponsiveImage(
+            EcommerceResponsiveWebpVariantGenerationService.GeneratedResponsiveWebpVariant responsiveVariant
+    ) {
+        return new EcommerceProductImageBinaryService.ValidatedProductImage(
+                responsiveVariant.mimeType(),
+                "webp",
+                responsiveVariant.width(),
+                responsiveVariant.height(),
+                responsiveVariant.sizeBytes(),
+                responsiveVariant.checksumSha256(),
+                responsiveVariant.originalFilename()
+        );
+    }
+
+    private void cleanupStoredResponsiveVariants(List<StoredResponsiveWebpVariant> storedResponsiveVariants) {
+        for (StoredResponsiveWebpVariant storedResponsiveVariant : storedResponsiveVariants) {
+            productImageBinaryService.cleanupBestEffort(storedResponsiveVariant.storedImage().storageKey());
+        }
+    }
+
+    private record StoredResponsiveWebpVariant(
+            EcommerceResponsiveWebpVariantGenerationService.GeneratedResponsiveWebpVariant variant,
+            EcommerceProductImageBinaryService.StoredProductImage storedImage
+    ) {
     }
 
     private ImportInput parseInput(String workbookFilename, byte[] workbookContent, String archiveFilename, byte[] archiveContent) {

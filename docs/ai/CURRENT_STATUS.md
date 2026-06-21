@@ -1159,3 +1159,36 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
   - `webp-imageio` 0.1.6 sigue siendo dependencia runtime no mantenida activamente.
   - Objetos storage anteriores pueden quedar orphan hasta fase futura de limpieza segura.
 - Recomendacion siguiente: cerrar commit D1; no iniciar D2 hasta autorizacion explicita.
+
+## Fase 2S.10D-D2 Binary Import Responsive WebP
+
+- Fase 2S.10D-D2 implementada localmente con PASS.
+- Objetivo: extender `PRIMARY_RESPONSIVE_WEBP` al flujo Excel + ZIP `confirm-file`, manteniendo preview sin efectos secundarios.
+- Reutiliza `EcommerceResponsiveWebpVariantGenerationService` creado en D1.
+- Flujo productivo modificado: `EcommercePrimaryImageBinaryImportApplicationService.applyRow(...)`.
+- Reglas implementadas:
+  - JPEG/PNG del ZIP generan responsive WebP.
+  - WebP original no genera responsive.
+  - No-upscaling por target `320w`, `640w`, `960w`, `1280w`.
+  - Cada variante se valida con `EcommerceProductImageBinaryService.validate(...)`.
+  - `PRIMARY_RESPONSIVE_WEBP` se persiste con `format=WEBP`, `purpose=RESPONSIVE`, `targetWidth`, `sortOrder`, `active=true`, `preferred=false`.
+  - `PRIMARY_OPTIMIZED_WEBP` sigue siendo la unica variante `preferred=true` para `primaryImage.url`.
+  - Reemplazo por import desactiva `PRIMARY_OPTIMIZED_WEBP` y `PRIMARY_RESPONSIVE_WEBP` previas del mismo `ProductAsset`.
+  - No se desactivan variantes de otro `ProductAsset`.
+  - Partial success por fila se mantiene.
+  - Cleanup best-effort por fila cubre original, optimized y responsive nuevos ante fallos storage/DB.
+- Preview Excel + ZIP sigue sin subir objetos, sin persistir variantes y sin tocar DB.
+- Tests ejecutados:
+  - Focalizados D2: 12 tests PASS.
+  - Regresion ecommerce solicitada: 115 tests PASS.
+  - Backend completo: 470 tests PASS.
+- Documento QA creado: `docs/qa/PHASE2S10D_D2_BINARY_IMPORT_RESPONSIVE_WEBP_QA.md`.
+- Restricciones cumplidas:
+  - No se toco Storefront, Admin UI, contrato publico, `PublicImageResponse`, API publica responsive, URL import, Admin URL upsert, staging/deploy, Dockerfile, `docker-compose.yml`, `.env`, Caddy, DNS, AWS/S3/CloudFront/IAM ni infraestructura.
+  - No se implemento AVIF ni se permitio `image/avif`.
+- Riesgos residuales:
+  - Calidad visual responsive requiere validacion con imagenes reales.
+  - `webp-imageio` 0.1.6 sigue siendo dependencia runtime no mantenida activamente.
+  - URL import/Admin URL upsert no generan responsive por alcance; revisar stale responsive antes de exponer API publica responsive.
+  - Objetos storage anteriores pueden quedar orphan hasta fase futura de limpieza segura.
+- Recomendacion siguiente: cerrar commit D2; no iniciar API publica responsive ni Storefront responsive sin autorizacion explicita.
