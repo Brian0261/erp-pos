@@ -1541,3 +1541,36 @@ Solo crear tag cuando se cumpla todo:
   - `webp-imageio` 0.1.6 no mantenida activamente y con binarios nativos embebidos.
   - Storefront todavia no consume variantes.
   - Imagenes grandes reales requieren medicion posterior de CPU/memoria/calidad.
+
+### Cierre Fase 2S.10C-D3 Local QA: WebP Derivatives
+
+- Tipo: validacion local y documentacion QA.
+- Base: D1 cerrado en commit `836fd78 feat(ecommerce): generate WebP derivative for manual upload`.
+- Base: D2 cerrado en commit `632a145 feat(ecommerce): generate WebP derivative for binary import`.
+- Objetivo: validar localmente que D1 (upload manual) y D2 (Excel + ZIP) conviven correctamente antes de 2S.10C-E.
+- No se implementó nueva funcionalidad.
+- Solo se ejecutaron pruebas y se documentó evidencia.
+- Validaciones:
+  - Upload manual: JPEG/WebP/PNG con reglas de preferred y descarte.
+  - Excel + ZIP preview: sin efectos secundarios.
+  - Excel + ZIP confirm-file: JPEG/WebP/PNG con partial success y cleanup.
+  - Consistencia: `ProductAsset` original, `ProductAssetVariant` WebP, `preferred=true` solo si activo y menor.
+  - Desactivación de variantes previas en reemplazos.
+- Tests ejecutados:
+  - Focalizados D1+D2: 72 tests PASS.
+  - Backend completo: 439 tests PASS.
+- Restricciones cumplidas:
+  - No se modificó Storefront, contrato público, `primaryImage.url`, Admin UI, staging, deploy, Dockerfile, `docker-compose.yml`, `.env`, Caddy, DNS, AWS/S3/CloudFront/IAM, infraestructura.
+  - No se implementó AVIF, responsive images, `srcset`, limpieza masiva de objetos orphan.
+  - No se inició 2S.10C-E todavía.
+  - Solo cambios documentales en D3.
+- Documento QA creado:
+  - `docs/qa/PHASE2S10C_D3_LOCAL_DERIVATIVES_QA.md`
+- Resultado: PASS.
+- Riesgos residuales:
+  - URL import fuera de alcance (puede requerir desactivación de variantes antes de 2S.10C-E).
+  - Storefront no consume variantes todavía.
+  - `webp-imageio` 0.1.6 no mantenida activamente.
+  - Objetos orphan de reemplazos anteriores.
+  - Cleanup best-effort puede fallar.
+- Conclusión: D1 y D2 conviven correctamente. Listo para 2S.10C-E.

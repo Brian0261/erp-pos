@@ -890,3 +890,32 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
   - No se implemento AVIF, responsive images, `srcset` ni cleanup masivo de objetos orphan.
 - Documento QA creado: `docs/qa/PHASE2S10C_D2_BINARY_IMPORT_WEBP_DERIVATIVE_QA.md`.
 - Riesgos residuales: dependencia `webp-imageio` 0.1.6 no mantenida activamente, falta medicion con imagenes grandes reales, Storefront aun no consume variantes.
+
+## Fase 2S.10C-D3 Local QA: WebP Derivatives
+
+- Fase 2S.10C-D3 implementada con PASS.
+- Objetivo: validar localmente que D1 (upload manual) y D2 (Excel + ZIP) conviven correctamente antes de 2S.10C-E.
+- No se implementó nueva funcionalidad.
+- Solo se ejecutaron pruebas y se documentó evidencia.
+- Tests ejecutados:
+  - Focalizados D1+D2: 72 tests PASS.
+  - Backend completo: 439 tests PASS.
+- Validaciones:
+  - Upload manual: JPEG/WebP/PNG con reglas de preferred y descarte.
+  - Excel + ZIP preview: sin efectos secundarios.
+  - Excel + ZIP confirm-file: JPEG/WebP/PNG con partial success y cleanup.
+  - Consistencia: `ProductAsset` original, `ProductAssetVariant` WebP, `preferred=true` solo si activo y menor.
+  - Desactivación de variantes previas en reemplazos.
+- Riesgos residuales documentados:
+  - URL import fuera de alcance (puede requerir desactivación de variantes antes de 2S.10C-E).
+  - Storefront no consume variantes todavía.
+  - `webp-imageio` 0.1.6 no mantenida activamente.
+  - Objetos orphan de reemplazos anteriores.
+  - Cleanup best-effort puede fallar.
+- Documento QA creado: `docs/qa/PHASE2S10C_D3_LOCAL_DERIVATIVES_QA.md`.
+- Restricciones cumplidas:
+  - No se modificó Storefront, contrato público, `primaryImage.url`, Admin UI, staging, deploy, Dockerfile, `docker-compose.yml`, `.env`, Caddy, DNS, AWS/S3/CloudFront/IAM, infraestructura.
+  - No se implementó AVIF, responsive images, `srcset`, limpieza masiva de objetos orphan.
+  - No se inició 2S.10C-E todavía.
+  - Solo cambios documentales en D3.
+- Conclusión: D1 y D2 conviven correctamente. Listo para 2S.10C-E.
