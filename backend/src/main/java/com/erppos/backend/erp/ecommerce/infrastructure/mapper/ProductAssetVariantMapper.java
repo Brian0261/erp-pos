@@ -12,6 +12,10 @@ public final class ProductAssetVariantMapper {
                 entity.getId(),
                 entity.getProductAssetId(),
                 entity.getVariantKind(),
+                entity.getFormat(),
+                entity.getPurpose(),
+                entity.getTargetWidth(),
+                entity.getSortOrder(),
                 entity.getAssetUrl(),
                 entity.getStorageProvider(),
                 entity.getStorageBucket(),
@@ -40,6 +44,10 @@ public final class ProductAssetVariantMapper {
     public static void merge(ProductAssetVariantEntity entity, ProductAssetVariant variant) {
         entity.setProductAssetId(variant.productAssetId());
         entity.setVariantKind(variant.variantKind());
+        entity.setFormat(variant.format());
+        entity.setPurpose(variant.purpose());
+        entity.setTargetWidth(variant.targetWidth());
+        entity.setSortOrder(variant.sortOrder());
         entity.setAssetUrl(variant.assetUrl());
         entity.setStorageProvider(variant.storageProvider());
         entity.setStorageBucket(variant.storageBucket());

@@ -1769,3 +1769,56 @@ Solo crear tag cuando se cumpla todo:
   - Calidad visual requiere validacion con imagenes reales.
   - AVIF requiere decision tecnica posterior o queda fuera de 2S.10D.
 - Recomendacion siguiente: avanzar a 2S.10D-C Modelo para soportar multiples tamanos WebP activos. Continuar 2S.10D con WebP responsive primero y dejar AVIF para fase posterior.
+
+### Cierre Fase 2S.10D-C Responsive WebP Variants Model
+
+- Tipo: backend modelo/persistencia + migracion Flyway + tests + documentacion QA.
+- Base: 2S.10D-B cerrado en commit `4257c2e test(ecommerce): validate responsive image spike`.
+- Objetivo: extender el modelo `ProductAssetVariant` para permitir multiples variantes WebP responsive activas por `ProductAsset`, sin generar variantes responsive todavia.
+- Migracion creada: `backend/src/main/resources/db/migration/V20__ecommerce_responsive_webp_asset_variants.sql`.
+- V20 agrega columnas:
+  - `format`.
+  - `purpose`.
+  - `target_width`.
+  - `sort_order`.
+- Backfill V20 para filas existentes 2S.10C:
+  - `format = WEBP`.
+  - `purpose = PRIMARY`.
+  - `target_width = width`.
+  - `sort_order = 0`.
+- Constraints V20:
+  - `variant_kind IN ('PRIMARY_OPTIMIZED_WEBP', 'PRIMARY_RESPONSIVE_WEBP')`.
+  - `mime_type = 'image/webp'`.
+  - `format IN ('WEBP')`.
+  - `purpose IN ('PRIMARY', 'RESPONSIVE')`.
+  - `target_width > 0`.
+  - `sort_order >= 0`.
+- Unique activo reemplazado por identidad responsive:
+  - `(product_asset_id, variant_kind, format, purpose, target_width) WHERE active = TRUE`.
+- Unique `preferred=true` activo por `ProductAsset` preservado.
+- Modelo dominio actualizado:
+  - `ProductAssetVariantKind.PRIMARY_RESPONSIVE_WEBP` agregado.
+  - `ProductAssetVariantFormat.WEBP` agregado.
+  - `ProductAssetVariantPurpose.PRIMARY/RESPONSIVE` agregado.
+  - `ProductAssetVariant` ahora incluye `format`, `purpose`, `targetWidth`, `sortOrder`.
+- Compatibilidad preservada:
+  - Constructor compatible mantiene `WEBP/PRIMARY/targetWidth=width/sortOrder=0` para D1/D2.
+  - D1 upload manual sigue insertando `PRIMARY_OPTIMIZED_WEBP` como antes.
+  - D2 Excel + ZIP sigue insertando `PRIMARY_OPTIMIZED_WEBP` como antes.
+  - E2 API publica sigue usando solo `PRIMARY_OPTIMIZED_WEBP active/preferred` para `primaryImage.url`.
+  - `PublicImageResponse(url, altText, type, displayOrder)` no cambio.
+- Tests ejecutados:
+  - `ProductAssetVariantPersistenceIntegrationTest`: 13 tests PASS.
+  - Regresion focalizada ecommerce: 96 tests PASS.
+  - Backend completo: 457 tests PASS.
+- Documento QA creado:
+  - `docs/qa/PHASE2S10D_RESPONSIVE_VARIANTS_MODEL_QA.md`
+- Resultado: PASS.
+- Restricciones cumplidas:
+  - No se toco Storefront, Admin UI, contrato publico, `PublicImageResponse`, API responsive, generacion WebP responsive productiva, staging/deploy, Dockerfile, `docker-compose.yml`, `.env`, Caddy, DNS, AWS/S3/CloudFront/IAM ni infraestructura.
+  - No se implemento AVIF ni se permitio `image/avif`.
+- Riesgos residuales antes de 2S.10D-D:
+  - D debe implementar generacion real de `PRIMARY_RESPONSIVE_WEBP` sin upscaling.
+  - Al generar responsive, URL import/Admin URL upsert deberan desactivar tambien variantes responsive activas para evitar stale variants.
+  - Cleanup best-effort debe cubrir multiples objetos nuevos por fila.
+- Recomendacion siguiente: avanzar a 2S.10D-D WebP Responsive Generation en Build separado, sin API publica responsive, Storefront ni AVIF.

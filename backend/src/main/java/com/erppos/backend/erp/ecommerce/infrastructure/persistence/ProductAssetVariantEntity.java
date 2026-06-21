@@ -1,6 +1,8 @@
 package com.erppos.backend.erp.ecommerce.infrastructure.persistence;
 
 import com.erppos.backend.erp.ecommerce.domain.model.ProductAssetVariantKind;
+import com.erppos.backend.erp.ecommerce.domain.model.ProductAssetVariantFormat;
+import com.erppos.backend.erp.ecommerce.domain.model.ProductAssetVariantPurpose;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -27,6 +29,20 @@ public class ProductAssetVariantEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "variant_kind", nullable = false, length = 40)
     private ProductAssetVariantKind variantKind;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "format", nullable = false, length = 20)
+    private ProductAssetVariantFormat format;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "purpose", nullable = false, length = 40)
+    private ProductAssetVariantPurpose purpose;
+
+    @Column(name = "target_width", nullable = false)
+    private Integer targetWidth;
+
+    @Column(name = "sort_order", nullable = false)
+    private Integer sortOrder;
 
     @Column(name = "asset_url", nullable = false, length = 1000)
     private String assetUrl;
@@ -93,6 +109,14 @@ public class ProductAssetVariantEntity {
     public void setProductAssetId(Long productAssetId) { this.productAssetId = productAssetId; }
     public ProductAssetVariantKind getVariantKind() { return variantKind; }
     public void setVariantKind(ProductAssetVariantKind variantKind) { this.variantKind = variantKind; }
+    public ProductAssetVariantFormat getFormat() { return format; }
+    public void setFormat(ProductAssetVariantFormat format) { this.format = format; }
+    public ProductAssetVariantPurpose getPurpose() { return purpose; }
+    public void setPurpose(ProductAssetVariantPurpose purpose) { this.purpose = purpose; }
+    public Integer getTargetWidth() { return targetWidth; }
+    public void setTargetWidth(Integer targetWidth) { this.targetWidth = targetWidth; }
+    public Integer getSortOrder() { return sortOrder; }
+    public void setSortOrder(Integer sortOrder) { this.sortOrder = sortOrder; }
     public String getAssetUrl() { return assetUrl; }
     public void setAssetUrl(String assetUrl) { this.assetUrl = assetUrl; }
     public String getStorageProvider() { return storageProvider; }

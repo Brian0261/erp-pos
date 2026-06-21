@@ -5,7 +5,9 @@ import com.erppos.backend.erp.ecommerce.application.usecase.EcommerceCatalogUseC
 import com.erppos.backend.erp.ecommerce.domain.model.EcommerceOnlineCategory;
 import com.erppos.backend.erp.ecommerce.domain.model.OnlinePublicationStatus;
 import com.erppos.backend.erp.ecommerce.domain.model.ProductAsset;
+import com.erppos.backend.erp.ecommerce.domain.model.ProductAssetVariantFormat;
 import com.erppos.backend.erp.ecommerce.domain.model.ProductAssetVariantKind;
+import com.erppos.backend.erp.ecommerce.domain.model.ProductAssetVariantPurpose;
 import com.erppos.backend.erp.ecommerce.domain.model.ProductOnlineProfile;
 import com.erppos.backend.erp.ecommerce.domain.port.EcommerceOnlineCategoryRepositoryPort;
 import com.erppos.backend.erp.ecommerce.domain.port.ProductAssetRepositoryPort;
@@ -707,6 +709,10 @@ class StorefrontPublicProductsIntegrationTest extends AbstractHttpIntegrationTes
         ProductAssetVariantEntity variant = new ProductAssetVariantEntity();
         variant.setProductAssetId(productAssetId);
         variant.setVariantKind(ProductAssetVariantKind.PRIMARY_OPTIMIZED_WEBP);
+        variant.setFormat(ProductAssetVariantFormat.WEBP);
+        variant.setPurpose(ProductAssetVariantPurpose.PRIMARY);
+        variant.setTargetWidth(96);
+        variant.setSortOrder(0);
         variant.setAssetUrl(assetUrl);
         variant.setStorageProvider("S3");
         variant.setStorageBucket("inktoy-test-bucket");
