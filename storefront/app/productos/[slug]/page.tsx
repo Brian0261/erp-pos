@@ -6,7 +6,7 @@ import { StorefrontFooter } from "@/components/layout/storefront-footer";
 import { StorefrontHeader } from "@/components/layout/storefront-header";
 import { Accordion, Badge, Breadcrumbs, ProductImageFrame, SectionHeading } from "@/components/ui";
 import { getStorefrontProductBySlug, StorefrontApiError } from "@/lib/api";
-import { getSafeImageAlt, getSafeImageSrc, getSafeOpenGraphImage } from "@/lib/images";
+import { getSafeImageAlt, getSafeImageSrc, getSafeOpenGraphImage, getSafeResponsiveImageVariants } from "@/lib/images";
 import { canStorefrontAllowIndexing } from "@/lib/seo";
 import type { PublicProductDetailResponse } from "@/types/storefront";
 
@@ -105,6 +105,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
   const brandName = product.brand?.name;
   const imageAlt = getSafeImageAlt(product.primaryImage?.altText, product.name);
   const imageSrc = getSafeImageSrc(product.primaryImage?.url);
+  const imageVariants = getSafeResponsiveImageVariants(product.primaryImage?.url, product.primaryImage?.responsive);
   const description = product.description ?? "Producto disponible para consulta en tiendas InkToy.";
   const availabilityVariant = getAvailabilityVariant(product);
   const galleryCount = product.gallery.length;
@@ -127,6 +128,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
               alt={imageAlt}
               className="aspect-[16/11] bg-ink-white shadow-ink-soft lg:sticky lg:top-24"
               priority
+              responsiveVariants={imageVariants}
               src={imageSrc}
             />
             {galleryCount > 1 ? (

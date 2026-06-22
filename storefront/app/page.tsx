@@ -6,7 +6,7 @@ import { StorefrontFooter } from "@/components/layout/storefront-footer";
 import { StorefrontHeader } from "@/components/layout/storefront-header";
 import { Button, SectionHeading } from "@/components/ui";
 import { getStorefrontCategories, getStorefrontProducts } from "@/lib/api";
-import { getSafeImageAlt, getSafeImageSrc } from "@/lib/images";
+import { getSafeImageAlt, getSafeImageSrc, getSafeResponsiveImageVariants } from "@/lib/images";
 import { buildStorefrontPublicUrl, getStorefrontRobotsMetadata } from "@/lib/seo";
 import type { PublicCategoryListItemResponse, PublicProductListItemResponse } from "@/types/storefront";
 
@@ -200,6 +200,7 @@ export default async function Home() {
                   detailHref={`/productos/${product.slug}`}
                   imageAlt={getSafeImageAlt(product.primaryImage?.altText, product.name)}
                   imageSrc={getSafeImageSrc(product.primaryImage?.url)}
+                  imageVariants={getSafeResponsiveImageVariants(product.primaryImage?.url, product.primaryImage?.responsive)}
                   key={product.slug}
                   name={product.name}
                   price={product.price.formatted}

@@ -16,6 +16,18 @@ export interface PublicImageResponse {
   altText: string | null;
   type: string | null;
   displayOrder: number | null;
+  responsive?: PublicResponsiveImageResponse | null;
+}
+
+export interface PublicResponsiveImageResponse {
+  variants: PublicResponsiveImageVariantResponse[];
+}
+
+export interface PublicResponsiveImageVariantResponse {
+  url: string;
+  mimeType: string;
+  width: number;
+  height: number;
 }
 
 export interface PublicPriceResponse {

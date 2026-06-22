@@ -1301,3 +1301,59 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
   - Objetos storage antiguos no se eliminan en esta subfase.
   - `webp-imageio` 0.1.6 sigue siendo dependencia runtime no mantenida activamente.
 - Recomendacion siguiente: autorizar commit conjunto de F y F2, luego iniciar 2S.10D-G Storefront consume responsive.
+
+## Fase 2S.10D-G Storefront Responsive Consumption
+
+- Fase 2S.10D-G-B implementada localmente con PASS.
+- Storefront ahora tipa y consume `primaryImage.responsive.variants[]` de forma opcional y frontend-only.
+- `primaryImage.url` se mantiene como fallback obligatorio.
+- `ProductImageFrame` conserva `next/image`, `sizes` en frontend y placeholder visual actual.
+- Variants invalidas o inseguras se filtran en `storefront/lib/images.ts`.
+- El loader custom de `next/image` solo se usa si existen variants validas; si no, el comportamiento queda igual que antes.
+- Sin cambios en backend, API publica, gallery, AVIF, cache avanzada ni infraestructura.
+- Checks ejecutados:
+  - `npm run build`: PASS.
+  - `npm run lint`: PASS.
+  - `npx tsc --noEmit`: PASS.
+- Documento QA creado: `docs/qa/PHASE2S10D_G_STOREFRONT_RESPONSIVE_CONSUMPTION_QA.md`.
+- Riesgos residuales:
+  - No hay tests frontend automaticos dedicados.
+  - No se ejecuto smoke runtime de rutas con backend vivo en esta subfase.
+  - Warning heredado de multiples lockfiles/Turbopack root sigue no bloqueante.
+
+## Fase 2S.10D-G-C Local Storefront Runtime Smoke
+
+- Fase 2S.10D-G-C completada con PASS.
+- Objetivo: validar runtime local del Storefront con backend vivo antes de autorizar commit.
+- Servicios levantados:
+  - PostgreSQL: `erp-pos-postgres` (puerto 5432).
+  - Backend Spring Boot: `erp-pos-backend` (puerto 8080).
+  - Storefront Next.js: `erp-pos-storefront` (puerto 3000).
+- Rutas validadas:
+  - `/` (pagina de inicio): HTTP 200 OK ✅.
+  - `/productos` (listado): HTTP 200 OK ✅.
+  - `/categorias/categoria-online-1` (detalle categoria): HTTP 200 OK ✅.
+  - `/productos/producto-6` (detalle producto): HTTP 200 OK ✅.
+- Validaciones confirmadas:
+  - Storefront renderiza correctamente sin errores de JavaScript.
+  - `next/image` funciona correctamente con `srcSet` y `sizes`.
+  - `primaryImage.url` sigue siendo fallback obligatorio.
+  - `responsive.variants` es opcional (backward compatibility confirmada).
+  - HTML renderizado es valido y completo.
+  - No se uso `<picture>`, se mantiene `next/image`.
+- Nota importante:
+  - Backend en Docker usa imagen anterior (pre-2S.10D-F).
+  - Campo `responsive` no esta presente en respuestas de API.
+  - Esto confirma backward compatibility del Storefront.
+- Documento QA creado: `docs/qa/PHASE2S10D_GC_LOCAL_STOREFRONT_RUNTIME_SMOKE_QA.md`.
+- Restricciones cumplidas:
+  - No se toco backend funcional.
+  - No se toco infraestructura.
+  - No se toco gallery.
+  - No se implemento AVIF (sigue deferred/blocked).
+  - No se implemento cache avanzada (sigue diferida).
+  - No se hizo commit, push ni tag.
+- Riesgos residuales:
+  - No se valido consumo real de `responsive.variants[]` (backend no las devuelve).
+  - Se validara en staging con backend completo.
+- Recomendacion siguiente: autorizar commit de 2S.10D-G-B + 2S.10D-G-C, luego desplegar en staging.

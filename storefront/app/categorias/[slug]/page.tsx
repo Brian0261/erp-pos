@@ -6,7 +6,7 @@ import { StorefrontFooter } from "@/components/layout/storefront-footer";
 import { StorefrontHeader } from "@/components/layout/storefront-header";
 import { Breadcrumbs, SectionHeading } from "@/components/ui";
 import { getStorefrontCategoryBySlug, getStorefrontProducts, StorefrontApiError } from "@/lib/api";
-import { getSafeImageAlt, getSafeImageSrc, getSafeOpenGraphImage } from "@/lib/images";
+import { getSafeImageAlt, getSafeImageSrc, getSafeOpenGraphImage, getSafeResponsiveImageVariants } from "@/lib/images";
 import { canStorefrontAllowIndexing } from "@/lib/seo";
 import type { PublicCategoryDetailResponse, PublicProductListItemResponse } from "@/types/storefront";
 
@@ -139,6 +139,7 @@ export default async function CategoryDetailPage({ params }: CategoryDetailPageP
                   detailHref={`/productos/${product.slug}`}
                   imageAlt={getSafeImageAlt(product.primaryImage?.altText, product.name)}
                   imageSrc={getSafeImageSrc(product.primaryImage?.url)}
+                  imageVariants={getSafeResponsiveImageVariants(product.primaryImage?.url, product.primaryImage?.responsive)}
                   key={product.slug}
                   name={product.name}
                   price={product.price.formatted}

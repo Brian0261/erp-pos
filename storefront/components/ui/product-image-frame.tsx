@@ -1,9 +1,11 @@
-import Image from "next/image";
+import Image, { type ImageLoaderProps } from "next/image";
+import { pickResponsiveImageVariant, type SafeResponsiveImageVariant } from "@/lib/images";
 
 export type ProductImageFrameProps = {
   alt?: string;
   className?: string;
   priority?: boolean;
+  responsiveVariants?: SafeResponsiveImageVariant[];
   src?: string | null;
 };
 
@@ -11,8 +13,17 @@ export function ProductImageFrame({
   alt = "Imagen de producto InkToy",
   className,
   priority = false,
+  responsiveVariants,
   src,
 }: ProductImageFrameProps) {
+  const hasResponsiveVariants = Boolean(src && responsiveVariants?.length);
+  const responsiveLoader = hasResponsiveVariants
+    ? ({ src: fallbackSrc, width }: ImageLoaderProps) => {
+        const variant = pickResponsiveImageVariant(responsiveVariants ?? [], width);
+        return variant?.url ?? fallbackSrc;
+      }
+    : undefined;
+
   return (
     <div
       className={[
@@ -27,6 +38,7 @@ export function ProductImageFrame({
           alt={alt}
           className="object-cover"
           fill
+          loader={responsiveLoader}
           priority={priority}
           sizes="(min-width: 1024px) 360px, (min-width: 768px) 45vw, 92vw"
           src={src}

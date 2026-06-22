@@ -1,3 +1,4 @@
+import type { SafeResponsiveImageVariant } from "@/lib/images";
 import { Badge, Button, ProductImageFrame } from "@/components/ui";
 
 export type ProductAvailability = "available" | "soldOut" | "store";
@@ -8,6 +9,7 @@ export type ProductCardProps = {
   detailHref?: string;
   imageAlt?: string;
   imageSrc?: string | null;
+  imageVariants?: SafeResponsiveImageVariant[];
   name: string;
   price: string;
 };
@@ -30,6 +32,7 @@ export function ProductCard({
   detailHref = "#",
   imageAlt,
   imageSrc,
+  imageVariants,
   name,
   price,
 }: ProductCardProps) {
@@ -38,6 +41,7 @@ export function ProductCard({
       <ProductImageFrame
         alt={imageAlt ?? name}
         className="aspect-square shadow-none"
+        responsiveVariants={imageVariants}
         src={imageSrc}
       />
       <div className="flex flex-1 flex-col gap-2.5 pt-3">
