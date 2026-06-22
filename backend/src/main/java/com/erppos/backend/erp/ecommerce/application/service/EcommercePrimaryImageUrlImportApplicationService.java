@@ -108,6 +108,11 @@ public class EcommercePrimaryImageUrlImportApplicationService implements Ecommer
                     ProductAssetVariantKind.PRIMARY_OPTIMIZED_WEBP,
                     auditUserProvider.currentUsername()
             );
+            assetVariantRepositoryPort.deactivateActiveByProductAssetIdAndVariantKind(
+                    saved.id(),
+                    ProductAssetVariantKind.PRIMARY_RESPONSIVE_WEBP,
+                    auditUserProvider.currentUsername()
+            );
             if (row.action() == EcommercePrimaryImageUrlImportAction.CREATE) {
                 createdRows += 1;
             } else if (row.action() == EcommercePrimaryImageUrlImportAction.UPDATE) {

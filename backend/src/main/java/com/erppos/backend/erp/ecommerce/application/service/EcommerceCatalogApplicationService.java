@@ -626,6 +626,11 @@ public class EcommerceCatalogApplicationService implements EcommerceCatalogUseCa
                 ProductAssetVariantKind.PRIMARY_OPTIMIZED_WEBP,
                 actor
         );
+        productAssetVariantRepositoryPort.deactivateActiveByProductAssetIdAndVariantKind(
+                saved.id(),
+                ProductAssetVariantKind.PRIMARY_RESPONSIVE_WEBP,
+                actor
+        );
         return saved;
     }
 

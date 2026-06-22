@@ -11,6 +11,8 @@ import com.erppos.backend.erp.ecommerce.adapter.dto.storefront.PublicProductDeta
 import com.erppos.backend.erp.ecommerce.adapter.dto.storefront.PublicPriceResponse;
 import com.erppos.backend.erp.ecommerce.adapter.dto.storefront.PublicProductListItemResponse;
 import com.erppos.backend.erp.ecommerce.adapter.dto.storefront.PublicSeoResponse;
+import com.erppos.backend.erp.ecommerce.adapter.dto.storefront.PublicImageResponse.PublicResponsiveImageResponse;
+import com.erppos.backend.erp.ecommerce.adapter.dto.storefront.PublicImageResponse.PublicResponsiveImageVariantResponse;
 import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontProductDetailResult;
 import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontImageResult;
 import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontCategorySummaryResult;
@@ -178,7 +180,24 @@ public class StorefrontCatalogController {
                 image.url(),
                 image.altText(),
                 image.type(),
-                image.displayOrder()
+                image.displayOrder(),
+                toPublicResponsiveImage(image.responsive())
+        );
+    }
+
+    private PublicResponsiveImageResponse toPublicResponsiveImage(StorefrontImageResult.StorefrontResponsiveImageResult responsive) {
+        if (responsive == null || responsive.variants() == null || responsive.variants().isEmpty()) {
+            return null;
+        }
+        return new PublicResponsiveImageResponse(
+                responsive.variants().stream()
+                        .map(variant -> new PublicResponsiveImageVariantResponse(
+                                variant.url(),
+                                variant.mimeType(),
+                                variant.width(),
+                                variant.height()
+                        ))
+                        .toList()
         );
     }
 

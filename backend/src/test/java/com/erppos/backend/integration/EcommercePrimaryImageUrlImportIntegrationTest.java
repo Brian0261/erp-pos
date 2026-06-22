@@ -174,7 +174,10 @@ class EcommercePrimaryImageUrlImportIntegrationTest extends AbstractHttpIntegrat
                 0
         ));
         ProductAssetVariantEntity staleVariant = productAssetVariantJpaRepository.saveAndFlush(validVariant(updateAsset.id(), suffix + "-stale"));
+        ProductAssetVariantEntity staleResponsive320 = productAssetVariantJpaRepository.saveAndFlush(validResponsiveVariant(updateAsset.id(), suffix + "-stale-320", 320, 0));
+        ProductAssetVariantEntity staleResponsive640 = productAssetVariantJpaRepository.saveAndFlush(validResponsiveVariant(updateAsset.id(), suffix + "-stale-640", 640, 1));
         ProductAssetVariantEntity otherVariant = productAssetVariantJpaRepository.saveAndFlush(validVariant(otherAsset.id(), suffix + "-other"));
+        ProductAssetVariantEntity otherResponsive = productAssetVariantJpaRepository.saveAndFlush(validResponsiveVariant(otherAsset.id(), suffix + "-other-320", 320, 0));
 
         MockMultipartFile file = workbookFile(new String[][]{{
                 productSku(suffix + "updvar"),
@@ -201,8 +204,11 @@ class EcommercePrimaryImageUrlImportIntegrationTest extends AbstractHttpIntegrat
         org.junit.jupiter.api.Assertions.assertEquals(updateAsset.id(), updatedAsset.id());
         org.junit.jupiter.api.Assertions.assertFalse(productAssetVariantJpaRepository.findById(staleVariant.getId()).orElseThrow().isActive());
         org.junit.jupiter.api.Assertions.assertFalse(productAssetVariantJpaRepository.findById(staleVariant.getId()).orElseThrow().isPreferred());
+        org.junit.jupiter.api.Assertions.assertFalse(productAssetVariantJpaRepository.findById(staleResponsive320.getId()).orElseThrow().isActive());
+        org.junit.jupiter.api.Assertions.assertFalse(productAssetVariantJpaRepository.findById(staleResponsive640.getId()).orElseThrow().isActive());
         org.junit.jupiter.api.Assertions.assertTrue(productAssetVariantJpaRepository.findById(otherVariant.getId()).orElseThrow().isActive());
         org.junit.jupiter.api.Assertions.assertTrue(productAssetVariantJpaRepository.findById(otherVariant.getId()).orElseThrow().isPreferred());
+        org.junit.jupiter.api.Assertions.assertTrue(productAssetVariantJpaRepository.findById(otherResponsive.getId()).orElseThrow().isActive());
     }
 
     @Test
@@ -219,6 +225,7 @@ class EcommercePrimaryImageUrlImportIntegrationTest extends AbstractHttpIntegrat
                 2
         ));
         ProductAssetVariantEntity variant = productAssetVariantJpaRepository.saveAndFlush(validVariant(asset.id(), suffix + "-same"));
+        ProductAssetVariantEntity responsiveVariant = productAssetVariantJpaRepository.saveAndFlush(validResponsiveVariant(asset.id(), suffix + "-same-320", 320, 0));
 
         MockMultipartFile file = workbookFile(new String[][]{{
                 productSku(suffix + "samevar"),
@@ -245,6 +252,9 @@ class EcommercePrimaryImageUrlImportIntegrationTest extends AbstractHttpIntegrat
         ProductAssetVariantEntity current = productAssetVariantJpaRepository.findById(variant.getId()).orElseThrow();
         org.junit.jupiter.api.Assertions.assertTrue(current.isActive());
         org.junit.jupiter.api.Assertions.assertTrue(current.isPreferred());
+        ProductAssetVariantEntity currentResponsive = productAssetVariantJpaRepository.findById(responsiveVariant.getId()).orElseThrow();
+        org.junit.jupiter.api.Assertions.assertTrue(currentResponsive.isActive());
+        org.junit.jupiter.api.Assertions.assertFalse(currentResponsive.isPreferred());
     }
 
     @Test
@@ -576,6 +586,31 @@ class EcommercePrimaryImageUrlImportIntegrationTest extends AbstractHttpIntegrat
         variant.setSourceChecksumSha256("abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789");
         variant.setActive(true);
         variant.setPreferred(true);
+        variant.setCreatedBy("it");
+        variant.setUpdatedBy("it");
+        return variant;
+    }
+
+    private ProductAssetVariantEntity validResponsiveVariant(Long productAssetId, String keySuffix, int targetWidth, int sortOrder) {
+        ProductAssetVariantEntity variant = new ProductAssetVariantEntity();
+        variant.setProductAssetId(productAssetId);
+        variant.setVariantKind(ProductAssetVariantKind.PRIMARY_RESPONSIVE_WEBP);
+        variant.setFormat(ProductAssetVariantFormat.WEBP);
+        variant.setPurpose(ProductAssetVariantPurpose.RESPONSIVE);
+        variant.setTargetWidth(targetWidth);
+        variant.setSortOrder(sortOrder);
+        variant.setAssetUrl("https://cdn.inktoy.pe/ecommerce/products/assets/" + productAssetId + "/" + keySuffix + ".webp");
+        variant.setStorageProvider("S3");
+        variant.setStorageBucket("inktoy-test-bucket");
+        variant.setStorageKey("ecommerce/products/assets/" + productAssetId + "/variants/responsive/" + keySuffix + ".webp");
+        variant.setMimeType("image/webp");
+        variant.setWidth(targetWidth);
+        variant.setHeight(Math.max(1, targetWidth * 3 / 4));
+        variant.setSizeBytes(1000L + targetWidth);
+        variant.setChecksumSha256("123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0");
+        variant.setSourceChecksumSha256("fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210");
+        variant.setActive(true);
+        variant.setPreferred(false);
         variant.setCreatedBy("it");
         variant.setUpdatedBy("it");
         return variant;

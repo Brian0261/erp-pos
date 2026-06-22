@@ -14,6 +14,8 @@ import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontPro
 import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontSeoResult;
 import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontSitemapEntryResult;
 import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontSitemapResult;
+import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontImageResult.StorefrontResponsiveImageResult;
+import com.erppos.backend.erp.ecommerce.application.dto.storefront.StorefrontImageResult.StorefrontResponsiveImageVariantResult;
 import com.erppos.backend.erp.ecommerce.application.usecase.StorefrontProductCatalogUseCase;
 import com.erppos.backend.erp.ecommerce.domain.model.RobotsPolicy;
 import com.erppos.backend.erp.ecommerce.domain.model.StorefrontPublicCategoryProjection;
@@ -146,7 +148,8 @@ public class StorefrontProductCatalogApplicationService implements StorefrontPro
                     item.primaryImageUrl(),
                     item.primaryImageAltText(),
                     item.primaryImageType(),
-                    item.primaryImageDisplayOrder()
+                    item.primaryImageDisplayOrder(),
+                    toResponsiveImage(item.primaryImageResponsiveVariants())
             );
         }
 
@@ -184,7 +187,8 @@ public class StorefrontProductCatalogApplicationService implements StorefrontPro
                     item.primaryImageUrl(),
                     item.primaryImageAltText(),
                     item.primaryImageType(),
-                    item.primaryImageDisplayOrder()
+                    item.primaryImageDisplayOrder(),
+                    toResponsiveImage(item.primaryImageResponsiveVariants())
             );
         }
 
@@ -225,6 +229,24 @@ public class StorefrontProductCatalogApplicationService implements StorefrontPro
                 category.slug(),
                 category.name(),
                 category.description()
+        );
+    }
+
+    private StorefrontResponsiveImageResult toResponsiveImage(
+            List<StorefrontPublicProductProjection.ResponsiveImageVariantProjection> variants
+    ) {
+        if (variants == null || variants.isEmpty()) {
+            return null;
+        }
+        return new StorefrontResponsiveImageResult(
+                variants.stream()
+                        .map(variant -> new StorefrontResponsiveImageVariantResult(
+                                variant.url(),
+                                variant.mimeType(),
+                                variant.width(),
+                                variant.height()
+                        ))
+                        .toList()
         );
     }
 

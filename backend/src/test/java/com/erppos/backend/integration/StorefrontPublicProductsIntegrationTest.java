@@ -383,10 +383,51 @@ class StorefrontPublicProductsIntegrationTest extends AbstractHttpIntegrationTes
         JsonNode listImage = listPrimaryImage(product);
         assertPublicImage(listImage, variantUrl, "Imagen storefront " + suffix, "PRODUCT_IMAGE", 0);
         assertPublicImageContract(listImage);
+        assertNoResponsiveVariants(listImage);
 
         JsonNode detailImage = detailPrimaryImage(product);
         assertPublicImage(detailImage, variantUrl, "Imagen storefront " + suffix, "PRODUCT_IMAGE", 0);
         assertPublicImageContract(detailImage);
+        assertNoResponsiveVariants(detailImage);
+    }
+
+    @Test
+    void shouldExposeResponsiveWebpVariantsInListAndDetailPrimaryImage() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = String.valueOf(System.nanoTime()) + "-resp";
+        ProductFixture product = createPublishedProfile(adminToken, suffix, BigDecimal.valueOf(79.00), null);
+        ProductAsset asset = primaryAsset(product);
+        String optimizedUrl = "https://cdn.inktoy.pe/ecommerce/products/variants/optimized-" + suffix + ".webp";
+        saveVariant(asset.id(), suffix, optimizedUrl, true, true);
+        saveResponsiveVariant(asset.id(), suffix + "-640", "https://cdn.inktoy.pe/ecommerce/products/variants/" + suffix + "-640.webp", true, 640, 480, 640, 20);
+        saveResponsiveVariant(asset.id(), suffix + "-320", "https://cdn.inktoy.pe/ecommerce/products/variants/" + suffix + "-320.webp", true, 320, 240, 320, 10);
+
+        JsonNode listImage = listPrimaryImage(product);
+        assertPublicImage(listImage, optimizedUrl, "Imagen storefront " + suffix, "PRODUCT_IMAGE", 0);
+        assertResponsiveVariants(listImage, suffix);
+
+        JsonNode detailImage = detailPrimaryImage(product);
+        assertPublicImage(detailImage, optimizedUrl, "Imagen storefront " + suffix, "PRODUCT_IMAGE", 0);
+        assertResponsiveVariants(detailImage, suffix);
+    }
+
+    @Test
+    void shouldIgnoreInvalidResponsiveVariantsAndKeepPrimaryImageUrl() throws Exception {
+        String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        String suffix = String.valueOf(System.nanoTime()) + "-badresp";
+        ProductFixture product = createPublishedProfile(adminToken, suffix, BigDecimal.valueOf(80.00), null);
+        ProductAsset asset = primaryAsset(product);
+        saveResponsiveVariant(asset.id(), suffix + "-blank", "   ", true, 320, 240, 320, 0);
+        saveResponsiveVariant(asset.id(), suffix + "-inactive", "https://cdn.inktoy.pe/ecommerce/products/variants/" + suffix + "-inactive.webp", false, 640, 480, 640, 1);
+
+        String originalUrl = "/images/products/storefront-" + suffix + ".jpg";
+        JsonNode listImage = listPrimaryImage(product);
+        assertPublicImage(listImage, originalUrl, "Imagen storefront " + suffix, "PRODUCT_IMAGE", 0);
+        assertNoResponsiveVariants(listImage);
+
+        JsonNode detailImage = detailPrimaryImage(product);
+        assertPublicImage(detailImage, originalUrl, "Imagen storefront " + suffix, "PRODUCT_IMAGE", 0);
+        assertNoResponsiveVariants(detailImage);
     }
 
     @Test
@@ -466,6 +507,26 @@ class StorefrontPublicProductsIntegrationTest extends AbstractHttpIntegrationTes
                 true,
                 true
         );
+        ProductAssetVariantEntity responsive320 = saveResponsiveVariant(
+                asset.id(),
+                suffix + "-320",
+                "https://cdn.inktoy.pe/ecommerce/products/variants/stale-" + suffix + "-320.webp",
+                true,
+                320,
+                240,
+                320,
+                0
+        );
+        ProductAssetVariantEntity responsive640 = saveResponsiveVariant(
+                asset.id(),
+                suffix + "-640",
+                "https://cdn.inktoy.pe/ecommerce/products/variants/stale-" + suffix + "-640.webp",
+                true,
+                640,
+                480,
+                640,
+                1
+        );
         String newOriginalUrl = "/images/products/replaced-" + suffix + ".jpg";
 
         upsertPrimaryAsset(adminToken, product.productId(), newOriginalUrl, "Imagen reemplazada " + suffix, 1);
@@ -473,8 +534,14 @@ class StorefrontPublicProductsIntegrationTest extends AbstractHttpIntegrationTes
         ProductAssetVariantEntity currentVariant = productAssetVariantJpaRepository.findById(variant.getId()).orElseThrow();
         org.junit.jupiter.api.Assertions.assertFalse(currentVariant.isActive());
         org.junit.jupiter.api.Assertions.assertFalse(currentVariant.isPreferred());
-        assertPublicImage(listPrimaryImage(product), newOriginalUrl, "Imagen reemplazada " + suffix, "PRODUCT_IMAGE", 1);
-        assertPublicImage(detailPrimaryImage(product), newOriginalUrl, "Imagen reemplazada " + suffix, "PRODUCT_IMAGE", 1);
+        org.junit.jupiter.api.Assertions.assertFalse(productAssetVariantJpaRepository.findById(responsive320.getId()).orElseThrow().isActive());
+        org.junit.jupiter.api.Assertions.assertFalse(productAssetVariantJpaRepository.findById(responsive640.getId()).orElseThrow().isActive());
+        JsonNode listImage = listPrimaryImage(product);
+        assertPublicImage(listImage, newOriginalUrl, "Imagen reemplazada " + suffix, "PRODUCT_IMAGE", 1);
+        assertNoResponsiveVariants(listImage);
+        JsonNode detailImage = detailPrimaryImage(product);
+        assertPublicImage(detailImage, newOriginalUrl, "Imagen reemplazada " + suffix, "PRODUCT_IMAGE", 1);
+        assertNoResponsiveVariants(detailImage);
     }
 
     private ProductFixture createPublishedProfile(String adminToken, String suffix, BigDecimal salePrice, BigDecimal overrideAmount) throws Exception {
@@ -691,13 +758,69 @@ class StorefrontPublicProductsIntegrationTest extends AbstractHttpIntegrationTes
         org.junit.jupiter.api.Assertions.assertTrue(image.has("altText"));
         org.junit.jupiter.api.Assertions.assertTrue(image.has("type"));
         org.junit.jupiter.api.Assertions.assertTrue(image.has("displayOrder"));
-        org.junit.jupiter.api.Assertions.assertEquals(4, image.size());
         org.junit.jupiter.api.Assertions.assertFalse(image.has("variants"));
         org.junit.jupiter.api.Assertions.assertFalse(image.has("mimeType"));
         org.junit.jupiter.api.Assertions.assertFalse(image.has("width"));
         org.junit.jupiter.api.Assertions.assertFalse(image.has("height"));
+        org.junit.jupiter.api.Assertions.assertFalse(image.has("sizes"));
         org.junit.jupiter.api.Assertions.assertFalse(image.has("srcset"));
+        org.junit.jupiter.api.Assertions.assertFalse(image.has("srcSet"));
+        org.junit.jupiter.api.Assertions.assertFalse(image.has("sources"));
         org.junit.jupiter.api.Assertions.assertFalse(image.has("metadata"));
+        org.junit.jupiter.api.Assertions.assertFalse(image.has("productAssetId"));
+        org.junit.jupiter.api.Assertions.assertFalse(image.has("storageKey"));
+        org.junit.jupiter.api.Assertions.assertFalse(image.has("storageProvider"));
+        org.junit.jupiter.api.Assertions.assertFalse(image.has("storageBucket"));
+        org.junit.jupiter.api.Assertions.assertFalse(image.has("checksumSha256"));
+        org.junit.jupiter.api.Assertions.assertFalse(image.has("sourceChecksumSha256"));
+        org.junit.jupiter.api.Assertions.assertFalse(image.has("active"));
+        org.junit.jupiter.api.Assertions.assertFalse(image.has("preferred"));
+        org.junit.jupiter.api.Assertions.assertFalse(image.has("variantKind"));
+        org.junit.jupiter.api.Assertions.assertFalse(image.has("purpose"));
+        org.junit.jupiter.api.Assertions.assertFalse(image.has("sortOrder"));
+        org.junit.jupiter.api.Assertions.assertFalse(image.has("createdAt"));
+        org.junit.jupiter.api.Assertions.assertFalse(image.has("updatedAt"));
+        org.junit.jupiter.api.Assertions.assertFalse(image.has("createdBy"));
+        org.junit.jupiter.api.Assertions.assertFalse(image.has("updatedBy"));
+    }
+
+    private void assertNoResponsiveVariants(JsonNode image) {
+        assertPublicImageContract(image);
+        org.junit.jupiter.api.Assertions.assertTrue(
+                !image.has("responsive") || image.path("responsive").isNull()
+        );
+    }
+
+    private void assertResponsiveVariants(JsonNode image, String suffix) {
+        assertPublicImageContract(image);
+        JsonNode variants = image.path("responsive").path("variants");
+        org.junit.jupiter.api.Assertions.assertTrue(variants.isArray());
+        org.junit.jupiter.api.Assertions.assertEquals(2, variants.size());
+        assertResponsiveVariant(variants.get(0), "https://cdn.inktoy.pe/ecommerce/products/variants/" + suffix + "-320.webp", 320, 240);
+        assertResponsiveVariant(variants.get(1), "https://cdn.inktoy.pe/ecommerce/products/variants/" + suffix + "-640.webp", 640, 480);
+    }
+
+    private void assertResponsiveVariant(JsonNode variant, String url, int width, int height) {
+        org.junit.jupiter.api.Assertions.assertEquals(url, variant.path("url").asText());
+        org.junit.jupiter.api.Assertions.assertEquals("image/webp", variant.path("mimeType").asText());
+        org.junit.jupiter.api.Assertions.assertEquals(width, variant.path("width").asInt());
+        org.junit.jupiter.api.Assertions.assertEquals(height, variant.path("height").asInt());
+        org.junit.jupiter.api.Assertions.assertEquals(4, variant.size());
+        org.junit.jupiter.api.Assertions.assertFalse(variant.has("productAssetId"));
+        org.junit.jupiter.api.Assertions.assertFalse(variant.has("storageKey"));
+        org.junit.jupiter.api.Assertions.assertFalse(variant.has("storageProvider"));
+        org.junit.jupiter.api.Assertions.assertFalse(variant.has("storageBucket"));
+        org.junit.jupiter.api.Assertions.assertFalse(variant.has("checksumSha256"));
+        org.junit.jupiter.api.Assertions.assertFalse(variant.has("sourceChecksumSha256"));
+        org.junit.jupiter.api.Assertions.assertFalse(variant.has("active"));
+        org.junit.jupiter.api.Assertions.assertFalse(variant.has("preferred"));
+        org.junit.jupiter.api.Assertions.assertFalse(variant.has("variantKind"));
+        org.junit.jupiter.api.Assertions.assertFalse(variant.has("purpose"));
+        org.junit.jupiter.api.Assertions.assertFalse(variant.has("sortOrder"));
+        org.junit.jupiter.api.Assertions.assertFalse(variant.has("createdAt"));
+        org.junit.jupiter.api.Assertions.assertFalse(variant.has("updatedAt"));
+        org.junit.jupiter.api.Assertions.assertFalse(variant.has("createdBy"));
+        org.junit.jupiter.api.Assertions.assertFalse(variant.has("updatedBy"));
     }
 
     private ProductAsset primaryAsset(ProductFixture product) {
@@ -725,6 +848,40 @@ class StorefrontPublicProductsIntegrationTest extends AbstractHttpIntegrationTes
         variant.setSourceChecksumSha256("abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789");
         variant.setActive(active);
         variant.setPreferred(preferred);
+        variant.setCreatedBy("it");
+        variant.setUpdatedBy("it");
+        return productAssetVariantJpaRepository.saveAndFlush(variant);
+    }
+
+    private ProductAssetVariantEntity saveResponsiveVariant(
+            Long productAssetId,
+            String keySuffix,
+            String assetUrl,
+            boolean active,
+            int width,
+            int height,
+            int targetWidth,
+            int sortOrder
+    ) {
+        ProductAssetVariantEntity variant = new ProductAssetVariantEntity();
+        variant.setProductAssetId(productAssetId);
+        variant.setVariantKind(ProductAssetVariantKind.PRIMARY_RESPONSIVE_WEBP);
+        variant.setFormat(ProductAssetVariantFormat.WEBP);
+        variant.setPurpose(ProductAssetVariantPurpose.RESPONSIVE);
+        variant.setTargetWidth(targetWidth);
+        variant.setSortOrder(sortOrder);
+        variant.setAssetUrl(assetUrl);
+        variant.setStorageProvider("S3");
+        variant.setStorageBucket("inktoy-test-bucket");
+        variant.setStorageKey("ecommerce/products/assets/" + productAssetId + "/responsive/" + keySuffix + ".webp");
+        variant.setMimeType("image/webp");
+        variant.setWidth(width);
+        variant.setHeight(height);
+        variant.setSizeBytes(1024L);
+        variant.setChecksumSha256("123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0");
+        variant.setSourceChecksumSha256("fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210");
+        variant.setActive(active);
+        variant.setPreferred(false);
         variant.setCreatedBy("it");
         variant.setUpdatedBy("it");
         return productAssetVariantJpaRepository.saveAndFlush(variant);

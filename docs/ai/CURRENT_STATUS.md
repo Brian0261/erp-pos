@@ -1192,3 +1192,112 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
   - URL import/Admin URL upsert no generan responsive por alcance; revisar stale responsive antes de exponer API publica responsive.
   - Objetos storage anteriores pueden quedar orphan hasta fase futura de limpieza segura.
 - Recomendacion siguiente: cerrar commit D2; no iniciar API publica responsive ni Storefront responsive sin autorizacion explicita.
+
+## Fase 2S.10D-F Public Responsive API Backend-Only
+
+- Fase 2S.10D-F implementada localmente con PASS.
+- Objetivo: exponer variantes `PRIMARY_RESPONSIVE_WEBP` en `primaryImage` de la API publica ecommerce mediante contrato opcional backward-compatible.
+- Contrato publico preservado:
+  - `PublicImageResponse.url`.
+  - `PublicImageResponse.altText`.
+  - `PublicImageResponse.type`.
+  - `PublicImageResponse.displayOrder`.
+- Campo publico agregado:
+  - `PublicImageResponse.responsive.variants[]`.
+- Campos por variante publica:
+  - `url`.
+  - `mimeType`.
+  - `width`.
+  - `height`.
+- Reglas implementadas:
+  - `primaryImage.url` mantiene preferencia por `PRIMARY_OPTIMIZED_WEBP active/preferred` con URL valida.
+  - Fallback de `primaryImage.url` a `ProductAsset.assetUrl` se conserva.
+  - `responsive.variants` se carga solo desde `PRIMARY_RESPONSIVE_WEBP` activas, `format=WEBP`, `purpose=RESPONSIVE`, `mimeType=image/webp`, URL no blank, `width/height/targetWidth` positivos.
+  - Orden por `sortOrder asc`, `targetWidth asc`.
+  - Si no hay responsive validas, `responsive` queda `null` y `primaryImage.url` se mantiene.
+  - Variantes responsive invalidas/blank/inactivas se ignoran sin romper la respuesta.
+  - Listado y detalle exponen el mismo contrato responsive para `primaryImage`.
+- Alcance limitado a `primaryImage`; gallery no se modifico.
+- Tests ejecutados:
+  - Focalizados `StorefrontPublicProductsIntegrationTest`: 30 tests PASS.
+  - Regresion ecommerce relacionada: 81 tests PASS.
+  - Backend completo: 472 tests PASS.
+- Documento QA creado: `docs/qa/PHASE2S10D_F_PUBLIC_RESPONSIVE_API_QA.md`.
+- Restricciones cumplidas:
+  - No se toco Storefront ni `storefront/`.
+  - No se toco generacion de imagenes, upload manual, Excel + ZIP, URL import, AVIF, Flyway/migraciones, staging/deploy ni infraestructura.
+  - No se agregaron `sizes`, `sources` ni `srcSet` como contrato unico.
+  - No se expusieron campos internos como `productAssetId`, storage keys/providers/buckets, checksums, `active`, `preferred`, `variantKind`, `purpose`, `sortOrder`, auditoria ni metadata interna.
+  - No se implemento AVIF; queda deferred/blocked.
+- Riesgos residuales:
+  - Storefront aun no consume `responsive.variants`; seguira usando `primaryImage.url` hasta una fase frontend explicita.
+  - Payload de listado crece cuando hay variantes responsive.
+  - URL import/Admin URL upsert no fueron modificados por alcance; si existen responsive variants historicas activas sobre el mismo `ProductAsset`, podrian requerir una subfase anti-stale especifica.
+  - `webp-imageio` 0.1.6 sigue siendo dependencia runtime no mantenida activamente.
+- Recomendacion siguiente: revision manual y commit; no iniciar consumo Storefront responsive sin autorizacion explicita.
+
+## Fase 2S.10D-F2 URL Responsive Anti-Stale
+
+- Fase 2S.10D-F2 implementada localmente con PASS.
+- Objetivo: cerrar riesgo de `PRIMARY_RESPONSIVE_WEBP` stale en flujos URL-only antes de tocar Storefront.
+- Flujos corregidos:
+  - URL import `confirm-file`.
+  - Admin URL upsert `PUT /api/v1/ecommerce-admin/products/{productId}/primary-asset`.
+- Reglas implementadas:
+  - Si URL import CREATE/UPDATE cambia el asset, desactiva `PRIMARY_OPTIMIZED_WEBP` y `PRIMARY_RESPONSIVE_WEBP` activas del `ProductAsset` guardado.
+  - Si Admin URL upsert cambia/guarda el asset URL-only, desactiva `PRIMARY_OPTIMIZED_WEBP` y `PRIMARY_RESPONSIVE_WEBP` activas del `ProductAsset` guardado.
+  - URL import NO_CHANGE no toca variantes.
+  - Multiples responsive variants activas del asset afectado quedan desactivadas.
+  - Variantes de otro `ProductAsset` no se tocan.
+  - API publica mantiene `primaryImage.url` fallback y deja de exponer responsive stale tras Admin URL upsert.
+- Tests ejecutados:
+  - Focalizados anti-stale: 82 tests PASS.
+  - Regresion ecommerce relacionada: 113 tests PASS.
+  - Backend completo: 473 tests PASS.
+- Documento QA creado: `docs/qa/PHASE2S10D_F2_URL_RESPONSIVE_ANTI_STALE_QA.md`.
+- Restricciones cumplidas:
+  - No se toco Storefront ni `storefront/`.
+  - No se modifico contrato publico, `PublicImageResponse`, `StorefrontProductReadAdapter`, generacion de imagenes, upload manual, Excel + ZIP, AVIF, Flyway/migraciones, staging/deploy ni infraestructura.
+  - No se agregaron `sizes`, `sources`, `srcSet` ni gallery responsive.
+  - No se implemento AVIF; queda deferred/blocked.
+- Riesgos residuales:
+  - Storefront aun no consume `responsive.variants`.
+  - Objetos storage antiguos asociados a variantes desactivadas no se eliminan en esta subfase.
+  - `webp-imageio` 0.1.6 sigue siendo dependencia runtime no mantenida activamente.
+- Recomendacion siguiente: revision manual y commit; no iniciar consumo Storefront responsive sin autorizacion explicita.
+
+## Fase 2S.10D-F3 Local API JSON Smoke + Git Readiness
+
+- Fase 2S.10D-F3 completada con PASS.
+- Objetivo: cerrar QA local/API smoke y revision Git antes de 2S.10D-G Storefront consume responsive.
+- Estado Git revisado:
+  - 14 archivos modificados (F + F2).
+  - 2 documentos QA nuevos (F + F2).
+  - `StorefrontPublicProductsIntegrationTest.java` contiene tests de F y F2 mezclados.
+- Tests smoke ejecutados:
+  - `shouldExposeResponsiveWebpVariantsInListAndDetailPrimaryImage`: PASS.
+  - `shouldNotReturnStaleVariantAfterUrlOnlyReplacement`: PASS.
+  - `confirmFileNoChangeShouldKeepExistingWebpVariantActive`: PASS.
+- Contrato JSON validado:
+  - `primaryImage.url` sigue presente y mantiene fallback.
+  - `primaryImage.responsive.variants[]` aparece cuando existen variantes validas.
+  - Cada variant expone solo `url`, `mimeType`, `width`, `height`.
+  - No se exponen campos internos (productAssetId, storageKey, checksumSha256, etc.).
+  - Listado y detalle mantienen el mismo contrato responsive.
+  - Backward compatible cuando no hay responsive variants.
+- Recomendacion de commit:
+  - **Un commit conjunto para F y F2** (no separar).
+  - Motivo: `StorefrontPublicProductsIntegrationTest.java` tiene tests que dependen de ambos cambios.
+- Documento QA creado: `docs/qa/PHASE2S10D_F3_LOCAL_PUBLIC_RESPONSIVE_JSON_SMOKE_QA.md`.
+- Restricciones cumplidas:
+  - No se toco Storefront ni `storefront/`.
+  - No se toco infraestructura, staging, deploy, Docker, Caddy, DNS, AWS, secretos ni `.env`.
+  - No se modifico backend funcional (solo se valido).
+  - No se crearon migraciones.
+  - No se implemento AVIF; queda deferred/blocked.
+  - No se hizo commit, push ni tag.
+- Riesgos residuales antes de 2S.10D-G:
+  - Storefront aun no consume `responsive.variants`.
+  - Objetos storage antiguos no se eliminan en esta subfase.
+  - `webp-imageio` 0.1.6 sigue siendo dependencia runtime no mantenida activamente.
+- Recomendacion siguiente: autorizar commit conjunto de F y F2, luego iniciar 2S.10D-G Storefront consume responsive.

@@ -314,6 +314,27 @@ class EcommerceCatalogApplicationServiceTest {
     }
 
     @Test
+    void shouldDeactivateStaleResponsiveWebpVariantsWhenAdminUrlAssetIsUpserted() {
+        PreparedData data = prepareBaseDraftProfile();
+        ProductAsset first = service.upsertPrimaryProductAsset(validAssetCommand(
+                data.productId(),
+                "https://cdn.inktoy.pe/products/lapicero-old.jpg"
+        ));
+        ProductAssetVariant responsive320 = assetVariantRepository.save(activeResponsiveVariant(first.id(), "old-320", 320, 0));
+        ProductAssetVariant responsive640 = assetVariantRepository.save(activeResponsiveVariant(first.id(), "old-640", 640, 1));
+
+        ProductAsset updated = service.upsertPrimaryProductAsset(validAssetCommand(
+                data.productId(),
+                "https://cdn.inktoy.pe/products/lapicero-new.jpg"
+        ));
+
+        assertEquals(first.id(), updated.id());
+        assertEquals("https://cdn.inktoy.pe/products/lapicero-new.jpg", updated.assetUrl());
+        assertFalse(assetVariantRepository.findById(responsive320.id()).orElseThrow().active());
+        assertFalse(assetVariantRepository.findById(responsive640.id()).orElseThrow().active());
+    }
+
+    @Test
     void shouldRejectBlankAssetUrl() {
         PreparedData data = prepareBaseDraftProfile();
 
@@ -1000,6 +1021,34 @@ class EcommerceCatalogApplicationServiceTest {
                 "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789",
                 true,
                 true,
+                null,
+                null,
+                "it",
+                "it"
+        );
+    }
+
+    private ProductAssetVariant activeResponsiveVariant(Long productAssetId, String suffix, int targetWidth, int sortOrder) {
+        return new ProductAssetVariant(
+                null,
+                productAssetId,
+                ProductAssetVariantKind.PRIMARY_RESPONSIVE_WEBP,
+                ProductAssetVariantFormat.WEBP,
+                ProductAssetVariantPurpose.RESPONSIVE,
+                targetWidth,
+                sortOrder,
+                "https://cdn.inktoy.pe/products/variants/" + suffix + ".webp",
+                "S3",
+                "inktoy-test-bucket",
+                "inktoy-dev/ecommerce/products/variants/responsive/" + suffix + ".webp",
+                "image/webp",
+                targetWidth,
+                Math.max(1, targetWidth * 3 / 4),
+                1000L + targetWidth,
+                "123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0",
+                "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",
+                true,
+                false,
                 null,
                 null,
                 "it",
