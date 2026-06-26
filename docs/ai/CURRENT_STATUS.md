@@ -1426,3 +1426,15 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
   - Logs Storefront estabilizados sin `Functions cannot be passed directly to Client Components` ni `loader: function`.
 - 2S.10D puede cerrarse como PASS total para el alcance responsive WebP/API/Storefront actual.
 - Siguen diferidos/bloqueados: AVIF, cache avanzada y gallery responsive.
+
+## Cierre final 2S.10D
+
+- `2S.10D - Build: responsive, AVIF y caché avanzada` cerrada formalmente como PASS para responsive WebP end-to-end, API publica y Storefront.
+- Documento final de cierre creado: `docs/qa/PHASE2S10D_FINAL_CLOSURE_QA.md`.
+- Se mantiene explicito:
+  - AVIF deferred/blocked.
+  - Caché avanzada deferred.
+  - Gallery responsive fuera de alcance.
+- No hay bloqueantes para continuar con el ERP/POS cuando el usuario defina la siguiente seccion.
+- No se inicia ninguna fase nueva automaticamente.
+- Siguiente accion: esperar definicion del usuario sobre la proxima seccion del ERP/POS.
