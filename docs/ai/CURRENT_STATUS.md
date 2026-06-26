@@ -1357,3 +1357,64 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
   - No se valido consumo real de `responsive.variants[]` (backend no las devuelve).
   - Se validara en staging con backend completo.
 - Recomendacion siguiente: autorizar commit de 2S.10D-G-B + 2S.10D-G-C, luego desplegar en staging.
+
+## Fase 2S.10D-S Staging Responsive Images Smoke
+
+- Fase 2S.10D-S ejecutada con resultado PARTIAL.
+- Commits desplegados en staging:
+  - `cb6f77e feat(ecommerce): expose responsive variants and prevent stale URL assets`
+  - `2a4645c feat(storefront): consume responsive product image variants`
+- Push a `origin/master`: realizado.
+- Deploy minimo staging ejecutado via `git pull --ff-only origin master` + `docker compose --profile storefront up -d --build backend storefront`.
+- API publica staging responde y ya expone el contrato nuevo con `primaryImage.responsive = null` en el producto visible `cuaderno-a4`.
+- Storefront staging responde 200 en `/`, `/productos`, `/categorias/categoria-1` y `/productos/cuaderno-a4`.
+- `primaryImage.url` sigue funcionando como fallback y Storefront renderiza sin error con `next/image`.
+- No se observo ningun producto staging con `responsive.variants[]` poblado, por lo que la validacion end-to-end de variants responsive queda pendiente.
+- Documento QA creado: `docs/qa/PHASE2S10D_STAGING_RESPONSIVE_IMAGES_SMOKE_QA.md`.
+- Restricciones cumplidas:
+  - No se tocaron archivos funcionales nuevos ni infraestructura.
+  - No se toco gallery.
+  - No se implemento AVIF.
+  - Cache avanzada sigue diferida.
+
+## Fase 2S.10D-S2 Staging Responsive Variants Real-Data Smoke
+
+- Fase 2S.10D-S2 ejecutada con resultado FAIL.
+- Se creo y publico un producto de prueba staging via flujos existentes:
+  - SKU `SMOKE-2S10D`
+  - slug `smoke-test-2s10d`
+  - upload manual JPEG 1600x1200 con metadata valida
+  - SEO metadata y publicacion via endpoints admin existentes
+- La API publica staging ya expone `primaryImage.responsive.variants[]` real y no vacio para ese producto.
+- Variants reales observadas: `320w`, `640w`, `960w`, `1280w`.
+- Todas las URLs responsive WebP respondieron HTTP 200 con `content-type: image/webp`.
+- Storefront staging fallo al renderizar el producto y contagio rutas principales con HTTP 500.
+- Error observado en logs:
+  - `Functions cannot be passed directly to Client Components ... loader: function ...`
+- Conclusion:
+  - Backend/API/CDN responsive: PASS.
+  - Storefront runtime con variants reales: FAIL.
+  - 2S.10D no puede cerrarse como PASS total hasta corregir el consumo frontend y repetir smoke staging.
+
+## Fase 2S.10D-G-D Storefront Responsive Loader Boundary Fix
+
+- Fase 2S.10D-G-D iniciada como correccion frontend-only.
+- Causa raiz confirmada:
+  - `ProductImageFrame` era Server Component.
+  - Creaba `responsiveLoader` inline.
+  - Pasaba esa funcion a `next/image` como `loader`.
+  - Next.js 16 / React 19 rechaza funciones no serializables cruzando Server Component -> Client Component.
+- Solucion aplicada localmente:
+  - `ProductImageFrame` se mantiene como Server Component.
+  - Nuevo `ProductImageFrameClient` con `"use client"` encapsula `next/image` y el custom loader.
+  - `ProductImageFrame` solo pasa props serializables al componente cliente.
+  - `primaryImage.url` sigue siendo fallback.
+  - `responsive.variants[]` sigue consumiendose cuando hay variants validas.
+- Validaciones locales:
+  - `npm run lint`: PASS.
+  - `npx tsc --noEmit`: PASS.
+  - `npm run build`: PASS.
+  - Smoke local Storefront `/`, `/productos`, `/categorias/categoria-online-1`, `/productos/producto-6`: HTTP 200.
+- Pendiente:
+  - commit, push, deploy staging y smoke staging con `smoke-test-2s10d`.
+  - confirmar logs staging sin `loader: function`.

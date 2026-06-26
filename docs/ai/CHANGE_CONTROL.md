@@ -2079,3 +2079,87 @@ Solo crear tag cuando se cumpla todo:
   - No se valido consumo real de `responsive.variants[]` (backend no las devuelve).
   - Se validara en staging con backend completo.
 - Recomendacion siguiente: autorizar commit de 2S.10D-G-B + 2S.10D-G-C, luego desplegar en staging.
+
+### Cierre Fase 2S.10D-S Staging Responsive Images Smoke
+
+- Tipo: push + deploy minimo staging + smoke funcional + documentacion QA.
+- Base: commits locales `cb6f77e` y `2a4645c` ya validados localmente.
+- Push realizado a `origin/master`.
+- Host staging actualizado desde `fb0445f` hasta `2a4645c` por fast-forward.
+- Deploy minimo ejecutado solo sobre `backend` + `storefront`.
+- `frontend` Angular, `postgres`, infraestructura, Dockerfile, `docker-compose.yml`, Caddy, DNS, AWS/S3/CloudFront/IAM, secretos y `.env` reales no se modificaron.
+- Backend staging aplico V20 existente y quedo arriba.
+- API publica staging responde 200 y expone `primaryImage.responsive = null` para `cuaderno-a4`, confirmando despliegue del contrato nuevo sin romper compatibilidad.
+- Storefront staging responde 200 en rutas principales y renderiza sin error con `next/image`.
+- URL WebP validada: `https://cdn-staging.inktoy.pe/staging/ecommerce/ecommerce/products/1/profiles/1/variants/cuaderno-a4-3fcc61f44cbf-37cfff654eef.webp` -> HTTP 200, `content-type: image/webp`.
+- Resultado: PARTIAL.
+- Motivo de partial:
+  - No existe evidencia en staging de un producto con `responsive.variants[]` poblado.
+  - Se valida fallback/backward compatibility, pero no el consumo real de variants responsive end-to-end.
+- Documento QA creado:
+  - `docs/qa/PHASE2S10D_STAGING_RESPONSIVE_IMAGES_SMOKE_QA.md`
+- Riesgos residuales:
+  - Falta un producto staging con `PRIMARY_RESPONSIVE_WEBP` activa para validar el flujo completo.
+  - Widths responsive especificos y URLs de `responsive.variants[]` quedan pendientes de smoke posterior.
+
+### Cierre Fase 2S.10D-S2 Staging Responsive Variants Real-Data Smoke
+
+- Tipo: smoke staging con datos reales/controlados + documentacion QA.
+- Base: staging ya actualizado con `cb6f77e` y `2a4645c`.
+- Alcance real ejecutado:
+  - Verificacion inicial: staging no tenia ninguna `PRIMARY_RESPONSIVE_WEBP` activa.
+  - Se creo producto de prueba via flujos existentes y seguros del sistema.
+  - Se genero imagen JPEG 1600x1200 por upload manual staging para forzar variants responsive.
+  - Se completo online profile, SEO y publicacion via endpoints admin existentes.
+- Resultado API/CDN:
+  - API detalle y listado devuelven `primaryImage.url` y `primaryImage.responsive.variants[]` real.
+  - Variants observadas: `320w`, `640w`, `960w`, `1280w`.
+  - URLs responsive WebP: HTTP 200, `content-type: image/webp`.
+  - No se exponen campos internos.
+- Resultado Storefront:
+  - FAIL runtime al renderizar producto con variants reales.
+  - Logs muestran error por pasar `loader: function` a Client Component / `next/image`.
+  - El fallo afecta home, listado, categoria y detalle del producto de prueba.
+- Restricciones cumplidas:
+  - No se modifico backend funcional.
+  - No se modifico Storefront funcional.
+  - No se toco infraestructura.
+  - No se crearon migraciones.
+  - No se toco gallery.
+  - No se implemento AVIF ni cache avanzada.
+- Resultado: FAIL.
+- Conclusion:
+  - Se requiere subfase correctiva frontend antes de poder cerrar 2S.10D como PASS total.
+
+### Inicio Fase 2S.10D-G-D Storefront Responsive Loader Boundary Fix
+
+- Tipo: correccion frontend-only en Storefront.
+- Contexto:
+  - 2S.10D-S2 valido backend/API/CDN responsive, pero Storefront staging fallo con HTTP 500 al renderizar producto con `primaryImage.responsive.variants[]` real.
+  - Error observado: `Functions cannot be passed directly to Client Components ... loader: function`.
+- Causa raiz:
+  - `ProductImageFrame` Server Component construia una funcion `responsiveLoader` y la pasaba a `next/image`.
+  - La funcion cruzaba el boundary Server Component -> Client Component y no era serializable.
+- Cambio aplicado localmente:
+  - `ProductImageFrame` permanece como Server Component.
+  - Nuevo `ProductImageFrameClient` con `"use client"` contiene `next/image` y el custom loader.
+  - Solo se pasan props serializables desde servidor a cliente.
+- Validaciones locales:
+  - `npm run lint`: PASS.
+  - `npx tsc --noEmit`: PASS.
+  - `npm run build`: PASS.
+  - Smoke local Storefront principal: HTTP 200.
+- Restricciones respetadas:
+  - No backend.
+  - No migraciones.
+  - No infraestructura.
+  - No Dockerfile/docker-compose.
+  - No Caddy/DNS/AWS/S3/CloudFront/IAM.
+  - No secretos ni `.env` reales.
+  - No AVIF.
+  - No cache avanzada.
+  - No gallery.
+  - No `<img>` ni `<picture>`.
+  - No se desactivo `responsive.variants[]`.
+- Pendiente para cierre:
+  - commit, push, deploy staging y smoke staging completo con `smoke-test-2s10d`.

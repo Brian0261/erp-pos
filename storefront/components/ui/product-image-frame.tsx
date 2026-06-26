@@ -1,5 +1,5 @@
-import Image, { type ImageLoaderProps } from "next/image";
-import { pickResponsiveImageVariant, type SafeResponsiveImageVariant } from "@/lib/images";
+import type { SafeResponsiveImageVariant } from "@/lib/images";
+import { ProductImageFrameClient } from "./product-image-frame-client";
 
 export type ProductImageFrameProps = {
   alt?: string;
@@ -16,14 +16,6 @@ export function ProductImageFrame({
   responsiveVariants,
   src,
 }: ProductImageFrameProps) {
-  const hasResponsiveVariants = Boolean(src && responsiveVariants?.length);
-  const responsiveLoader = hasResponsiveVariants
-    ? ({ src: fallbackSrc, width }: ImageLoaderProps) => {
-        const variant = pickResponsiveImageVariant(responsiveVariants ?? [], width);
-        return variant?.url ?? fallbackSrc;
-      }
-    : undefined;
-
   return (
     <div
       className={[
@@ -34,13 +26,11 @@ export function ProductImageFrame({
         .join(" ")}
     >
       {src ? (
-        <Image
+        <ProductImageFrameClient
           alt={alt}
-          className="object-cover"
-          fill
-          loader={responsiveLoader}
           priority={priority}
           sizes="(min-width: 1024px) 360px, (min-width: 768px) 45vw, 92vw"
+          responsiveVariants={responsiveVariants}
           src={src}
         />
       ) : (
