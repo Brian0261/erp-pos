@@ -2131,9 +2131,13 @@ Solo crear tag cuando se cumpla todo:
 - Conclusion:
   - Se requiere subfase correctiva frontend antes de poder cerrar 2S.10D como PASS total.
 
-### Inicio Fase 2S.10D-G-D Storefront Responsive Loader Boundary Fix
+### Cierre Fase 2S.10D-G-D Storefront Responsive Loader Boundary Fix
 
 - Tipo: correccion frontend-only en Storefront.
+- Commit:
+  - `96dc6c3 fix(storefront): keep responsive image loader inside client boundary`
+- Push a `origin/master`: realizado.
+- Staging actualizado a `96dc6c3` por fast-forward.
 - Contexto:
   - 2S.10D-S2 valido backend/API/CDN responsive, pero Storefront staging fallo con HTTP 500 al renderizar producto con `primaryImage.responsive.variants[]` real.
   - Error observado: `Functions cannot be passed directly to Client Components ... loader: function`.
@@ -2149,6 +2153,13 @@ Solo crear tag cuando se cumpla todo:
   - `npx tsc --noEmit`: PASS.
   - `npm run build`: PASS.
   - Smoke local Storefront principal: HTTP 200.
+- Validaciones staging:
+  - API publica `GET /api/v1/storefront/catalog/products/smoke-test-2s10d`: HTTP 200.
+  - `primaryImage.url` presente.
+  - `primaryImage.responsive.variants[]` real no vacio con `320w`, `640w`, `960w`, `1280w`.
+  - URLs WebP responsive: HTTP 200, `content-type: image/webp`.
+  - Storefront `/`, `/productos`, `/categorias/categoria-1`, `/productos/smoke-test-2s10d`: HTTP 200 tras estabilizar servicios.
+  - Logs Storefront estabilizados sin `Functions cannot be passed directly to Client Components` ni `loader: function`.
 - Restricciones respetadas:
   - No backend.
   - No migraciones.
@@ -2161,5 +2172,9 @@ Solo crear tag cuando se cumpla todo:
   - No gallery.
   - No `<img>` ni `<picture>`.
   - No se desactivo `responsive.variants[]`.
-- Pendiente para cierre:
-  - commit, push, deploy staging y smoke staging completo con `smoke-test-2s10d`.
+- Resultado: PASS.
+- Observacion operativa:
+  - El comando de deploy apunto a `storefront`, pero Docker Compose tambien reconstruyo/recreo `backend` por dependencias del perfil; no hubo cambios funcionales backend ni migraciones.
+- Conclusion:
+  - 2S.10D puede cerrarse como PASS total para el alcance responsive WebP/API/Storefront actual.
+  - AVIF, cache avanzada y gallery responsive permanecen fuera de alcance/diferidos.

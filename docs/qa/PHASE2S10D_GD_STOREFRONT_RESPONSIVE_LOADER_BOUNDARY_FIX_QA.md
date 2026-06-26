@@ -83,40 +83,113 @@ Rutas locales revisadas contra Storefront local disponible:
 
 ## Commit
 
-- Pendiente de crear al momento de esta primera actualizacion documental.
+- `96dc6c3 fix(storefront): keep responsive image loader inside client boundary`.
 
 ## Push
 
-- Pendiente.
+- Push realizado a `origin/master`.
 
 ## Staging
 
-- Pendiente de actualizar.
+- Staging actualizado desde `2a4645c` hasta `96dc6c3` por fast-forward.
+- Comando ejecutado:
+
+```bash
+git pull --ff-only origin master
+docker compose --profile storefront up -d --build storefront
+```
+
+Nota operativa:
+
+- Aunque el comando apunto a `storefront`, Docker Compose tambien reconstruyo/recreo `backend` por dependencias del perfil.
+- No hubo cambios funcionales backend en el commit.
+- No se modificaron migraciones ni infraestructura.
 
 ## Rutas Storefront Staging Revisadas
 
-- Pendiente tras push/deploy.
+- `https://storefront-staging.inktoy.pe/` -> HTTP 200.
+- `https://storefront-staging.inktoy.pe/productos` -> HTTP 200.
+- `https://storefront-staging.inktoy.pe/categorias/categoria-1` -> HTTP 200.
+- `https://storefront-staging.inktoy.pe/productos/smoke-test-2s10d` -> HTTP 200.
+
+Observacion:
+
+- La primera pasada inmediatamente despues del deploy devolvio 500 por `StorefrontApiError` mientras backend terminaba de arrancar.
+- Tras estabilizar servicios, las cuatro rutas devolvieron HTTP 200.
 
 ## Endpoint API Revisado
 
-- Pendiente tras push/deploy.
+- `GET https://staging.inktoy.pe/api/v1/storefront/catalog/products/smoke-test-2s10d` -> HTTP 200.
 
 ## Evidencia de `primaryImage.url`
 
-- Pendiente tras smoke staging final.
+```json
+{
+  "url": "https://cdn-staging.inktoy.pe/staging/ecommerce/ecommerce/products/2/profiles/2/variants/smoke-test-2s10d-afb8fb834cee-8b05af9e5348.webp",
+  "altText": "Smoke responsive 2S10D",
+  "type": "PRODUCT_IMAGE",
+  "displayOrder": 0
+}
+```
+
+Validacion:
+
+- `primaryImage.url` sigue presente como fallback contractual.
 
 ## Evidencia de `primaryImage.responsive.variants[]`
 
-- Pendiente tras smoke staging final.
+```json
+"responsive": {
+  "variants": [
+    {
+      "url": "https://cdn-staging.inktoy.pe/staging/ecommerce/ecommerce/products/2/profiles/2/variants/responsive/smoke-test-2s10d-320w-afb8fb834cee-89ddf7562ca0.webp",
+      "mimeType": "image/webp",
+      "width": 320,
+      "height": 240
+    },
+    {
+      "url": "https://cdn-staging.inktoy.pe/staging/ecommerce/ecommerce/products/2/profiles/2/variants/responsive/smoke-test-2s10d-640w-afb8fb834cee-c59596944a27.webp",
+      "mimeType": "image/webp",
+      "width": 640,
+      "height": 480
+    },
+    {
+      "url": "https://cdn-staging.inktoy.pe/staging/ecommerce/ecommerce/products/2/profiles/2/variants/responsive/smoke-test-2s10d-960w-afb8fb834cee-263432e2d4b5.webp",
+      "mimeType": "image/webp",
+      "width": 960,
+      "height": 720
+    },
+    {
+      "url": "https://cdn-staging.inktoy.pe/staging/ecommerce/ecommerce/products/2/profiles/2/variants/responsive/smoke-test-2s10d-1280w-afb8fb834cee-ec96e37e8bc1.webp",
+      "mimeType": "image/webp",
+      "width": 1280,
+      "height": 960
+    }
+  ]
+}
+```
+
+Validaciones:
+
+- `responsive.variants[]` presente y no vacio.
+- Variants WebP reales: `320w`, `640w`, `960w`, `1280w`.
+- Width y height positivos.
+- No se observaron campos internos.
 
 ## Evidencia de URLs WebP Responsive
 
-- Pendiente tras smoke staging final.
+- 320w: HTTP 200, `Content-Type: image/webp`, `Content-Length: 1128`.
+- 640w: HTTP 200, `Content-Type: image/webp`, `Content-Length: 2910`.
+- 960w: HTTP 200, `Content-Type: image/webp`, `Content-Length: 4872`.
+- 1280w: HTTP 200, `Content-Type: image/webp`, `Content-Length: 7022`.
 
 ## Confirmacion Sobre `loader: function`
 
 - Local build PASS sin error de serializacion por `loader`.
-- Confirmacion final en logs staging pendiente tras deploy.
+- Logs Storefront staging estabilizados (`docker logs --since 20s erp-pos-storefront`) sin:
+  - `Functions cannot be passed directly to Client Components`.
+  - `loader: function`.
+- Los errores `StorefrontApiError` observados fueron transitorios durante el reinicio/reconexion post-deploy y no persistieron tras estabilizar servicios.
 
 ## Confirmaciones de Alcance
 
@@ -137,10 +210,11 @@ Rutas locales revisadas contra Storefront local disponible:
 
 ## Resultado
 
-PARTIAL hasta completar commit, push, deploy y smoke staging.
+PASS.
 
 ## Riesgos Residuales
 
-- Falta validar en staging con el producto real `smoke-test-2s10d`.
-- Falta confirmar logs staging sin `Functions cannot be passed directly to Client Components` ni `loader: function`.
-- 2S.10D todavia no puede cerrarse como PASS total hasta finalizar el smoke staging post-fix.
+- Docker Compose reconstruyo/recreo backend durante el deploy del perfil aunque la correccion fue frontend-only; no hubo cambio funcional backend.
+- La primera pasada de rutas Storefront justo despues del deploy devolvio 500 por backend aun arrancando; la pasada estabilizada devolvio 200 en todas las rutas.
+- AVIF sigue deferred/blocked.
+- Cache avanzada sigue diferida.

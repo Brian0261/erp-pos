@@ -1398,7 +1398,11 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
 
 ## Fase 2S.10D-G-D Storefront Responsive Loader Boundary Fix
 
-- Fase 2S.10D-G-D iniciada como correccion frontend-only.
+- Fase 2S.10D-G-D completada con resultado PASS.
+- Commit funcional/documental:
+  - `96dc6c3 fix(storefront): keep responsive image loader inside client boundary`
+- Push a `origin/master`: realizado.
+- Staging actualizado por fast-forward a `96dc6c3`.
 - Causa raiz confirmada:
   - `ProductImageFrame` era Server Component.
   - Creaba `responsiveLoader` inline.
@@ -1415,6 +1419,10 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
   - `npx tsc --noEmit`: PASS.
   - `npm run build`: PASS.
   - Smoke local Storefront `/`, `/productos`, `/categorias/categoria-online-1`, `/productos/producto-6`: HTTP 200.
-- Pendiente:
-  - commit, push, deploy staging y smoke staging con `smoke-test-2s10d`.
-  - confirmar logs staging sin `loader: function`.
+- Validaciones staging:
+  - API publica `smoke-test-2s10d`: HTTP 200, `primaryImage.url` presente y `responsive.variants[]` real no vacio.
+  - URLs WebP responsive `320w`, `640w`, `960w`, `1280w`: HTTP 200 con `content-type: image/webp`.
+  - Storefront `/`, `/productos`, `/categorias/categoria-1`, `/productos/smoke-test-2s10d`: HTTP 200 tras estabilizar servicios.
+  - Logs Storefront estabilizados sin `Functions cannot be passed directly to Client Components` ni `loader: function`.
+- 2S.10D puede cerrarse como PASS total para el alcance responsive WebP/API/Storefront actual.
+- Siguen diferidos/bloqueados: AVIF, cache avanzada y gallery responsive.
