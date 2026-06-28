@@ -11,6 +11,7 @@ import { CashRegisterService } from "./data/cash-register.service";
 import { toHttpErrorMessage } from "./data/http-error-message";
 import { PosService } from "./data/pos.service";
 import { PosDraftState, PosStateService } from "./data/pos-state.service";
+import { PaymentLine, PosCartItem, PosReceiptType } from "./data/pos-ui.models";
 import { SalesService } from "./data/sales.service";
 import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.service";
 import {
@@ -24,28 +25,19 @@ import {
   CashRegisterResponse,
   CreateSaleRequest,
   SaleResponse,
-  PaymentMethod,
   PosProductResponse,
 } from "./data/sales.models";
-
-interface PosCartItem {
-  productId: number;
-  sku: string;
-  barcode: string | null;
-  name: string;
-  salePrice: number;
-  stockAvailable: number;
-  quantity: number;
-  discountAmount: number;
-}
-
-interface PaymentLine {
-  paymentMethod: PaymentMethod;
-  amount: number;
-  reference: string;
-}
-
-type PosReceiptType = "TICKET" | "RECEIPT" | "INVOICE";
+import {
+  calculatePosChange,
+  calculatePosDiscountTotal,
+  calculatePosLineSubtotal,
+  calculatePosLineTotal,
+  calculatePosPaidTotal,
+  calculatePosSubtotal,
+  calculatePosTotal,
+  normalizePosNumber,
+  normalizePosQuantity,
+} from "./utils/pos-calculations";
 
 @Component({
   selector: "app-pos-page",
@@ -2496,29 +2488,23 @@ export class PosPageComponent implements OnInit, OnDestroy {
   }
 
   get subtotal(): number {
-    return this.cart.reduce((acc, item) => acc + this.lineSubtotal(item), 0);
+    return calculatePosSubtotal(this.cart);
   }
 
   get discountTotal(): number {
-    return this.cart.reduce(
-      (acc, item) => acc + this.normalizeNumber(item.discountAmount),
-      0,
-    );
+    return calculatePosDiscountTotal(this.cart);
   }
 
   get total(): number {
-    return Math.max(this.subtotal - this.discountTotal, 0);
+    return calculatePosTotal(this.cart);
   }
 
   get paidTotal(): number {
-    return this.payments.reduce(
-      (acc, payment) => acc + this.normalizeNumber(payment.amount),
-      0,
-    );
+    return calculatePosPaidTotal(this.payments);
   }
 
   get change(): number {
-    return this.paidTotal > this.total ? this.paidTotal - this.total : 0;
+    return calculatePosChange(this.cart, this.payments);
   }
 
   get selectedWarehouseLabel(): string {
@@ -2723,7 +2709,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
     }
 
     const availableStock = Math.floor(
-      this.normalizeNumber(product.stockAvailable),
+      normalizePosNumber(product.stockAvailable),
     );
 
     if (availableStock <= 0) {
@@ -2736,8 +2722,8 @@ export class PosPageComponent implements OnInit, OnDestroy {
       sku: product.sku,
       barcode: product.barcode,
       name: product.name,
-      salePrice: this.normalizeNumber(product.salePrice),
-      stockAvailable: this.normalizeNumber(product.stockAvailable),
+      salePrice: normalizePosNumber(product.salePrice),
+      stockAvailable: normalizePosNumber(product.stockAvailable),
       quantity: 1,
       discountAmount: 0,
     });
@@ -2769,7 +2755,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const parsed = this.normalizeQuantity(rawValue);
+    const parsed = normalizePosQuantity(rawValue);
     const maxStock = this.availableIntegerStock(item);
 
     if (parsed > maxStock) {
@@ -2808,7 +2794,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
   }
 
   availableIntegerStock(item: Pick<PosCartItem, "stockAvailable">): number {
-    return Math.floor(this.normalizeNumber(item.stockAvailable));
+    return Math.floor(normalizePosNumber(item.stockAvailable));
   }
 
   setDiscount(index: number, rawValue: string): void {
@@ -2817,7 +2803,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const parsed = Math.max(this.normalizeNumber(rawValue), 0);
+    const parsed = Math.max(normalizePosNumber(rawValue), 0);
     const maxDiscount = this.lineSubtotal(item);
 
     if (parsed > maxDiscount) {
@@ -2831,16 +2817,11 @@ export class PosPageComponent implements OnInit, OnDestroy {
   }
 
   lineSubtotal(item: PosCartItem): number {
-    return (
-      this.normalizeNumber(item.salePrice) * this.normalizeNumber(item.quantity)
-    );
+    return calculatePosLineSubtotal(item);
   }
 
   lineTotal(item: PosCartItem): number {
-    return Math.max(
-      this.lineSubtotal(item) - this.normalizeNumber(item.discountAmount),
-      0,
-    );
+    return calculatePosLineTotal(item);
   }
 
   addPaymentLine(): void {
@@ -2874,7 +2855,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
       return;
     }
 
-    payment.amount = Math.max(this.normalizeNumber(rawValue), 0);
+    payment.amount = Math.max(normalizePosNumber(rawValue), 0);
     this.persistDraftState();
   }
 
@@ -3065,13 +3046,13 @@ export class PosPageComponent implements OnInit, OnDestroy {
         warehouseId,
         items: this.cart.map((item) => ({
           productId: item.productId,
-          quantity: this.normalizeQuantity(item.quantity),
-          discountAmount: this.normalizeNumber(item.discountAmount),
+          quantity: normalizePosQuantity(item.quantity),
+          discountAmount: normalizePosNumber(item.discountAmount),
         })),
         payments: this.payments
           .map((payment) => ({
             paymentMethod: payment.paymentMethod,
-            amount: this.normalizeNumber(payment.amount),
+            amount: normalizePosNumber(payment.amount),
             reference: payment.reference.trim() ? payment.reference.trim() : null,
           }))
           .filter((payment) => payment.amount > 0),
@@ -3205,23 +3186,23 @@ export class PosPageComponent implements OnInit, OnDestroy {
     }
 
     for (const item of this.cart) {
-      if (this.normalizeQuantity(item.quantity) <= 0) {
+      if (normalizePosQuantity(item.quantity) <= 0) {
         return `La cantidad de ${item.sku} debe ser mayor que 0.`;
       }
 
-      if (this.normalizeNumber(item.discountAmount) < 0) {
+      if (normalizePosNumber(item.discountAmount) < 0) {
         return `El descuento de ${item.sku} debe ser >= 0.`;
       }
 
       if (
-        this.normalizeQuantity(item.quantity) > this.availableIntegerStock(item)
+        normalizePosQuantity(item.quantity) > this.availableIntegerStock(item)
       ) {
         return `Stock insuficiente para ${item.sku}.`;
       }
     }
 
     const validPayments = this.payments.filter(
-      (payment) => this.normalizeNumber(payment.amount) > 0,
+      (payment) => normalizePosNumber(payment.amount) > 0,
     );
 
     if (validPayments.length === 0) {
@@ -3239,16 +3220,4 @@ export class PosPageComponent implements OnInit, OnDestroy {
     return "";
   }
 
-  private normalizeNumber(value: unknown): number {
-    const parsed = Number(value);
-    if (!Number.isFinite(parsed)) {
-      return 0;
-    }
-    return parsed;
-  }
-
-  private normalizeQuantity(value: unknown): number {
-    const parsed = Math.floor(this.normalizeNumber(value));
-    return parsed > 0 ? parsed : 1;
-  }
 }
