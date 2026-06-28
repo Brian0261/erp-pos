@@ -7,7 +7,7 @@ import { Subscription } from "rxjs";
 import { AuthService } from "../../core/auth/auth.service";
 import { WarehouseService } from "../inventory/data/warehouse.service";
 import { WarehouseResponse } from "../inventory/data/inventory.models";
-import { PosCartItemComponent } from "./components/pos-cart-item.component";
+import { PosCartPanelComponent } from "./components/pos-cart-panel.component";
 import { PosTotalsSummaryComponent } from "./components/pos-totals-summary.component";
 import { CashRegisterService } from "./data/cash-register.service";
 import { toHttpErrorMessage } from "./data/http-error-message";
@@ -49,7 +49,7 @@ import {
     ReactiveFormsModule,
     RouterLink,
     PosTotalsSummaryComponent,
-    PosCartItemComponent,
+    PosCartPanelComponent,
   ],
   template: `
     <section class="ui-card pos-page">
@@ -243,53 +243,19 @@ import {
         </main>
 
         <aside class="checkout-panel" aria-label="Carrito y cobro">
-          <section class="cart-panel">
-            <header class="panel-head panel-head--compact">
-              <div>
-                <h2>{{ cartTitle }}</h2>
-              </div>
-              <div class="cart-head-actions">
-                <button
-                  type="button"
-                  class="ui-button ui-button--secondary pos-button pos-button--quiet"
-                  (click)="openFullCart()"
-                  [disabled]="cart.length === 0"
-                >
-                  Ver carrito completo
-                </button>
-                <button
-                  type="button"
-                  class="ui-button ui-button--secondary pos-button pos-button--quiet"
-                  (click)="cancelSale()"
-                  [disabled]="cart.length === 0"
-                >
-                  Cancelar venta
-                </button>
-              </div>
-            </header>
-
-            <div class="cart-list" *ngIf="cart.length > 0; else emptyCart">
-              <app-pos-cart-item
-                *ngFor="let item of cart; let index = index"
-                [item]="item"
-                [index]="index"
-                [lineTotal]="lineTotal(item)"
-                (decrease)="decreaseQuantity($event)"
-                (increase)="increaseQuantity($event)"
-                (remove)="removeFromCart($event)"
-                (quantityFocus)="selectQuantityInput($event)"
-                (setQuantity)="setQuantity($event.index, $event.value, $event.input)"
-                (setDiscount)="setDiscount($event.index, $event.value)"
-              ></app-pos-cart-item>
-            </div>
-
-            <ng-template #emptyCart>
-              <div class="empty-cart">
-                <strong>Carrito vacio</strong>
-                <span>Escanea o busca un producto para empezar.</span>
-              </div>
-            </ng-template>
-          </section>
+          <app-pos-cart-panel
+            [cart]="cart"
+            [cartTitle]="cartTitle"
+            [lineTotals]="cartLineTotals"
+            (openFullCart)="openFullCart()"
+            (cancelSale)="cancelSale()"
+            (decrease)="decreaseQuantity($event)"
+            (increase)="increaseQuantity($event)"
+            (remove)="removeFromCart($event)"
+            (quantityFocus)="selectQuantityInput($event)"
+            (setQuantity)="setQuantity($event.index, $event.value, $event.input)"
+            (setDiscount)="setDiscount($event.index, $event.value)"
+          ></app-pos-cart-panel>
 
           <section class="payment-panel">
             <header class="panel-head panel-head--compact">
@@ -2450,6 +2416,10 @@ export class PosPageComponent implements OnInit, OnDestroy {
 
   get cartCountLabel(): string {
     return this.cart.length === 1 ? "1 ítem" : `${this.cart.length} ítems`;
+  }
+
+  get cartLineTotals(): number[] {
+    return this.cart.map((item) => this.lineTotal(item));
   }
 
   @HostListener("document:keydown.escape")
