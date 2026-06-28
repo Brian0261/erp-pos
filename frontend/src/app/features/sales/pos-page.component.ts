@@ -7,6 +7,8 @@ import { Subscription } from "rxjs";
 import { AuthService } from "../../core/auth/auth.service";
 import { WarehouseService } from "../inventory/data/warehouse.service";
 import { WarehouseResponse } from "../inventory/data/inventory.models";
+import { PosCartItemComponent } from "./components/pos-cart-item.component";
+import { PosTotalsSummaryComponent } from "./components/pos-totals-summary.component";
 import { CashRegisterService } from "./data/cash-register.service";
 import { toHttpErrorMessage } from "./data/http-error-message";
 import { PosService } from "./data/pos.service";
@@ -42,7 +44,13 @@ import {
 @Component({
   selector: "app-pos-page",
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink],
+  imports: [
+    CommonModule,
+    ReactiveFormsModule,
+    RouterLink,
+    PosTotalsSummaryComponent,
+    PosCartItemComponent,
+  ],
   template: `
     <section class="ui-card pos-page">
       <header class="pos-hero">
@@ -261,87 +269,18 @@ import {
             </header>
 
             <div class="cart-list" *ngIf="cart.length > 0; else emptyCart">
-              <article
-                class="cart-item"
+              <app-pos-cart-item
                 *ngFor="let item of cart; let index = index"
-              >
-                <div class="cart-item__main">
-                  <div class="cart-item__meta-row">
-                    <p class="cart-item__sku">{{ item.sku }}</p>
-                    <span class="cart-item__meta-separator" aria-hidden="true"
-                      >·</span
-                    >
-                    <p class="cart-item__stock">
-                      P.U. S/ {{ item.salePrice | number: "1.2-2" }}
-                    </p>
-                  </div>
-                  <h3>{{ item.name }}</h3>
-                </div>
-
-                <div class="cart-item__controls">
-                  <label class="mini-field">
-                    <span>Cantidad *</span>
-                    <div class="quantity-tools">
-                      <button
-                        type="button"
-                        class="ui-button quantity-stepper"
-                        (click)="decreaseQuantity(index)"
-                        [disabled]="item.quantity <= 1"
-                      >
-                        -
-                      </button>
-                      <input
-                        type="number"
-                        min="1"
-                        step="1"
-                        inputmode="numeric"
-                        pattern="[0-9]*"
-                        [value]="item.quantity"
-                        (focus)="selectQuantityInput($any($event.target))"
-                        (click)="selectQuantityInput($any($event.target))"
-                        (input)="
-                          setQuantity(
-                            index,
-                            $any($event.target).value,
-                            $any($event.target)
-                          )
-                        "
-                      />
-                      <button
-                        type="button"
-                        class="ui-button quantity-stepper"
-                        (click)="increaseQuantity(index)"
-                      >
-                        +
-                      </button>
-                    </div>
-                  </label>
-                  <label class="mini-field">
-                    <span>Descuento</span>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      [value]="item.discountAmount"
-                      (input)="setDiscount(index, $any($event.target).value)"
-                    />
-                  </label>
-                </div>
-
-                <div class="cart-item__footer">
-                  <div>
-                    <span>Subtotal</span>
-                    <strong>S/ {{ lineTotal(item) | number: "1.2-2" }}</strong>
-                  </div>
-                  <button
-                    type="button"
-                    class="ui-button ui-button--danger pos-button pos-button--small cart-item__remove"
-                    (click)="removeFromCart(index)"
-                  >
-                    Quitar
-                  </button>
-                </div>
-              </article>
+                [item]="item"
+                [index]="index"
+                [lineTotal]="lineTotal(item)"
+                (decrease)="decreaseQuantity($event)"
+                (increase)="increaseQuantity($event)"
+                (remove)="removeFromCart($event)"
+                (quantityFocus)="selectQuantityInput($event)"
+                (setQuantity)="setQuantity($event.index, $event.value, $event.input)"
+                (setDiscount)="setDiscount($event.index, $event.value)"
+              ></app-pos-cart-item>
             </div>
 
             <ng-template #emptyCart>
@@ -569,31 +508,13 @@ import {
             </small>
           </section>
 
-          <section class="total-board" aria-label="Totales de venta">
-            <article class="total-main">
-              <span>Total a cobrar</span>
-              <strong>S/ {{ total | number: "1.2-2" }}</strong>
-            </article>
-
-            <div class="total-grid">
-              <article>
-                <span>Subtotal</span>
-                <strong>S/ {{ subtotal | number: "1.2-2" }}</strong>
-              </article>
-              <article>
-                <span>Descuento</span>
-                <strong>S/ {{ discountTotal | number: "1.2-2" }}</strong>
-              </article>
-              <article>
-                <span>Pagado</span>
-                <strong>S/ {{ paidTotal | number: "1.2-2" }}</strong>
-              </article>
-              <article class="total-change">
-                <span>Vuelto</span>
-                <strong>S/ {{ change | number: "1.2-2" }}</strong>
-              </article>
-            </div>
-          </section>
+          <app-pos-totals-summary
+            [total]="total"
+            [subtotal]="subtotal"
+            [discountTotal]="discountTotal"
+            [paidTotal]="paidTotal"
+            [change]="change"
+          ></app-pos-totals-summary>
 
           <footer class="checkout-actions">
             <button
