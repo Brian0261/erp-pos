@@ -65,6 +65,7 @@ import { PosCartItem } from "../data/pos-ui.models";
     `
       :host {
         display: block;
+        height: 100%;
         min-height: 0;
       }
 
@@ -73,11 +74,13 @@ import { PosCartItem } from "../data/pos-ui.models";
       }
 
       .cart-panel {
-        border: 1px solid var(--color-border-default);
+        height: 100%;
+        box-sizing: border-box;
+        border: 1px solid color-mix(in srgb, var(--color-brand-primary) 20%, var(--color-border-default));
         border-radius: var(--radius-lg);
         background: var(--color-bg-surface);
         box-shadow: var(--shadow-sm);
-        padding: var(--space-2);
+        padding: 0.65rem;
         display: grid;
         gap: var(--space-2);
         min-height: 0;
@@ -98,8 +101,9 @@ import { PosCartItem } from "../data/pos-ui.models";
       }
 
       .panel-head h2 {
-        font-size: 1.05rem;
+        font-size: 1.1rem;
         line-height: 1.1;
+        font-weight: 900;
       }
 
       .cart-head-actions {
@@ -134,7 +138,7 @@ import { PosCartItem } from "../data/pos-ui.models";
       .cart-list {
         display: grid;
         align-content: start;
-        gap: var(--space-2);
+        gap: 0.42rem;
         min-height: 0;
         overflow: auto;
         padding-right: var(--space-1);
@@ -144,7 +148,7 @@ import { PosCartItem } from "../data/pos-ui.models";
         display: grid;
         gap: var(--space-1);
         place-items: center;
-        min-height: 4.6rem;
+        min-height: 8rem;
         border: 2px dashed var(--color-border-default);
         border-radius: var(--radius-lg);
         background: var(--color-bg-soft);
@@ -177,7 +181,7 @@ import { PosCartItem } from "../data/pos-ui.models";
 
       @media (max-width: 980px) {
         .cart-list {
-          max-height: 18rem;
+          max-height: 22rem;
         }
       }
 

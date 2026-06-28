@@ -45,13 +45,13 @@ import { Component, Input } from "@angular/core";
         overflow: hidden;
         grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
         align-items: stretch;
-        min-height: 4.35rem;
+        min-height: 4.15rem;
         padding: 0.35rem;
       }
 
       .total-main {
         display: grid;
-        gap: var(--space-1);
+        gap: 0.18rem;
         border-radius: var(--radius-lg);
         background:
           linear-gradient(135deg, var(--color-brand-primary), #0f172a),
@@ -73,7 +73,7 @@ import { Component, Input } from "@angular/core";
       }
 
       .total-main strong {
-        font-size: clamp(1.35rem, 2vw, 1.75rem);
+        font-size: clamp(1.42rem, 2vw, 1.82rem);
         line-height: 1;
       }
 

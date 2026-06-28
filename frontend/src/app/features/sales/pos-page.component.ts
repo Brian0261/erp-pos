@@ -664,36 +664,29 @@ import {
 
       .pos-hero {
         display: flex;
-        justify-content: space-between;
+        justify-content: flex-end;
         align-items: center;
         gap: var(--space-2);
-        border: 1px solid rgba(255, 255, 255, 0.18);
+        border: 1px solid rgba(255, 255, 255, 0.14);
         border-radius: var(--radius-lg);
         background:
           linear-gradient(
             135deg,
-            rgba(18, 23, 184, 0.86),
-            rgba(16, 17, 20, 0.9)
+            rgba(18, 23, 184, 0.74),
+            rgba(16, 17, 20, 0.86)
           ),
           var(--color-brand-primary);
         color: var(--color-text-on-dark);
-        padding: 0.58rem 0.75rem;
+        padding: 0.36rem 0.55rem;
         box-shadow: var(--shadow-sm);
       }
 
       .pos-hero .ui-page-title {
-        font-size: clamp(1.08rem, 1.45vw, 1.28rem);
-        line-height: 1.1;
+        display: none;
       }
 
       .pos-hero .ui-page-kicker {
-        color: rgba(255, 255, 255, 0.82);
-      }
-
-      .pos-hero .ui-page-kicker {
-        margin-bottom: 0.08rem;
-        font-size: 0.65rem;
-        letter-spacing: 0.08em;
+        display: none;
       }
 
       .pos-hero .ui-page-description {
@@ -701,7 +694,7 @@ import {
       }
 
       .pos-hero__copy {
-        max-width: 760px;
+        display: none;
       }
 
       .pos-hero__actions {
@@ -767,7 +760,7 @@ import {
 
       .pos-shell {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(350px, 0.58fr);
+        grid-template-columns: minmax(0, 0.94fr) minmax(420px, 0.74fr);
         gap: var(--pos-gap);
         align-items: stretch;
         min-height: 0;
@@ -790,7 +783,7 @@ import {
         position: static;
         height: 100%;
         grid-template-rows:
-          minmax(12.75rem, 1fr) minmax(5rem, auto) minmax(5rem, auto)
+          minmax(16rem, 1.35fr) minmax(4.6rem, auto) minmax(4.8rem, auto)
           auto;
       }
 
@@ -1026,11 +1019,14 @@ import {
         grid-template-columns: max-content minmax(0, 1fr);
         align-items: stretch;
         min-height: 5rem;
-        padding: 0.4rem;
+        padding: 0.35rem;
+        border-color: color-mix(in srgb, var(--color-border-default) 76%, transparent);
       }
 
       .receipt-panel {
         grid-template-columns: 1fr;
+        padding: 0.5rem;
+        border-color: color-mix(in srgb, var(--color-border-default) 76%, transparent);
       }
 
       .panel-head {
