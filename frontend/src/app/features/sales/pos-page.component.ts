@@ -259,156 +259,6 @@ import {
             (setDiscount)="setDiscount($event.index, $event.value)"
           ></app-pos-cart-panel>
 
-          <section class="receipt-panel">
-            <header class="panel-head panel-head--compact">
-              <div>
-                <p class="panel-kicker">Comprobante</p>
-                <h2>Tipo de documento</h2>
-              </div>
-            </header>
-
-            <div class="receipt-type-list">
-              <button
-                type="button"
-                class="receipt-segment"
-                [class.is-active]="receiptType === 'TICKET'"
-                (click)="setReceiptType('TICKET')"
-              >
-                Ticket interno
-              </button>
-              <button
-                type="button"
-                class="receipt-segment"
-                [class.is-active]="receiptType === 'RECEIPT'"
-                (click)="setReceiptType('RECEIPT')"
-              >
-                Boleta
-              </button>
-              <button
-                type="button"
-                class="receipt-segment"
-                [class.is-active]="receiptType === 'INVOICE'"
-                (click)="setReceiptType('INVOICE')"
-              >
-                Factura
-              </button>
-            </div>
-
-            <div class="receipt-customer-grid" *ngIf="receiptType !== 'TICKET'">
-              <label class="mini-field mini-field--wide">
-                <span>Serie de comprobante *</span>
-                <select
-                  [value]="receiptSeriesId"
-                  (change)="setReceiptSeriesId($any($event.target).value)"
-                >
-                  <option value="">Selecciona serie</option>
-                  <option *ngFor="let row of filteredBillingSeries" [value]="row.id">
-                    {{ row.series }}
-                  </option>
-                </select>
-                <small class="field-inline-error" *ngIf="receiptSeriesInvalid">
-                  Debes seleccionar una serie para emitir el comprobante.
-                </small>
-              </label>
-            </div>
-
-            <div class="receipt-no-series" *ngIf="showNoSeriesMessage">
-              <p class="field-inline-error">
-                {{ noSeriesMessage }}
-              </p>
-              <a
-                class="ui-button ui-button--secondary pos-button pos-button--quiet receipt-series-link"
-                [routerLink]="['/facturacion/series']"
-              >
-                Ir a series
-              </a>
-            </div>
-
-            <div class="receipt-customer-grid" *ngIf="receiptType === 'RECEIPT'">
-              <label class="mini-field">
-                <span>Documento (DNI)</span>
-                <input
-                  type="text"
-                  inputmode="numeric"
-                  [value]="receiptCustomerDocument"
-                  maxlength="8"
-                  (input)="setReceiptCustomerDocument($any($event.target).value)"
-                  (keydown)="blockInvalidNumericKeys($event)"
-                  placeholder="Opcional"
-                />
-                <small class="field-inline-error" *ngIf="boletaDniInvalid">
-                  El DNI debe tener exactamente 8 dígitos.
-                </small>
-              </label>
-              <label class="mini-field mini-field--wide">
-                <span>Nombre del cliente</span>
-                <input
-                  type="text"
-                  [value]="receiptCustomerName"
-                  maxlength="180"
-                  (input)="setReceiptCustomerName($any($event.target).value)"
-                  placeholder="Opcional"
-                />
-              </label>
-            </div>
-
-            <div class="receipt-customer-grid" *ngIf="receiptType === 'INVOICE'">
-              <label class="mini-field">
-                <span>RUC *</span>
-                <input
-                  type="text"
-                  inputmode="numeric"
-                  [value]="receiptCustomerDocument"
-                  maxlength="11"
-                  (input)="setReceiptCustomerDocument($any($event.target).value)"
-                  (keydown)="blockInvalidNumericKeys($event)"
-                  placeholder="11 dígitos"
-                />
-                <small class="field-inline-error" *ngIf="invoiceRucInvalid">
-                  El RUC debe tener exactamente 11 dígitos.
-                </small>
-              </label>
-              <label class="mini-field mini-field--wide">
-                <span>Razón social *</span>
-                <input
-                  type="text"
-                  [value]="receiptCustomerName"
-                  maxlength="180"
-                  (input)="setReceiptCustomerName($any($event.target).value)"
-                  placeholder="Requerido para factura"
-                />
-                <small class="field-inline-error" *ngIf="invoiceBusinessNameInvalid">
-                  La razón social es obligatoria.
-                </small>
-              </label>
-            </div>
-
-            <div class="receipt-extra" *ngIf="receiptType === 'INVOICE'">
-              <button
-                type="button"
-                class="ui-button ui-button--secondary pos-button pos-button--quiet receipt-extra-toggle"
-                (click)="toggleFiscalDetails()"
-              >
-                {{ showFiscalDetails ? "Ocultar" : "Mostrar" }} datos fiscales adicionales
-              </button>
-
-              <label class="mini-field" *ngIf="showFiscalDetails">
-                <span>Dirección fiscal</span>
-                <input
-                  type="text"
-                  [value]="receiptCustomerAddress"
-                  maxlength="240"
-                  (input)="setReceiptCustomerAddress($any($event.target).value)"
-                  placeholder="Opcional en esta fase"
-                />
-              </label>
-            </div>
-
-            <small class="field-inline-error" *ngIf="receiptValidationError">
-              {{ receiptValidationError }}
-            </small>
-          </section>
-
           <app-pos-totals-summary
             [total]="total"
             [subtotal]="subtotal"
@@ -422,7 +272,7 @@ import {
               type="button"
               class="ui-button ui-button--primary checkout-button"
               (click)="openCheckoutModal()"
-              [disabled]="submitting || !!receiptValidationError"
+              [disabled]="submitting"
             >
               {{ submitting ? "Cobrando..." : checkoutButtonLabel }}
             </button>
@@ -447,6 +297,19 @@ import {
       <app-pos-checkout-modal
         [isOpen]="isCheckoutModalOpen"
         [payments]="payments"
+        [receiptType]="receiptType"
+        [receiptSeriesId]="receiptSeriesId"
+        [receiptCustomerDocument]="receiptCustomerDocument"
+        [receiptCustomerName]="receiptCustomerName"
+        [receiptCustomerAddress]="receiptCustomerAddress"
+        [showFiscalDetails]="showFiscalDetails"
+        [filteredBillingSeries]="filteredBillingSeries"
+        [receiptSeriesInvalid]="receiptSeriesInvalid"
+        [showNoSeriesMessage]="showNoSeriesMessage"
+        [noSeriesMessage]="noSeriesMessage"
+        [boletaDniInvalid]="boletaDniInvalid"
+        [invoiceRucInvalid]="invoiceRucInvalid"
+        [invoiceBusinessNameInvalid]="invoiceBusinessNameInvalid"
         [total]="total"
         [subtotal]="subtotal"
         [discountTotal]="discountTotal"
@@ -463,6 +326,13 @@ import {
         (updatePaymentMethod)="setPaymentMethod($event.index, $event.value)"
         (updatePaymentAmount)="setPaymentAmount($event.index, $event.value)"
         (updatePaymentReference)="setPaymentReference($event.index, $event.value)"
+        (updateReceiptType)="setReceiptType($event)"
+        (updateReceiptSeriesId)="setReceiptSeriesId($event)"
+        (updateReceiptCustomerDocument)="setReceiptCustomerDocument($event)"
+        (updateReceiptCustomerName)="setReceiptCustomerName($event)"
+        (updateReceiptCustomerAddress)="setReceiptCustomerAddress($event)"
+        (toggleFiscalDetails)="toggleFiscalDetails()"
+        (receiptNumericKeydown)="blockInvalidNumericKeys($event)"
       ></app-pos-checkout-modal>
 
       <section
@@ -738,9 +608,7 @@ import {
       .checkout-panel {
         position: static;
         height: 100%;
-        grid-template-rows:
-          minmax(16rem, 1.35fr) minmax(4.8rem, auto) minmax(4.8rem, auto)
-          auto;
+        grid-template-rows: minmax(16rem, 1.35fr) minmax(4.8rem, auto) auto;
       }
 
       .pos-command,
