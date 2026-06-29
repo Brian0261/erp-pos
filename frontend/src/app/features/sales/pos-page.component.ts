@@ -259,73 +259,6 @@ import {
             (setDiscount)="setDiscount($event.index, $event.value)"
           ></app-pos-cart-panel>
 
-          <section class="payment-panel">
-            <header class="panel-head panel-head--compact">
-              <div>
-                <p class="panel-kicker">Cobro</p>
-                <h2>Pagos</h2>
-              </div>
-              <button
-                type="button"
-                class="ui-button ui-button--secondary pos-button pos-button--quiet"
-                (click)="addPaymentLine()"
-              >
-                + Pago
-              </button>
-            </header>
-
-            <div class="payment-list">
-              <article
-                class="payment-line"
-                *ngFor="let payment of payments; let index = index"
-              >
-                <label class="mini-field">
-                  <span>Metodo *</span>
-                  <select
-                    [value]="payment.paymentMethod"
-                    (change)="
-                      setPaymentMethod(index, $any($event.target).value)
-                    "
-                  >
-                    <option value="CASH">Efectivo</option>
-                    <option value="CARD">Tarjeta</option>
-                    <option value="TRANSFER">Transferencia</option>
-                  </select>
-                </label>
-                <label class="mini-field">
-                  <span>Monto *</span>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    [value]="payment.amount"
-                    (input)="setPaymentAmount(index, $any($event.target).value)"
-                  />
-                </label>
-                <label class="mini-field mini-field--wide">
-                  <span>Referencia</span>
-                  <input
-                    type="text"
-                    [value]="payment.reference"
-                    (input)="
-                      setPaymentReference(index, $any($event.target).value)
-                    "
-                    maxlength="120"
-                    placeholder="Opcional"
-                  />
-                </label>
-                <button
-                  type="button"
-                  class="ui-button ui-button--danger pos-button pos-button--small"
-                  (click)="removePaymentLine(index)"
-                  [disabled]="payments.length === 1"
-                >
-                  Quitar
-                </button>
-              </article>
-            </div>
-          </section>
-
           <section class="receipt-panel">
             <header class="panel-head panel-head--compact">
               <div>
@@ -513,6 +446,7 @@ import {
 
       <app-pos-checkout-modal
         [isOpen]="isCheckoutModalOpen"
+        [payments]="payments"
         [total]="total"
         [subtotal]="subtotal"
         [discountTotal]="discountTotal"
@@ -524,6 +458,11 @@ import {
         [receiptValidationError]="receiptValidationError"
         (close)="closeCheckoutModal()"
         (finalize)="finalizeSale()"
+        (addPayment)="addPaymentLine()"
+        (removePayment)="removePaymentLine($event)"
+        (updatePaymentMethod)="setPaymentMethod($event.index, $event.value)"
+        (updatePaymentAmount)="setPaymentAmount($event.index, $event.value)"
+        (updatePaymentReference)="setPaymentReference($event.index, $event.value)"
       ></app-pos-checkout-modal>
 
       <section
@@ -800,7 +739,7 @@ import {
         position: static;
         height: 100%;
         grid-template-rows:
-          minmax(16rem, 1.35fr) minmax(4.6rem, auto) minmax(4.8rem, auto)
+          minmax(16rem, 1.35fr) minmax(4.8rem, auto) minmax(4.8rem, auto)
           auto;
       }
 
