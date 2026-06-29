@@ -9,6 +9,7 @@ import { WarehouseService } from "../inventory/data/warehouse.service";
 import { WarehouseResponse } from "../inventory/data/inventory.models";
 import { PosCartPanelComponent } from "./components/pos-cart-panel.component";
 import { PosCheckoutModalComponent } from "./components/pos-checkout-modal.component";
+import { PosFullCartModalComponent } from "./components/pos-full-cart-modal.component";
 import { PosSearchPanelComponent } from "./components/pos-search-panel.component";
 import { PosSearchResultsComponent } from "./components/pos-search-results.component";
 import { PosTotalsSummaryComponent } from "./components/pos-totals-summary.component";
@@ -53,6 +54,7 @@ import {
     PosTotalsSummaryComponent,
     PosCartPanelComponent,
     PosCheckoutModalComponent,
+    PosFullCartModalComponent,
     PosSearchPanelComponent,
     PosSearchResultsComponent,
   ],
@@ -215,126 +217,20 @@ import {
         (receiptNumericKeydown)="blockInvalidNumericKeys($event)"
       ></app-pos-checkout-modal>
 
-      <section
-        class="full-cart-backdrop"
-        *ngIf="isFullCartOpen"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="full-cart-title"
-      >
-        <article class="full-cart-modal">
-          <header class="full-cart-header">
-            <div>
-              <h2 id="full-cart-title">Carrito completo</h2>
-              <span class="full-cart-count">{{ cartCountLabel }}</span>
-            </div>
-            <div class="full-cart-summary">
-              <span>Total actual</span>
-              <strong>S/ {{ total | number: "1.2-2" }}</strong>
-            </div>
-            <button
-              type="button"
-              class="ui-button ui-button--secondary pos-button pos-button--quiet"
-              (click)="closeFullCart()"
-            >
-              Cerrar
-            </button>
-          </header>
-
-          <div class="full-cart-empty" *ngIf="cart.length === 0">
-            <strong>Carrito vacio</strong>
-            <span>Agrega productos desde el POS para revisar la venta.</span>
-          </div>
-
-          <div class="full-cart-list" *ngIf="cart.length > 0">
-            <article
-              class="full-cart-row"
-              *ngFor="let item of cart; let index = index"
-            >
-              <div class="full-cart-product">
-                <div class="full-cart-product-meta-row">
-                  <p class="cart-item__sku">{{ item.sku }}</p>
-                  <span class="full-cart-meta-separator" aria-hidden="true"
-                    >·</span
-                  >
-                  <span class="full-cart-product-price">
-                    P.U. S/ {{ item.salePrice | number: "1.2-2" }}
-                  </span>
-                  <span *ngIf="item.barcode" class="full-cart-barcode-note">
-                    {{ item.barcode }}
-                  </span>
-                  <span *ngIf="!item.barcode" class="full-cart-barcode-note">
-                    Sin código
-                  </span>
-                </div>
-                <h3>{{ item.name }}</h3>
-              </div>
-
-              <label class="mini-field full-cart-quantity">
-                <span>Cantidad</span>
-                <div class="quantity-tools">
-                  <button
-                    type="button"
-                    class="ui-button quantity-stepper"
-                    (click)="decreaseQuantity(index)"
-                    [disabled]="item.quantity <= 1"
-                  >
-                    -
-                  </button>
-                  <input
-                    type="number"
-                    min="1"
-                    step="1"
-                    inputmode="numeric"
-                    pattern="[0-9]*"
-                    [value]="item.quantity"
-                    (focus)="selectQuantityInput($any($event.target))"
-                    (click)="selectQuantityInput($any($event.target))"
-                    (input)="
-                      setQuantity(
-                        index,
-                        $any($event.target).value,
-                        $any($event.target)
-                      )
-                    "
-                  />
-                  <button
-                    type="button"
-                    class="ui-button quantity-stepper"
-                    (click)="increaseQuantity(index)"
-                  >
-                    +
-                  </button>
-                </div>
-              </label>
-
-              <label class="mini-field full-cart-discount">
-                <span>Descuento</span>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  [value]="item.discountAmount"
-                  (input)="setDiscount(index, $any($event.target).value)"
-                />
-              </label>
-
-              <div class="full-cart-line">
-                <span>Subtotal</span>
-                <strong>S/ {{ lineTotal(item) | number: "1.2-2" }}</strong>
-              </div>
-
-              <button
-                type="button"
-                class="ui-button ui-button--secondary pos-button pos-button--small full-cart-remove"
-                (click)="removeFromCart(index)"
-              >
-                Quitar
-              </button>
-            </article>
-          </div>
-        </article>
-      </section>
+      <app-pos-full-cart-modal
+        [isOpen]="isFullCartOpen"
+        [cart]="cart"
+        [cartCountLabel]="cartCountLabel"
+        [total]="total"
+        [lineTotals]="cartLineTotals"
+        (close)="closeFullCart()"
+        (decrease)="decreaseQuantity($event)"
+        (increase)="increaseQuantity($event)"
+        (remove)="removeFromCart($event)"
+        (quantityFocus)="selectQuantityInput($event)"
+        (setQuantity)="setQuantity($event.index, $event.value, $event.input)"
+        (setDiscount)="setDiscount($event.index, $event.value)"
+      ></app-pos-full-cart-modal>
     </section>
   `,
   styles: [
@@ -1001,254 +897,23 @@ import {
         letter-spacing: 0.06em;
       }
 
-      .full-cart-backdrop {
-        position: fixed;
-        inset: 0;
-        z-index: 60;
-        display: grid;
-        place-items: center;
-        padding: var(--space-4);
-        background: rgba(16, 17, 20, 0.62);
-        backdrop-filter: blur(3px);
-      }
-
-      .full-cart-modal {
-        width: min(980px, calc(100vw - 2rem));
-        max-height: min(720px, calc(100dvh - 2rem));
-        display: grid;
-        grid-template-rows: auto minmax(0, 1fr);
-        gap: var(--space-3);
-        border: 1px solid var(--color-border-default);
-        border-radius: calc(var(--radius-lg) + 0.35rem);
-        background: var(--color-bg-surface);
-        box-shadow: 0 24px 80px rgba(16, 17, 20, 0.36);
-        padding: var(--space-4);
-        overflow: hidden;
-      }
-
-      .full-cart-header {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) auto auto;
-        gap: var(--space-3);
-        align-items: center;
-      }
-
-      .full-cart-header h2 {
-        font-size: clamp(1.25rem, 2vw, 1.6rem);
-      }
-
-      .full-cart-count {
-        color: var(--color-text-secondary);
-        font-size: var(--font-size-sm);
-        font-weight: 800;
-      }
-
-      .full-cart-summary {
-        display: grid;
-        place-items: center;
-        gap: 0.05rem;
-        min-width: 10.75rem;
-        border: 1px solid var(--color-border-strong);
-        border-radius: var(--radius-lg);
-        background:
-          linear-gradient(
-            180deg,
-            var(--color-bg-surface),
-            var(--color-bg-soft)
-          ),
-          var(--color-bg-soft);
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
-        padding: 0.62rem var(--space-3);
-        text-align: center;
-      }
-
-      .full-cart-summary span,
-      .full-cart-line span {
-        color: var(--color-text-secondary);
-        font-size: var(--font-size-xs);
-        font-weight: 900;
-        letter-spacing: 0.06em;
-        text-transform: uppercase;
-      }
-
-      .full-cart-summary strong {
-        color: var(--color-text-primary);
-        font-size: clamp(1.38rem, 2vw, 1.65rem);
-        font-variant-numeric: tabular-nums;
-        font-weight: 900;
-        letter-spacing: -0.03em;
-        line-height: 1.05;
-      }
-
-      .full-cart-empty {
-        display: grid;
-        place-items: center;
-        gap: var(--space-1);
-        min-height: 16rem;
-        border: 2px dashed var(--color-border-default);
-        border-radius: var(--radius-lg);
-        background: var(--color-bg-soft);
-        color: var(--color-text-secondary);
-        text-align: center;
-      }
-
-      .full-cart-list {
-        display: grid;
-        align-content: start;
-        gap: var(--space-2);
-        min-height: 0;
-        overflow: auto;
-        padding-right: var(--space-1);
-      }
-
-      .full-cart-row {
-        display: grid;
-        grid-template-columns:
-          minmax(240px, 1.6fr) minmax(142px, 0.58fr)
-          minmax(96px, 0.36fr) minmax(108px, 0.42fr) minmax(76px, auto);
-        gap: 0.55rem;
-        align-items: center;
-        border: 1px solid var(--color-border-default);
-        border-radius: var(--radius-lg);
-        background: var(--color-bg-surface);
-        padding: 0.62rem 0.7rem;
-      }
-
-      .full-cart-product {
-        display: grid;
-        gap: 0.16rem;
-        align-content: center;
-        align-items: start;
-        min-width: 0;
-      }
-
-      .full-cart-product-meta-row {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 0.22rem 0.32rem;
-        min-width: 0;
-        color: var(--color-text-secondary);
-        font-size: 0.58rem;
-        opacity: 0.8;
-      }
-
-      .full-cart-product .cart-item__sku {
-        margin: 0;
-        color: var(--color-text-secondary);
-        font-size: 0.58rem;
-        font-weight: 700;
-        letter-spacing: 0.03em;
-        line-height: 1.15;
-      }
-
-      .full-cart-product h3 {
-        overflow: hidden;
-        display: -webkit-box;
-        -webkit-box-orient: vertical;
-        -webkit-line-clamp: 2;
-        text-overflow: ellipsis;
-        white-space: normal;
-        font-size: 1rem;
-        font-weight: 900;
-        line-height: 1.16;
-      }
-
-      .full-cart-product-price {
-        font-weight: 700;
-        color: var(--color-text-secondary);
-        white-space: nowrap;
-      }
-
-      .full-cart-barcode-note {
-        display: inline-flex;
-        width: fit-content;
-        border: 1px solid var(--color-border-default);
-        border-radius: var(--radius-pill);
-        background: var(--color-bg-soft);
-        color: var(--color-text-secondary);
-        padding: 0.03rem 0.34rem;
-        font-size: 0.58rem;
-        font-weight: 700;
-        letter-spacing: 0.02em;
-      }
-
-      .full-cart-meta-separator {
-        color: var(--color-text-secondary);
-        font-size: 0.58rem;
-        font-weight: 700;
-        line-height: 1;
-      }
-
-      .full-cart-line {
-        display: grid;
-        gap: 0.08rem;
-        align-self: center;
-        min-width: 0;
-        justify-items: end;
-      }
-
-      .full-cart-line strong {
-        color: var(--color-text-primary);
-        font-size: 1rem;
-        font-variant-numeric: tabular-nums;
-        font-weight: 900;
-        line-height: 1.08;
-      }
-
-      .full-cart-remove {
-        min-height: 2.2rem;
-        border-color: var(--color-border-default);
-        color: var(--color-danger);
-        background: color-mix(
-          in srgb,
-          var(--color-danger) 8%,
-          var(--color-bg-surface)
-        );
-        box-shadow: none;
-        opacity: 0.96;
-      }
-
       .sale-link {
         width: 100%;
       }
 
-      :host-context(body[data-theme="dark"]) .full-cart-summary {
-        border-color: rgba(96, 165, 250, 0.32);
-        background:
-          linear-gradient(
-            180deg,
-            rgba(30, 41, 59, 0.94),
-            rgba(15, 23, 42, 0.88)
-          ),
-          var(--color-bg-soft);
-      }
-
-      :host-context(body[data-theme="dark"]) .full-cart-barcode-note {
-        border-color: rgba(148, 163, 184, 0.24);
-        background: rgba(148, 163, 184, 0.1);
-      }
-
-      :host-context(body[data-theme="dark"]) .full-cart-remove {
-        background: rgba(220, 38, 38, 0.08);
-      }
-
       .cart-list::-webkit-scrollbar,
-      .payment-list::-webkit-scrollbar,
-      .full-cart-list::-webkit-scrollbar {
+      .payment-list::-webkit-scrollbar {
         width: 8px;
       }
 
       .cart-list::-webkit-scrollbar-track,
-      .payment-list::-webkit-scrollbar-track,
-      .full-cart-list::-webkit-scrollbar-track {
+      .payment-list::-webkit-scrollbar-track {
         background: var(--color-bg-soft);
         border-radius: var(--radius-pill);
       }
 
       .cart-list::-webkit-scrollbar-thumb,
-      .payment-list::-webkit-scrollbar-thumb,
-      .full-cart-list::-webkit-scrollbar-thumb {
+      .payment-list::-webkit-scrollbar-thumb {
         background: linear-gradient(
           180deg,
           var(--color-brand-highlight),
@@ -1347,15 +1012,6 @@ import {
         .payment-panel,
         .cart-item {
           grid-template-columns: 1fr;
-        }
-
-        .full-cart-header,
-        .full-cart-row {
-          grid-template-columns: 1fr;
-        }
-
-        .full-cart-summary {
-          text-align: left;
         }
 
         .cart-item__main,
