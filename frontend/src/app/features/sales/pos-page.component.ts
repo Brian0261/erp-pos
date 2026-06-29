@@ -8,6 +8,7 @@ import { AuthService } from "../../core/auth/auth.service";
 import { WarehouseService } from "../inventory/data/warehouse.service";
 import { WarehouseResponse } from "../inventory/data/inventory.models";
 import { PosCartPanelComponent } from "./components/pos-cart-panel.component";
+import { PosCheckoutModalComponent } from "./components/pos-checkout-modal.component";
 import { PosTotalsSummaryComponent } from "./components/pos-totals-summary.component";
 import { CashRegisterService } from "./data/cash-register.service";
 import { toHttpErrorMessage } from "./data/http-error-message";
@@ -50,6 +51,7 @@ import {
     RouterLink,
     PosTotalsSummaryComponent,
     PosCartPanelComponent,
+    PosCheckoutModalComponent,
   ],
   template: `
     <section class="ui-card pos-page">
@@ -486,7 +488,7 @@ import {
             <button
               type="button"
               class="ui-button ui-button--primary checkout-button"
-              (click)="finalizeSale()"
+              (click)="openCheckoutModal()"
               [disabled]="submitting || !!receiptValidationError"
             >
               {{ submitting ? "Cobrando..." : checkoutButtonLabel }}
@@ -508,6 +510,21 @@ import {
           </footer>
         </aside>
       </div>
+
+      <app-pos-checkout-modal
+        [isOpen]="isCheckoutModalOpen"
+        [total]="total"
+        [subtotal]="subtotal"
+        [discountTotal]="discountTotal"
+        [paidTotal]="paidTotal"
+        [change]="change"
+        [cartItemsCount]="cart.length"
+        [checkoutButtonLabel]="checkoutButtonLabel"
+        [submitting]="submitting"
+        [receiptValidationError]="receiptValidationError"
+        (close)="closeCheckoutModal()"
+        (finalize)="finalizeSale()"
+      ></app-pos-checkout-modal>
 
       <section
         class="full-cart-backdrop"
@@ -2083,6 +2100,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
   loadingSearch = false;
   submitting = false;
   isFullCartOpen = false;
+  isCheckoutModalOpen = false;
 
   errorMessage = "";
   warningMessage = "";
@@ -2244,6 +2262,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
     this.loadingSearch = false;
     this.submitting = false;
     this.isFullCartOpen = false;
+    this.isCheckoutModalOpen = false;
     this.isHydratingDraft = false;
 
     this.persistDraftState();
@@ -2278,6 +2297,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
     this.loadingSearch = false;
     this.submitting = false;
     this.isFullCartOpen = false;
+    this.isCheckoutModalOpen = false;
     this.successMessage = "";
     this.isHydratingDraft = false;
 
@@ -2351,6 +2371,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
     this.loadingSearch = false;
     this.submitting = false;
     this.isFullCartOpen = false;
+    this.isCheckoutModalOpen = false;
     this.errorMessage = "";
     this.warningMessage = "";
     if (!preserveLastSaleId) {
@@ -2563,6 +2584,14 @@ export class PosPageComponent implements OnInit, OnDestroy {
 
   closeFullCart(): void {
     this.isFullCartOpen = false;
+  }
+
+  openCheckoutModal(): void {
+    this.isCheckoutModalOpen = true;
+  }
+
+  closeCheckoutModal(): void {
+    this.isCheckoutModalOpen = false;
   }
 
   addToCart(product: PosProductResponse): void {
