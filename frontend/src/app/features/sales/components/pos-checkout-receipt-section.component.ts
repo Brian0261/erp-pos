@@ -1,0 +1,304 @@
+import { CommonModule } from "@angular/common";
+import { Component, EventEmitter, Input, Output } from "@angular/core";
+
+import { BillingSeriesResponse } from "../../billing/data/billing.models";
+import { PosReceiptType } from "../data/pos-ui.models";
+
+@Component({
+  selector: "app-pos-checkout-receipt-section",
+  standalone: true,
+  imports: [CommonModule],
+  template: `
+    <section class="receipt-panel" aria-label="Comprobante de la venta">
+      <header class="receipt-panel__header">
+        <div>
+          <p class="checkout-section__kicker">Comprobante</p>
+          <h3>Tipo de documento</h3>
+        </div>
+      </header>
+
+      <div class="receipt-type-list">
+        <button
+          type="button"
+          class="receipt-segment"
+          [class.is-active]="receiptType === 'TICKET'"
+          (click)="updateReceiptType.emit('TICKET')"
+        >
+          Ticket interno
+        </button>
+        <button
+          type="button"
+          class="receipt-segment"
+          [class.is-active]="receiptType === 'RECEIPT'"
+          (click)="updateReceiptType.emit('RECEIPT')"
+        >
+          Boleta
+        </button>
+        <button
+          type="button"
+          class="receipt-segment"
+          [class.is-active]="receiptType === 'INVOICE'"
+          (click)="updateReceiptType.emit('INVOICE')"
+        >
+          Factura
+        </button>
+      </div>
+
+      <div class="receipt-customer-grid" *ngIf="receiptType !== 'TICKET'">
+        <label class="mini-field mini-field--wide">
+          <span>Serie de comprobante *</span>
+          <select
+            [value]="receiptSeriesId"
+            (change)="updateReceiptSeriesId.emit($any($event.target).value)"
+          >
+            <option value="">Selecciona serie</option>
+            <option *ngFor="let row of filteredBillingSeries" [value]="row.id">
+              {{ row.series }}
+            </option>
+          </select>
+          <small class="field-inline-error" *ngIf="receiptSeriesInvalid">
+            Debes seleccionar una serie para emitir el comprobante.
+          </small>
+        </label>
+      </div>
+
+      <div class="receipt-no-series" *ngIf="showNoSeriesMessage">
+        <p class="field-inline-error">
+          {{ noSeriesMessage }}
+        </p>
+      </div>
+
+      <div class="receipt-customer-grid" *ngIf="receiptType === 'RECEIPT'">
+        <label class="mini-field">
+          <span>Documento (DNI)</span>
+          <input
+            type="text"
+            inputmode="numeric"
+            [value]="receiptCustomerDocument"
+            maxlength="8"
+            (input)="updateReceiptCustomerDocument.emit($any($event.target).value)"
+            (keydown)="receiptNumericKeydown.emit($event)"
+            placeholder="Opcional"
+          />
+          <small class="field-inline-error" *ngIf="boletaDniInvalid">
+            El DNI debe tener exactamente 8 digitos.
+          </small>
+        </label>
+        <label class="mini-field mini-field--wide">
+          <span>Nombre del cliente</span>
+          <input
+            type="text"
+            [value]="receiptCustomerName"
+            maxlength="180"
+            (input)="updateReceiptCustomerName.emit($any($event.target).value)"
+            placeholder="Opcional"
+          />
+        </label>
+      </div>
+
+      <div class="receipt-customer-grid" *ngIf="receiptType === 'INVOICE'">
+        <label class="mini-field">
+          <span>RUC *</span>
+          <input
+            type="text"
+            inputmode="numeric"
+            [value]="receiptCustomerDocument"
+            maxlength="11"
+            (input)="updateReceiptCustomerDocument.emit($any($event.target).value)"
+            (keydown)="receiptNumericKeydown.emit($event)"
+            placeholder="11 digitos"
+          />
+          <small class="field-inline-error" *ngIf="invoiceRucInvalid">
+            El RUC debe tener exactamente 11 digitos.
+          </small>
+        </label>
+        <label class="mini-field mini-field--wide">
+          <span>Razon social *</span>
+          <input
+            type="text"
+            [value]="receiptCustomerName"
+            maxlength="180"
+            (input)="updateReceiptCustomerName.emit($any($event.target).value)"
+            placeholder="Requerido para factura"
+          />
+          <small class="field-inline-error" *ngIf="invoiceBusinessNameInvalid">
+            La razon social es obligatoria.
+          </small>
+        </label>
+      </div>
+
+      <div class="receipt-extra" *ngIf="receiptType === 'INVOICE'">
+        <button
+          type="button"
+          class="ui-button ui-button--secondary receipt-extra-toggle"
+          (click)="toggleFiscalDetails.emit()"
+        >
+          {{ showFiscalDetails ? "Ocultar" : "Mostrar" }} datos fiscales adicionales
+        </button>
+
+        <label class="mini-field" *ngIf="showFiscalDetails">
+          <span>Direccion fiscal</span>
+          <input
+            type="text"
+            [value]="receiptCustomerAddress"
+            maxlength="240"
+            (input)="updateReceiptCustomerAddress.emit($any($event.target).value)"
+            placeholder="Opcional en esta fase"
+          />
+        </label>
+      </div>
+
+      <small class="field-inline-error" *ngIf="receiptValidationError">
+        {{ receiptValidationError }}
+      </small>
+    </section>
+  `,
+  styles: [
+    `
+      .receipt-panel {
+        display: grid;
+        gap: var(--space-2);
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-lg);
+        background: var(--color-bg-surface);
+        box-shadow: var(--shadow-sm);
+        padding: var(--space-2);
+      }
+
+      .receipt-panel__header {
+        display: flex;
+        gap: var(--space-2);
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .receipt-panel__header h3 {
+        margin: 0;
+        color: var(--color-text-primary);
+        font-size: var(--font-size-lg);
+      }
+
+      .checkout-section__kicker {
+        margin: 0 0 0.2rem;
+        color: var(--color-brand-primary);
+        font-size: var(--font-size-xs);
+        font-weight: 900;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .receipt-extra-toggle {
+        min-height: 2.35rem;
+      }
+
+      .mini-field {
+        display: grid;
+        gap: var(--space-1);
+      }
+
+      .mini-field > span {
+        color: var(--color-text-secondary);
+        font-size: var(--font-size-sm);
+        font-weight: 800;
+      }
+
+      .mini-field input,
+      .mini-field select {
+        width: 100%;
+        min-height: 2.35rem;
+        border: 1px solid var(--color-border-strong);
+        border-radius: var(--radius-md);
+        background: var(--color-bg-surface);
+        color: var(--color-text-primary);
+        font-weight: 800;
+        padding: 0.48rem 0.62rem;
+      }
+
+      .receipt-type-list {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(120px, 1fr));
+        gap: var(--space-2);
+      }
+
+      .receipt-segment {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 2.35rem;
+        border: 1px solid var(--color-border-default);
+        border-radius: var(--radius-sm);
+        background: var(--color-bg-soft);
+        color: var(--color-text-primary);
+        cursor: pointer;
+        font-weight: 800;
+        padding: 0.48rem 0.58rem;
+      }
+
+      .receipt-segment.is-active {
+        border-color: var(--color-brand-primary);
+        box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-brand-primary) 35%, transparent);
+        background: color-mix(in srgb, var(--color-brand-primary) 8%, var(--color-bg-soft));
+      }
+
+      .receipt-customer-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(180px, 1fr));
+        gap: var(--space-2);
+      }
+
+      .receipt-extra {
+        display: grid;
+        gap: var(--space-2);
+      }
+
+      .receipt-no-series {
+        display: grid;
+        gap: var(--space-1);
+      }
+
+      .field-inline-error {
+        margin: 0;
+        color: var(--color-danger);
+        font-size: var(--font-size-xs);
+        font-weight: 700;
+      }
+
+      @media (max-width: 640px) {
+        .receipt-panel__header,
+        .receipt-type-list,
+        .receipt-customer-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .receipt-panel__header {
+          align-items: stretch;
+          display: grid;
+        }
+      }
+    `,
+  ],
+})
+export class PosCheckoutReceiptSectionComponent {
+  @Input({ required: true }) receiptType: PosReceiptType = "TICKET";
+  @Input({ required: true }) receiptSeriesId = "";
+  @Input({ required: true }) receiptCustomerDocument = "";
+  @Input({ required: true }) receiptCustomerName = "";
+  @Input({ required: true }) receiptCustomerAddress = "";
+  @Input({ required: true }) showFiscalDetails = false;
+  @Input({ required: true }) filteredBillingSeries: BillingSeriesResponse[] = [];
+  @Input({ required: true }) receiptSeriesInvalid = false;
+  @Input({ required: true }) showNoSeriesMessage = false;
+  @Input({ required: true }) noSeriesMessage = "";
+  @Input({ required: true }) boletaDniInvalid = false;
+  @Input({ required: true }) invoiceRucInvalid = false;
+  @Input({ required: true }) invoiceBusinessNameInvalid = false;
+  @Input({ required: true }) receiptValidationError = "";
+
+  @Output() readonly updateReceiptType = new EventEmitter<PosReceiptType>();
+  @Output() readonly updateReceiptSeriesId = new EventEmitter<string>();
+  @Output() readonly updateReceiptCustomerDocument = new EventEmitter<string>();
+  @Output() readonly updateReceiptCustomerName = new EventEmitter<string>();
+  @Output() readonly updateReceiptCustomerAddress = new EventEmitter<string>();
+  @Output() readonly toggleFiscalDetails = new EventEmitter<void>();
+  @Output() readonly receiptNumericKeydown = new EventEmitter<KeyboardEvent>();
+}

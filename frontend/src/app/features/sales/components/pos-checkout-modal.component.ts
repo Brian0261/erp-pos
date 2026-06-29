@@ -3,12 +3,19 @@ import { Component, EventEmitter, Input, Output } from "@angular/core";
 
 import { BillingSeriesResponse } from "../../billing/data/billing.models";
 import { PaymentLine, PosReceiptType } from "../data/pos-ui.models";
+import { PosCheckoutPaymentSectionComponent } from "./pos-checkout-payment-section.component";
+import { PosCheckoutReceiptSectionComponent } from "./pos-checkout-receipt-section.component";
 import { PosTotalsSummaryComponent } from "./pos-totals-summary.component";
 
 @Component({
   selector: "app-pos-checkout-modal",
   standalone: true,
-  imports: [CommonModule, PosTotalsSummaryComponent],
+  imports: [
+    CommonModule,
+    PosCheckoutPaymentSectionComponent,
+    PosCheckoutReceiptSectionComponent,
+    PosTotalsSummaryComponent,
+  ],
   template: `
     <section
       class="checkout-modal-backdrop"
@@ -43,232 +50,40 @@ import { PosTotalsSummaryComponent } from "./pos-totals-summary.component";
             </p>
           </section>
 
-          <section class="payment-panel" aria-label="Pagos de la venta">
-            <header class="payment-panel__header">
-              <div>
-                <p class="checkout-modal__kicker">Cobro</p>
-                <h3>Pagos</h3>
-              </div>
-              <button
-                type="button"
-                class="ui-button ui-button--secondary payment-panel__quiet-button"
-                (click)="addPayment.emit()"
-              >
-                + Pago
-              </button>
-            </header>
+          <app-pos-checkout-payment-section
+            [payments]="payments"
+            [paidTotal]="paidTotal"
+            [change]="change"
+            (addPayment)="addPayment.emit()"
+            (removePayment)="removePayment.emit($event)"
+            (updatePaymentMethod)="updatePaymentMethod.emit($event)"
+            (updatePaymentAmount)="updatePaymentAmount.emit($event)"
+            (updatePaymentReference)="updatePaymentReference.emit($event)"
+          ></app-pos-checkout-payment-section>
 
-            <div class="payment-list">
-              <article
-                class="payment-line"
-                *ngFor="let payment of payments; let index = index"
-              >
-                <label class="mini-field">
-                  <span>Metodo *</span>
-                  <select
-                    [value]="payment.paymentMethod"
-                    (change)="
-                      updatePaymentMethod.emit({
-                        index,
-                        value: $any($event.target).value,
-                      })
-                    "
-                  >
-                    <option value="CASH">Efectivo</option>
-                    <option value="CARD">Tarjeta</option>
-                    <option value="TRANSFER">Transferencia</option>
-                  </select>
-                </label>
-                <label class="mini-field">
-                  <span>Monto *</span>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    [value]="payment.amount"
-                    (input)="
-                      updatePaymentAmount.emit({
-                        index,
-                        value: $any($event.target).value,
-                      })
-                    "
-                  />
-                </label>
-                <label class="mini-field mini-field--wide">
-                  <span>Referencia</span>
-                  <input
-                    type="text"
-                    [value]="payment.reference"
-                    (input)="
-                      updatePaymentReference.emit({
-                        index,
-                        value: $any($event.target).value,
-                      })
-                    "
-                    maxlength="120"
-                    placeholder="Opcional"
-                  />
-                </label>
-                <button
-                  type="button"
-                  class="ui-button ui-button--danger payment-panel__remove-button"
-                  (click)="removePayment.emit(index)"
-                  [disabled]="payments.length === 1"
-                >
-                  Quitar
-                </button>
-              </article>
-            </div>
-
-            <div class="payment-panel__metrics" aria-label="Resumen de pagos">
-              <span>Pagado: <strong>S/ {{ paidTotal | number: "1.2-2" }}</strong></span>
-              <span>Vuelto: <strong>S/ {{ change | number: "1.2-2" }}</strong></span>
-            </div>
-          </section>
-
-          <section class="receipt-panel" aria-label="Comprobante de la venta">
-            <header class="receipt-panel__header">
-              <div>
-                <p class="checkout-modal__kicker">Comprobante</p>
-                <h3>Tipo de documento</h3>
-              </div>
-            </header>
-
-            <div class="receipt-type-list">
-              <button
-                type="button"
-                class="receipt-segment"
-                [class.is-active]="receiptType === 'TICKET'"
-                (click)="updateReceiptType.emit('TICKET')"
-              >
-                Ticket interno
-              </button>
-              <button
-                type="button"
-                class="receipt-segment"
-                [class.is-active]="receiptType === 'RECEIPT'"
-                (click)="updateReceiptType.emit('RECEIPT')"
-              >
-                Boleta
-              </button>
-              <button
-                type="button"
-                class="receipt-segment"
-                [class.is-active]="receiptType === 'INVOICE'"
-                (click)="updateReceiptType.emit('INVOICE')"
-              >
-                Factura
-              </button>
-            </div>
-
-            <div class="receipt-customer-grid" *ngIf="receiptType !== 'TICKET'">
-              <label class="mini-field mini-field--wide">
-                <span>Serie de comprobante *</span>
-                <select
-                  [value]="receiptSeriesId"
-                  (change)="updateReceiptSeriesId.emit($any($event.target).value)"
-                >
-                  <option value="">Selecciona serie</option>
-                  <option *ngFor="let row of filteredBillingSeries" [value]="row.id">
-                    {{ row.series }}
-                  </option>
-                </select>
-                <small class="field-inline-error" *ngIf="receiptSeriesInvalid">
-                  Debes seleccionar una serie para emitir el comprobante.
-                </small>
-              </label>
-            </div>
-
-            <div class="receipt-no-series" *ngIf="showNoSeriesMessage">
-              <p class="field-inline-error">
-                {{ noSeriesMessage }}
-              </p>
-            </div>
-
-            <div class="receipt-customer-grid" *ngIf="receiptType === 'RECEIPT'">
-              <label class="mini-field">
-                <span>Documento (DNI)</span>
-                <input
-                  type="text"
-                  inputmode="numeric"
-                  [value]="receiptCustomerDocument"
-                  maxlength="8"
-                  (input)="updateReceiptCustomerDocument.emit($any($event.target).value)"
-                  (keydown)="receiptNumericKeydown.emit($event)"
-                  placeholder="Opcional"
-                />
-                <small class="field-inline-error" *ngIf="boletaDniInvalid">
-                  El DNI debe tener exactamente 8 digitos.
-                </small>
-              </label>
-              <label class="mini-field mini-field--wide">
-                <span>Nombre del cliente</span>
-                <input
-                  type="text"
-                  [value]="receiptCustomerName"
-                  maxlength="180"
-                  (input)="updateReceiptCustomerName.emit($any($event.target).value)"
-                  placeholder="Opcional"
-                />
-              </label>
-            </div>
-
-            <div class="receipt-customer-grid" *ngIf="receiptType === 'INVOICE'">
-              <label class="mini-field">
-                <span>RUC *</span>
-                <input
-                  type="text"
-                  inputmode="numeric"
-                  [value]="receiptCustomerDocument"
-                  maxlength="11"
-                  (input)="updateReceiptCustomerDocument.emit($any($event.target).value)"
-                  (keydown)="receiptNumericKeydown.emit($event)"
-                  placeholder="11 digitos"
-                />
-                <small class="field-inline-error" *ngIf="invoiceRucInvalid">
-                  El RUC debe tener exactamente 11 digitos.
-                </small>
-              </label>
-              <label class="mini-field mini-field--wide">
-                <span>Razon social *</span>
-                <input
-                  type="text"
-                  [value]="receiptCustomerName"
-                  maxlength="180"
-                  (input)="updateReceiptCustomerName.emit($any($event.target).value)"
-                  placeholder="Requerido para factura"
-                />
-                <small class="field-inline-error" *ngIf="invoiceBusinessNameInvalid">
-                  La razon social es obligatoria.
-                </small>
-              </label>
-            </div>
-
-            <div class="receipt-extra" *ngIf="receiptType === 'INVOICE'">
-              <button
-                type="button"
-                class="ui-button ui-button--secondary receipt-extra-toggle"
-                (click)="toggleFiscalDetails.emit()"
-              >
-                {{ showFiscalDetails ? "Ocultar" : "Mostrar" }} datos fiscales adicionales
-              </button>
-
-              <label class="mini-field" *ngIf="showFiscalDetails">
-                <span>Direccion fiscal</span>
-                <input
-                  type="text"
-                  [value]="receiptCustomerAddress"
-                  maxlength="240"
-                  (input)="updateReceiptCustomerAddress.emit($any($event.target).value)"
-                  placeholder="Opcional en esta fase"
-                />
-              </label>
-            </div>
-
-            <small class="field-inline-error" *ngIf="receiptValidationError">
-              {{ receiptValidationError }}
-            </small>
-          </section>
+          <app-pos-checkout-receipt-section
+            [receiptType]="receiptType"
+            [receiptSeriesId]="receiptSeriesId"
+            [receiptCustomerDocument]="receiptCustomerDocument"
+            [receiptCustomerName]="receiptCustomerName"
+            [receiptCustomerAddress]="receiptCustomerAddress"
+            [showFiscalDetails]="showFiscalDetails"
+            [filteredBillingSeries]="filteredBillingSeries"
+            [receiptSeriesInvalid]="receiptSeriesInvalid"
+            [showNoSeriesMessage]="showNoSeriesMessage"
+            [noSeriesMessage]="noSeriesMessage"
+            [boletaDniInvalid]="boletaDniInvalid"
+            [invoiceRucInvalid]="invoiceRucInvalid"
+            [invoiceBusinessNameInvalid]="invoiceBusinessNameInvalid"
+            [receiptValidationError]="receiptValidationError"
+            (updateReceiptType)="updateReceiptType.emit($event)"
+            (updateReceiptSeriesId)="updateReceiptSeriesId.emit($event)"
+            (updateReceiptCustomerDocument)="updateReceiptCustomerDocument.emit($event)"
+            (updateReceiptCustomerName)="updateReceiptCustomerName.emit($event)"
+            (updateReceiptCustomerAddress)="updateReceiptCustomerAddress.emit($event)"
+            (toggleFiscalDetails)="toggleFiscalDetails.emit()"
+            (receiptNumericKeydown)="receiptNumericKeydown.emit($event)"
+          ></app-pos-checkout-receipt-section>
 
           <app-pos-totals-summary
             [total]="total"
@@ -396,164 +211,6 @@ import { PosTotalsSummaryComponent } from "./pos-totals-summary.component";
         font-weight: 800;
       }
 
-      .payment-panel {
-        display: grid;
-        gap: var(--space-2);
-        border: 1px solid var(--color-border-default);
-        border-radius: var(--radius-lg);
-        background: var(--color-bg-surface);
-        box-shadow: var(--shadow-sm);
-        padding: var(--space-2);
-      }
-
-      .receipt-panel {
-        display: grid;
-        gap: var(--space-2);
-        border: 1px solid var(--color-border-default);
-        border-radius: var(--radius-lg);
-        background: var(--color-bg-surface);
-        box-shadow: var(--shadow-sm);
-        padding: var(--space-2);
-      }
-
-      .payment-panel__header {
-        display: flex;
-        gap: var(--space-2);
-        align-items: center;
-        justify-content: space-between;
-      }
-
-      .receipt-panel__header {
-        display: flex;
-        gap: var(--space-2);
-        align-items: center;
-        justify-content: space-between;
-      }
-
-      .payment-panel__header h3,
-      .receipt-panel__header h3 {
-        margin: 0;
-        color: var(--color-text-primary);
-        font-size: var(--font-size-lg);
-      }
-
-      .payment-panel__quiet-button,
-      .payment-panel__remove-button,
-      .receipt-extra-toggle {
-        min-height: 2.35rem;
-      }
-
-      .payment-panel__quiet-button {
-        background: #4b5563;
-      }
-
-      .payment-list {
-        display: grid;
-        gap: var(--space-2);
-        max-height: 15rem;
-        overflow: auto;
-        padding-right: var(--space-1);
-      }
-
-      .payment-line {
-        display: grid;
-        grid-template-columns:
-          minmax(136px, 0.95fr) minmax(98px, 0.58fr) minmax(140px, 1fr)
-          minmax(76px, auto);
-        gap: var(--space-2);
-        align-items: end;
-        border: 1px solid var(--color-border-default);
-        border-radius: var(--radius-lg);
-        background: var(--color-bg-soft);
-        padding: var(--space-2);
-      }
-
-      .mini-field {
-        display: grid;
-        gap: var(--space-1);
-      }
-
-      .mini-field > span {
-        color: var(--color-text-secondary);
-        font-size: var(--font-size-sm);
-        font-weight: 800;
-      }
-
-      .mini-field input,
-      .mini-field select {
-        width: 100%;
-        min-height: 2.35rem;
-        border: 1px solid var(--color-border-strong);
-        border-radius: var(--radius-md);
-        background: var(--color-bg-surface);
-        color: var(--color-text-primary);
-        font-weight: 800;
-        padding: 0.48rem 0.62rem;
-      }
-
-      .payment-panel__metrics {
-        display: flex;
-        gap: var(--space-2);
-        justify-content: flex-end;
-        flex-wrap: wrap;
-        color: var(--color-text-secondary);
-        font-size: var(--font-size-sm);
-        font-weight: 800;
-      }
-
-      .payment-panel__metrics strong {
-        color: var(--color-text-primary);
-      }
-
-      .receipt-type-list {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(120px, 1fr));
-        gap: var(--space-2);
-      }
-
-      .receipt-segment {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        min-height: 2.35rem;
-        border: 1px solid var(--color-border-default);
-        border-radius: var(--radius-sm);
-        background: var(--color-bg-soft);
-        color: var(--color-text-primary);
-        cursor: pointer;
-        font-weight: 800;
-        padding: 0.48rem 0.58rem;
-      }
-
-      .receipt-segment.is-active {
-        border-color: var(--color-brand-primary);
-        box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-brand-primary) 35%, transparent);
-        background: color-mix(in srgb, var(--color-brand-primary) 8%, var(--color-bg-soft));
-      }
-
-      .receipt-customer-grid {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(180px, 1fr));
-        gap: var(--space-2);
-      }
-
-      .receipt-extra {
-        display: grid;
-        gap: var(--space-2);
-      }
-
-      .receipt-no-series {
-        display: grid;
-        gap: var(--space-1);
-      }
-
-      .field-inline-error {
-        margin: 0;
-        color: var(--color-danger);
-        font-size: var(--font-size-xs);
-        font-weight: 700;
-      }
-
       .checkout-modal__actions {
         flex-wrap: wrap;
       }
@@ -583,19 +240,6 @@ import { PosTotalsSummaryComponent } from "./pos-totals-summary.component";
           align-items: flex-start;
         }
 
-        .payment-panel__header,
-        .receipt-panel__header,
-        .payment-line,
-        .receipt-type-list,
-        .receipt-customer-grid {
-          grid-template-columns: 1fr;
-        }
-
-        .payment-panel__header,
-        .receipt-panel__header {
-          align-items: stretch;
-          display: grid;
-        }
       }
     `,
   ],
