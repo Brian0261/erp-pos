@@ -1,6 +1,6 @@
 import { CommonModule } from "@angular/common";
 import { Component, HostListener, OnDestroy, OnInit } from "@angular/core";
-import { FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
+import { FormBuilder, Validators } from "@angular/forms";
 import { RouterLink } from "@angular/router";
 import { Subscription } from "rxjs";
 
@@ -9,6 +9,8 @@ import { WarehouseService } from "../inventory/data/warehouse.service";
 import { WarehouseResponse } from "../inventory/data/inventory.models";
 import { PosCartPanelComponent } from "./components/pos-cart-panel.component";
 import { PosCheckoutModalComponent } from "./components/pos-checkout-modal.component";
+import { PosSearchPanelComponent } from "./components/pos-search-panel.component";
+import { PosSearchResultsComponent } from "./components/pos-search-results.component";
 import { PosTotalsSummaryComponent } from "./components/pos-totals-summary.component";
 import { CashRegisterService } from "./data/cash-register.service";
 import { toHttpErrorMessage } from "./data/http-error-message";
@@ -47,11 +49,12 @@ import {
   standalone: true,
   imports: [
     CommonModule,
-    ReactiveFormsModule,
     RouterLink,
     PosTotalsSummaryComponent,
     PosCartPanelComponent,
     PosCheckoutModalComponent,
+    PosSearchPanelComponent,
+    PosSearchResultsComponent,
   ],
   template: `
     <section class="ui-card pos-page">
@@ -91,78 +94,17 @@ import {
 
       <div class="pos-shell">
         <main class="pos-workspace">
-          <form
-            [formGroup]="saleForm"
-            class="pos-command"
-            (ngSubmit)="submitUnifiedSearch()"
-          >
-            <label class="field field--warehouse">
-              <span>Almacen de salida *</span>
-              <select
-                formControlName="warehouseId"
-                [title]="selectedWarehouseLabel"
-              >
-                <option [ngValue]="null">Selecciona almacen</option>
-                <option
-                  *ngFor="let warehouse of warehouses"
-                  [ngValue]="warehouse.id"
-                  [title]="warehouse.code + ' - ' + warehouse.name"
-                >
-                  {{ getWarehouseDisplayLabel(warehouse) }}
-                </option>
-              </select>
-            </label>
-
-            <section class="scan-card" aria-label="Busqueda unificada POS">
-              <label class="scan-field">
-                <span class="scan-label">Buscar o escanear producto</span>
-                <input
-                  class="scan-input"
-                  type="text"
-                  formControlName="code"
-                  placeholder="Escanea barcode/SKU o busca producto..."
-                  autocomplete="off"
-                />
-              </label>
-
-              <div class="scan-actions">
-                <button
-                  type="button"
-                  class="ui-button ui-button--primary pos-button pos-button--scan"
-                  (click)="addExactFromUnifiedSearch()"
-                  [disabled]="loadingLookup"
-                >
-                  {{ loadingLookup ? "Agregando..." : "Agregar codigo" }}
-                </button>
-                <button
-                  type="button"
-                  class="ui-button ui-button--secondary pos-button pos-button--quiet"
-                  (click)="submitUnifiedSearch()"
-                  [disabled]="loadingSearch"
-                >
-                  {{ loadingSearch ? "Buscando..." : "Buscar" }}
-                </button>
-              </div>
-            </section>
-
-            <section
-              class="quick-search"
-              aria-label="Busquedas rapidas para productos sin barcode"
-            >
-              <span>BÚSQUEDAS RÁPIDAS</span>
-              <div class="quick-search__buttons">
-                <button
-                  type="button"
-                  class="ui-button quick-search__button"
-                  *ngFor="let term of quickSearchTerms"
-                  (click)="applyQuickSearch(term)"
-                  [disabled]="loadingSearch"
-                >
-                  {{ term }}
-                </button>
-              </div>
-            </section>
-          </form>
+          <app-pos-search-panel
+            [saleForm]="saleForm"
+            [warehouses]="warehouses"
+            [selectedWarehouseLabel]="selectedWarehouseLabel"
+            [quickSearchTerms]="quickSearchTerms"
+            [loadingLookup]="loadingLookup"
+            [loadingSearch]="loadingSearch"
+            (search)="submitUnifiedSearch()"
+            (exactLookup)="addExactFromUnifiedSearch()"
+            (quickSearch)="applyQuickSearch($event)"
+          ></app-pos-search-panel>
 
           <div class="message-stack" *ngIf="errorMessage || warningMessage || successMessage">
             <p class="ui-alert ui-alert--error" *ngIf="errorMessage">
@@ -176,72 +118,10 @@ import {
             </p>
           </div>
 
-          <section class="results-panel">
-            <header class="panel-head">
-              <div>
-                <h2>Resultados de busqueda</h2>
-              </div>
-              <span class="ui-badge"
-                >{{ searchResults.length }} resultados</span
-              >
-            </header>
-
-            <p class="result-hint" *ngIf="searchResults.length > 1">
-              Hay varias coincidencias. Revisa nombre, codigo, precio y stock
-              antes de tocar Agregar.
-            </p>
-
-            <div class="empty-results" *ngIf="searchResults.length === 0">
-              <strong>Sin resultados activos</strong>
-              <span
-                >Busca por nombre para elegir el producto antes de
-                agregar.</span
-              >
-            </div>
-
-            <div class="results-grid" *ngIf="searchResults.length > 0">
-              <article class="result-card" *ngFor="let result of searchResults">
-                <div class="result-card__body">
-                  <div class="result-card__meta-row">
-                    <p class="result-card__sku">{{ result.sku }}</p>
-                    <span class="result-card__meta-separator" aria-hidden="true"
-                      >·</span
-                    >
-                    <div class="result-meta">
-                      <span *ngIf="result.barcode" class="result-meta__code">
-                        {{ result.barcode }}
-                      </span>
-                      <span
-                        *ngIf="!result.barcode"
-                        class="barcode-badge barcode-badge--missing"
-                      >
-                        Sin código
-                      </span>
-                      <span class="result-meta__stock">
-                        <span class="result-meta__label">Stock</span>
-                        <span class="result-meta__value">{{
-                          result.stockAvailable | number: "1.0-3"
-                        }}</span>
-                      </span>
-                    </div>
-                  </div>
-                  <h3>{{ result.name }}</h3>
-                </div>
-                <div class="result-card__action">
-                  <p class="result-price">
-                    S/ {{ result.salePrice | number: "1.2-2" }}
-                  </p>
-                  <button
-                    type="button"
-                    class="ui-button ui-button--primary pos-button pos-button--add result-add-button"
-                    (click)="addToCart(result)"
-                  >
-                    Agregar
-                  </button>
-                </div>
-              </article>
-            </div>
-          </section>
+          <app-pos-search-results
+            [searchResults]="searchResults"
+            (addProduct)="addToCart($event)"
+          ></app-pos-search-results>
         </main>
 
         <aside class="checkout-panel" aria-label="Carrito y cobro">
@@ -611,8 +491,6 @@ import {
         grid-template-rows: minmax(16rem, 1.35fr) minmax(4.8rem, auto) auto;
       }
 
-      .pos-command,
-      .results-panel,
       .cart-panel,
       .payment-panel,
       .receipt-panel,
@@ -623,37 +501,15 @@ import {
         box-shadow: var(--shadow-sm);
       }
 
-      .pos-command {
-        display: grid;
-        grid-template-columns: minmax(240px, 0.34fr) minmax(0, 1fr);
-        gap: var(--space-2);
-        padding: var(--space-2);
-        align-items: end;
-      }
-
-      .field,
-      .mini-field,
-      .scan-field {
+      .mini-field {
         display: grid;
         gap: var(--space-1);
       }
 
-      .field > span,
-      .mini-field > span,
-      .scan-label {
+      .mini-field > span {
         font-size: var(--font-size-sm);
         font-weight: 800;
         color: var(--color-text-secondary);
-      }
-
-      .field--warehouse {
-        grid-column: 1;
-        grid-row: 2;
-        max-width: none;
-      }
-
-      .field--warehouse select {
-        min-width: 0;
       }
 
       input,
@@ -668,113 +524,10 @@ import {
         color: var(--color-text-primary);
       }
 
-      .scan-card {
-        grid-column: 1 / -1;
-        grid-row: 1;
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
-        align-items: end;
-        gap: var(--space-2);
-        border-radius: calc(var(--radius-lg) + 0.2rem);
-        border: 2px solid rgba(18, 23, 184, 0.3);
-        background:
-          linear-gradient(
-            135deg,
-            rgba(18, 23, 184, 0.14),
-            rgba(34, 197, 246, 0.08)
-          ),
-          var(--color-bg-soft);
-        padding: 0.65rem;
-      }
-
-      .scan-label {
-        color: var(--color-text-primary);
-        font-size: var(--font-size-sm);
-      }
-
-      .scan-input {
-        min-height: 2.8rem;
-        border-width: 2px;
-        border-color: rgba(18, 23, 184, 0.38);
-        border-radius: var(--radius-lg);
-        font-size: clamp(1rem, 1.35vw, 1.2rem);
-        font-weight: 800;
-        letter-spacing: 0.01em;
-      }
-
-      .scan-actions {
-        display: grid;
-        grid-template-columns: repeat(2, max-content);
-        gap: var(--space-2);
-        justify-content: start;
-      }
-
-      .manual-search__row {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
-        gap: var(--space-2);
-      }
-
-      .quick-search {
-        grid-column: 2;
-        grid-row: 2;
-        display: grid;
-        grid-template-columns: minmax(0, 1fr);
-        gap: var(--space-1);
-        align-items: center;
-        min-width: 0;
-      }
-
-      .quick-search > span {
-        display: none;
-        color: var(--color-text-secondary);
-        font-size: var(--font-size-xs);
-        font-weight: 900;
-        letter-spacing: 0.06em;
-        text-transform: uppercase;
-      }
-
-      .quick-search__buttons {
-        display: flex;
-        gap: var(--space-1);
-        overflow-x: auto;
-        padding-bottom: 0.05rem;
-      }
-
-      .quick-search__button {
-        min-height: 1.9rem;
-        flex: 0 0 auto;
-        border: 1px solid var(--color-border-strong);
-        background: var(--color-bg-soft);
-        color: var(--color-text-primary);
-        padding: 0.26rem 0.58rem;
-        font-size: var(--font-size-sm);
-        white-space: nowrap;
-      }
-
-      .scan-help,
-      .result-hint,
       .cart-item__stock,
       .empty-cart span {
         margin: 0;
         color: var(--color-text-secondary);
-      }
-
-      .scan-help,
-      .result-hint {
-        font-weight: 700;
-        font-size: var(--font-size-xs);
-      }
-
-      .scan-help {
-        display: none;
-      }
-
-      .manual-search {
-        grid-column: 2;
-        grid-row: 2;
-        border-top: 0;
-        padding-top: 0;
       }
 
       .pos-button,
@@ -782,20 +535,6 @@ import {
         min-height: 2.55rem;
         border-radius: var(--radius-md);
         padding: 0.58rem var(--space-4);
-        font-size: var(--font-size-md);
-      }
-
-      .pos-button--scan {
-        min-height: 2.8rem;
-        background: var(--color-brand-accent);
-        font-size: var(--font-size-md);
-        letter-spacing: 0.01em;
-      }
-
-      .pos-button--add {
-        width: 100%;
-        min-height: 2.35rem;
-        background: var(--color-brand-accent);
         font-size: var(--font-size-md);
       }
 
@@ -818,7 +557,6 @@ import {
         gap: var(--space-2);
       }
 
-      .results-panel,
       .cart-panel,
       .payment-panel,
       .receipt-panel,
@@ -828,11 +566,6 @@ import {
         gap: var(--space-2);
         min-height: 0;
         overflow: hidden;
-      }
-
-      .results-panel {
-        grid-row: 3;
-        grid-template-rows: auto minmax(0, 1fr);
       }
 
       .cart-panel {
@@ -914,98 +647,11 @@ import {
         color: var(--color-text-secondary);
       }
 
-      .results-panel .result-hint {
-        display: none;
-      }
-
-      .results-grid {
-        grid-row: 2;
-        display: grid;
-        grid-template-columns: 1fr;
-        align-content: start;
-        gap: 0.25rem;
-        min-height: 0;
-        overflow: auto;
-        padding-right: var(--space-1);
-      }
-
-      .empty-results {
-        grid-row: 2;
-        display: grid;
-        place-items: center;
-        gap: var(--space-1);
-        min-height: 0;
-        border: 2px dashed var(--color-border-default);
-        border-radius: var(--radius-lg);
-        background: var(--color-bg-soft);
-        color: var(--color-text-secondary);
-        text-align: center;
-        padding: var(--space-4);
-      }
-
-      .result-card {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(198px, auto);
-        gap: 0.45rem;
-        align-items: center;
-        border: 1px solid var(--color-border-default);
-        border-radius: var(--radius-lg);
-        background:
-          linear-gradient(
-            180deg,
-            rgba(18, 23, 184, 0.04),
-            rgba(18, 23, 184, 0)
-          ),
-          var(--color-bg-surface);
-        padding: 0.35rem;
-      }
-
-      .result-card__body,
-      .result-card__action,
       .cart-item__main {
         display: grid;
         gap: 0.14rem;
       }
 
-      .result-card__body {
-        min-width: 0;
-      }
-
-      .result-card__meta-row {
-        display: flex;
-        justify-content: flex-start;
-        align-items: center;
-        gap: 0.34rem;
-        min-width: 0;
-        flex-wrap: wrap;
-        opacity: 0.82;
-      }
-
-      .result-card h3 {
-        overflow: hidden;
-        display: -webkit-box;
-        -webkit-box-orient: vertical;
-        -webkit-line-clamp: 2;
-        font-size: 1.06rem;
-        font-weight: 900;
-        line-height: 1.18;
-        color: var(--color-text-primary);
-      }
-
-      .result-card__action {
-        grid-template-columns: minmax(72px, auto) minmax(7.5rem, 1fr);
-        align-items: center;
-        align-content: center;
-        gap: 0.5rem;
-      }
-
-      .result-add-button {
-        width: 100%;
-        min-width: 7.5rem;
-        justify-self: stretch;
-      }
-
-      .result-card__sku,
       .cart-item__sku {
         margin: 0;
         width: fit-content;
@@ -1018,43 +664,12 @@ import {
         letter-spacing: 0.03em;
       }
 
-      .result-meta {
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: flex-start;
-        gap: 0.22rem;
-        min-width: 0;
-        margin: 0;
-      }
-
-      .result-card__meta-separator {
-        color: var(--color-text-secondary);
-        font-weight: 700;
-        font-size: 0.56rem;
-        line-height: 1;
-      }
-
-      .result-meta__code,
-      .result-meta__stock,
       .total-grid article {
         border-radius: var(--radius-md);
         background: var(--color-bg-soft);
         padding: 0.3rem 0.45rem;
       }
 
-      .result-meta__code,
-      .result-meta__stock {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.22rem;
-        padding: 0.03rem 0.3rem;
-        white-space: nowrap;
-        color: var(--color-text-secondary);
-        font-size: 0.58rem;
-        font-weight: 700;
-      }
-
-      .result-meta__label,
       .total-grid span,
       .cart-item__footer span,
       .total-main span {
@@ -1063,37 +678,6 @@ import {
         font-weight: 700;
         letter-spacing: 0.04em;
         text-transform: uppercase;
-      }
-
-      .result-meta__value {
-        margin: 0;
-        font-weight: 700;
-      }
-
-      .barcode-badge {
-        display: inline-flex;
-        width: fit-content;
-        border-radius: var(--radius-pill);
-        background: var(--color-bg-soft);
-        color: var(--color-text-secondary);
-        padding: 0.03rem 0.3rem;
-        font-size: 0.58rem;
-        font-weight: 700;
-      }
-
-      .barcode-badge--missing {
-        border: 1px solid var(--color-border-default);
-        background: var(--color-bg-soft);
-        color: var(--color-text-secondary);
-      }
-
-      .result-price {
-        margin: 0;
-        color: var(--color-brand-primary);
-        font-size: clamp(0.98rem, 1.35vw, 1.18rem);
-        font-weight: 900;
-        text-align: right;
-        line-height: 1;
       }
 
       .cart-list,
@@ -1629,27 +1213,6 @@ import {
         width: 100%;
       }
 
-      :host-context(body[data-theme="dark"]) .scan-card {
-        border-color: rgba(96, 165, 250, 0.46);
-        background:
-          linear-gradient(
-            135deg,
-            rgba(18, 23, 184, 0.34),
-            rgba(56, 189, 248, 0.16)
-          ),
-          var(--color-bg-soft);
-      }
-
-      :host-context(body[data-theme="dark"]) .result-card {
-        background:
-          linear-gradient(
-            180deg,
-            rgba(244, 194, 13, 0.08),
-            rgba(244, 194, 13, 0)
-          ),
-          var(--color-bg-surface);
-      }
-
       :host-context(body[data-theme="dark"]) .full-cart-summary {
         border-color: rgba(96, 165, 250, 0.32);
         background:
@@ -1670,14 +1233,12 @@ import {
         background: rgba(220, 38, 38, 0.08);
       }
 
-      .results-grid::-webkit-scrollbar,
       .cart-list::-webkit-scrollbar,
       .payment-list::-webkit-scrollbar,
       .full-cart-list::-webkit-scrollbar {
         width: 8px;
       }
 
-      .results-grid::-webkit-scrollbar-track,
       .cart-list::-webkit-scrollbar-track,
       .payment-list::-webkit-scrollbar-track,
       .full-cart-list::-webkit-scrollbar-track {
@@ -1685,7 +1246,6 @@ import {
         border-radius: var(--radius-pill);
       }
 
-      .results-grid::-webkit-scrollbar-thumb,
       .cart-list::-webkit-scrollbar-thumb,
       .payment-list::-webkit-scrollbar-thumb,
       .full-cart-list::-webkit-scrollbar-thumb {
@@ -1720,26 +1280,6 @@ import {
           display: none;
         }
 
-        .scan-help,
-        .result-hint,
-        .quick-search > span {
-          display: none;
-        }
-
-        .quick-search {
-          grid-template-columns: 1fr;
-        }
-
-        .quick-search__button {
-          min-height: 1.75rem;
-          padding: 0.2rem 0.5rem;
-          font-size: var(--font-size-xs);
-        }
-
-        .scan-input {
-          min-height: 2.85rem;
-        }
-
         .payment-list {
           max-height: 5.4rem;
         }
@@ -1772,7 +1312,6 @@ import {
           grid-template-rows: auto;
         }
 
-        .results-grid,
         .cart-list,
         .payment-list {
           max-height: 18rem;
@@ -1798,14 +1337,8 @@ import {
         }
 
         .pos-hero__actions,
-        .pos-command,
-        .scan-card,
-        .scan-actions,
-        .manual-search__row,
-        .quick-search,
         .cart-item__controls,
         .payment-line,
-        .result-card,
         .total-board,
         .total-grid {
           grid-template-columns: 1fr;
@@ -1849,21 +1382,9 @@ import {
           max-width: none;
         }
 
-        .scan-card,
-        .field--warehouse,
-        .manual-search,
-        .quick-search {
-          grid-column: 1;
-          grid-row: auto;
-        }
-
         .pos-button,
         .checkout-button {
           width: 100%;
-        }
-
-        .result-price {
-          text-align: left;
         }
       }
     `,
@@ -2224,10 +1745,6 @@ export class PosPageComponent implements OnInit, OnDestroy {
     return warehouse
       ? `${warehouse.code} - ${warehouse.name}`
       : "Selecciona almacen";
-  }
-
-  getWarehouseDisplayLabel(warehouse: WarehouseResponse): string {
-    return warehouse.name?.trim() || warehouse.code?.trim() || "Selecciona almacen";
   }
 
   get cartTitle(): string {
