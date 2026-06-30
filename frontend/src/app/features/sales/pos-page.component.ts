@@ -253,15 +253,8 @@ import {
         overflow: hidden;
       }
 
-      h1,
-      h2,
-      h3 {
+      h1 {
         margin: 0;
-      }
-
-      .inline-link {
-        text-decoration: underline;
-        font-weight: 700;
       }
 
       .pos-hero {
@@ -387,60 +380,12 @@ import {
         grid-template-rows: minmax(16rem, 1.35fr) minmax(4.8rem, auto) auto;
       }
 
-      .cart-panel,
-      .payment-panel,
-      .receipt-panel,
-      .total-board {
-        border: 1px solid var(--color-border-default);
-        border-radius: var(--radius-lg);
-        background: var(--color-bg-surface);
-        box-shadow: var(--shadow-sm);
-      }
-
-      .mini-field {
-        display: grid;
-        gap: var(--space-1);
-      }
-
-      .mini-field > span {
-        font-size: var(--font-size-sm);
-        font-weight: 800;
-        color: var(--color-text-secondary);
-      }
-
-      input,
-      select,
-      textarea {
-        width: 100%;
-        min-height: 2.55rem;
-        padding: 0.58rem 0.72rem;
-        border-radius: var(--radius-md);
-        border: 1px solid var(--color-border-strong);
-        background: var(--color-bg-surface);
-        color: var(--color-text-primary);
-      }
-
-      .cart-item__stock,
-      .empty-cart span {
-        margin: 0;
-        color: var(--color-text-secondary);
-      }
-
       .pos-button,
       .checkout-button {
         min-height: 2.55rem;
         border-radius: var(--radius-md);
         padding: 0.58rem var(--space-4);
         font-size: var(--font-size-md);
-      }
-
-      .pos-button--quiet {
-        background: #4b5563;
-      }
-
-      .pos-button--small {
-        min-height: 2.35rem;
-        padding-inline: var(--space-3);
       }
 
       .ui-button[disabled] {
@@ -451,436 +396,6 @@ import {
       .message-stack {
         display: grid;
         gap: var(--space-2);
-      }
-
-      .cart-panel,
-      .payment-panel,
-      .receipt-panel,
-      .total-board {
-        padding: var(--space-2);
-        display: grid;
-        gap: var(--space-2);
-        min-height: 0;
-        overflow: hidden;
-      }
-
-      .cart-panel {
-        grid-template-rows: auto minmax(0, 1fr);
-      }
-
-      .payment-panel {
-        grid-template-columns: max-content minmax(0, 1fr);
-        align-items: stretch;
-        min-height: 5rem;
-        padding: 0.35rem;
-        border-color: color-mix(in srgb, var(--color-border-default) 76%, transparent);
-      }
-
-      .receipt-panel {
-        grid-template-columns: 1fr;
-        padding: 0.5rem;
-        border-color: color-mix(in srgb, var(--color-border-default) 76%, transparent);
-      }
-
-      .panel-head {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        gap: var(--space-2);
-        flex-wrap: wrap;
-      }
-
-      .panel-head--compact {
-        align-items: center;
-      }
-
-      .payment-panel .panel-head--compact {
-        align-items: flex-start;
-        align-self: center;
-        flex-direction: column;
-        justify-content: center;
-        gap: 0.2rem;
-      }
-
-      .panel-head h2 {
-        font-size: 1.05rem;
-        line-height: 1.1;
-      }
-
-      .payment-panel .panel-head h2 {
-        font-size: 0.9rem;
-      }
-
-      .payment-panel .panel-kicker {
-        display: none;
-      }
-
-      .payment-panel .pos-button {
-        min-height: 2rem;
-        padding: 0.3rem var(--space-2);
-        font-size: var(--font-size-sm);
-      }
-
-      .cart-panel .pos-button--quiet {
-        min-height: 2rem;
-        padding: 0.36rem var(--space-2);
-        font-size: var(--font-size-sm);
-      }
-
-      .cart-head-actions {
-        display: flex;
-        justify-content: flex-end;
-        gap: var(--space-1);
-        flex-wrap: wrap;
-      }
-
-      .panel-kicker {
-        margin: 0 0 var(--space-1);
-        font-size: 0.68rem;
-        font-weight: 800;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        color: var(--color-text-secondary);
-      }
-
-      .cart-item__main {
-        display: grid;
-        gap: 0.14rem;
-      }
-
-      .cart-item__sku {
-        margin: 0;
-        width: fit-content;
-        border-radius: var(--radius-pill);
-        background: var(--color-bg-soft);
-        color: var(--color-text-secondary);
-        padding: 0.03rem 0.3rem;
-        font-size: 0.58rem;
-        font-weight: 700;
-        letter-spacing: 0.03em;
-      }
-
-      .total-grid article {
-        border-radius: var(--radius-md);
-        background: var(--color-bg-soft);
-        padding: 0.3rem 0.45rem;
-      }
-
-      .total-grid span,
-      .cart-item__footer span,
-      .total-main span {
-        color: var(--color-text-secondary);
-        font-size: 0.56rem;
-        font-weight: 700;
-        letter-spacing: 0.04em;
-        text-transform: uppercase;
-      }
-
-      .cart-list,
-      .payment-list {
-        display: grid;
-        align-content: start;
-        gap: var(--space-2);
-        min-height: 0;
-        overflow: auto;
-        padding-right: var(--space-1);
-      }
-
-      .cart-list {
-        overflow: auto;
-      }
-
-      .payment-list {
-        align-content: center;
-        max-height: 5.4rem;
-        overflow-y: auto;
-        overflow-x: hidden;
-        padding-right: 0;
-      }
-
-      .cart-item,
-      .payment-line {
-        border: 1px solid var(--color-border-default);
-        border-radius: var(--radius-lg);
-        background: var(--color-bg-surface);
-        padding: 0.55rem;
-      }
-
-      .cart-item {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(82px, auto);
-        gap: 0.38rem var(--space-2);
-        align-items: start;
-      }
-
-      .cart-item__main {
-        grid-column: 1;
-        grid-template-columns: minmax(0, 1fr);
-        align-items: start;
-        gap: 0.18rem;
-        align-content: start;
-        min-width: 0;
-      }
-
-      .cart-item__meta-row {
-        display: flex;
-        align-items: center;
-        gap: 0.28rem;
-        min-width: 0;
-        flex-wrap: wrap;
-      }
-
-      .cart-item__meta-separator {
-        color: var(--color-text-secondary);
-        font-size: 0.58rem;
-        font-weight: 700;
-        line-height: 1;
-      }
-
-      .cart-item__main h3 {
-        font-size: 0.98rem;
-        line-height: 1.15;
-        font-weight: 900;
-      }
-
-      .cart-item__stock {
-        margin: 0;
-        font-size: 0.62rem;
-        color: var(--color-text-secondary);
-        font-weight: 700;
-        letter-spacing: 0.03em;
-      }
-
-      .cart-item__controls {
-        grid-column: 1;
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: var(--space-1);
-        align-content: end;
-      }
-
-      .cart-item__footer {
-        grid-column: 2;
-        grid-row: 1 / span 2;
-        display: grid;
-        align-self: center;
-        align-content: center;
-        align-items: stretch;
-        gap: 0.28rem;
-        border-left: 1px solid var(--color-border-default);
-        border-top: 0;
-        padding-left: 0.38rem;
-        padding-top: 0;
-      }
-
-      .cart-item__footer div {
-        display: grid;
-        align-content: start;
-        gap: 0.06rem;
-      }
-
-      .cart-item__footer span {
-        line-height: 1.05;
-      }
-
-      .cart-item__footer strong {
-        font-size: var(--font-size-sm);
-        line-height: 1.1;
-      }
-
-      .cart-item__remove {
-        min-height: 2.05rem;
-        box-shadow: none;
-        opacity: 0.92;
-      }
-
-      .cart-item .mini-field > span {
-        font-size: 0.68rem;
-      }
-
-      .mini-field input,
-      .mini-field select {
-        min-height: 2.35rem;
-        font-weight: 800;
-      }
-
-      .cart-item .mini-field input {
-        min-height: 1.75rem;
-        padding: 0.24rem 0.42rem;
-      }
-
-      .quantity-tools {
-        display: grid;
-        grid-template-columns: 1.8rem minmax(3.2rem, 1fr) 1.8rem;
-        gap: 0.22rem;
-        align-items: center;
-      }
-
-      .quantity-tools input {
-        text-align: center;
-      }
-
-      .quantity-stepper {
-        min-height: 1.75rem;
-        padding: 0;
-        border-radius: var(--radius-sm);
-        background: var(--color-bg-soft);
-        border: 1px solid var(--color-border-strong);
-        color: var(--color-text-primary);
-        font-weight: 900;
-      }
-
-      .payment-line {
-        display: grid;
-        grid-template-columns:
-          minmax(132px, 0.92fr) minmax(74px, 0.46fr) minmax(108px, 0.95fr)
-          minmax(66px, auto);
-        gap: 0.28rem;
-        align-items: end;
-        min-width: 0;
-      }
-
-      .payment-line .mini-field > span {
-        font-size: 0.68rem;
-      }
-
-      .payment-line input,
-      .payment-line select {
-        min-height: 2rem;
-        padding: 0.28rem 0.42rem;
-      }
-
-      .payment-line select {
-        font-weight: 700;
-      }
-
-      .payment-line .pos-button--small {
-        min-height: 2.05rem;
-        padding-inline: var(--space-2);
-      }
-
-      .receipt-type-list {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(120px, 1fr));
-        gap: var(--space-2);
-      }
-
-      .receipt-segment {
-        border: 1px solid var(--color-border-default);
-        border-radius: var(--radius-sm);
-        padding: 0.48rem 0.58rem;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        background: var(--color-bg-soft);
-        cursor: pointer;
-        font-size: var(--font-size-sm);
-        font-weight: 700;
-        min-height: 2.15rem;
-      }
-
-      .receipt-segment.is-active {
-        border-color: var(--color-brand-primary);
-        box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-brand-primary) 35%, transparent);
-        background: color-mix(in srgb, var(--color-brand-primary) 8%, var(--color-bg-soft));
-      }
-
-      .receipt-customer-grid {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(180px, 1fr));
-        gap: var(--space-2);
-      }
-
-      .receipt-extra {
-        display: grid;
-        gap: var(--space-2);
-      }
-
-      .receipt-no-series {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: var(--space-2);
-        flex-wrap: wrap;
-      }
-
-      .receipt-series-link {
-        min-height: 2rem;
-        padding: 0.34rem var(--space-2);
-        font-size: var(--font-size-sm);
-      }
-
-      .receipt-extra-toggle {
-        min-height: 2rem;
-        padding: 0.34rem var(--space-2);
-        font-size: var(--font-size-sm);
-      }
-
-      .field-inline-error {
-        margin: 0;
-        color: var(--color-danger);
-        font-size: var(--font-size-xs);
-        font-weight: 700;
-      }
-
-      .empty-cart {
-        display: grid;
-        gap: var(--space-1);
-        place-items: center;
-        min-height: 4.6rem;
-        border: 2px dashed var(--color-border-default);
-        border-radius: var(--radius-lg);
-        background: var(--color-bg-soft);
-        text-align: center;
-        padding: var(--space-3);
-      }
-
-      .total-board {
-        border-color: rgba(18, 23, 184, 0.28);
-        grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
-        align-items: stretch;
-        min-height: 4.35rem;
-        padding: 0.35rem;
-      }
-
-      .total-main {
-        display: grid;
-        gap: var(--space-1);
-        border-radius: var(--radius-lg);
-        background:
-          linear-gradient(135deg, var(--color-brand-primary), #0f172a),
-          var(--color-brand-primary);
-        color: var(--color-text-on-dark);
-        padding: 0.4rem var(--space-2);
-      }
-
-      .total-main span {
-        color: rgba(255, 255, 255, 0.78);
-      }
-
-      .total-main strong {
-        font-size: clamp(1.35rem, 2vw, 1.75rem);
-        line-height: 1;
-      }
-
-      .total-grid {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: var(--space-1);
-      }
-
-      .total-grid article {
-        display: grid;
-        gap: 0;
-        padding: 0.22rem var(--space-1);
-      }
-
-      .total-grid strong {
-        font-size: var(--font-size-sm);
-      }
-
-      .total-change strong {
-        color: var(--color-success);
       }
 
       .checkout-actions {
@@ -901,27 +416,6 @@ import {
         width: 100%;
       }
 
-      .cart-list::-webkit-scrollbar,
-      .payment-list::-webkit-scrollbar {
-        width: 8px;
-      }
-
-      .cart-list::-webkit-scrollbar-track,
-      .payment-list::-webkit-scrollbar-track {
-        background: var(--color-bg-soft);
-        border-radius: var(--radius-pill);
-      }
-
-      .cart-list::-webkit-scrollbar-thumb,
-      .payment-list::-webkit-scrollbar-thumb {
-        background: linear-gradient(
-          180deg,
-          var(--color-brand-highlight),
-          var(--color-brand-accent)
-        );
-        border-radius: var(--radius-pill);
-      }
-
       @media (max-height: 820px) and (min-width: 981px) {
         .pos-page {
           height: calc(100dvh - 7rem);
@@ -933,21 +427,6 @@ import {
           padding: var(--space-2) var(--space-3);
         }
 
-        .pos-cash-badge {
-          min-height: 2rem;
-        }
-
-        .pos-cash-strip {
-          padding: 0.32rem 0.6rem;
-        }
-
-        .pos-hero .ui-page-description {
-          display: none;
-        }
-
-        .payment-list {
-          max-height: 5.4rem;
-        }
       }
 
       @media (max-width: 980px) {
@@ -976,16 +455,6 @@ import {
         .checkout-panel {
           grid-template-rows: auto;
         }
-
-        .cart-list,
-        .payment-list {
-          max-height: 18rem;
-        }
-
-        .receipt-type-list,
-        .receipt-customer-grid {
-          grid-template-columns: 1fr;
-        }
       }
 
       @media (max-width: 760px) {
@@ -993,43 +462,12 @@ import {
           padding: var(--space-3);
         }
 
-        .pos-hero,
-        .panel-head,
-        .panel-head--compact,
-        .cart-item__footer {
+        .pos-hero {
           align-items: stretch;
           flex-direction: column;
         }
 
-        .pos-hero__actions,
-        .cart-item__controls,
-        .payment-line,
-        .total-board,
-        .total-grid {
-          grid-template-columns: 1fr;
-        }
-
-        .payment-panel,
-        .cart-item {
-          grid-template-columns: 1fr;
-        }
-
-        .cart-item__main,
-        .cart-item__controls,
-        .cart-item__footer {
-          grid-column: 1;
-          grid-row: auto;
-        }
-
-        .cart-item__footer {
-          border-left: 0;
-          border-top: 1px solid var(--color-border-default);
-          padding-left: 0;
-          padding-top: var(--space-2);
-        }
-
-        .pos-hero__actions,
-        .panel-head {
+        .pos-hero__actions {
           width: 100%;
         }
 
