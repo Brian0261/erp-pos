@@ -7,6 +7,7 @@
     "build": "ng build",
     "test": "ng test --watch=false --browsers=ChromeHeadless",
     "e2e:install": "playwright install chromium",
+    "e2e:auth": "playwright test e2e/setup/auth.setup.ts --grep @no-write",
     "e2e:no-write": "playwright test --grep @no-write",
     "e2e:no-write:headed": "playwright test --grep @no-write --headed",
     "e2e:report": "playwright show-report e2e/playwright-report"
