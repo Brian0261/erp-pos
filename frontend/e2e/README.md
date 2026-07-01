@@ -12,6 +12,12 @@ npm run e2e:no-write:headed
 npm run e2e:report
 ```
 
+For visual local QA observation, run the no-write suite headed and sequentially:
+
+```powershell
+npx playwright test --grep @no-write --headed --workers=1
+```
+
 ## Environment
 
 Default values:
@@ -34,3 +40,5 @@ Authenticated specs require `E2E_QA_USER` and `E2E_QA_PASSWORD`. When those vari
 ## Safety
 
 The no-write fixture blocks mutating API requests by default. The only allowed write in no-write mode is `POST /api/v1/auth/login` for authentication.
+
+Authenticated POS no-write specs may add products to the browser-side cart, edit quantities, open checkout, and close modals, but must not press the final checkout confirmation button or accept any real-sale confirmation.
