@@ -18,6 +18,8 @@ For visual local QA observation, run the no-write suite headed and sequentially:
 npx playwright test --grep @no-write --headed --workers=1
 ```
 
+`npm run e2e:report` serves the generated HTML report locally and keeps the terminal attached until it is stopped.
+
 ## Environment
 
 Default values:
@@ -42,3 +44,11 @@ Authenticated specs require `E2E_QA_USER` and `E2E_QA_PASSWORD`. When those vari
 The no-write fixture blocks mutating API requests by default. The only allowed write in no-write mode is `POST /api/v1/auth/login` for authentication.
 
 Authenticated POS no-write specs may add products to the browser-side cart, edit quantities, open checkout, and close modals, but must not press the final checkout confirmation button or accept any real-sale confirmation.
+
+## Evidence
+
+- HTML report: `frontend/e2e/playwright-report/`
+- Test artifacts on failures: `frontend/e2e/test-results/`
+- Local storage state only: `frontend/e2e/.auth/qa-user.json`
+
+All those paths are ignored by Git through `frontend/e2e/.gitignore`.
