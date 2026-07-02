@@ -76,11 +76,10 @@ import { PosCartItem } from "../data/pos-ui.models";
       .cart-panel {
         height: 100%;
         box-sizing: border-box;
-        border: 1px solid color-mix(in srgb, var(--color-brand-primary) 20%, var(--color-border-default));
+        border: 1px solid color-mix(in srgb, var(--color-brand-primary) 12%, var(--color-border-default));
         border-radius: var(--radius-lg);
         background: var(--color-bg-surface);
-        box-shadow: var(--shadow-sm);
-        padding: 0.65rem;
+        padding: 0.75rem;
         display: grid;
         gap: var(--space-2);
         min-height: 0;
@@ -103,19 +102,19 @@ import { PosCartItem } from "../data/pos-ui.models";
       .panel-head h2 {
         font-size: 1.1rem;
         line-height: 1.1;
-        font-weight: 900;
+        font-weight: 700;
       }
 
       .cart-head-actions {
         display: flex;
         justify-content: flex-end;
-        gap: var(--space-1);
+        gap: var(--space-2);
         flex-wrap: wrap;
       }
 
       .cart-panel .pos-button--quiet {
-        min-height: 2rem;
-        padding: 0.36rem var(--space-2);
+        min-height: 2.3rem;
+        padding: 0.45rem var(--space-2);
         font-size: var(--font-size-sm);
       }
 
@@ -127,7 +126,8 @@ import { PosCartItem } from "../data/pos-ui.models";
       }
 
       .pos-button--quiet {
-        background: #4b5563;
+        background: color-mix(in srgb, var(--color-text-primary) 16%, var(--color-bg-soft));
+        color: var(--color-text-primary);
       }
 
       .ui-button[disabled] {
@@ -138,7 +138,7 @@ import { PosCartItem } from "../data/pos-ui.models";
       .cart-list {
         display: grid;
         align-content: start;
-        gap: 0.42rem;
+        gap: 0.55rem;
         min-height: 0;
         overflow: auto;
         padding-right: var(--space-1);
@@ -149,7 +149,7 @@ import { PosCartItem } from "../data/pos-ui.models";
         gap: var(--space-1);
         place-items: center;
         min-height: 8rem;
-        border: 2px dashed var(--color-border-default);
+        border: 1px dashed var(--color-border-default);
         border-radius: var(--radius-lg);
         background: var(--color-bg-soft);
         text-align: center;

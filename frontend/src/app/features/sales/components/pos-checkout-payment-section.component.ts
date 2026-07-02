@@ -99,7 +99,6 @@ import { PaymentLine } from "../data/pos-ui.models";
         border: 1px solid var(--color-border-default);
         border-radius: var(--radius-lg);
         background: var(--color-bg-surface);
-        box-shadow: var(--shadow-sm);
         padding: var(--space-2);
       }
 
@@ -120,8 +119,8 @@ import { PaymentLine } from "../data/pos-ui.models";
         margin: 0 0 0.2rem;
         color: var(--color-brand-primary);
         font-size: var(--font-size-xs);
-        font-weight: 900;
-        letter-spacing: 0.12em;
+        font-weight: 700;
+        letter-spacing: 0.08em;
         text-transform: uppercase;
       }
 
@@ -131,7 +130,8 @@ import { PaymentLine } from "../data/pos-ui.models";
       }
 
       .payment-panel__quiet-button {
-        background: #4b5563;
+        background: color-mix(in srgb, var(--color-text-primary) 16%, var(--color-bg-soft));
+        color: var(--color-text-primary);
       }
 
       .payment-list {
@@ -149,9 +149,9 @@ import { PaymentLine } from "../data/pos-ui.models";
           minmax(76px, auto);
         gap: var(--space-2);
         align-items: end;
-        border: 1px solid var(--color-border-default);
+        border: 1px solid color-mix(in srgb, var(--color-border-default) 86%, transparent);
         border-radius: var(--radius-lg);
-        background: var(--color-bg-soft);
+        background: color-mix(in srgb, var(--color-bg-soft) 84%, var(--color-bg-surface));
         padding: var(--space-2);
       }
 
@@ -163,18 +163,18 @@ import { PaymentLine } from "../data/pos-ui.models";
       .mini-field > span {
         color: var(--color-text-secondary);
         font-size: var(--font-size-sm);
-        font-weight: 800;
+        font-weight: 700;
       }
 
       .mini-field input,
       .mini-field select {
         width: 100%;
         min-height: 2.35rem;
-        border: 1px solid var(--color-border-strong);
+        border: 1px solid var(--color-border-default);
         border-radius: var(--radius-md);
         background: var(--color-bg-surface);
         color: var(--color-text-primary);
-        font-weight: 800;
+        font-weight: 700;
         padding: 0.48rem 0.62rem;
       }
 
@@ -185,7 +185,7 @@ import { PaymentLine } from "../data/pos-ui.models";
         flex-wrap: wrap;
         color: var(--color-text-secondary);
         font-size: var(--font-size-sm);
-        font-weight: 800;
+        font-weight: 700;
       }
 
       .payment-panel__metrics strong {

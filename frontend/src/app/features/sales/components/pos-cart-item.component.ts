@@ -101,14 +101,14 @@ export interface PosCartItemQuantityChange extends PosCartItemValueChange {
         padding: 0.62rem;
         display: grid;
         grid-template-columns: minmax(0, 1fr) minmax(96px, auto);
-        gap: 0.38rem var(--space-2);
+        gap: 0.55rem var(--space-2);
         align-items: start;
       }
 
       .cart-item__main {
         grid-column: 1;
         display: grid;
-        gap: 0.18rem;
+        gap: 0.22rem;
         grid-template-columns: minmax(0, 1fr);
         align-items: start;
         align-content: start;
@@ -126,34 +126,34 @@ export interface PosCartItemQuantityChange extends PosCartItemValueChange {
       .cart-item__sku {
         margin: 0;
         width: fit-content;
-        border-radius: var(--radius-pill);
-        background: var(--color-bg-soft);
+        border-radius: 0;
+        background: transparent;
         color: var(--color-text-secondary);
-        padding: 0.03rem 0.3rem;
-        font-size: 0.58rem;
-        font-weight: 700;
+        padding: 0;
+        font-size: 0.68rem;
+        font-weight: 600;
         letter-spacing: 0.03em;
       }
 
       .cart-item__meta-separator {
         color: var(--color-text-secondary);
-        font-size: 0.58rem;
-        font-weight: 700;
+        font-size: 0.62rem;
+        font-weight: 600;
         line-height: 1;
       }
 
       .cart-item__main h3 {
         margin: 0;
-        font-size: 1rem;
+        font-size: 0.98rem;
         line-height: 1.18;
-        font-weight: 900;
+        font-weight: 700;
       }
 
       .cart-item__stock {
         margin: 0;
-        font-size: 0.62rem;
+        font-size: 0.68rem;
         color: var(--color-text-secondary);
-        font-weight: 700;
+        font-weight: 600;
         letter-spacing: 0.03em;
       }
 
@@ -161,7 +161,7 @@ export interface PosCartItemQuantityChange extends PosCartItemValueChange {
         grid-column: 1;
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: var(--space-1);
+        gap: var(--space-2);
         align-content: end;
       }
 
@@ -169,13 +169,13 @@ export interface PosCartItemQuantityChange extends PosCartItemValueChange {
         grid-column: 2;
         grid-row: 1 / span 2;
         display: grid;
-        align-self: center;
+        align-self: stretch;
         align-content: center;
         align-items: stretch;
-        gap: 0.28rem;
+        gap: 0.45rem;
         border-left: 1px solid var(--color-border-default);
         border-top: 0;
-        padding-left: 0.5rem;
+        padding-left: 0.75rem;
         padding-top: 0;
       }
 
@@ -187,22 +187,22 @@ export interface PosCartItemQuantityChange extends PosCartItemValueChange {
 
       .cart-item__footer span {
         color: var(--color-text-secondary);
-        font-size: 0.56rem;
-        font-weight: 700;
+        font-size: 0.62rem;
+        font-weight: 600;
         letter-spacing: 0.04em;
         text-transform: uppercase;
         line-height: 1.05;
       }
 
       .cart-item__footer strong {
-        font-size: 0.95rem;
+        font-size: 1rem;
         line-height: 1.1;
       }
 
       .cart-item__remove {
-        min-height: 2.05rem;
+        min-height: 2.4rem;
         box-shadow: none;
-        opacity: 0.88;
+        opacity: 0.92;
       }
 
       .mini-field {
@@ -212,30 +212,30 @@ export interface PosCartItemQuantityChange extends PosCartItemValueChange {
 
       .mini-field > span {
         font-size: 0.68rem;
-        font-weight: 800;
+        font-weight: 700;
         color: var(--color-text-secondary);
       }
 
       .mini-field input {
         width: 100%;
-        min-height: 2.35rem;
+        min-height: 2.6rem;
         padding: 0.58rem 0.72rem;
         border-radius: var(--radius-md);
-        border: 1px solid var(--color-border-strong);
+        border: 1px solid var(--color-border-default);
         background: var(--color-bg-surface);
         color: var(--color-text-primary);
-        font-weight: 800;
+        font-weight: 700;
       }
 
       .cart-item .mini-field input {
-        min-height: 1.75rem;
-        padding: 0.24rem 0.42rem;
+        min-height: 2.1rem;
+        padding: 0.34rem 0.5rem;
       }
 
       .quantity-tools {
         display: grid;
-        grid-template-columns: 1.8rem minmax(3.2rem, 1fr) 1.8rem;
-        gap: 0.22rem;
+        grid-template-columns: 2.3rem minmax(3.6rem, 1fr) 2.3rem;
+        gap: 0.35rem;
         align-items: center;
       }
 
@@ -244,13 +244,13 @@ export interface PosCartItemQuantityChange extends PosCartItemValueChange {
       }
 
       .quantity-stepper {
-        min-height: 1.75rem;
+        min-height: 2.1rem;
         padding: 0;
         border-radius: var(--radius-sm);
         background: var(--color-bg-soft);
-        border: 1px solid var(--color-border-strong);
+        border: 1px solid var(--color-border-default);
         color: var(--color-text-primary);
-        font-weight: 900;
+        font-weight: 700;
       }
 
       @media (max-width: 760px) {

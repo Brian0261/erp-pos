@@ -13,7 +13,7 @@ import { PosProductResponse } from "../data/sales.models";
         <div>
           <h2>Resultados de busqueda</h2>
         </div>
-        <span class="ui-badge">{{ searchResults.length }} resultados</span>
+        <span class="results-count">{{ searchResults.length }} resultados</span>
       </header>
 
       <p class="result-hint" *ngIf="searchResults.length > 1">
@@ -33,15 +33,15 @@ import { PosProductResponse } from "../data/sales.models";
               <p class="result-card__sku">{{ result.sku }}</p>
               <span class="result-card__meta-separator" aria-hidden="true">·</span>
               <div class="result-meta">
-                <span *ngIf="result.barcode" class="result-meta__code">
-                  {{ result.barcode }}
-                </span>
-                <span
-                  *ngIf="!result.barcode"
-                  class="barcode-badge barcode-badge--missing"
-                >
-                  Sin código
-                </span>
+                 <span *ngIf="result.barcode" class="result-meta__code">
+                   Cod. {{ result.barcode }}
+                 </span>
+                 <span
+                   *ngIf="!result.barcode"
+                   class="barcode-badge barcode-badge--missing"
+                 >
+                   Cod. no disponible
+                 </span>
                 <span class="result-meta__stock">
                   <span class="result-meta__label">Stock</span>
                   <span class="result-meta__value">{{
@@ -81,7 +81,6 @@ import { PosProductResponse } from "../data/sales.models";
         border: 1px solid var(--color-border-default);
         border-radius: var(--radius-lg);
         background: var(--color-bg-surface);
-        box-shadow: var(--shadow-sm);
         padding: var(--space-2);
         display: grid;
         gap: var(--space-2);
@@ -102,6 +101,12 @@ import { PosProductResponse } from "../data/sales.models";
         line-height: 1.1;
       }
 
+      .results-count {
+        color: var(--color-text-secondary);
+        font-size: var(--font-size-sm);
+        font-weight: 600;
+      }
+
       .results-panel .result-hint {
         display: none;
       }
@@ -109,7 +114,7 @@ import { PosProductResponse } from "../data/sales.models";
       .result-hint {
         margin: 0;
         color: var(--color-text-secondary);
-        font-weight: 700;
+        font-weight: 600;
         font-size: var(--font-size-xs);
       }
 
@@ -130,7 +135,7 @@ import { PosProductResponse } from "../data/sales.models";
         place-items: center;
         gap: var(--space-1);
         min-height: 0;
-        border: 2px dashed var(--color-border-default);
+        border: 1px dashed var(--color-border-default);
         border-radius: var(--radius-lg);
         background: var(--color-bg-soft);
         color: var(--color-text-secondary);
@@ -141,24 +146,18 @@ import { PosProductResponse } from "../data/sales.models";
       .result-card {
         display: grid;
         grid-template-columns: minmax(0, 1fr) minmax(198px, auto);
-        gap: 0.45rem;
+        gap: 0.75rem;
         align-items: center;
         border: 1px solid var(--color-border-default);
         border-radius: var(--radius-lg);
-        background:
-          linear-gradient(
-            180deg,
-            rgba(18, 23, 184, 0.04),
-            rgba(18, 23, 184, 0)
-          ),
-          var(--color-bg-surface);
-        padding: 0.35rem;
+        background: var(--color-bg-surface);
+        padding: 0.6rem 0.7rem;
       }
 
       .result-card__body,
       .result-card__action {
         display: grid;
-        gap: 0.14rem;
+        gap: 0.2rem;
       }
 
       .result-card__body {
@@ -169,10 +168,10 @@ import { PosProductResponse } from "../data/sales.models";
         display: flex;
         justify-content: flex-start;
         align-items: center;
-        gap: 0.34rem;
+        gap: 0.38rem;
         min-width: 0;
         flex-wrap: wrap;
-        opacity: 0.82;
+        opacity: 0.88;
       }
 
       .result-card h3 {
@@ -180,14 +179,14 @@ import { PosProductResponse } from "../data/sales.models";
         display: -webkit-box;
         -webkit-box-orient: vertical;
         -webkit-line-clamp: 2;
-        font-size: 1.06rem;
-        font-weight: 900;
+        font-size: 1.02rem;
+        font-weight: 700;
         line-height: 1.18;
         color: var(--color-text-primary);
       }
 
       .result-card__action {
-        grid-template-columns: minmax(72px, auto) minmax(7.5rem, 1fr);
+        grid-template-columns: minmax(84px, auto) minmax(8rem, 1fr);
         align-items: center;
         align-content: center;
         gap: 0.5rem;
@@ -202,12 +201,12 @@ import { PosProductResponse } from "../data/sales.models";
       .result-card__sku {
         margin: 0;
         width: fit-content;
-        border-radius: var(--radius-pill);
-        background: var(--color-bg-soft);
+        border-radius: 0;
+        background: transparent;
         color: var(--color-text-secondary);
-        padding: 0.03rem 0.3rem;
-        font-size: 0.58rem;
-        font-weight: 700;
+        padding: 0;
+        font-size: 0.68rem;
+        font-weight: 600;
         letter-spacing: 0.03em;
       }
 
@@ -215,7 +214,7 @@ import { PosProductResponse } from "../data/sales.models";
         display: flex;
         flex-wrap: wrap;
         justify-content: flex-start;
-        gap: 0.22rem;
+        gap: 0.4rem;
         min-width: 0;
         margin: 0;
       }
@@ -223,7 +222,7 @@ import { PosProductResponse } from "../data/sales.models";
       .result-card__meta-separator {
         color: var(--color-text-secondary);
         font-weight: 700;
-        font-size: 0.56rem;
+        font-size: 0.62rem;
         line-height: 1;
       }
 
@@ -232,42 +231,40 @@ import { PosProductResponse } from "../data/sales.models";
         display: inline-flex;
         align-items: center;
         gap: 0.22rem;
-        border-radius: var(--radius-md);
-        background: var(--color-bg-soft);
-        padding: 0.03rem 0.3rem;
+        border-radius: 0;
+        background: transparent;
+        padding: 0;
         white-space: nowrap;
         color: var(--color-text-secondary);
-        font-size: 0.58rem;
-        font-weight: 700;
+        font-size: 0.68rem;
+        font-weight: 600;
       }
 
       .result-meta__label {
         color: var(--color-text-secondary);
-        font-size: 0.56rem;
-        font-weight: 700;
+        font-size: 0.62rem;
+        font-weight: 600;
         letter-spacing: 0.04em;
         text-transform: uppercase;
       }
 
       .result-meta__value {
         margin: 0;
-        font-weight: 700;
+        font-weight: 600;
       }
 
       .barcode-badge {
         display: inline-flex;
         width: fit-content;
-        border-radius: var(--radius-pill);
-        background: var(--color-bg-soft);
+        border-radius: 0;
+        background: transparent;
         color: var(--color-text-secondary);
-        padding: 0.03rem 0.3rem;
-        font-size: 0.58rem;
-        font-weight: 700;
+        padding: 0;
+        font-size: 0.68rem;
+        font-weight: 600;
       }
 
       .barcode-badge--missing {
-        border: 1px solid var(--color-border-default);
-        background: var(--color-bg-soft);
         color: var(--color-text-secondary);
       }
 
@@ -275,7 +272,7 @@ import { PosProductResponse } from "../data/sales.models";
         margin: 0;
         color: var(--color-brand-primary);
         font-size: clamp(0.98rem, 1.35vw, 1.18rem);
-        font-weight: 900;
+        font-weight: 800;
         text-align: right;
         line-height: 1;
       }
@@ -289,19 +286,13 @@ import { PosProductResponse } from "../data/sales.models";
 
       .pos-button--add {
         width: 100%;
-        min-height: 2.35rem;
+        min-height: 2.65rem;
         background: var(--color-brand-accent);
         font-size: var(--font-size-md);
       }
 
       :host-context(body[data-theme="dark"]) .result-card {
-        background:
-          linear-gradient(
-            180deg,
-            rgba(244, 194, 13, 0.08),
-            rgba(244, 194, 13, 0)
-          ),
-          var(--color-bg-surface);
+        border-color: rgba(148, 163, 184, 0.22);
       }
 
       .results-grid::-webkit-scrollbar {

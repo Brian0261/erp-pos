@@ -262,18 +262,17 @@ import {
         justify-content: flex-end;
         align-items: center;
         gap: var(--space-2);
-        border: 1px solid rgba(255, 255, 255, 0.14);
+        border: 1px solid rgba(255, 255, 255, 0.12);
         border-radius: var(--radius-lg);
         background:
           linear-gradient(
             135deg,
-            rgba(18, 23, 184, 0.74),
-            rgba(16, 17, 20, 0.86)
+            rgba(18, 23, 184, 0.68),
+            rgba(16, 17, 20, 0.84)
           ),
           var(--color-brand-primary);
         color: var(--color-text-on-dark);
-        padding: 0.36rem 0.55rem;
-        box-shadow: var(--shadow-sm);
+        padding: 0.45rem 0.65rem;
       }
 
       .pos-hero .ui-page-title {
@@ -309,14 +308,14 @@ import {
       .pos-cash-status {
         display: inline-flex;
         align-items: center;
-        gap: 0.35rem;
+        gap: 0.4rem;
         min-height: 2.12rem;
         max-width: min(42vw, 22rem);
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        border-radius: var(--radius-pill);
-        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: var(--radius-lg);
+        background: rgba(255, 255, 255, 0.08);
         color: rgba(255, 255, 255, 0.9);
-        padding: 0.34rem 0.65rem;
+        padding: 0.42rem 0.72rem;
         font-size: var(--font-size-sm);
         line-height: 1.1;
         white-space: nowrap;
@@ -332,7 +331,7 @@ import {
 
       .pos-cash-status strong {
         flex: 0 0 auto;
-        font-weight: 900;
+        font-weight: 700;
       }
 
       .pos-cash-status span:not(.pos-cash-dot) {
@@ -345,12 +344,12 @@ import {
         flex: 0 0 auto;
         border-radius: 999px;
         background: var(--color-success);
-        box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.18);
+        box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.16);
       }
 
       .pos-cash-status--closed .pos-cash-dot {
         background: var(--color-danger);
-        box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.18);
+        box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.16);
       }
 
       .pos-shell {
@@ -400,7 +399,7 @@ import {
 
       .checkout-actions {
         display: grid;
-        gap: var(--space-1);
+        gap: var(--space-2);
       }
 
       .checkout-button {
@@ -408,8 +407,8 @@ import {
         border-radius: var(--radius-lg);
         background: var(--color-brand-accent);
         font-size: clamp(1.05rem, 1.7vw, 1.35rem);
-        font-weight: 900;
-        letter-spacing: 0.06em;
+        font-weight: 800;
+        letter-spacing: 0.04em;
       }
 
       .sale-link {

@@ -91,7 +91,6 @@ import { WarehouseResponse } from "../../inventory/data/inventory.models";
         border: 1px solid var(--color-border-default);
         border-radius: var(--radius-lg);
         background: var(--color-bg-surface);
-        box-shadow: var(--shadow-sm);
       }
 
       .field,
@@ -103,7 +102,7 @@ import { WarehouseResponse } from "../../inventory/data/inventory.models";
       .field > span,
       .scan-label {
         font-size: var(--font-size-sm);
-        font-weight: 800;
+        font-weight: 700;
         color: var(--color-text-secondary);
       }
 
@@ -123,7 +122,7 @@ import { WarehouseResponse } from "../../inventory/data/inventory.models";
         min-height: 2.55rem;
         padding: 0.58rem 0.72rem;
         border-radius: var(--radius-md);
-        border: 1px solid var(--color-border-strong);
+        border: 1px solid var(--color-border-default);
         background: var(--color-bg-surface);
         color: var(--color-text-primary);
       }
@@ -136,15 +135,15 @@ import { WarehouseResponse } from "../../inventory/data/inventory.models";
         align-items: end;
         gap: var(--space-2);
         border-radius: calc(var(--radius-lg) + 0.2rem);
-        border: 2px solid rgba(18, 23, 184, 0.3);
+        border: 1px solid rgba(18, 23, 184, 0.22);
         background:
           linear-gradient(
             135deg,
-            rgba(18, 23, 184, 0.14),
-            rgba(34, 197, 246, 0.08)
+            rgba(18, 23, 184, 0.08),
+            rgba(34, 197, 246, 0.04)
           ),
           var(--color-bg-soft);
-        padding: 0.65rem;
+        padding: 0.75rem;
       }
 
       .scan-label {
@@ -152,12 +151,12 @@ import { WarehouseResponse } from "../../inventory/data/inventory.models";
       }
 
       .scan-input {
-        min-height: 2.8rem;
-        border-width: 2px;
-        border-color: rgba(18, 23, 184, 0.38);
+        min-height: 3rem;
+        border-width: 1px;
+        border-color: rgba(18, 23, 184, 0.24);
         border-radius: var(--radius-lg);
         font-size: clamp(1rem, 1.35vw, 1.2rem);
-        font-weight: 800;
+        font-weight: 700;
         letter-spacing: 0.01em;
       }
 
@@ -173,17 +172,17 @@ import { WarehouseResponse } from "../../inventory/data/inventory.models";
         grid-row: 2;
         display: grid;
         grid-template-columns: minmax(0, 1fr);
-        gap: var(--space-1);
+        gap: var(--space-2);
         align-items: center;
         min-width: 0;
       }
 
       .quick-search > span {
-        display: none;
+        display: block;
         color: var(--color-text-secondary);
         font-size: var(--font-size-xs);
-        font-weight: 900;
-        letter-spacing: 0.06em;
+        font-weight: 700;
+        letter-spacing: 0.04em;
         text-transform: uppercase;
       }
 
@@ -195,13 +194,14 @@ import { WarehouseResponse } from "../../inventory/data/inventory.models";
       }
 
       .quick-search__button {
-        min-height: 1.9rem;
+        min-height: 2.2rem;
         flex: 0 0 auto;
-        border: 1px solid var(--color-border-strong);
-        background: var(--color-bg-soft);
+        border: 1px solid var(--color-border-default);
+        background: color-mix(in srgb, var(--color-bg-soft) 78%, var(--color-bg-surface));
         color: var(--color-text-primary);
-        padding: 0.26rem 0.58rem;
+        padding: 0.35rem 0.7rem;
         font-size: var(--font-size-sm);
+        font-weight: 600;
         white-space: nowrap;
       }
 
@@ -213,14 +213,15 @@ import { WarehouseResponse } from "../../inventory/data/inventory.models";
       }
 
       .pos-button--scan {
-        min-height: 2.8rem;
+        min-height: 3rem;
         background: var(--color-brand-accent);
         font-size: var(--font-size-md);
         letter-spacing: 0.01em;
       }
 
       .pos-button--quiet {
-        background: #4b5563;
+        background: color-mix(in srgb, var(--color-text-primary) 16%, var(--color-bg-soft));
+        color: var(--color-text-primary);
       }
 
       .ui-button[disabled] {
@@ -241,7 +242,7 @@ import { WarehouseResponse } from "../../inventory/data/inventory.models";
 
       @media (max-height: 820px) and (min-width: 981px) {
         .quick-search > span {
-          display: none;
+          display: block;
         }
 
         .quick-search {
@@ -249,8 +250,8 @@ import { WarehouseResponse } from "../../inventory/data/inventory.models";
         }
 
         .quick-search__button {
-          min-height: 1.75rem;
-          padding: 0.2rem 0.5rem;
+          min-height: 2rem;
+          padding: 0.24rem 0.56rem;
           font-size: var(--font-size-xs);
         }
 

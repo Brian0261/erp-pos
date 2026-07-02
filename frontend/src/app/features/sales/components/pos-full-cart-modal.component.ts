@@ -145,8 +145,8 @@ import { PosCartItem } from "../data/pos-ui.models";
         display: grid;
         place-items: center;
         padding: var(--space-4);
-        background: rgba(16, 17, 20, 0.62);
-        backdrop-filter: blur(3px);
+        background: rgba(16, 17, 20, 0.54);
+        backdrop-filter: blur(4px);
       }
 
       .full-cart-modal {
@@ -158,7 +158,7 @@ import { PosCartItem } from "../data/pos-ui.models";
         border: 1px solid var(--color-border-default);
         border-radius: calc(var(--radius-lg) + 0.35rem);
         background: var(--color-bg-surface);
-        box-shadow: 0 24px 80px rgba(16, 17, 20, 0.36);
+        box-shadow: 0 20px 60px rgba(16, 17, 20, 0.24);
         padding: var(--space-4);
         overflow: hidden;
       }
@@ -178,7 +178,7 @@ import { PosCartItem } from "../data/pos-ui.models";
       .full-cart-count {
         color: var(--color-text-secondary);
         font-size: var(--font-size-sm);
-        font-weight: 800;
+        font-weight: 600;
       }
 
       .full-cart-summary {
@@ -186,16 +186,9 @@ import { PosCartItem } from "../data/pos-ui.models";
         place-items: center;
         gap: 0.05rem;
         min-width: 10.75rem;
-        border: 1px solid var(--color-border-strong);
+        border: 1px solid var(--color-border-default);
         border-radius: var(--radius-lg);
-        background:
-          linear-gradient(
-            180deg,
-            var(--color-bg-surface),
-            var(--color-bg-soft)
-          ),
-          var(--color-bg-soft);
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+        background: color-mix(in srgb, var(--color-bg-soft) 84%, var(--color-bg-surface));
         padding: 0.62rem var(--space-3);
         text-align: center;
       }
@@ -204,7 +197,7 @@ import { PosCartItem } from "../data/pos-ui.models";
       .full-cart-line span {
         color: var(--color-text-secondary);
         font-size: var(--font-size-xs);
-        font-weight: 900;
+        font-weight: 700;
         letter-spacing: 0.06em;
         text-transform: uppercase;
       }
@@ -213,7 +206,7 @@ import { PosCartItem } from "../data/pos-ui.models";
         color: var(--color-text-primary);
         font-size: clamp(1.38rem, 2vw, 1.65rem);
         font-variant-numeric: tabular-nums;
-        font-weight: 900;
+        font-weight: 800;
         letter-spacing: -0.03em;
         line-height: 1.05;
       }
@@ -223,7 +216,7 @@ import { PosCartItem } from "../data/pos-ui.models";
         place-items: center;
         gap: var(--space-1);
         min-height: 16rem;
-        border: 2px dashed var(--color-border-default);
+        border: 1px dashed var(--color-border-default);
         border-radius: var(--radius-lg);
         background: var(--color-bg-soft);
         color: var(--color-text-secondary);
@@ -246,10 +239,10 @@ import { PosCartItem } from "../data/pos-ui.models";
           minmax(96px, 0.36fr) minmax(108px, 0.42fr) minmax(76px, auto);
         gap: 0.55rem;
         align-items: center;
-        border: 1px solid var(--color-border-default);
+        border: 1px solid color-mix(in srgb, var(--color-border-default) 86%, transparent);
         border-radius: var(--radius-lg);
         background: var(--color-bg-surface);
-        padding: 0.62rem 0.7rem;
+        padding: 0.72rem 0.8rem;
       }
 
       .full-cart-product {
@@ -267,19 +260,19 @@ import { PosCartItem } from "../data/pos-ui.models";
         gap: 0.22rem 0.32rem;
         min-width: 0;
         color: var(--color-text-secondary);
-        font-size: 0.58rem;
+        font-size: 0.68rem;
         opacity: 0.8;
       }
 
       .full-cart-sku {
         margin: 0;
         width: fit-content;
-        border-radius: var(--radius-pill);
-        background: var(--color-bg-soft);
+        border-radius: 0;
+        background: transparent;
         color: var(--color-text-secondary);
-        padding: 0.03rem 0.3rem;
-        font-size: 0.58rem;
-        font-weight: 700;
+        padding: 0;
+        font-size: 0.68rem;
+        font-weight: 600;
         letter-spacing: 0.03em;
         line-height: 1.15;
       }
@@ -292,13 +285,13 @@ import { PosCartItem } from "../data/pos-ui.models";
         -webkit-line-clamp: 2;
         text-overflow: ellipsis;
         white-space: normal;
-        font-size: 1rem;
-        font-weight: 900;
+        font-size: 0.98rem;
+        font-weight: 700;
         line-height: 1.16;
       }
 
       .full-cart-product-price {
-        font-weight: 700;
+        font-weight: 600;
         color: var(--color-text-secondary);
         white-space: nowrap;
       }
@@ -306,20 +299,20 @@ import { PosCartItem } from "../data/pos-ui.models";
       .full-cart-barcode-note {
         display: inline-flex;
         width: fit-content;
-        border: 1px solid var(--color-border-default);
-        border-radius: var(--radius-pill);
-        background: var(--color-bg-soft);
+        border: 0;
+        border-radius: 0;
+        background: transparent;
         color: var(--color-text-secondary);
-        padding: 0.03rem 0.34rem;
-        font-size: 0.58rem;
-        font-weight: 700;
+        padding: 0;
+        font-size: 0.68rem;
+        font-weight: 600;
         letter-spacing: 0.02em;
       }
 
       .full-cart-meta-separator {
         color: var(--color-text-secondary);
-        font-size: 0.58rem;
-        font-weight: 700;
+        font-size: 0.62rem;
+        font-weight: 600;
         line-height: 1;
       }
 
@@ -331,24 +324,24 @@ import { PosCartItem } from "../data/pos-ui.models";
       .mini-field > span {
         color: var(--color-text-secondary);
         font-size: var(--font-size-sm);
-        font-weight: 800;
+        font-weight: 700;
       }
 
       .mini-field input {
         width: 100%;
         min-height: 2.35rem;
-        border: 1px solid var(--color-border-strong);
+        border: 1px solid var(--color-border-default);
         border-radius: var(--radius-md);
         background: var(--color-bg-surface);
         color: var(--color-text-primary);
-        font-weight: 800;
+        font-weight: 700;
         padding: 0.58rem 0.72rem;
       }
 
       .quantity-tools {
         display: grid;
-        grid-template-columns: 1.8rem minmax(3.2rem, 1fr) 1.8rem;
-        gap: 0.22rem;
+        grid-template-columns: 2.3rem minmax(3.6rem, 1fr) 2.3rem;
+        gap: 0.35rem;
         align-items: center;
       }
 
@@ -357,13 +350,13 @@ import { PosCartItem } from "../data/pos-ui.models";
       }
 
       .quantity-stepper {
-        min-height: 1.75rem;
+        min-height: 2.2rem;
         padding: 0;
         border-radius: var(--radius-sm);
         background: var(--color-bg-soft);
-        border: 1px solid var(--color-border-strong);
+        border: 1px solid var(--color-border-default);
         color: var(--color-text-primary);
-        font-weight: 900;
+        font-weight: 700;
       }
 
       .full-cart-line {
@@ -378,7 +371,7 @@ import { PosCartItem } from "../data/pos-ui.models";
         color: var(--color-text-primary);
         font-size: 1rem;
         font-variant-numeric: tabular-nums;
-        font-weight: 900;
+        font-weight: 800;
         line-height: 1.08;
       }
 
@@ -390,7 +383,8 @@ import { PosCartItem } from "../data/pos-ui.models";
       }
 
       .pos-button--quiet {
-        background: #4b5563;
+        background: color-mix(in srgb, var(--color-text-primary) 16%, var(--color-bg-soft));
+        color: var(--color-text-primary);
       }
 
       .pos-button--small {
@@ -417,19 +411,8 @@ import { PosCartItem } from "../data/pos-ui.models";
       }
 
       :host-context(body[data-theme="dark"]) .full-cart-summary {
-        border-color: rgba(96, 165, 250, 0.32);
-        background:
-          linear-gradient(
-            180deg,
-            rgba(30, 41, 59, 0.94),
-            rgba(15, 23, 42, 0.88)
-          ),
-          var(--color-bg-soft);
-      }
-
-      :host-context(body[data-theme="dark"]) .full-cart-barcode-note {
-        border-color: rgba(148, 163, 184, 0.24);
-        background: rgba(148, 163, 184, 0.1);
+        border-color: rgba(96, 165, 250, 0.22);
+        background: rgba(30, 41, 59, 0.72);
       }
 
       :host-context(body[data-theme="dark"]) .full-cart-remove {

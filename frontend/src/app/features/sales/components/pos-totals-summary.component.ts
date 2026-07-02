@@ -35,10 +35,9 @@ import { Component, Input } from "@angular/core";
   styles: [
     `
       .total-board {
-        border: 1px solid rgba(18, 23, 184, 0.28);
+        border: 1px solid rgba(18, 23, 184, 0.18);
         border-radius: var(--radius-lg);
         background: var(--color-bg-surface);
-        box-shadow: var(--shadow-sm);
         display: grid;
         gap: var(--space-2);
         min-height: 0;
@@ -54,10 +53,10 @@ import { Component, Input } from "@angular/core";
         gap: 0.18rem;
         border-radius: var(--radius-lg);
         background:
-          linear-gradient(135deg, var(--color-brand-primary), #0f172a),
+          linear-gradient(135deg, var(--color-brand-primary), rgba(15, 23, 42, 0.94)),
           var(--color-brand-primary);
         color: var(--color-text-on-dark);
-        padding: 0.4rem var(--space-2);
+        padding: 0.55rem var(--space-2);
       }
 
       .total-main span {
@@ -67,7 +66,7 @@ import { Component, Input } from "@angular/core";
       .total-grid span,
       .total-main span {
         font-size: 0.56rem;
-        font-weight: 700;
+        font-weight: 600;
         letter-spacing: 0.04em;
         text-transform: uppercase;
       }
@@ -85,14 +84,15 @@ import { Component, Input } from "@angular/core";
 
       .total-grid article {
         display: grid;
-        gap: 0;
+        gap: 0.08rem;
         border-radius: var(--radius-md);
-        background: var(--color-bg-soft);
-        padding: 0.22rem var(--space-1);
+        background: color-mix(in srgb, var(--color-bg-soft) 82%, var(--color-bg-surface));
+        padding: 0.35rem var(--space-1);
       }
 
       .total-grid strong {
         font-size: var(--font-size-sm);
+        font-weight: 700;
       }
 
       .total-change strong {

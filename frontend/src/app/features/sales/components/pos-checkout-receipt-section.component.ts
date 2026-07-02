@@ -161,7 +161,6 @@ import { PosReceiptType } from "../data/pos-ui.models";
         border: 1px solid var(--color-border-default);
         border-radius: var(--radius-lg);
         background: var(--color-bg-surface);
-        box-shadow: var(--shadow-sm);
         padding: var(--space-2);
       }
 
@@ -182,8 +181,8 @@ import { PosReceiptType } from "../data/pos-ui.models";
         margin: 0 0 0.2rem;
         color: var(--color-brand-primary);
         font-size: var(--font-size-xs);
-        font-weight: 900;
-        letter-spacing: 0.12em;
+        font-weight: 700;
+        letter-spacing: 0.08em;
         text-transform: uppercase;
       }
 
@@ -199,45 +198,45 @@ import { PosReceiptType } from "../data/pos-ui.models";
       .mini-field > span {
         color: var(--color-text-secondary);
         font-size: var(--font-size-sm);
-        font-weight: 800;
+        font-weight: 700;
       }
 
       .mini-field input,
       .mini-field select {
         width: 100%;
         min-height: 2.35rem;
-        border: 1px solid var(--color-border-strong);
+        border: 1px solid var(--color-border-default);
         border-radius: var(--radius-md);
         background: var(--color-bg-surface);
         color: var(--color-text-primary);
-        font-weight: 800;
+        font-weight: 700;
         padding: 0.48rem 0.62rem;
       }
 
       .receipt-type-list {
         display: grid;
         grid-template-columns: repeat(3, minmax(120px, 1fr));
-        gap: var(--space-2);
+        gap: var(--space-1);
       }
 
       .receipt-segment {
         display: flex;
         align-items: center;
         justify-content: center;
-        min-height: 2.35rem;
+        min-height: 2.6rem;
         border: 1px solid var(--color-border-default);
-        border-radius: var(--radius-sm);
-        background: var(--color-bg-soft);
+        border-radius: var(--radius-md);
+        background: color-mix(in srgb, var(--color-bg-soft) 84%, var(--color-bg-surface));
         color: var(--color-text-primary);
         cursor: pointer;
-        font-weight: 800;
-        padding: 0.48rem 0.58rem;
+        font-weight: 700;
+        padding: 0.55rem 0.62rem;
       }
 
       .receipt-segment.is-active {
         border-color: var(--color-brand-primary);
-        box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-brand-primary) 35%, transparent);
-        background: color-mix(in srgb, var(--color-brand-primary) 8%, var(--color-bg-soft));
+        box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-brand-primary) 22%, transparent);
+        background: color-mix(in srgb, var(--color-brand-primary) 10%, var(--color-bg-surface));
       }
 
       .receipt-customer-grid {
@@ -260,7 +259,7 @@ import { PosReceiptType } from "../data/pos-ui.models";
         margin: 0;
         color: var(--color-danger);
         font-size: var(--font-size-xs);
-        font-weight: 700;
+        font-weight: 600;
       }
 
       @media (max-width: 640px) {

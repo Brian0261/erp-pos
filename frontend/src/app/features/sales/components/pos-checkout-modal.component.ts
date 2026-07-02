@@ -127,7 +127,7 @@ import { PosTotalsSummaryComponent } from "./pos-totals-summary.component";
         display: grid;
         place-items: center;
         padding: var(--space-3);
-        background: rgba(15, 23, 42, 0.62);
+        background: rgba(15, 23, 42, 0.56);
         backdrop-filter: blur(10px);
       }
 
@@ -140,7 +140,7 @@ import { PosTotalsSummaryComponent } from "./pos-totals-summary.component";
         border: 1px solid var(--color-border-default);
         border-radius: calc(var(--radius-lg) + 0.35rem);
         background: var(--color-bg-surface);
-        box-shadow: var(--shadow-lg);
+        box-shadow: 0 20px 60px rgba(15, 23, 42, 0.2);
         padding: var(--space-3);
       }
 
@@ -163,8 +163,8 @@ import { PosTotalsSummaryComponent } from "./pos-totals-summary.component";
         margin: 0 0 0.2rem;
         color: var(--color-brand-primary);
         font-size: var(--font-size-xs);
-        font-weight: 900;
-        letter-spacing: 0.12em;
+        font-weight: 700;
+        letter-spacing: 0.08em;
         text-transform: uppercase;
       }
 
@@ -181,17 +181,17 @@ import { PosTotalsSummaryComponent } from "./pos-totals-summary.component";
       .checkout-modal__intro {
         display: grid;
         gap: var(--space-1);
-        border: 1px solid rgba(18, 23, 184, 0.18);
+        border: 1px solid rgba(18, 23, 184, 0.14);
         border-radius: var(--radius-lg);
-        background: var(--color-bg-soft);
+        background: color-mix(in srgb, var(--color-bg-soft) 80%, var(--color-bg-surface));
         padding: var(--space-3);
       }
 
       .checkout-modal__intro span {
         color: var(--color-text-secondary);
         font-size: var(--font-size-xs);
-        font-weight: 900;
-        letter-spacing: 0.08em;
+        font-weight: 700;
+        letter-spacing: 0.05em;
         text-transform: uppercase;
       }
 
@@ -208,7 +208,7 @@ import { PosTotalsSummaryComponent } from "./pos-totals-summary.component";
 
       .checkout-modal__warning {
         color: var(--color-danger);
-        font-weight: 800;
+        font-weight: 700;
       }
 
       .checkout-modal__actions {
@@ -221,7 +221,7 @@ import { PosTotalsSummaryComponent } from "./pos-totals-summary.component";
 
       .checkout-modal__action--primary {
         font-size: var(--font-size-lg);
-        font-weight: 900;
+        font-weight: 800;
       }
 
       @media (max-width: 640px) {
