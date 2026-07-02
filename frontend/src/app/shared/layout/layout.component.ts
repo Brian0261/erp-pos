@@ -1433,7 +1433,6 @@ export class LayoutComponent implements OnInit, OnDestroy {
 
   changeThemeFromMenu(): void {
     this.toggleTheme();
-    this.closeUserMenu();
   }
 
   logoutFromMenu(): void {
