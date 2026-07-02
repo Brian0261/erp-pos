@@ -68,7 +68,7 @@ const ROLES_ECOMMERCE_ADMIN: AppRole[] = ["ADMIN", "SUPERVISOR"];
               />
               <div class="sidebar-brand-copy">
                 <p class="sidebar-brand-kicker">InkToy ERP/POS</p>
-                <h2>Operacion diaria</h2>
+                <h2>Operacion</h2>
               </div>
             </div>
 
@@ -86,21 +86,6 @@ const ROLES_ECOMMERCE_ADMIN: AppRole[] = ["ADMIN", "SUPERVISOR"];
               <span class="visually-hidden">{{ sidebarToggleAriaLabel }}</span>
             </button>
           </div>
-
-          <section
-            class="sidebar-user ui-card"
-            aria-label="Usuario actual"
-            *ngIf="!isSidebarCompact"
-          >
-            <p class="sidebar-user-label">Usuario activo</p>
-            <p class="sidebar-user-name">
-              {{ currentUser?.username || "Usuario" }}
-            </p>
-            <p class="sidebar-user-role">
-              Rol:
-              <span class="ui-badge sidebar-role-badge">{{ primaryRole }}</span>
-            </p>
-          </section>
         </div>
 
         <nav class="sidebar-menu" aria-label="Menu principal">
@@ -184,9 +169,13 @@ const ROLES_ECOMMERCE_ADMIN: AppRole[] = ["ADMIN", "SUPERVISOR"];
           <button
             type="button"
             class="ui-button ui-button--secondary sidebar-logout"
+            [attr.aria-label]="logoutAriaLabel"
+            [attr.title]="logoutAriaLabel"
+            [attr.data-tooltip]="isSidebarCompact ? logoutAriaLabel : null"
             (click)="logout()"
           >
-            Cerrar sesion
+            <span class="sidebar-logout-icon" aria-hidden="true">⎋</span>
+            <span class="sidebar-logout-label">Cerrar sesion</span>
           </button>
         </footer>
       </aside>
@@ -194,32 +183,67 @@ const ROLES_ECOMMERCE_ADMIN: AppRole[] = ["ADMIN", "SUPERVISOR"];
       <section class="workspace">
         <header class="topbar">
           <div class="topbar-context">
-            <p class="topbar-kicker">Panel principal</p>
             <h1>{{ currentSectionLabel }}</h1>
           </div>
 
           <div class="topbar-actions">
             <button
               type="button"
-              class="ui-button theme-toggle"
-              [attr.aria-label]="themeToggleAriaLabel"
-              [attr.title]="themeToggleAriaLabel"
-              (click)="toggleTheme()"
+              class="topbar-user-menu"
+              [attr.aria-label]="userMenuAriaLabel"
+              [attr.aria-expanded]="isUserMenuOpen"
+              aria-haspopup="menu"
+              (click)="toggleUserMenu()"
             >
-              <span class="theme-toggle-icon" aria-hidden="true">{{
-                isDarkTheme ? "☀" : "☾"
-              }}</span>
-              <span class="theme-toggle-label">{{
-                isDarkTheme ? "Modo claro" : "Modo oscuro"
-              }}</span>
+              <span class="topbar-user-avatar" aria-hidden="true">{{ userInitial }}</span>
+              <span class="topbar-user-name">{{ currentUser?.username || "Usuario" }}</span>
+              <span class="topbar-user-chevron" aria-hidden="true">▾</span>
             </button>
 
-            <div class="topbar-user">
-              <span class="topbar-user-name">{{
-                currentUser?.username || "Usuario"
-              }}</span>
-              <span class="ui-badge topbar-role-badge">{{ primaryRole }}</span>
-            </div>
+            <section
+              class="topbar-user-panel"
+              *ngIf="isUserMenuOpen"
+              role="menu"
+              aria-label="Menu de usuario"
+              (click)="$event.stopPropagation()"
+            >
+              <div class="topbar-user-panel__identity">
+                <span class="topbar-user-panel__avatar" aria-hidden="true">{{ userInitial }}</span>
+                <div class="topbar-user-panel__copy">
+                  <strong>{{ currentUser?.username || "Usuario" }}</strong>
+                  <span *ngIf="currentUser?.email">{{ currentUser?.email }}</span>
+                  <small>Rol: {{ primaryRole }}</small>
+                </div>
+              </div>
+
+              <div class="topbar-user-panel__actions">
+                <button
+                  type="button"
+                  class="topbar-user-panel__action"
+                  role="menuitem"
+                  [attr.aria-label]="themeToggleAriaLabel"
+                  [attr.title]="themeToggleAriaLabel"
+                  (click)="changeThemeFromMenu()"
+                >
+                  <span class="topbar-user-panel__action-icon" aria-hidden="true">{{
+                    isDarkTheme ? "☀" : "☾"
+                  }}</span>
+                  <span>{{ isDarkTheme ? "Cambiar a modo claro" : "Cambiar a modo oscuro" }}</span>
+                </button>
+
+                <button
+                  type="button"
+                  class="topbar-user-panel__action topbar-user-panel__action--danger"
+                  role="menuitem"
+                  [attr.aria-label]="logoutAriaLabel"
+                  [attr.title]="logoutAriaLabel"
+                  (click)="logoutFromMenu()"
+                >
+                  <span class="topbar-user-panel__action-icon" aria-hidden="true">⎋</span>
+                  <span>Cerrar sesión</span>
+                </button>
+              </div>
+            </section>
           </div>
         </header>
 
@@ -248,7 +272,7 @@ const ROLES_ECOMMERCE_ADMIN: AppRole[] = ["ADMIN", "SUPERVISOR"];
       }
 
       .layout-shell.is-sidebar-compact {
-        grid-template-columns: var(--layout-sidebar-width-compact, 88px) 1fr;
+        grid-template-columns: var(--layout-sidebar-width-compact, 76px) 1fr;
       }
 
       .sidebar {
@@ -258,10 +282,10 @@ const ROLES_ECOMMERCE_ADMIN: AppRole[] = ["ADMIN", "SUPERVISOR"];
           var(--layout-sidebar-bg-end) 65%
         );
         color: var(--color-text-on-dark);
-        padding: var(--space-5) var(--space-4);
+        padding: var(--space-4) var(--space-3);
         display: grid;
         grid-template-rows: auto minmax(0, 1fr) auto;
-        gap: var(--space-4);
+        gap: var(--space-3);
         height: 100vh;
         height: 100dvh;
         min-height: 100vh;
@@ -274,13 +298,13 @@ const ROLES_ECOMMERCE_ADMIN: AppRole[] = ["ADMIN", "SUPERVISOR"];
       .sidebar-header {
         display: flex;
         flex-direction: column;
-        gap: var(--space-4);
+        gap: var(--space-2);
         min-height: 0;
       }
 
       .sidebar-top {
         display: flex;
-        align-items: flex-start;
+        align-items: center;
         justify-content: space-between;
         gap: var(--space-2);
         flex-shrink: 0;
@@ -288,19 +312,19 @@ const ROLES_ECOMMERCE_ADMIN: AppRole[] = ["ADMIN", "SUPERVISOR"];
 
       .sidebar-brand {
         display: grid;
-        grid-template-columns: 68px 1fr;
+        grid-template-columns: 56px 1fr;
         align-items: center;
-        gap: var(--space-3);
+        gap: var(--space-2);
         min-width: 0;
       }
 
       .sidebar-brand-logo {
         width: 100%;
-        max-width: 68px;
+        max-width: 56px;
         background: #ffffff;
         border-radius: var(--radius-md);
-        padding: var(--space-1);
-        box-shadow: 0 8px 20px rgba(16, 17, 20, 0.28);
+        padding: 0.35rem;
+        box-shadow: 0 6px 16px rgba(16, 17, 20, 0.22);
       }
 
       .sidebar-brand-kicker {
@@ -313,18 +337,18 @@ const ROLES_ECOMMERCE_ADMIN: AppRole[] = ["ADMIN", "SUPERVISOR"];
       }
 
       .sidebar-brand-copy h2 {
-        margin: var(--space-1) 0 0;
+        margin: 0.1rem 0 0;
         font-family: var(--font-family-display);
-        font-size: 1.15rem;
+        font-size: 1rem;
         line-height: 1.2;
       }
 
       .sidebar-toggle {
         border: 1px solid rgba(255, 255, 255, 0.3);
         border-radius: var(--radius-sm);
-        width: 2rem;
-        height: 2rem;
-        background: rgba(255, 255, 255, 0.12);
+        width: 1.9rem;
+        height: 1.9rem;
+        background: rgba(255, 255, 255, 0.08);
         color: #ffffff;
         cursor: pointer;
         display: inline-flex;
@@ -351,50 +375,12 @@ const ROLES_ECOMMERCE_ADMIN: AppRole[] = ["ADMIN", "SUPERVISOR"];
         line-height: 1;
       }
 
-      .sidebar-user {
-        background: var(--layout-sidebar-surface-bg);
-        border-color: var(--layout-sidebar-surface-border);
-        box-shadow: none;
-        color: var(--color-text-on-dark);
-        padding: var(--space-3);
-        flex-shrink: 0;
-      }
-
-      .sidebar-user-label {
-        margin: 0;
-        font-size: var(--font-size-xs);
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        color: var(--layout-sidebar-muted);
-        font-weight: 700;
-      }
-
-      .sidebar-user-name {
-        margin: var(--space-1) 0 var(--space-2);
-        font-size: var(--font-size-lg);
-        font-weight: 800;
-      }
-
-      .sidebar-user-role {
-        margin: 0;
-        display: flex;
-        align-items: center;
-        gap: var(--space-2);
-        font-size: var(--font-size-sm);
-      }
-
-      .sidebar-role-badge {
-        background: rgba(244, 194, 13, 0.18);
-        border: 1px solid rgba(244, 194, 13, 0.5);
-        color: #ffe082;
-      }
-
       .sidebar-menu {
         height: 100%;
         min-height: 0;
         display: flex;
         flex-direction: column;
-        gap: var(--space-2);
+        gap: 0.35rem;
         overflow-y: auto;
         overflow-x: hidden;
         padding-right: var(--space-1);
@@ -431,16 +417,16 @@ const ROLES_ECOMMERCE_ADMIN: AppRole[] = ["ADMIN", "SUPERVISOR"];
 
       .sidebar-group {
         display: grid;
-        gap: var(--space-2);
+        gap: 0.35rem;
       }
 
       .sidebar-group-toggle {
-        border: 1px solid rgba(255, 255, 255, 0.12);
+        border: 1px solid rgba(255, 255, 255, 0.1);
         border-radius: var(--radius-sm);
-        background: rgba(255, 255, 255, 0.05);
+        background: transparent;
         color: rgba(255, 255, 255, 0.88);
-        padding: 0.56rem 0.72rem;
-        min-height: 2.25rem;
+        padding: 0.5rem 0.65rem;
+        min-height: 2.1rem;
         cursor: pointer;
         display: flex;
         align-items: center;
@@ -452,14 +438,14 @@ const ROLES_ECOMMERCE_ADMIN: AppRole[] = ["ADMIN", "SUPERVISOR"];
       }
 
       .sidebar-group-toggle:hover {
-        background: rgba(255, 255, 255, 0.14);
-        border-color: rgba(255, 255, 255, 0.22);
+        background: rgba(255, 255, 255, 0.1);
+        border-color: rgba(255, 255, 255, 0.18);
         color: #ffffff;
       }
 
       .sidebar-group-toggle.is-active-group {
-        border-color: rgba(255, 255, 255, 0.35);
-        background: rgba(255, 255, 255, 0.18);
+        border-color: rgba(255, 255, 255, 0.22);
+        background: rgba(255, 255, 255, 0.14);
         color: #ffffff;
       }
 
@@ -476,15 +462,15 @@ const ROLES_ECOMMERCE_ADMIN: AppRole[] = ["ADMIN", "SUPERVISOR"];
 
       .sidebar-group-items {
         display: grid;
-        gap: var(--space-2);
-        padding-left: var(--space-2);
+        gap: 0.35rem;
+        padding-left: 0.7rem;
       }
 
       .sidebar-link {
         display: flex;
         align-items: center;
-        min-height: 2.25rem;
-        padding: 0.56rem 0.72rem;
+        min-height: 2.1rem;
+        padding: 0.5rem 0.65rem;
         border-radius: var(--radius-sm);
         border: 1px solid transparent;
         color: rgba(255, 255, 255, 0.85);
@@ -498,17 +484,17 @@ const ROLES_ECOMMERCE_ADMIN: AppRole[] = ["ADMIN", "SUPERVISOR"];
       }
 
       .sidebar-link:hover {
-        background: rgba(255, 255, 255, 0.14);
-        border-color: rgba(255, 255, 255, 0.22);
+        background: rgba(255, 255, 255, 0.1);
+        border-color: rgba(255, 255, 255, 0.18);
         color: #ffffff;
         transform: translateX(1px);
       }
 
       .sidebar-link.is-active {
-        background: #ffffff;
-        border-color: #ffffff;
+        background: rgba(255, 255, 255, 0.98);
+        border-color: rgba(255, 255, 255, 0.98);
         color: var(--color-brand-primary);
-        box-shadow: 0 8px 16px rgba(18, 23, 184, 0.24);
+        box-shadow: 0 6px 14px rgba(18, 23, 184, 0.2);
       }
 
       .sidebar-link.is-active:hover {
@@ -520,12 +506,12 @@ const ROLES_ECOMMERCE_ADMIN: AppRole[] = ["ADMIN", "SUPERVISOR"];
       }
 
       .sidebar-icon {
-        width: 1.48rem;
-        min-width: 1.48rem;
-        height: 1.48rem;
+        width: 1.4rem;
+        min-width: 1.4rem;
+        height: 1.4rem;
         border-radius: 0.38rem;
-        border: 1px solid rgba(255, 255, 255, 0.35);
-        background: rgba(255, 255, 255, 0.16);
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        background: rgba(255, 255, 255, 0.12);
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -549,12 +535,25 @@ const ROLES_ECOMMERCE_ADMIN: AppRole[] = ["ADMIN", "SUPERVISOR"];
       .sidebar-logout {
         width: 100%;
         border: 1px solid rgba(255, 255, 255, 0.24);
-        background: rgba(255, 255, 255, 0.14);
+        background: rgba(255, 255, 255, 0.08);
         flex-shrink: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: var(--space-2);
       }
 
       .sidebar-logout:hover {
-        background: rgba(255, 255, 255, 0.22);
+        background: rgba(255, 255, 255, 0.16);
+      }
+
+      .sidebar-logout-icon {
+        font-size: 0.95rem;
+        line-height: 1;
+      }
+
+      .sidebar-logout-label {
+        font-weight: 700;
       }
 
       .sidebar.is-compact {
@@ -572,18 +571,40 @@ const ROLES_ECOMMERCE_ADMIN: AppRole[] = ["ADMIN", "SUPERVISOR"];
 
       .sidebar.is-compact .sidebar-brand-copy,
       .sidebar.is-compact .sidebar-label,
-      .sidebar.is-compact .sidebar-group-chevron {
+      .sidebar.is-compact .sidebar-group-chevron,
+      .sidebar.is-compact .sidebar-logout-label {
         display: none;
       }
 
       .sidebar.is-compact .sidebar-link,
       .sidebar.is-compact .sidebar-group-toggle {
         justify-content: center;
-        padding: 0.56rem 0.45rem;
+        padding: 0.48rem 0.35rem;
+        border-radius: 0.85rem;
       }
 
       .sidebar.is-compact .sidebar-group-items {
         padding-left: 0;
+      }
+
+      .sidebar.is-compact .sidebar-toggle,
+      .sidebar.is-compact .sidebar-link,
+      .sidebar.is-compact .sidebar-group-toggle,
+      .sidebar.is-compact .sidebar-logout {
+        width: 100%;
+      }
+
+      .sidebar.is-compact .sidebar-icon {
+        width: 1.7rem;
+        min-width: 1.7rem;
+        height: 1.7rem;
+        border-radius: 0.6rem;
+      }
+
+      .sidebar.is-compact .sidebar-logout {
+        min-height: 2.35rem;
+        padding-inline: 0.35rem;
+        border-radius: 0.85rem;
       }
 
       .sidebar.is-compact [data-tooltip] {
@@ -631,15 +652,20 @@ const ROLES_ECOMMERCE_ADMIN: AppRole[] = ["ADMIN", "SUPERVISOR"];
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: var(--space-4);
-        padding: var(--space-4) var(--space-5);
+        gap: var(--space-3);
+        padding: var(--space-3) var(--space-4);
         flex-shrink: 0;
         background: var(--layout-topbar-bg);
         border-bottom: 1px solid var(--layout-topbar-border);
         backdrop-filter: blur(6px);
       }
 
+      .topbar-context {
+        min-width: 0;
+      }
+
       .topbar-actions {
+        position: relative;
         display: inline-flex;
         align-items: center;
         justify-content: flex-end;
@@ -647,29 +673,43 @@ const ROLES_ECOMMERCE_ADMIN: AppRole[] = ["ADMIN", "SUPERVISOR"];
         flex-wrap: wrap;
       }
 
-      .topbar-kicker {
-        margin: 0;
-        color: var(--color-text-secondary);
-        font-size: var(--font-size-xs);
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        font-weight: 700;
-      }
-
       .topbar h1 {
         margin: 0;
-        font-size: clamp(1.1rem, 2vw, 1.4rem);
+        font-size: clamp(1.05rem, 1.8vw, 1.28rem);
         font-family: var(--font-family-display);
+        line-height: 1.15;
       }
 
-      .topbar-user {
+      .topbar-user-menu {
         display: inline-flex;
         align-items: center;
         gap: var(--space-2);
-        padding: var(--space-2) var(--space-3);
+        min-height: 2.35rem;
+        padding: 0.35rem 0.55rem 0.35rem 0.45rem;
         border-radius: var(--radius-pill);
         background: var(--layout-topbar-user-bg);
         border: 1px solid var(--layout-topbar-user-border);
+        color: var(--color-text-primary);
+        cursor: pointer;
+      }
+
+      .topbar-user-menu:hover {
+        background: color-mix(in srgb, var(--layout-topbar-user-bg) 82%, var(--color-bg-soft));
+      }
+
+      .topbar-user-avatar,
+      .topbar-user-panel__avatar {
+        width: 1.8rem;
+        min-width: 1.8rem;
+        height: 1.8rem;
+        border-radius: 999px;
+        background: var(--layout-topbar-role-bg);
+        color: var(--layout-topbar-role-text);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.74rem;
+        font-weight: 800;
       }
 
       .topbar-user-name {
@@ -678,32 +718,92 @@ const ROLES_ECOMMERCE_ADMIN: AppRole[] = ["ADMIN", "SUPERVISOR"];
         font-weight: 700;
       }
 
-      .topbar-role-badge {
-        background: var(--layout-topbar-role-bg);
-        color: var(--layout-topbar-role-text);
+      .topbar-user-chevron {
+        color: var(--color-text-secondary);
+        font-size: 0.75rem;
       }
 
-      .theme-toggle {
-        min-height: 2.1rem;
+      .topbar-user-panel {
+        position: absolute;
+        top: calc(100% + 0.55rem);
+        right: 0;
+        width: min(20rem, calc(100vw - 2rem));
+        display: grid;
+        gap: var(--space-3);
+        padding: var(--space-3);
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--layout-topbar-user-border);
+        background: var(--color-bg-surface);
+        box-shadow: var(--shadow-md);
+        z-index: 40;
+      }
+
+      .topbar-user-panel__identity {
+        display: flex;
+        align-items: flex-start;
+        gap: var(--space-3);
+        min-width: 0;
+      }
+
+      .topbar-user-panel__copy {
+        display: grid;
+        gap: 0.18rem;
+        min-width: 0;
+      }
+
+      .topbar-user-panel__copy strong {
+        color: var(--color-text-primary);
+        font-size: var(--font-size-sm);
+        font-weight: 700;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .topbar-user-panel__copy span,
+      .topbar-user-panel__copy small {
+        color: var(--color-text-secondary);
+        font-size: var(--font-size-xs);
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .topbar-user-panel__actions {
+        display: grid;
+        gap: var(--space-2);
+      }
+
+      .topbar-user-panel__action {
+        width: 100%;
+        min-height: 2.5rem;
         border: 1px solid var(--layout-theme-toggle-border);
+        border-radius: var(--radius-md);
         background: var(--layout-theme-toggle-bg);
         color: var(--color-text-primary);
-        padding-inline: var(--space-3);
+        display: inline-flex;
+        align-items: center;
+        justify-content: flex-start;
+        gap: var(--space-2);
+        padding: 0.58rem 0.72rem;
+        font-size: var(--font-size-sm);
+        font-weight: 600;
+        text-align: left;
+        cursor: pointer;
       }
 
-      .theme-toggle:hover {
-        filter: none;
+      .topbar-user-panel__action:hover {
         background: var(--layout-theme-toggle-hover-bg);
       }
 
-      .theme-toggle-icon {
+      .topbar-user-panel__action-icon {
+        width: 1.25rem;
+        min-width: 1.25rem;
+        text-align: center;
         font-size: 0.9rem;
         line-height: 1;
       }
 
-      .theme-toggle-label {
-        font-size: var(--font-size-sm);
-        font-weight: 700;
+      .topbar-user-panel__action--danger {
+        color: var(--color-danger);
       }
 
       .content {
@@ -768,6 +868,7 @@ const ROLES_ECOMMERCE_ADMIN: AppRole[] = ["ADMIN", "SUPERVISOR"];
         .sidebar-logout {
           max-width: 260px;
         }
+
       }
 
       @media (max-width: 700px) {
@@ -791,12 +892,16 @@ const ROLES_ECOMMERCE_ADMIN: AppRole[] = ["ADMIN", "SUPERVISOR"];
 
         .topbar-actions {
           width: 100%;
-          justify-content: space-between;
+          justify-content: flex-end;
         }
 
-        .topbar-user {
+        .topbar-user-menu {
+          margin-left: auto;
+        }
+
+        .topbar-user-panel {
           width: 100%;
-          justify-content: space-between;
+          max-width: 22rem;
         }
 
         .content {
@@ -810,6 +915,7 @@ export class LayoutComponent implements OnInit, OnDestroy {
   currentUser: UserProfile | null = null;
   primaryRole = "N/A";
   isSidebarCompact = false;
+  isUserMenuOpen = false;
   activeTheme: UiTheme = "light";
   sidebarNodesForView: VisibleSidebarNode[] = [];
 
@@ -1207,6 +1313,25 @@ export class LayoutComponent implements OnInit, OnDestroy {
     }
   }
 
+  @HostListener("document:click", ["$event"])
+  onDocumentClick(event: MouseEvent): void {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+
+    if (target.closest(".topbar-user-menu") || target.closest(".topbar-user-panel")) {
+      return;
+    }
+
+    this.closeUserMenu();
+  }
+
+  @HostListener("document:keydown.escape")
+  onEscapeKey(): void {
+    this.closeUserMenu();
+  }
+
   get canToggleCompactMode(): boolean {
     return this.isCompactModeAvailable();
   }
@@ -1223,6 +1348,18 @@ export class LayoutComponent implements OnInit, OnDestroy {
 
   get themeToggleAriaLabel(): string {
     return this.isDarkTheme ? "Cambiar a modo claro" : "Cambiar a modo oscuro";
+  }
+
+  get userMenuAriaLabel(): string {
+    return `Abrir menú de usuario de ${this.currentUser?.username || "Usuario"}`;
+  }
+
+  get logoutAriaLabel(): string {
+    return "Cerrar sesion";
+  }
+
+  get userInitial(): string {
+    return (this.currentUser?.username || "U").trim().charAt(0).toUpperCase() || "U";
   }
 
   get currentSectionLabel(): string {
@@ -1284,6 +1421,24 @@ export class LayoutComponent implements OnInit, OnDestroy {
     this.posStateService.clearAll();
     this.authService.logout();
     this.router.navigate(["/login"]);
+  }
+
+  toggleUserMenu(): void {
+    this.isUserMenuOpen = !this.isUserMenuOpen;
+  }
+
+  closeUserMenu(): void {
+    this.isUserMenuOpen = false;
+  }
+
+  changeThemeFromMenu(): void {
+    this.toggleTheme();
+    this.closeUserMenu();
+  }
+
+  logoutFromMenu(): void {
+    this.closeUserMenu();
+    this.logout();
   }
 
   private refreshSidebarNodesForView(): void {
