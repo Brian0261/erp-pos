@@ -38,6 +38,7 @@ interface SidebarGroupNode {
 
 type SidebarNode = SidebarLinkNode | SidebarGroupNode;
 type VisibleSidebarNode = SidebarLinkNode | SidebarGroupNode;
+type RailFlyoutOpenSource = "hover" | "focus" | "click";
 
 const ROLES_ALL: AppRole[] = ["ADMIN", "CAJERO", "ALMACENERO", "SUPERVISOR"];
 const ROLES_ADMIN: AppRole[] = ["ADMIN"];
@@ -88,80 +89,174 @@ const ROLES_ECOMMERCE_ADMIN: AppRole[] = ["ADMIN", "SUPERVISOR"];
         </div>
 
         <nav class="sidebar-menu" aria-label="Menu principal">
-          <ng-container
-            *ngFor="let node of sidebarNodesForView; trackBy: trackByNodeId"
-          >
-            <a
-              *ngIf="node.kind === 'link'"
-              class="sidebar-link sidebar-link--standalone"
-              [routerLink]="node.route"
-              routerLinkActive="is-active"
-              [routerLinkActiveOptions]="
-                node.route === '/dashboard'
-                  ? exactMatchOptions
-                  : inclusiveMatchOptions
-              "
-              [attr.data-tooltip]="isSidebarCompact ? node.label : null"
+          <ng-container *ngIf="!isSidebarCompact; else compactRailTemplate">
+            <ng-container
+              *ngFor="let node of sidebarNodesForView; trackBy: trackByNodeId"
             >
-              <span class="sidebar-icon" aria-hidden="true">{{
-                node.icon
-              }}</span>
-              <span class="sidebar-label">{{ node.label }}</span>
-            </a>
+              <a
+                *ngIf="node.kind === 'link'"
+                class="sidebar-link sidebar-link--standalone"
+                [routerLink]="node.route"
+                routerLinkActive="is-active"
+                [routerLinkActiveOptions]="
+                  node.route === '/dashboard'
+                    ? exactMatchOptions
+                    : inclusiveMatchOptions
+                "
+                [attr.data-tooltip]="null"
+              >
+                <span class="sidebar-icon" aria-hidden="true">{{
+                  node.icon
+                }}</span>
+                <span class="sidebar-label">{{ node.label }}</span>
+              </a>
 
-            <section
-              *ngIf="node.kind === 'group'"
-              class="sidebar-group"
-              [class.is-active-group]="isGroupActive(node)"
-            >
-              <button
-                type="button"
-                class="sidebar-group-toggle"
+              <section
+                *ngIf="node.kind === 'group'"
+                class="sidebar-group"
                 [class.is-active-group]="isGroupActive(node)"
-                [attr.aria-expanded]="isGroupExpanded(node.id)"
-                [attr.aria-controls]="getGroupItemsContainerId(node.id)"
-                [attr.data-tooltip]="isSidebarCompact ? node.label : null"
-                (click)="toggleGroup(node.id)"
               >
-                <span class="sidebar-group-leading">
-                  <span class="sidebar-icon" aria-hidden="true">{{
-                    node.icon
-                  }}</span>
-                  <span class="sidebar-label">{{ node.label }}</span>
-                </span>
-                <span
-                  class="sidebar-group-chevron"
-                  *ngIf="node.collapsible && !isSidebarCompact"
-                  aria-hidden="true"
-                  >{{ isGroupExpanded(node.id) ? "▾" : "▸" }}</span
+                <button
+                  type="button"
+                  class="sidebar-group-toggle"
+                  [class.is-active-group]="isGroupActive(node)"
+                  [attr.aria-expanded]="isGroupExpanded(node.id)"
+                  [attr.aria-controls]="getGroupItemsContainerId(node.id)"
+                  [attr.data-tooltip]="null"
+                  (click)="toggleGroup(node.id)"
                 >
-              </button>
+                  <span class="sidebar-group-leading">
+                    <span class="sidebar-icon" aria-hidden="true">{{
+                      node.icon
+                    }}</span>
+                    <span class="sidebar-label">{{ node.label }}</span>
+                  </span>
+                  <span
+                    class="sidebar-group-chevron"
+                    *ngIf="node.collapsible && !isSidebarCompact"
+                    aria-hidden="true"
+                    >{{ isGroupExpanded(node.id) ? "▾" : "▸" }}</span
+                  >
+                </button>
 
-              <div
-                class="sidebar-group-items"
-                [id]="getGroupItemsContainerId(node.id)"
-                *ngIf="isGroupExpanded(node.id)"
-              >
-                <a
-                  class="sidebar-link sidebar-link--child"
-                  *ngFor="let item of node.items; trackBy: trackByItemId"
-                  [routerLink]="item.route"
-                  routerLinkActive="is-active"
-                  [routerLinkActiveOptions]="
-                    item.route === '/dashboard'
-                      ? exactMatchOptions
-                      : inclusiveMatchOptions
-                  "
-                  [attr.data-tooltip]="isSidebarCompact ? item.label : null"
+                <div
+                  class="sidebar-group-items"
+                  [id]="getGroupItemsContainerId(node.id)"
+                  *ngIf="isGroupExpanded(node.id)"
                 >
-                  <span class="sidebar-icon" aria-hidden="true">{{
-                    item.icon
-                  }}</span>
-                  <span class="sidebar-label">{{ item.label }}</span>
-                </a>
-              </div>
-            </section>
+                  <a
+                    class="sidebar-link sidebar-link--child"
+                    *ngFor="let item of node.items; trackBy: trackByItemId"
+                    [routerLink]="item.route"
+                    routerLinkActive="is-active"
+                    [routerLinkActiveOptions]="
+                      item.route === '/dashboard'
+                        ? exactMatchOptions
+                        : inclusiveMatchOptions
+                    "
+                    [attr.data-tooltip]="null"
+                  >
+                    <span class="sidebar-icon" aria-hidden="true">{{
+                      item.icon
+                    }}</span>
+                    <span class="sidebar-label">{{ item.label }}</span>
+                  </a>
+                </div>
+              </section>
+            </ng-container>
           </ng-container>
+
+          <ng-template #compactRailTemplate>
+            <ng-container
+              *ngFor="let node of sidebarNodesForView; trackBy: trackByNodeId"
+            >
+              <a
+                *ngIf="node.kind === 'link'"
+                class="sidebar-link sidebar-link--standalone sidebar-rail-launcher"
+                [class.is-active]="isRailNodeActive(node)"
+                [routerLink]="node.route"
+                routerLinkActive="is-active"
+                [routerLinkActiveOptions]="
+                  node.route === '/dashboard'
+                    ? exactMatchOptions
+                    : inclusiveMatchOptions
+                "
+                [attr.aria-label]="node.label"
+                [attr.title]="node.label"
+                [attr.data-tooltip]="getRailTooltip(node)"
+                (click)="closeRailFlyout()"
+              >
+                <span class="sidebar-icon" aria-hidden="true">{{
+                  node.icon
+                }}</span>
+                <span class="sidebar-label">{{ node.label }}</span>
+              </a>
+
+              <section
+                *ngIf="node.kind === 'group'"
+                class="sidebar-group sidebar-rail-item"
+                [class.is-active-group]="isGroupActive(node)"
+                [class.is-open]="isRailFlyoutOpen(node.id)"
+                (mouseenter)="openRailFlyout(node.id, 'hover')"
+                (mouseleave)="closeRailFlyoutFromPointer(node.id)"
+                (focusin)="openRailFlyout(node.id, 'focus')"
+                (focusout)="onRailItemFocusOut($event, node.id)"
+              >
+                <button
+                  type="button"
+                  class="sidebar-group-toggle sidebar-rail-launcher"
+                  [class.is-active-group]="isGroupActive(node)"
+                  [attr.aria-label]="node.label"
+                  [attr.aria-expanded]="isRailFlyoutOpen(node.id)"
+                  [attr.aria-controls]="getRailFlyoutId(node.id)"
+                  aria-haspopup="menu"
+                  [attr.title]="node.label"
+                  [attr.data-tooltip]="getRailTooltip(node)"
+                  (click)="toggleRailFlyout(node.id, $event)"
+                >
+                  <span class="sidebar-group-leading">
+                    <span class="sidebar-icon" aria-hidden="true">{{
+                      node.icon
+                    }}</span>
+                    <span class="sidebar-label">{{ node.label }}</span>
+                  </span>
+                </button>
+
+                <section
+                  *ngIf="isRailFlyoutOpen(node.id)"
+                  class="sidebar-rail-flyout"
+                  [id]="getRailFlyoutId(node.id)"
+                  role="menu"
+                  [attr.aria-label]="node.label"
+                >
+                  <header class="sidebar-rail-flyout-header">
+                    <span class="sidebar-rail-flyout-title">{{ node.label }}</span>
+                  </header>
+
+                  <div class="sidebar-rail-flyout-items">
+                    <a
+                      class="sidebar-link sidebar-link--child sidebar-rail-flyout-link"
+                      *ngFor="let item of node.items; trackBy: trackByItemId"
+                      [routerLink]="item.route"
+                      routerLinkActive="is-active"
+                      [routerLinkActiveOptions]="
+                        item.route === '/dashboard'
+                          ? exactMatchOptions
+                          : inclusiveMatchOptions
+                      "
+                      [attr.data-tooltip]="null"
+                      (click)="onRailItemNavigate()"
+                    >
+                      <span class="sidebar-icon" aria-hidden="true">{{
+                        item.icon
+                      }}</span>
+                      <span class="sidebar-label">{{ item.label }}</span>
+                    </a>
+                  </div>
+                </section>
+              </section>
+            </ng-container>
+          </ng-template>
         </nav>
       </aside>
 
@@ -258,6 +353,7 @@ const ROLES_ECOMMERCE_ADMIN: AppRole[] = ["ADMIN", "SUPERVISOR"];
 
       .layout-shell.is-sidebar-compact {
         grid-template-columns: var(--layout-sidebar-width-compact, 76px) 1fr;
+        overflow: visible;
       }
 
       .sidebar {
@@ -278,6 +374,8 @@ const ROLES_ECOMMERCE_ADMIN: AppRole[] = ["ADMIN", "SUPERVISOR"];
         align-self: start;
         overflow: hidden;
         border-right: 1px solid var(--layout-sidebar-border);
+        position: relative;
+        z-index: 5;
       }
 
       .sidebar-header {
@@ -414,15 +512,22 @@ const ROLES_ECOMMERCE_ADMIN: AppRole[] = ["ADMIN", "SUPERVISOR"];
 
       .sidebar-group-toggle:hover {
         background: rgba(255, 255, 255, 0.08);
-        border-color: rgba(255, 255, 255, 0.16);
-        color: #ffffff;
+        border-color: rgba(255, 255, 255, 0.14);
+        color: rgba(255, 255, 255, 0.96);
       }
 
       .sidebar-group-toggle.is-active-group {
-        border-color: rgba(255, 255, 255, 0.18);
-        background: rgba(255, 255, 255, 0.11);
-        color: #ffffff;
-        box-shadow: inset 3px 0 0 rgba(255, 255, 255, 0.82);
+        border-color: rgba(255, 255, 255, 0.22);
+        background: rgba(255, 255, 255, 0.12);
+        color: rgba(255, 255, 255, 0.98);
+        box-shadow: 0 4px 10px rgba(8, 10, 44, 0.12);
+      }
+
+      .sidebar-group-toggle.is-active-group:hover,
+      .sidebar-group-toggle.is-active-group:focus-visible {
+        background: rgba(255, 255, 255, 0.15);
+        border-color: rgba(255, 255, 255, 0.22);
+        color: rgba(255, 255, 255, 0.98);
       }
 
       .sidebar-group-leading {
@@ -461,22 +566,23 @@ const ROLES_ECOMMERCE_ADMIN: AppRole[] = ["ADMIN", "SUPERVISOR"];
 
       .sidebar-link:hover {
         background: rgba(255, 255, 255, 0.08);
-        border-color: rgba(255, 255, 255, 0.16);
-        color: #ffffff;
+        border-color: rgba(255, 255, 255, 0.14);
+        color: rgba(255, 255, 255, 0.96);
         transform: translateX(1px);
       }
 
       .sidebar-link.is-active {
-        background: rgba(255, 255, 255, 0.16);
+        background: rgba(255, 255, 255, 0.12);
         border-color: rgba(255, 255, 255, 0.22);
-        color: var(--color-brand-primary);
-        box-shadow:
-          inset 3px 0 0 rgba(255, 255, 255, 0.9),
-          0 4px 10px rgba(8, 10, 44, 0.12);
+        color: rgba(255, 255, 255, 0.98);
+        box-shadow: 0 4px 10px rgba(8, 10, 44, 0.12);
       }
 
-      .sidebar-link.is-active:hover {
-        color: var(--color-brand-primary);
+      .sidebar-link.is-active:hover,
+      .sidebar-link.is-active:focus-visible {
+        background: rgba(255, 255, 255, 0.15);
+        border-color: rgba(255, 255, 255, 0.22);
+        color: rgba(255, 255, 255, 0.98);
       }
 
       .sidebar-link--standalone {
@@ -492,7 +598,8 @@ const ROLES_ECOMMERCE_ADMIN: AppRole[] = ["ADMIN", "SUPERVISOR"];
 
       .sidebar-link--standalone.is-active {
         background: rgba(255, 255, 255, 0.12);
-        color: #ffffff;
+        border-color: rgba(255, 255, 255, 0.22);
+        color: rgba(255, 255, 255, 0.98);
       }
 
       .sidebar-link--child {
@@ -513,10 +620,36 @@ const ROLES_ECOMMERCE_ADMIN: AppRole[] = ["ADMIN", "SUPERVISOR"];
       }
 
       .sidebar-link--child.is-active {
-        background: rgba(255, 255, 255, 0.08);
-        border-color: transparent;
-        color: #ffffff;
-        box-shadow: inset 2px 0 0 rgba(255, 255, 255, 0.65);
+        background: rgba(255, 255, 255, 0.12);
+        border-color: rgba(255, 255, 255, 0.22);
+        color: rgba(255, 255, 255, 0.98);
+        box-shadow: none;
+      }
+
+      .sidebar-link--child.is-active:hover,
+      .sidebar-link--child.is-active:focus-visible {
+        background: rgba(255, 255, 255, 0.15);
+        border-color: rgba(255, 255, 255, 0.22);
+        color: rgba(255, 255, 255, 0.98);
+      }
+
+      .sidebar-link:focus-visible,
+      .sidebar-group-toggle:focus-visible,
+      .sidebar-rail-flyout-link:focus-visible {
+        outline: 2px solid rgba(255, 255, 255, 0.36);
+        outline-offset: 2px;
+      }
+
+      .sidebar-link.is-active .sidebar-icon,
+      .sidebar-link.is-active:hover .sidebar-icon,
+      .sidebar-link.is-active:focus-visible .sidebar-icon,
+      .sidebar-group-toggle.is-active-group .sidebar-icon,
+      .sidebar-group-toggle.is-active-group:hover .sidebar-icon,
+      .sidebar-group-toggle.is-active-group:focus-visible .sidebar-icon,
+      .sidebar-rail-flyout-link.is-active .sidebar-icon,
+      .sidebar-rail-flyout-link.is-active:hover .sidebar-icon,
+      .sidebar-rail-flyout-link.is-active:focus-visible .sidebar-icon {
+        color: rgba(255, 255, 255, 0.98);
       }
 
       .sidebar-icon {
@@ -544,10 +677,16 @@ const ROLES_ECOMMERCE_ADMIN: AppRole[] = ["ADMIN", "SUPERVISOR"];
 
       .sidebar.is-compact {
         align-items: stretch;
+        overflow: visible;
       }
 
       .sidebar.is-compact .sidebar-top {
         justify-content: center;
+      }
+
+      .sidebar.is-compact .sidebar-menu {
+        overflow: visible;
+        padding-right: 0;
       }
 
       .sidebar.is-compact .sidebar-brand {
@@ -581,6 +720,101 @@ const ROLES_ECOMMERCE_ADMIN: AppRole[] = ["ADMIN", "SUPERVISOR"];
       .sidebar.is-compact .sidebar-group,
       .sidebar.is-compact .sidebar-menu {
         gap: 0.4rem;
+      }
+
+      .sidebar-rail-item {
+        position: relative;
+        overflow: visible;
+      }
+
+      .sidebar.is-compact .sidebar-rail-launcher {
+        position: relative;
+        z-index: 1;
+      }
+
+      .sidebar.is-compact .sidebar-rail-item.is-open .sidebar-rail-launcher {
+        background: rgba(255, 255, 255, 0.11);
+        border-color: rgba(255, 255, 255, 0.18);
+        color: rgba(255, 255, 255, 0.98);
+      }
+
+      .sidebar.is-compact .sidebar-rail-item.is-open .sidebar-rail-launcher:hover,
+      .sidebar.is-compact .sidebar-rail-item.is-open .sidebar-rail-launcher:focus-visible,
+      .sidebar.is-compact .sidebar-rail-launcher.is-active,
+      .sidebar.is-compact .sidebar-rail-launcher.is-active:hover,
+      .sidebar.is-compact .sidebar-rail-launcher.is-active:focus-visible,
+      .sidebar.is-compact .sidebar-rail-launcher.is-active-group,
+      .sidebar.is-compact .sidebar-rail-launcher.is-active-group:hover,
+      .sidebar.is-compact .sidebar-rail-launcher.is-active-group:focus-visible {
+        background: rgba(255, 255, 255, 0.15);
+        border-color: rgba(255, 255, 255, 0.22);
+        color: rgba(255, 255, 255, 0.98);
+      }
+
+      .sidebar.is-compact .sidebar-rail-launcher.is-active .sidebar-icon,
+      .sidebar.is-compact .sidebar-rail-launcher.is-active:hover .sidebar-icon,
+      .sidebar.is-compact .sidebar-rail-launcher.is-active:focus-visible .sidebar-icon,
+      .sidebar.is-compact .sidebar-rail-launcher.is-active-group .sidebar-icon,
+      .sidebar.is-compact .sidebar-rail-launcher.is-active-group:hover .sidebar-icon,
+      .sidebar.is-compact .sidebar-rail-launcher.is-active-group:focus-visible .sidebar-icon,
+      .sidebar.is-compact .sidebar-rail-item.is-open .sidebar-rail-launcher .sidebar-icon {
+        color: rgba(255, 255, 255, 0.98);
+      }
+
+      .sidebar-rail-flyout {
+        position: absolute;
+        left: calc(100% + 0.7rem);
+        top: 0;
+        width: min(18rem, calc(100vw - 8rem));
+        display: grid;
+        gap: 0.55rem;
+        padding: 0.7rem;
+        border-radius: 1rem;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(16, 17, 20, 0.98);
+        box-shadow: 0 18px 34px rgba(8, 10, 44, 0.28);
+        z-index: 35;
+      }
+
+      .sidebar-rail-flyout::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        right: 100%;
+        width: 0.7rem;
+        height: 100%;
+        pointer-events: auto;
+      }
+
+      .sidebar-rail-flyout-header {
+        display: flex;
+        align-items: center;
+        min-height: 1.5rem;
+        padding: 0 0.15rem;
+      }
+
+      .sidebar-rail-flyout-title {
+        color: rgba(255, 255, 255, 0.98);
+        font-size: 0.78rem;
+        font-weight: 800;
+        letter-spacing: 0.03em;
+      }
+
+      .sidebar-rail-flyout-items {
+        display: grid;
+        gap: 0.3rem;
+      }
+
+      .sidebar.is-compact .sidebar-rail-flyout-link {
+        margin-left: 0;
+        padding-left: 0.7rem;
+        padding-right: 0.7rem;
+        justify-content: flex-start;
+        min-height: 2.2rem;
+      }
+
+      .sidebar.is-compact .sidebar-rail-flyout-link .sidebar-label {
+        display: inline;
       }
 
       .sidebar.is-compact .sidebar-link,
@@ -633,6 +867,10 @@ const ROLES_ECOMMERCE_ADMIN: AppRole[] = ["ADMIN", "SUPERVISOR"];
         transform: translateY(-50%) scale(1);
       }
 
+      .sidebar.is-compact .sidebar-rail-item.is-open [data-tooltip]::after {
+        opacity: 0;
+      }
+
       .workspace {
         min-width: 0;
         min-height: 0;
@@ -640,6 +878,8 @@ const ROLES_ECOMMERCE_ADMIN: AppRole[] = ["ADMIN", "SUPERVISOR"];
         display: flex;
         flex-direction: column;
         overflow: hidden;
+        position: relative;
+        z-index: 1;
       }
 
       .topbar {
@@ -908,6 +1148,7 @@ export class LayoutComponent implements OnInit, OnDestroy {
   isUserMenuOpen = false;
   activeTheme: UiTheme = "light";
   sidebarNodesForView: VisibleSidebarNode[] = [];
+  activeRailNodeId: string | null = null;
 
   readonly exactMatchOptions = { exact: true };
   readonly inclusiveMatchOptions = { exact: false };
@@ -919,6 +1160,8 @@ export class LayoutComponent implements OnInit, OnDestroy {
 
   private readonly subscriptions = new Subscription();
   private groupExpandedState: Record<string, boolean> = {};
+  private pinnedRailNodeId: string | null = null;
+  private railCloseTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
   private readonly sectionLabels: Record<string, string> = {
     dashboard: "Inicio",
@@ -1293,6 +1536,7 @@ export class LayoutComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.subscriptions.unsubscribe();
+    this.clearRailCloseTimeout();
   }
 
   @HostListener("window:resize")
@@ -1311,15 +1555,21 @@ export class LayoutComponent implements OnInit, OnDestroy {
     }
 
     if (target.closest(".topbar-user-menu") || target.closest(".topbar-user-panel")) {
+    } else {
+      this.closeUserMenu();
+    }
+
+    if (target.closest(".sidebar-rail-item") || target.closest(".sidebar-rail-launcher")) {
       return;
     }
 
-    this.closeUserMenu();
+    this.closeRailFlyout();
   }
 
   @HostListener("document:keydown.escape")
   onEscapeKey(): void {
     this.closeUserMenu();
+    this.closeRailFlyout();
   }
 
   get canToggleCompactMode(): boolean {
@@ -1395,6 +1645,22 @@ export class LayoutComponent implements OnInit, OnDestroy {
     return group.items.some((item) => this.isRouteActive(item.route));
   }
 
+  isRailNodeActive(node: VisibleSidebarNode): boolean {
+    return node.kind === "link" ? this.isRouteActive(node.route) : this.isGroupActive(node);
+  }
+
+  isRailFlyoutOpen(groupId: string): boolean {
+    return this.activeRailNodeId === groupId;
+  }
+
+  getRailFlyoutId(groupId: string): string {
+    return `sidebar-rail-flyout-${groupId}`;
+  }
+
+  getRailTooltip(node: VisibleSidebarNode): string | null {
+    return this.isRailFlyoutOpen(node.id) ? null : node.label;
+  }
+
   getGroupItemsContainerId(groupId: string): string {
     return `sidebar-group-${groupId}`;
   }
@@ -1419,6 +1685,94 @@ export class LayoutComponent implements OnInit, OnDestroy {
 
   closeUserMenu(): void {
     this.isUserMenuOpen = false;
+  }
+
+  openRailFlyout(groupId: string, source: RailFlyoutOpenSource): void {
+    if (!this.isSidebarCompact) {
+      return;
+    }
+
+    this.clearRailCloseTimeout();
+
+    if (source !== "click" && this.pinnedRailNodeId && this.pinnedRailNodeId !== groupId) {
+      return;
+    }
+
+    this.activeRailNodeId = groupId;
+    if (source === "click") {
+      this.pinnedRailNodeId = groupId;
+    }
+  }
+
+  toggleRailFlyout(groupId: string, event: MouseEvent): void {
+    event.stopPropagation();
+
+    if (this.isRailFlyoutOpen(groupId) && this.pinnedRailNodeId === groupId) {
+      this.closeRailFlyout();
+      return;
+    }
+
+    this.openRailFlyout(groupId, "click");
+  }
+
+  closeRailFlyout(): void {
+    this.clearRailCloseTimeout();
+    this.activeRailNodeId = null;
+    this.pinnedRailNodeId = null;
+  }
+
+  closeRailFlyoutFromPointer(groupId: string): void {
+    if (this.pinnedRailNodeId === groupId) {
+      return;
+    }
+
+    if (this.activeRailNodeId === groupId) {
+      this.scheduleRailFlyoutClose(groupId);
+    }
+  }
+
+  onRailItemFocusOut(event: FocusEvent, groupId: string): void {
+    const relatedTarget = event.relatedTarget;
+    if (relatedTarget instanceof Node && event.currentTarget instanceof HTMLElement) {
+      if (event.currentTarget.contains(relatedTarget)) {
+        return;
+      }
+    }
+
+    if (this.pinnedRailNodeId === groupId) {
+      return;
+    }
+
+    if (this.activeRailNodeId === groupId) {
+      this.scheduleRailFlyoutClose(groupId);
+    }
+  }
+
+  onRailItemNavigate(): void {
+    this.closeRailFlyout();
+  }
+
+  private scheduleRailFlyoutClose(groupId: string): void {
+    this.clearRailCloseTimeout();
+    this.railCloseTimeoutId = setTimeout(() => {
+      if (this.pinnedRailNodeId === groupId) {
+        return;
+      }
+
+      if (this.activeRailNodeId === groupId) {
+        this.activeRailNodeId = null;
+      }
+      this.railCloseTimeoutId = null;
+    }, 90);
+  }
+
+  private clearRailCloseTimeout(): void {
+    if (this.railCloseTimeoutId === null) {
+      return;
+    }
+
+    clearTimeout(this.railCloseTimeoutId);
+    this.railCloseTimeoutId = null;
   }
 
   changeThemeFromMenu(): void {
@@ -1524,6 +1878,15 @@ export class LayoutComponent implements OnInit, OnDestroy {
       this.groupExpandedState = nextState;
       this.persistGroupExpandedState();
     }
+
+    if (this.isSidebarCompact && this.pinnedRailNodeId) {
+      return;
+    }
+
+    const activeRailGroup = this.sidebarNodesForView.find(
+      (node): node is SidebarGroupNode => node.kind === "group" && this.isGroupActive(node),
+    );
+    this.activeRailNodeId = activeRailGroup?.id || null;
   }
 
   private restoreSidebarPreferences(): void {
