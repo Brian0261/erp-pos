@@ -16,6 +16,19 @@ import { ConfirmDialogComponent } from "../dialogs/confirm-dialog.component";
 
 type AppRole = "ADMIN" | "CAJERO" | "ALMACENERO" | "SUPERVISOR";
 type UiTheme = "light" | "dark";
+type SidebarIconKey =
+  | "home"
+  | "pos"
+  | "catalog"
+  | "online-store"
+  | "inventory"
+  | "purchases"
+  | "search"
+  | "quote"
+  | "invoice"
+  | "reports"
+  | "integrations"
+  | "admin";
 
 interface SidebarLinkNode {
   kind: "link";
@@ -59,6 +72,152 @@ const ROLES_ECOMMERCE_ADMIN: AppRole[] = ["ADMIN", "SUPERVISOR"];
   template: `
     <div class="layout-shell" [class.is-sidebar-compact]="isSidebarCompact">
       <aside class="sidebar" [class.is-compact]="isSidebarCompact">
+        <ng-template #sidebarIconTemplate let-icon>
+          <ng-container *ngIf="isProfessionalIcon(icon); else sidebarIconText">
+            <svg
+              *ngIf="icon === 'home'"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path d="M3.75 10.5L12 4l8.25 6.5"></path>
+              <path d="M5.25 9.75V20h13.5V9.75"></path>
+              <path d="M10 20v-5.25h4V20"></path>
+            </svg>
+            <svg
+              *ngIf="icon === 'pos'"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path d="M4.5 6.75h15v10.5h-15z"></path>
+              <path d="M7.5 17.25v2.25"></path>
+              <path d="M16.5 17.25v2.25"></path>
+              <path d="M7.5 9.75h4.5"></path>
+              <path d="M7.5 12.75h2.25"></path>
+              <circle cx="15.75" cy="11.25" r="1.5"></circle>
+            </svg>
+            <svg
+              *ngIf="icon === 'catalog'"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path d="M4.5 6.75h15v10.5h-15z"></path>
+              <path d="M12 6.75v10.5"></path>
+              <path d="M8.25 10.5h.01"></path>
+              <path d="M8.25 13.5h.01"></path>
+              <path d="M15.75 10.5h.01"></path>
+              <path d="M15.75 13.5h.01"></path>
+            </svg>
+            <svg
+              *ngIf="icon === 'online-store'"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path d="M4.5 9.75h15"></path>
+              <path d="M6 9.75l1.5-4.5h9L18 9.75"></path>
+              <path d="M5.25 9.75V18.75H18.75V9.75"></path>
+              <path d="M9 18.75v-4.5h6v4.5"></path>
+              <circle cx="18.75" cy="5.25" r="2.25"></circle>
+              <path d="M18.75 3v4.5"></path>
+              <path d="M16.5 5.25H21"></path>
+            </svg>
+            <svg
+              *ngIf="icon === 'inventory'"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path d="M4.5 8.25L12 4.5l7.5 3.75L12 12 4.5 8.25z"></path>
+              <path d="M4.5 8.25V15.75L12 19.5l7.5-3.75V8.25"></path>
+              <path d="M12 12v7.5"></path>
+            </svg>
+            <svg
+              *ngIf="icon === 'purchases'"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path d="M6 6.75h12l-1.2 6H7.2L6 6.75z"></path>
+              <path d="M7.5 6.75L9 4.5h6l1.5 2.25"></path>
+              <circle cx="9" cy="17.25" r="1.5"></circle>
+              <circle cx="15" cy="17.25" r="1.5"></circle>
+            </svg>
+            <svg
+              *ngIf="icon === 'search'"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <circle cx="10.5" cy="10.5" r="5.25"></circle>
+              <path d="M14.25 14.25L19.5 19.5"></path>
+            </svg>
+            <svg
+              *ngIf="icon === 'quote'"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path d="M6 5.25h12l3 3v10.5H6z"></path>
+              <path d="M18 5.25v3h3"></path>
+              <path d="M9 11.25h6"></path>
+              <path d="M9 14.25h4.5"></path>
+            </svg>
+            <svg
+              *ngIf="icon === 'invoice'"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path d="M7.5 4.5h9v15l-2.25-1.5L12 19.5l-2.25-1.5L7.5 19.5z"></path>
+              <path d="M9.75 9h4.5"></path>
+              <path d="M9.75 12h4.5"></path>
+              <path d="M9.75 15h3"></path>
+            </svg>
+            <svg
+              *ngIf="icon === 'reports'"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path d="M5.25 19.5V10.5"></path>
+              <path d="M10.5 19.5V6.75"></path>
+              <path d="M15.75 19.5v-5.25"></path>
+              <path d="M3.75 19.5h16.5"></path>
+            </svg>
+            <svg
+              *ngIf="icon === 'integrations'"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path d="M8.25 9.75h7.5"></path>
+              <path d="M8.25 14.25h7.5"></path>
+              <path d="M15.75 9.75l2.25-2.25"></path>
+              <path d="M15.75 14.25l2.25 2.25"></path>
+              <path d="M8.25 9.75L6 7.5"></path>
+              <path d="M8.25 14.25L6 16.5"></path>
+              <circle cx="4.5" cy="6" r="1.5"></circle>
+              <circle cx="4.5" cy="18" r="1.5"></circle>
+              <circle cx="19.5" cy="6" r="1.5"></circle>
+              <circle cx="19.5" cy="18" r="1.5"></circle>
+            </svg>
+            <svg
+              *ngIf="icon === 'admin'"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path d="M12 3.75l6 2.25v5.25c0 4.05-2.58 7.83-6 9-3.42-1.17-6-4.95-6-9V6z"></path>
+              <path d="M12 9v5.25"></path>
+              <path d="M9.75 11.25H14.25"></path>
+            </svg>
+          </ng-container>
+          <ng-template #sidebarIconText>{{ icon }}</ng-template>
+        </ng-template>
+
         <div class="sidebar-header">
           <div class="sidebar-top">
             <div class="sidebar-brand">
@@ -105,9 +264,12 @@ const ROLES_ECOMMERCE_ADMIN: AppRole[] = ["ADMIN", "SUPERVISOR"];
                 "
                 [attr.data-tooltip]="null"
               >
-                <span class="sidebar-icon" aria-hidden="true">{{
-                  node.icon
-                }}</span>
+                <span class="sidebar-icon" aria-hidden="true">
+                  <ng-container
+                    [ngTemplateOutlet]="sidebarIconTemplate"
+                    [ngTemplateOutletContext]="{ $implicit: node.icon }"
+                  ></ng-container>
+                </span>
                 <span class="sidebar-label">{{ node.label }}</span>
               </a>
 
@@ -126,9 +288,12 @@ const ROLES_ECOMMERCE_ADMIN: AppRole[] = ["ADMIN", "SUPERVISOR"];
                   (click)="toggleGroup(node.id)"
                 >
                   <span class="sidebar-group-leading">
-                    <span class="sidebar-icon" aria-hidden="true">{{
-                      node.icon
-                    }}</span>
+                    <span class="sidebar-icon" aria-hidden="true">
+                      <ng-container
+                        [ngTemplateOutlet]="sidebarIconTemplate"
+                        [ngTemplateOutletContext]="{ $implicit: node.icon }"
+                      ></ng-container>
+                    </span>
                     <span class="sidebar-label">{{ node.label }}</span>
                   </span>
                   <span
@@ -145,7 +310,7 @@ const ROLES_ECOMMERCE_ADMIN: AppRole[] = ["ADMIN", "SUPERVISOR"];
                   *ngIf="isGroupExpanded(node.id)"
                 >
                   <a
-                    class="sidebar-link sidebar-link--child"
+                    class="sidebar-link sidebar-link--child sidebar-link--child-text-only"
                     *ngFor="let item of node.items; trackBy: trackByItemId"
                     [routerLink]="item.route"
                     routerLinkActive="is-active"
@@ -156,9 +321,6 @@ const ROLES_ECOMMERCE_ADMIN: AppRole[] = ["ADMIN", "SUPERVISOR"];
                     "
                     [attr.data-tooltip]="null"
                   >
-                    <span class="sidebar-icon" aria-hidden="true">{{
-                      item.icon
-                    }}</span>
                     <span class="sidebar-label">{{ item.label }}</span>
                   </a>
                 </div>
@@ -186,9 +348,12 @@ const ROLES_ECOMMERCE_ADMIN: AppRole[] = ["ADMIN", "SUPERVISOR"];
                 [attr.data-tooltip]="getRailTooltip(node)"
                 (click)="closeRailFlyout()"
               >
-                <span class="sidebar-icon" aria-hidden="true">{{
-                  node.icon
-                }}</span>
+                <span class="sidebar-icon" aria-hidden="true">
+                  <ng-container
+                    [ngTemplateOutlet]="sidebarIconTemplate"
+                    [ngTemplateOutletContext]="{ $implicit: node.icon }"
+                  ></ng-container>
+                </span>
                 <span class="sidebar-label">{{ node.label }}</span>
               </a>
 
@@ -212,15 +377,18 @@ const ROLES_ECOMMERCE_ADMIN: AppRole[] = ["ADMIN", "SUPERVISOR"];
                   aria-haspopup="menu"
                   [attr.title]="node.label"
                   [attr.data-tooltip]="getRailTooltip(node)"
-                  (click)="toggleRailFlyout(node.id, $event)"
-                >
-                  <span class="sidebar-group-leading">
-                    <span class="sidebar-icon" aria-hidden="true">{{
-                      node.icon
-                    }}</span>
-                    <span class="sidebar-label">{{ node.label }}</span>
-                  </span>
-                </button>
+                   (click)="toggleRailFlyout(node.id, $event)"
+                 >
+                   <span class="sidebar-group-leading">
+                     <span class="sidebar-icon" aria-hidden="true">
+                       <ng-container
+                         [ngTemplateOutlet]="sidebarIconTemplate"
+                         [ngTemplateOutletContext]="{ $implicit: node.icon }"
+                       ></ng-container>
+                     </span>
+                     <span class="sidebar-label">{{ node.label }}</span>
+                   </span>
+                 </button>
 
                 <section
                   *ngIf="isRailFlyoutOpen(node.id)"
@@ -235,7 +403,7 @@ const ROLES_ECOMMERCE_ADMIN: AppRole[] = ["ADMIN", "SUPERVISOR"];
 
                   <div class="sidebar-rail-flyout-items">
                     <a
-                      class="sidebar-link sidebar-link--child sidebar-rail-flyout-link"
+                      class="sidebar-link sidebar-link--child sidebar-link--child-text-only sidebar-rail-flyout-link"
                       *ngFor="let item of node.items; trackBy: trackByItemId"
                       [routerLink]="item.route"
                       routerLinkActive="is-active"
@@ -247,9 +415,6 @@ const ROLES_ECOMMERCE_ADMIN: AppRole[] = ["ADMIN", "SUPERVISOR"];
                       [attr.data-tooltip]="null"
                       (click)="onRailItemNavigate()"
                     >
-                      <span class="sidebar-icon" aria-hidden="true">{{
-                        item.icon
-                      }}</span>
                       <span class="sidebar-label">{{ item.label }}</span>
                     </a>
                   </div>
@@ -613,6 +778,16 @@ const ROLES_ECOMMERCE_ADMIN: AppRole[] = ["ADMIN", "SUPERVISOR"];
         font-weight: 500;
       }
 
+      .sidebar-link--child-text-only {
+        justify-content: flex-start;
+        padding-right: 0.7rem;
+        padding-left: 0.78rem;
+      }
+
+      .sidebar-link--child-text-only .sidebar-label {
+        margin-left: 0;
+      }
+
       .sidebar-link--child:hover {
         background: rgba(255, 255, 255, 0.05);
         border-color: transparent;
@@ -666,6 +841,18 @@ const ROLES_ECOMMERCE_ADMIN: AppRole[] = ["ADMIN", "SUPERVISOR"];
         font-weight: 800;
         letter-spacing: 0.02em;
         line-height: 1;
+      }
+
+      .sidebar-icon svg {
+        width: 0.95rem;
+        height: 0.95rem;
+        display: block;
+        stroke: currentColor;
+        fill: none;
+        stroke-width: 1.85;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        vector-effect: non-scaling-stroke;
       }
 
       .sidebar-label {
@@ -807,7 +994,7 @@ const ROLES_ECOMMERCE_ADMIN: AppRole[] = ["ADMIN", "SUPERVISOR"];
 
       .sidebar.is-compact .sidebar-rail-flyout-link {
         margin-left: 0;
-        padding-left: 0.7rem;
+        padding-left: 0.78rem;
         padding-right: 0.7rem;
         justify-content: flex-start;
         min-height: 2.2rem;
@@ -833,6 +1020,11 @@ const ROLES_ECOMMERCE_ADMIN: AppRole[] = ["ADMIN", "SUPERVISOR"];
         min-width: 1.62rem;
         height: 1.62rem;
         border-radius: 0.55rem;
+      }
+
+      .sidebar.is-compact .sidebar-icon svg {
+        width: 1rem;
+        height: 1rem;
       }
 
       .sidebar.is-compact [data-tooltip] {
@@ -1157,6 +1349,20 @@ export class LayoutComponent implements OnInit, OnDestroy {
   private readonly sidebarModeStorageKey = "erp_pos_sidebar_mode";
   private readonly sidebarGroupsStorageKey = "erp_pos_sidebar_groups";
   private readonly themeStorageKey = "erp_pos_theme";
+  private readonly professionalIconKeys = new Set<SidebarIconKey>([
+    "home",
+    "pos",
+    "catalog",
+    "online-store",
+    "inventory",
+    "purchases",
+    "search",
+    "quote",
+    "invoice",
+    "reports",
+    "integrations",
+    "admin",
+  ]);
 
   private readonly subscriptions = new Subscription();
   private groupExpandedState: Record<string, boolean> = {};
@@ -1185,14 +1391,14 @@ export class LayoutComponent implements OnInit, OnDestroy {
       id: "inicio",
       label: "Inicio",
       route: "/dashboard",
-      icon: "IN",
+      icon: "home",
       allowedRoles: ROLES_ALL,
     },
     {
       kind: "group",
       id: "operacion",
       label: "Operación",
-      icon: "OP",
+      icon: "pos",
       allowedRoles: ROLES_SALES,
       collapsible: true,
       items: [
@@ -1226,7 +1432,7 @@ export class LayoutComponent implements OnInit, OnDestroy {
       kind: "group",
       id: "catalogo",
       label: "Catálogo",
-      icon: "CA",
+      icon: "catalog",
       allowedRoles: ROLES_CATALOG,
       collapsible: true,
       items: [
@@ -1260,7 +1466,7 @@ export class LayoutComponent implements OnInit, OnDestroy {
       kind: "group",
       id: "catalogo-online",
       label: "Catálogo online",
-      icon: "EO",
+      icon: "online-store",
       allowedRoles: ROLES_ECOMMERCE_ADMIN,
       collapsible: true,
       items: [
@@ -1318,7 +1524,7 @@ export class LayoutComponent implements OnInit, OnDestroy {
       kind: "group",
       id: "inventario",
       label: "Inventario",
-      icon: "IV",
+      icon: "inventory",
       allowedRoles: [...ROLES_CATALOG, ...ROLES_INVENTORY_MANAGEMENT],
       collapsible: true,
       items: [
@@ -1376,7 +1582,7 @@ export class LayoutComponent implements OnInit, OnDestroy {
       kind: "group",
       id: "compras",
       label: "Compras",
-      icon: "CO",
+      icon: "purchases",
       allowedRoles: ROLES_PURCHASES,
       collapsible: true,
       items: [
@@ -1402,7 +1608,7 @@ export class LayoutComponent implements OnInit, OnDestroy {
       kind: "group",
       id: "consulta",
       label: "Consulta",
-      icon: "CS",
+      icon: "search",
       allowedRoles: ROLES_CONSULTA_CAJERO,
       collapsible: true,
       items: [
@@ -1421,14 +1627,14 @@ export class LayoutComponent implements OnInit, OnDestroy {
       id: "cotizaciones",
       label: "Cotizaciones",
       route: "/cotizaciones",
-      icon: "CZ",
+      icon: "quote",
       allowedRoles: ROLES_SALES,
     },
     {
       kind: "group",
       id: "facturacion",
       label: "Facturación",
-      icon: "FA",
+      icon: "invoice",
       allowedRoles: ROLES_SALES,
       collapsible: true,
       items: [
@@ -1463,14 +1669,14 @@ export class LayoutComponent implements OnInit, OnDestroy {
       id: "reportes",
       label: "Reportes",
       route: "/reportes",
-      icon: "RP",
+      icon: "reports",
       allowedRoles: ROLES_REPORTS,
     },
     {
       kind: "group",
       id: "integraciones",
       label: "Integraciones",
-      icon: "IG",
+      icon: "integrations",
       allowedRoles: ROLES_ADMIN,
       collapsible: true,
       items: [
@@ -1488,7 +1694,7 @@ export class LayoutComponent implements OnInit, OnDestroy {
       kind: "group",
       id: "administracion",
       label: "Administración",
-      icon: "AD",
+      icon: "admin",
       allowedRoles: ROLES_ADMIN,
       collapsible: true,
       items: [
@@ -1663,6 +1869,10 @@ export class LayoutComponent implements OnInit, OnDestroy {
 
   getGroupItemsContainerId(groupId: string): string {
     return `sidebar-group-${groupId}`;
+  }
+
+  isProfessionalIcon(icon: string): icon is SidebarIconKey {
+    return this.professionalIconKeys.has(icon as SidebarIconKey);
   }
 
   trackByNodeId(_: number, node: VisibleSidebarNode): string {
