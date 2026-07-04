@@ -146,19 +146,30 @@ import { PosCartItem } from "../data/pos-ui.models";
 
       .empty-cart {
         display: grid;
-        gap: var(--space-1);
+        gap: 0.28rem;
         place-items: center;
-        min-height: 8rem;
+        align-content: center;
+        min-height: 6.5rem;
         border: 1px dashed var(--color-border-default);
         border-radius: var(--radius-lg);
         background: var(--color-bg-soft);
         text-align: center;
-        padding: var(--space-3);
+        padding: 0.9rem var(--space-3);
+      }
+
+      .empty-cart strong {
+        line-height: 1.15;
+      }
+
+      .empty-cart strong,
+      .empty-cart span {
+        max-width: 16rem;
       }
 
       .empty-cart span {
         margin: 0;
         color: var(--color-text-secondary);
+        line-height: 1.35;
       }
 
       .cart-list::-webkit-scrollbar {

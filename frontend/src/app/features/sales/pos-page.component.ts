@@ -60,16 +60,7 @@ import {
   ],
   template: `
     <section class="ui-card pos-page">
-      <header class="pos-hero">
-        <div class="pos-hero__copy">
-          <p class="ui-page-kicker">InkToy POS</p>
-          <h1 class="ui-page-title">Punto de venta</h1>
-          <p class="ui-page-description">
-            Venta guiada para caja fisica: escanea, selecciona, cobra y conserva
-            el control de caja en tiempo real.
-          </p>
-        </div>
-
+      <div class="pos-utility-header">
         <div class="pos-hero__actions">
           <div
             class="pos-cash-status"
@@ -77,22 +68,26 @@ import {
             [class.pos-cash-status--closed]="!currentCashSession"
           >
             <span class="pos-cash-dot" aria-hidden="true"></span>
-            <strong>{{
-              currentCashSession ? "Caja abierta" : "Caja cerrada"
-            }}</strong>
-            <span *ngIf="currentCashSession">
-              #{{ currentCashSession.id }} · desde
-              {{ currentCashSession.openedAt | date: "HH:mm" }}
+            <span class="pos-cash-status__copy">
+              <strong class="pos-cash-status__state">{{
+                currentCashSession ? "Caja abierta" : "Caja cerrada"
+              }}</strong>
+              <span class="pos-cash-status__detail" *ngIf="currentCashSession">
+                · Sesión #{{ currentCashSession.id }} · desde
+                {{ currentCashSession.openedAt | date: "HH:mm" }}
+              </span>
+              <span class="pos-cash-status__detail" *ngIf="!currentCashSession"
+                >· Abre caja antes de vender</span
+              >
             </span>
-            <span *ngIf="!currentCashSession">Abre caja antes de vender</span>
           </div>
           <a
-            class="ui-button ui-button--secondary pos-button"
+            class="ui-button ui-button--secondary pos-button pos-button--quiet pos-button--compact"
             [routerLink]="['/caja']"
             >Ir a Caja</a
           >
         </div>
-      </header>
+      </div>
 
       <div class="pos-shell">
         <main class="pos-workspace">
@@ -103,14 +98,19 @@ import {
             [quickSearchTerms]="quickSearchTerms"
             [loadingLookup]="loadingLookup"
             [loadingSearch]="loadingSearch"
+            [showClearSearch]="showClearSearch"
             (search)="submitUnifiedSearch()"
             (exactLookup)="addExactFromUnifiedSearch()"
             (quickSearch)="applyQuickSearch($event)"
+            (clearSearch)="clearSearch($event)"
           ></app-pos-search-panel>
 
-          <div class="message-stack" *ngIf="errorMessage || warningMessage || successMessage">
-            <p class="ui-alert ui-alert--error" *ngIf="errorMessage">
-              {{ errorMessage }}
+          <div
+            class="message-stack"
+            *ngIf="activeErrorMessage || warningMessage || successMessage"
+          >
+            <p class="ui-alert ui-alert--error" *ngIf="activeErrorMessage">
+              {{ activeErrorMessage }}
             </p>
             <p class="ui-alert ui-alert--info" *ngIf="warningMessage">
               {{ warningMessage }}
@@ -257,85 +257,70 @@ import {
         margin: 0;
       }
 
-      .pos-hero {
+      .pos-utility-header {
         display: flex;
         justify-content: flex-end;
-        align-items: center;
-        gap: var(--space-2);
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        border-radius: var(--radius-lg);
-        background:
-          linear-gradient(
-            135deg,
-            rgba(18, 23, 184, 0.68),
-            rgba(16, 17, 20, 0.84)
-          ),
-          var(--color-brand-primary);
-        color: var(--color-text-on-dark);
-        padding: 0.45rem 0.65rem;
-      }
-
-      .pos-hero .ui-page-title {
-        display: none;
-      }
-
-      .pos-hero .ui-page-kicker {
-        display: none;
-      }
-
-      .pos-hero .ui-page-description {
-        display: none;
-      }
-
-      .pos-hero__copy {
-        display: none;
+        align-items: flex-start;
+        min-height: 0;
+        margin-bottom: 0.4rem;
       }
 
       .pos-hero__actions {
-        display: flex;
-        align-items: center;
+        display: inline-flex;
+        align-items: flex-start;
         justify-content: flex-end;
         gap: var(--space-2);
         flex-wrap: wrap;
+        margin-left: auto;
       }
 
       .pos-hero__actions .pos-button {
-        min-height: 2.12rem;
-        padding: 0.38rem 0.75rem;
+        min-height: 2rem;
+        padding: 0.34rem 0.68rem;
         font-size: var(--font-size-sm);
       }
 
       .pos-cash-status {
         display: inline-flex;
         align-items: center;
-        gap: 0.4rem;
-        min-height: 2.12rem;
-        max-width: min(42vw, 22rem);
-        border: 1px solid rgba(255, 255, 255, 0.16);
-        border-radius: var(--radius-lg);
-        background: rgba(255, 255, 255, 0.08);
-        color: rgba(255, 255, 255, 0.9);
-        padding: 0.42rem 0.72rem;
+        gap: 0.55rem;
+        min-height: 2rem;
+        max-width: min(36rem, 100%);
+        border: 1px solid var(--color-border-soft);
+        border-radius: var(--radius-md);
+        background: var(--color-bg-surface);
+        color: var(--color-text-primary);
+        padding: 0.45rem 0.7rem;
         font-size: var(--font-size-sm);
-        line-height: 1.1;
+        line-height: 1.15;
+        overflow: hidden;
         white-space: nowrap;
+        box-shadow: var(--shadow-xs, 0 1px 2px rgba(16, 17, 20, 0.06));
+      }
+
+      .pos-cash-status__copy {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.18rem;
+        min-width: 0;
+        overflow: hidden;
+      }
+
+      .pos-cash-status__state,
+      .pos-cash-status__detail {
         overflow: hidden;
         text-overflow: ellipsis;
       }
 
-      .pos-cash-status strong,
-      .pos-cash-status span:not(.pos-cash-dot) {
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-
-      .pos-cash-status strong {
+      .pos-cash-status__state {
         flex: 0 0 auto;
         font-weight: 700;
       }
 
-      .pos-cash-status span:not(.pos-cash-dot) {
-        color: rgba(255, 255, 255, 0.78);
+      .pos-cash-status__detail {
+        min-width: 0;
+        color: var(--color-text-secondary);
+        white-space: nowrap;
       }
 
       .pos-cash-dot {
@@ -345,11 +330,28 @@ import {
         border-radius: 999px;
         background: var(--color-success);
         box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.16);
+        margin-top: 0.28rem;
       }
 
       .pos-cash-status--closed .pos-cash-dot {
         background: var(--color-danger);
         box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.16);
+      }
+
+      .pos-button--compact {
+        min-width: auto;
+      }
+
+      .pos-button--quiet {
+        border-color: var(--color-border-soft);
+        background: transparent;
+        color: var(--color-text-secondary);
+      }
+
+      .pos-button--quiet:hover,
+      .pos-button--quiet:focus-visible {
+        background: var(--color-bg-soft);
+        color: var(--color-text-primary);
       }
 
       .pos-shell {
@@ -422,8 +424,8 @@ import {
           padding: var(--space-2);
         }
 
-        .pos-hero {
-          padding: var(--space-2) var(--space-3);
+        .pos-utility-header {
+          margin-bottom: 0.32rem;
         }
 
       }
@@ -461,18 +463,29 @@ import {
           padding: var(--space-3);
         }
 
-        .pos-hero {
-          align-items: stretch;
-          flex-direction: column;
+        .pos-utility-header {
+          margin-bottom: 0.4rem;
         }
 
         .pos-hero__actions {
           width: 100%;
+          margin-left: 0;
         }
 
         .pos-cash-status {
           width: 100%;
           max-width: none;
+          align-items: flex-start;
+          white-space: normal;
+        }
+
+        .pos-cash-status__copy {
+          display: grid;
+          gap: 0.1rem;
+        }
+
+        .pos-cash-status__detail {
+          white-space: normal;
         }
 
         .pos-button,
@@ -524,6 +537,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
   isCheckoutModalOpen = false;
 
   errorMessage = "";
+  searchErrorMessage = "";
   warningMessage = "";
   successMessage = "";
   lastSaleId: number | null = null;
@@ -535,6 +549,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
   private cashSessionLoaded = false;
   private draftInitialized = false;
   private isHydratingDraft = false;
+  private searchRequestVersion = 0;
 
   constructor(
     private readonly formBuilder: FormBuilder,
@@ -575,6 +590,11 @@ export class PosPageComponent implements OnInit, OnDestroy {
         if (this.saleForm.controls.query.value !== code) {
           this.saleForm.patchValue({ query: code }, { emitEvent: false });
         }
+
+        if (code.trim().length < 2) {
+          this.clearSearchState({ clearInput: false });
+        }
+
         this.persistDraftState();
       }),
     );
@@ -684,6 +704,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
     this.submitting = false;
     this.isFullCartOpen = false;
     this.isCheckoutModalOpen = false;
+    this.searchErrorMessage = "";
     this.isHydratingDraft = false;
 
     this.persistDraftState();
@@ -719,6 +740,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
     this.submitting = false;
     this.isFullCartOpen = false;
     this.isCheckoutModalOpen = false;
+    this.searchErrorMessage = "";
     this.successMessage = "";
     this.isHydratingDraft = false;
 
@@ -794,6 +816,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
     this.isFullCartOpen = false;
     this.isCheckoutModalOpen = false;
     this.errorMessage = "";
+    this.searchErrorMessage = "";
     this.warningMessage = "";
     if (!preserveLastSaleId) {
       this.successMessage = "";
@@ -810,6 +833,14 @@ export class PosPageComponent implements OnInit, OnDestroy {
 
   cancelSale(): void {
     this.resetDraftAfterCheckout(false);
+  }
+
+  clearSearch(input?: HTMLInputElement): void {
+    this.clearSearchState({ clearInput: true });
+
+    if (input) {
+      setTimeout(() => input.focus(), 0);
+    }
   }
 
   get subtotal(): number {
@@ -856,6 +887,15 @@ export class PosPageComponent implements OnInit, OnDestroy {
     return this.cart.map((item) => this.lineTotal(item));
   }
 
+  get activeErrorMessage(): string {
+    return this.searchErrorMessage || this.errorMessage;
+  }
+
+  get showClearSearch(): boolean {
+    const code = (this.saleForm.value.code ?? "").trim();
+    return code.length > 0 || this.searchResults.length > 0 || this.searchErrorMessage.length > 0;
+  }
+
   @HostListener("document:keydown.escape")
   closeFullCartOnEscape(): void {
     this.closeFullCart();
@@ -890,30 +930,40 @@ export class PosPageComponent implements OnInit, OnDestroy {
   lookupByCode(): void {
     const code = (this.saleForm.value.code ?? "").trim();
     if (!code) {
-      this.errorMessage = "Ingresa un SKU o barcode para buscar.";
+      this.searchErrorMessage = "Ingresa un SKU o barcode para buscar.";
       return;
     }
 
     const warehouseId = this.saleForm.value.warehouseId ?? undefined;
     if (!warehouseId) {
-      this.errorMessage = "Selecciona un almacen antes de buscar por codigo.";
+      this.searchErrorMessage = "Selecciona un almacen antes de buscar por codigo.";
       return;
     }
 
+    const requestVersion = this.bumpSearchRequestVersion();
     this.loadingLookup = true;
-    this.errorMessage = "";
+    this.searchErrorMessage = "";
     this.successMessage = "";
 
     this.posService.lookup(code, warehouseId).subscribe({
       next: (product) => {
+        if (!this.isCurrentSearchRequest(requestVersion)) {
+          return;
+        }
+
         this.loadingLookup = false;
         this.addToCart(product);
         this.saleForm.patchValue({ code: "" });
+        this.clearSearchState({ clearInput: false });
         this.persistDraftState();
       },
       error: (error: unknown) => {
+        if (!this.isCurrentSearchRequest(requestVersion)) {
+          return;
+        }
+
         this.loadingLookup = false;
-        this.errorMessage = toHttpErrorMessage(
+        this.searchErrorMessage = toHttpErrorMessage(
           error,
           "No se pudo consultar el producto por codigo.",
         );
@@ -933,30 +983,45 @@ export class PosPageComponent implements OnInit, OnDestroy {
     rawQuery = this.saleForm.value.query ?? this.saleForm.value.code ?? "",
   ): void {
     const query = rawQuery.trim();
+    if (!query) {
+      this.clearSearchState({ clearInput: false });
+      return;
+    }
+
     if (query.length < 2) {
-      this.errorMessage =
+      this.clearSearchState({ clearInput: false });
+      this.searchErrorMessage =
         "Ingresa al menos 2 caracteres para buscar por nombre o SKU.";
       return;
     }
 
     const warehouseId = this.saleForm.value.warehouseId ?? undefined;
 
+    const requestVersion = this.bumpSearchRequestVersion();
     this.loadingSearch = true;
-    this.errorMessage = "";
+    this.searchErrorMessage = "";
     this.successMessage = "";
 
     this.posService.search(query, warehouseId).subscribe({
       next: (results) => {
+        if (!this.isCurrentSearchRequest(requestVersion)) {
+          return;
+        }
+
         this.loadingSearch = false;
         this.searchResults = results;
         if (results.length === 0) {
-          this.errorMessage = "No se encontraron productos para la busqueda.";
+          this.searchErrorMessage = "No se encontraron productos para la busqueda.";
         }
         this.persistDraftState();
       },
       error: (error: unknown) => {
+        if (!this.isCurrentSearchRequest(requestVersion)) {
+          return;
+        }
+
         this.loadingSearch = false;
-        this.errorMessage = toHttpErrorMessage(
+        this.searchErrorMessage = toHttpErrorMessage(
           error,
           "No se pudo realizar la busqueda por nombre.",
         );
@@ -989,6 +1054,34 @@ export class PosPageComponent implements OnInit, OnDestroy {
       "status" in error &&
       (error as { status?: number }).status === 404
     );
+  }
+
+  private clearSearchState(options?: { clearInput?: boolean }): void {
+    const clearInput = options?.clearInput ?? false;
+
+    this.bumpSearchRequestVersion();
+    this.loadingLookup = false;
+    this.loadingSearch = false;
+    this.searchResults = [];
+    this.searchErrorMessage = "";
+
+    if (clearInput) {
+      this.saleForm.patchValue(
+        { code: "", query: "" },
+        { emitEvent: false },
+      );
+    }
+
+    this.persistDraftState();
+  }
+
+  private bumpSearchRequestVersion(): number {
+    this.searchRequestVersion += 1;
+    return this.searchRequestVersion;
+  }
+
+  private isCurrentSearchRequest(version: number): boolean {
+    return version === this.searchRequestVersion;
   }
 
   openFullCart(): void {

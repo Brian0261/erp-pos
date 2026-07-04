@@ -27,13 +27,27 @@ import { WarehouseResponse } from "../../inventory/data/inventory.models";
       <section class="scan-card" aria-label="Busqueda unificada POS">
         <label class="scan-field">
           <span class="scan-label">Buscar o escanear producto</span>
-          <input
-            class="scan-input"
-            type="text"
-            formControlName="code"
-            placeholder="Escanea barcode/SKU o busca producto..."
-            autocomplete="off"
-          />
+          <div class="scan-input-wrap">
+            <input
+              #searchInput
+              class="scan-input"
+              type="text"
+              formControlName="code"
+              placeholder="Escanea barcode/SKU o busca producto..."
+              autocomplete="off"
+              (keydown.escape)="handleEscape($event, searchInput)"
+            />
+            <button
+              *ngIf="showClearSearch"
+              type="button"
+              class="scan-clear-button"
+              aria-label="Limpiar búsqueda"
+              title="Limpiar búsqueda"
+              (click)="clearSearch.emit(searchInput)"
+            >
+              <span aria-hidden="true">×</span>
+            </button>
+          </div>
         </label>
 
         <div class="scan-actions">
@@ -158,6 +172,43 @@ import { WarehouseResponse } from "../../inventory/data/inventory.models";
         font-size: clamp(1rem, 1.35vw, 1.2rem);
         font-weight: 700;
         letter-spacing: 0.01em;
+      }
+
+      .scan-input-wrap {
+        position: relative;
+      }
+
+      .scan-input-wrap .scan-input {
+        padding-right: 2.85rem;
+      }
+
+      .scan-clear-button {
+        position: absolute;
+        top: 50%;
+        right: 0.55rem;
+        transform: translateY(-50%);
+        width: 1.8rem;
+        height: 1.8rem;
+        border: 1px solid var(--color-border-default);
+        border-radius: 999px;
+        background: color-mix(in srgb, var(--color-bg-surface) 88%, transparent);
+        color: var(--color-text-secondary);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        cursor: pointer;
+      }
+
+      .scan-clear-button:hover,
+      .scan-clear-button:focus-visible {
+        background: var(--color-bg-soft);
+        color: var(--color-text-primary);
+      }
+
+      .scan-clear-button span {
+        font-size: 1rem;
+        line-height: 1;
       }
 
       .scan-actions {
@@ -289,10 +340,18 @@ export class PosSearchPanelComponent {
   @Input({ required: true }) quickSearchTerms: string[] = [];
   @Input({ required: true }) loadingLookup = false;
   @Input({ required: true }) loadingSearch = false;
+  @Input({ required: true }) showClearSearch = false;
 
   @Output() readonly search = new EventEmitter<void>();
   @Output() readonly exactLookup = new EventEmitter<void>();
   @Output() readonly quickSearch = new EventEmitter<string>();
+  @Output() readonly clearSearch = new EventEmitter<HTMLInputElement>();
+
+  handleEscape(event: Event, input: HTMLInputElement): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.clearSearch.emit(input);
+  }
 
   getWarehouseDisplayLabel(warehouse: WarehouseResponse): string {
     return warehouse.name?.trim() || warehouse.code?.trim() || "Selecciona almacen";
