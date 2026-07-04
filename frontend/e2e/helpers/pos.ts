@@ -24,12 +24,12 @@ export async function expectPosShellVisible(page: Page): Promise<void> {
 }
 
 export async function clearVisibleCart(page: Page): Promise<void> {
-  const cancelSale = page.getByRole("button", { name: "Cancelar venta" });
-  if (await cancelSale.isEnabled()) {
-    await cancelSale.click();
-    await expect(page.getByText("Carrito vacio")).toBeVisible();
+    const cancelSale = page.getByRole("button", { name: "Cancelar venta" });
+    if (await cancelSale.isEnabled()) {
+      await cancelSale.click();
+      await expect(page.getByText("Carrito vacío")).toBeVisible();
+    }
   }
-}
 
 export async function searchForFirstVisibleProduct(page: Page): Promise<boolean> {
   const searchInput = page.getByLabel("Buscar o escanear producto");
@@ -96,7 +96,7 @@ export async function openCheckoutAndValidateNoWritePaymentControls(page: Page):
 
 export async function removeFirstCartItem(page: Page): Promise<void> {
   await firstCartItem(page).getByRole("button", { name: "Quitar" }).click();
-  await expect(page.getByText("Carrito vacio")).toBeVisible();
+  await expect(page.getByText("Carrito vacío")).toBeVisible();
 }
 
 function firstCartItem(page: Page): Locator {

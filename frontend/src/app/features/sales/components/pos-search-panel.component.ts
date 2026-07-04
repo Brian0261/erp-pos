@@ -11,9 +11,9 @@ import { WarehouseResponse } from "../../inventory/data/inventory.models";
   template: `
     <form [formGroup]="saleForm" class="pos-command" (ngSubmit)="search.emit()">
       <label class="field field--warehouse">
-        <span>Almacen de salida *</span>
+        <span>Almacén de salida</span>
         <select formControlName="warehouseId" [title]="selectedWarehouseLabel">
-          <option [ngValue]="null">Selecciona almacen</option>
+          <option [ngValue]="null">Selecciona almacén</option>
           <option
             *ngFor="let warehouse of warehouses"
             [ngValue]="warehouse.id"
@@ -24,7 +24,7 @@ import { WarehouseResponse } from "../../inventory/data/inventory.models";
         </select>
       </label>
 
-      <section class="scan-card" aria-label="Busqueda unificada POS">
+      <section class="scan-card" aria-label="Búsqueda unificada POS">
         <label class="scan-field">
           <span class="scan-label">Buscar o escanear producto</span>
           <div class="scan-input-wrap">
@@ -57,7 +57,7 @@ import { WarehouseResponse } from "../../inventory/data/inventory.models";
             (click)="exactLookup.emit()"
             [disabled]="loadingLookup"
           >
-            {{ loadingLookup ? "Agregando..." : "Agregar codigo" }}
+            {{ loadingLookup ? "Agregando..." : "Agregar código" }}
           </button>
           <button
             type="button"
@@ -72,9 +72,9 @@ import { WarehouseResponse } from "../../inventory/data/inventory.models";
 
       <section
         class="quick-search"
-        aria-label="Busquedas rapidas para productos sin barcode"
+        aria-label="Búsquedas rápidas para productos sin barcode"
       >
-        <span>BÚSQUEDAS RÁPIDAS</span>
+        <span>Búsquedas rápidas</span>
         <div class="quick-search__buttons">
           <button
             type="button"
@@ -124,10 +124,14 @@ import { WarehouseResponse } from "../../inventory/data/inventory.models";
         grid-column: 1;
         grid-row: 2;
         max-width: none;
+        align-content: start;
+        gap: 0.38rem;
       }
 
       .field--warehouse select {
         min-width: 0;
+        min-height: 2.2rem;
+        padding: 0.42rem 2rem 0.42rem 0.68rem;
       }
 
       input,
@@ -223,18 +227,20 @@ import { WarehouseResponse } from "../../inventory/data/inventory.models";
         grid-row: 2;
         display: grid;
         grid-template-columns: minmax(0, 1fr);
-        gap: var(--space-2);
-        align-items: center;
+        gap: 0.38rem;
+        align-content: start;
         min-width: 0;
       }
 
+      .field--warehouse > span,
       .quick-search > span {
         display: block;
         color: var(--color-text-secondary);
         font-size: var(--font-size-xs);
         font-weight: 700;
-        letter-spacing: 0.04em;
-        text-transform: uppercase;
+        letter-spacing: 0.02em;
+        line-height: 1.2;
+        white-space: nowrap;
       }
 
       .quick-search__buttons {
@@ -242,15 +248,17 @@ import { WarehouseResponse } from "../../inventory/data/inventory.models";
         gap: var(--space-1);
         overflow-x: auto;
         padding-bottom: 0.05rem;
+        scrollbar-width: thin;
+        align-items: center;
       }
 
       .quick-search__button {
-        min-height: 2.2rem;
+        min-height: 2rem;
         flex: 0 0 auto;
         border: 1px solid var(--color-border-default);
         background: color-mix(in srgb, var(--color-bg-soft) 78%, var(--color-bg-surface));
         color: var(--color-text-primary);
-        padding: 0.35rem 0.7rem;
+        padding: 0.26rem 0.62rem;
         font-size: var(--font-size-sm);
         font-weight: 600;
         white-space: nowrap;
@@ -292,12 +300,8 @@ import { WarehouseResponse } from "../../inventory/data/inventory.models";
       }
 
       @media (max-height: 820px) and (min-width: 981px) {
-        .quick-search > span {
-          display: block;
-        }
-
         .quick-search {
-          grid-template-columns: 1fr;
+          gap: 0.48rem;
         }
 
         .quick-search__button {
@@ -311,12 +315,32 @@ import { WarehouseResponse } from "../../inventory/data/inventory.models";
         }
       }
 
+      @media (max-width: 980px) {
+        .pos-command {
+          grid-template-columns: 1fr;
+        }
+
+        .field--warehouse,
+        .quick-search {
+          grid-column: 1;
+        }
+
+        .quick-search {
+          grid-row: 3;
+        }
+      }
+
       @media (max-width: 760px) {
         .pos-command,
         .scan-card,
         .scan-actions,
         .quick-search {
           grid-template-columns: 1fr;
+        }
+
+        .field--warehouse {
+          grid-template-columns: 1fr;
+          gap: var(--space-1);
         }
 
         .scan-card,
@@ -336,7 +360,7 @@ import { WarehouseResponse } from "../../inventory/data/inventory.models";
 export class PosSearchPanelComponent {
   @Input({ required: true }) saleForm!: FormGroup;
   @Input({ required: true }) warehouses: WarehouseResponse[] = [];
-  @Input({ required: true }) selectedWarehouseLabel = "Selecciona almacen";
+  @Input({ required: true }) selectedWarehouseLabel = "Selecciona almacén";
   @Input({ required: true }) quickSearchTerms: string[] = [];
   @Input({ required: true }) loadingLookup = false;
   @Input({ required: true }) loadingSearch = false;
@@ -354,6 +378,6 @@ export class PosSearchPanelComponent {
   }
 
   getWarehouseDisplayLabel(warehouse: WarehouseResponse): string {
-    return warehouse.name?.trim() || warehouse.code?.trim() || "Selecciona almacen";
+    return warehouse.name?.trim() || warehouse.code?.trim() || "Selecciona almacén";
   }
 }

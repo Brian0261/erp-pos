@@ -1,4 +1,4 @@
-const DEFAULT_BASE_URL = "http://localhost:4200";
+const DEFAULT_BASE_URL = "http://127.0.0.1:4201";
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1"]);
 const PRODUCTION_HOST_PATTERNS = ["inktoy.pe", "www.inktoy.pe"];
 

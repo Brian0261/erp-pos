@@ -308,6 +308,24 @@ Estandarizar cambios tecnicos para reducir regresiones y mantener trazabilidad e
 - Documentacion creada: `docs/qa/PHASE2_2H5D_ONLINE_PROFILE_DETAIL_QA.md`.
 - Exclusiones confirmadas: sin backend, endpoints, DTOs, servicios, Storefront, Flyway/DB, Docker, `.env`, secretos, reglas de publicacion, payloads ni contratos.
 
+### Cierre POS Search Feedback And E2E Runtime Polish
+
+- Tipo: polish frontend POS + cierre QA/E2E.
+- Commit objetivo: `fix(pos): improve search feedback and e2e runtime`.
+- Alcance real documentado:
+  - Búsqueda y resultados POS refinados.
+  - Mensaje de sin stock con nombre principal y SKU/código como detalle.
+  - Empty state de resultados compacto con helper desktop en una línea cuando hay ancho.
+  - Carrito con `Carrito vacío` y helper E2E alineado.
+  - Runtime E2E aislado en `127.0.0.1:4201` sin reutilización de servidor para evitar estado stale.
+- Validaciones:
+  - `npm run build`: PASS.
+  - `E2E_BASE_URL=http://127.0.0.1:4201 npm run e2e:no-write`: PASS, 3 tests.
+  - `E2E_BASE_URL=http://127.0.0.1:4201 npm run e2e:no-write:headed`: PASS, 3 tests.
+  - `git diff --check`: sin errores, solo advertencias LF -> CRLF.
+- Confirmaciones:
+  - No se toco backend, DB, Auth/JWT, guards, rutas funcionales, caja real, ventas transaccionales, stock real, comprobantes ni Storefront.
+
 ### Cierre Fase 2S.2A Catalogo Publico Navegable Minimo
 
 - Tipo: implementacion funcional Storefront Next.js + cierre documental QA.

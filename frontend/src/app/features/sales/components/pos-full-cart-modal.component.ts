@@ -39,7 +39,7 @@ import { PosCartItem } from "../data/pos-ui.models";
         </header>
 
         <div class="full-cart-empty" *ngIf="cart.length === 0">
-          <strong>Carrito vacio</strong>
+          <strong>Carrito vacío</strong>
           <span>Agrega productos desde el POS para revisar la venta.</span>
         </div>
 

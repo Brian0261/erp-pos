@@ -55,7 +55,7 @@ import { PosCartItem } from "../data/pos-ui.models";
 
       <ng-template #emptyCart>
         <div class="empty-cart">
-          <strong>Carrito vacio</strong>
+          <strong>Carrito vacío</strong>
           <span>Escanea o busca un producto para empezar.</span>
         </div>
       </ng-template>

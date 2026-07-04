@@ -32,11 +32,11 @@ export default defineConfig({
     },
   ],
   webServer: shouldUseLocalWebServer(baseURL)
-    ? {
-        command: "npm run start -- --host 127.0.0.1 --port 4200",
-        url: baseURL,
-        reuseExistingServer: true,
-        timeout: 120_000,
-      }
+      ? {
+          command: "npm run start -- --host 127.0.0.1 --port 4201",
+          url: baseURL,
+          reuseExistingServer: false,
+          timeout: 120_000,
+        }
     : undefined,
 });

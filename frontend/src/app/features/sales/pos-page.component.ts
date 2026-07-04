@@ -538,6 +538,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
 
   errorMessage = "";
   searchErrorMessage = "";
+  stockMessage = "";
   warningMessage = "";
   successMessage = "";
   lastSaleId: number | null = null;
@@ -591,6 +592,8 @@ export class PosPageComponent implements OnInit, OnDestroy {
           this.saleForm.patchValue({ query: code }, { emitEvent: false });
         }
 
+        this.clearStockMessage();
+
         if (code.trim().length < 2) {
           this.clearSearchState({ clearInput: false });
         }
@@ -602,6 +605,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
     this.subscriptions.add(
       warehouseControl.valueChanges.subscribe(() => {
         if (!this.isHydratingDraft) {
+          this.clearStockMessage();
           this.persistDraftState();
         }
       }),
@@ -705,6 +709,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
     this.isFullCartOpen = false;
     this.isCheckoutModalOpen = false;
     this.searchErrorMessage = "";
+    this.stockMessage = "";
     this.isHydratingDraft = false;
 
     this.persistDraftState();
@@ -741,6 +746,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
     this.isFullCartOpen = false;
     this.isCheckoutModalOpen = false;
     this.searchErrorMessage = "";
+    this.stockMessage = "";
     this.successMessage = "";
     this.isHydratingDraft = false;
 
@@ -817,6 +823,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
     this.isCheckoutModalOpen = false;
     this.errorMessage = "";
     this.searchErrorMessage = "";
+    this.stockMessage = "";
     this.warningMessage = "";
     if (!preserveLastSaleId) {
       this.successMessage = "";
@@ -868,7 +875,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
     const warehouse = this.warehouses.find((item) => item.id === warehouseId);
     return warehouse
       ? `${warehouse.code} - ${warehouse.name}`
-      : "Selecciona almacen";
+      : "Selecciona almacén";
   }
 
   get cartTitle(): string {
@@ -888,12 +895,17 @@ export class PosPageComponent implements OnInit, OnDestroy {
   }
 
   get activeErrorMessage(): string {
-    return this.searchErrorMessage || this.errorMessage;
+    return this.searchErrorMessage || this.stockMessage || this.errorMessage;
   }
 
   get showClearSearch(): boolean {
     const code = (this.saleForm.value.code ?? "").trim();
-    return code.length > 0 || this.searchResults.length > 0 || this.searchErrorMessage.length > 0;
+    return (
+      code.length > 0 ||
+      this.searchResults.length > 0 ||
+      this.searchErrorMessage.length > 0 ||
+      this.stockMessage.length > 0
+    );
   }
 
   @HostListener("document:keydown.escape")
@@ -936,13 +948,14 @@ export class PosPageComponent implements OnInit, OnDestroy {
 
     const warehouseId = this.saleForm.value.warehouseId ?? undefined;
     if (!warehouseId) {
-      this.searchErrorMessage = "Selecciona un almacen antes de buscar por codigo.";
+      this.searchErrorMessage = "Selecciona un almacén antes de buscar por código.";
       return;
     }
 
     const requestVersion = this.bumpSearchRequestVersion();
     this.loadingLookup = true;
     this.searchErrorMessage = "";
+    this.clearStockMessage();
     this.successMessage = "";
 
     this.posService.lookup(code, warehouseId).subscribe({
@@ -965,7 +978,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
         this.loadingLookup = false;
         this.searchErrorMessage = toHttpErrorMessage(
           error,
-          "No se pudo consultar el producto por codigo.",
+          "No se pudo consultar el producto por código.",
         );
       },
     });
@@ -1000,6 +1013,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
     const requestVersion = this.bumpSearchRequestVersion();
     this.loadingSearch = true;
     this.searchErrorMessage = "";
+    this.clearStockMessage();
     this.successMessage = "";
 
     this.posService.search(query, warehouseId).subscribe({
@@ -1011,7 +1025,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
         this.loadingSearch = false;
         this.searchResults = results;
         if (results.length === 0) {
-          this.searchErrorMessage = "No se encontraron productos para la busqueda.";
+          this.searchErrorMessage = "No se encontraron productos para la búsqueda.";
         }
         this.persistDraftState();
       },
@@ -1023,7 +1037,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
         this.loadingSearch = false;
         this.searchErrorMessage = toHttpErrorMessage(
           error,
-          "No se pudo realizar la busqueda por nombre.",
+          "No se pudo realizar la búsqueda por nombre.",
         );
       },
     });
@@ -1064,6 +1078,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
     this.loadingSearch = false;
     this.searchResults = [];
     this.searchErrorMessage = "";
+    this.stockMessage = "";
 
     if (clearInput) {
       this.saleForm.patchValue(
@@ -1073,6 +1088,28 @@ export class PosPageComponent implements OnInit, OnDestroy {
     }
 
     this.persistDraftState();
+  }
+
+  private clearStockMessage(): void {
+    this.stockMessage = "";
+  }
+
+  private buildStockUnavailableMessage(product: PosProductResponse): string {
+    const productName = product.name?.trim();
+    const secondaryCode = this.getProductSecondaryCode(product);
+
+    if (productName) {
+      return secondaryCode
+        ? `${productName} no tiene stock disponible. SKU: ${secondaryCode}.`
+        : `${productName} no tiene stock disponible.`;
+    }
+
+    const fallbackCode = secondaryCode || String(product.productId);
+    return `El producto ${fallbackCode} no tiene stock disponible.`;
+  }
+
+  private getProductSecondaryCode(product: PosProductResponse): string {
+    return product.sku?.trim() || product.barcode?.trim() || "";
   }
 
   private bumpSearchRequestVersion(): number {
@@ -1106,12 +1143,13 @@ export class PosPageComponent implements OnInit, OnDestroy {
 
   addToCart(product: PosProductResponse): void {
     this.errorMessage = "";
+    this.stockMessage = "";
     this.successMessage = "";
 
     const warehouseId = this.saleForm.value.warehouseId;
     if (!warehouseId) {
       this.errorMessage =
-        "Selecciona un almacen antes de agregar productos al carrito.";
+        "Selecciona un almacén antes de agregar productos al carrito.";
       return;
     }
 
@@ -1126,10 +1164,11 @@ export class PosPageComponent implements OnInit, OnDestroy {
     if (existing) {
       const nextQty = existing.quantity + 1;
       if (nextQty > this.availableIntegerStock(existing)) {
-        this.errorMessage = `Stock insuficiente para ${product.sku}. Disponible: ${product.stockAvailable}.`;
+        this.stockMessage = this.buildStockUnavailableMessage(product);
         return;
       }
       existing.quantity = nextQty;
+      this.clearStockMessage();
       this.persistDraftState();
       return;
     }
@@ -1139,7 +1178,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
     );
 
     if (availableStock <= 0) {
-      this.errorMessage = `El producto ${product.sku} no tiene stock disponible.`;
+      this.stockMessage = this.buildStockUnavailableMessage(product);
       return;
     }
 
@@ -1154,6 +1193,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
       discountAmount: 0,
     });
 
+    this.clearStockMessage();
     this.persistDraftState();
   }
 

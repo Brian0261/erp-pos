@@ -11,13 +11,13 @@ import { PosProductResponse } from "../data/sales.models";
     <section class="results-panel">
       <header class="panel-head">
         <div>
-          <h2>Resultados de busqueda</h2>
+          <h2>Resultados de búsqueda</h2>
         </div>
         <span class="results-count">{{ searchResults.length }} resultados</span>
       </header>
 
       <p class="result-hint" *ngIf="searchResults.length > 1">
-        Hay varias coincidencias. Revisa nombre, codigo, precio y stock antes de
+        Hay varias coincidencias. Revisa nombre, código, precio y stock antes de
         tocar Agregar.
       </p>
 
@@ -133,14 +133,29 @@ import { PosProductResponse } from "../data/sales.models";
         grid-row: 2;
         display: grid;
         place-items: center;
-        gap: var(--space-1);
+        gap: 0.28rem;
+        align-content: center;
         min-height: 0;
         border: 1px dashed var(--color-border-default);
         border-radius: var(--radius-lg);
         background: var(--color-bg-soft);
         color: var(--color-text-secondary);
         text-align: center;
-        padding: var(--space-4);
+        padding: 0.95rem var(--space-4);
+      }
+
+      .empty-results strong {
+        line-height: 1.15;
+      }
+
+      .empty-results strong,
+      .empty-results span {
+        max-width: 32rem;
+      }
+
+      .empty-results span {
+        line-height: 1.35;
+        white-space: nowrap;
       }
 
       .result-card {
@@ -316,6 +331,15 @@ import { PosProductResponse } from "../data/sales.models";
       @media (max-width: 980px) {
         .results-grid {
           max-height: 18rem;
+        }
+
+        .empty-results span {
+          white-space: normal;
+        }
+
+        .empty-results strong,
+        .empty-results span {
+          max-width: 18rem;
         }
       }
 
