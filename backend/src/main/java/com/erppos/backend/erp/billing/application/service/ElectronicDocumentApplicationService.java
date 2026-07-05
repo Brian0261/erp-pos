@@ -51,6 +51,7 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
     private final UblXmlGeneratorPort ublXmlGeneratorPort;
     private final XmlSignerPort xmlSignerPort;
     private final ElectronicBillingProviderPort billingProviderPort;
+    private final BillingRuntimeSafetyPolicy runtimeSafetyPolicy;
     private final AuditUserProvider auditUserProvider;
 
     public ElectronicDocumentApplicationService(
@@ -64,6 +65,7 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
             UblXmlGeneratorPort ublXmlGeneratorPort,
             XmlSignerPort xmlSignerPort,
             ElectronicBillingProviderPort billingProviderPort,
+            BillingRuntimeSafetyPolicy runtimeSafetyPolicy,
             AuditUserProvider auditUserProvider
     ) {
         this.documentRepositoryPort = documentRepositoryPort;
@@ -76,6 +78,7 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
         this.ublXmlGeneratorPort = ublXmlGeneratorPort;
         this.xmlSignerPort = xmlSignerPort;
         this.billingProviderPort = billingProviderPort;
+        this.runtimeSafetyPolicy = runtimeSafetyPolicy;
         this.auditUserProvider = auditUserProvider;
     }
 
@@ -122,6 +125,7 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
 
         CompanyBillingProfile profile = profileRepositoryPort.findActiveByEnvironment(series.environment())
                 .orElseThrow(() -> new BillingNotFoundException("Billing profile not found for series environment"));
+        runtimeSafetyPolicy.assertCanCreateFromSale(profile.environment());
 
         String customerName = trimToNull(command.customerName());
         String customerDocument = trimToNull(command.customerDocument());
@@ -228,12 +232,10 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
     @Transactional
     public ElectronicDocument sign(Long id) {
         ElectronicDocument current = getById(id);
-        if (current.environment() == BillingEnvironment.PROD) {
-            throw new BillingConflictException("La firma en produccion requiere un certificado digital valido y firma XML real.");
-        }
         if (current.status() != ElectronicDocumentStatus.GENERATED && current.status() != ElectronicDocumentStatus.SIGNED) {
             throw new BillingConflictException("El estado actual no permite firmar el XML.");
         }
+        runtimeSafetyPolicy.assertCanSign(current.environment());
 
         BillingXmlFile generated = xmlFileRepositoryPort.findByElectronicDocumentIdAndFileType(id, BillingXmlFileType.GENERATED)
                 .orElseThrow(() -> new BillingNotFoundException("XML generado no disponible. Genera el XML antes de firmar."));
@@ -260,12 +262,10 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
     @Transactional
     public ElectronicDocument send(Long id) {
         ElectronicDocument current = getById(id);
-        if (current.environment() == BillingEnvironment.PROD && !billingProviderPort.supportsProduction()) {
-            throw new BillingConflictException("El envio en produccion esta bloqueado porque no hay proveedor tributario real configurado.");
-        }
         if (current.status() != ElectronicDocumentStatus.SIGNED) {
             throw new BillingConflictException("El estado actual no permite enviar el comprobante.");
         }
+        runtimeSafetyPolicy.assertCanSend(current.environment());
 
         BillingXmlFile signed = xmlFileRepositoryPort.findByElectronicDocumentIdAndFileType(id, BillingXmlFileType.SIGNED)
                 .orElseThrow(() -> new BillingNotFoundException("XML firmado no disponible. Firma el XML antes de enviar."));
@@ -275,6 +275,7 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
 
         ProviderSendResult result = billingProviderPort.send(sent, signed.content());
         ElectronicDocumentStatus finalStatus = result.status() == null ? ElectronicDocumentStatus.ERROR : result.status();
+        runtimeSafetyPolicy.assertCanAcceptProviderResult(sent.environment(), finalStatus);
 
         ElectronicDocument finalized = new ElectronicDocument(
                 sent.id(),

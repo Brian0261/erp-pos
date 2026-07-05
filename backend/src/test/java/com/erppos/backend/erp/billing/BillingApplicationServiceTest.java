@@ -4,6 +4,7 @@ import com.erppos.backend.erp.billing.adapter.rest.BillingSeriesController;
 import com.erppos.backend.erp.billing.adapter.rest.ElectronicDocumentController;
 import com.erppos.backend.erp.billing.application.service.AuditUserProvider;
 import com.erppos.backend.erp.billing.application.service.BillingSeriesApplicationService;
+import com.erppos.backend.erp.billing.application.service.BillingRuntimeSafetyPolicy;
 import com.erppos.backend.erp.billing.application.service.CompanyBillingProfileApplicationService;
 import com.erppos.backend.erp.billing.application.service.ElectronicDocumentApplicationService;
 import com.erppos.backend.erp.billing.application.usecase.CreateBillingSeriesCommand;
@@ -36,6 +37,7 @@ import com.erppos.backend.erp.billing.domain.port.ElectronicDocumentRepositoryPo
 import com.erppos.backend.erp.billing.domain.port.ElectronicDocumentStatusHistoryRepositoryPort;
 import com.erppos.backend.erp.billing.domain.port.UblXmlGeneratorPort;
 import com.erppos.backend.erp.billing.domain.port.XmlSignerPort;
+import com.erppos.backend.erp.billing.infrastructure.provider.MockElectronicBillingProviderAdapter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -65,6 +67,7 @@ class BillingApplicationServiceTest {
     private StubXmlGenerator stubXmlGenerator;
     private StubXmlSigner stubXmlSigner;
     private StubProvider stubProvider;
+    private BillingRuntimeSafetyPolicy runtimeSafetyPolicy;
 
     private CompanyBillingProfileApplicationService profileService;
     private BillingSeriesApplicationService seriesService;
@@ -82,6 +85,7 @@ class BillingApplicationServiceTest {
         stubXmlGenerator = new StubXmlGenerator();
         stubXmlSigner = new StubXmlSigner();
         stubProvider = new StubProvider();
+        runtimeSafetyPolicy = new BillingRuntimeSafetyPolicy(stubProvider, stubXmlSigner);
 
         AuditUserProvider auditUserProvider = new AuditUserProvider();
         profileService = new CompanyBillingProfileApplicationService(profileRepository, auditUserProvider);
@@ -97,6 +101,7 @@ class BillingApplicationServiceTest {
                 stubXmlGenerator,
                 stubXmlSigner,
                 stubProvider,
+                runtimeSafetyPolicy,
                 auditUserProvider
         );
 
@@ -609,6 +614,38 @@ class BillingApplicationServiceTest {
     }
 
     @Test
+    void shouldAllowBetaSimulationFlow() {
+        profileService.create(new CreateCompanyBillingProfileCommand(
+                "20999999990",
+                "INKTOY BETA SAC",
+                "AV. BETA 100",
+                BillingEnvironment.BETA,
+                null,
+                null
+        ));
+        BillingSeries betaSeries = seriesService.create(new CreateBillingSeriesCommand(
+                ElectronicDocumentType.RECEIPT,
+                "B301",
+                1L,
+                BillingEnvironment.BETA
+        ));
+        saleReadPort.sales.put(5L, completedSale(5L));
+
+        ElectronicDocument doc = documentService.createFromSale(5L, new CreateElectronicDocumentFromSaleCommand(
+                ElectronicDocumentType.RECEIPT,
+                betaSeries.id(),
+                null,
+                null
+        ));
+        documentService.generateXml(doc.id());
+        documentService.sign(doc.id());
+        ElectronicDocument sent = documentService.send(doc.id());
+
+        assertEquals(BillingEnvironment.BETA, sent.environment());
+        assertEquals(ElectronicDocumentStatus.ACCEPTED, sent.status());
+    }
+
+    @Test
     void shouldSimulateRejectedAndMarkRejected() {
         saleReadPort.sales.put(4L, completedSale(4L));
         ElectronicDocument doc = documentService.createFromSale(4L, new CreateElectronicDocumentFromSaleCommand(
@@ -625,90 +662,52 @@ class BillingApplicationServiceTest {
     }
 
     @Test
-    void shouldBlockSigningInProdWhenRealSignatureIsNotAvailable() {
-        profileService.create(new CreateCompanyBillingProfileCommand(
-                "20999999991",
-                "INKTOY PROD SAC",
-                "AV. PROD 100",
-                BillingEnvironment.PROD,
-                null,
-                null
-        ));
-        BillingSeries prodSeries = seriesService.create(new CreateBillingSeriesCommand(
-                ElectronicDocumentType.RECEIPT,
-                "B101",
-                1L,
-                BillingEnvironment.PROD
-        ));
+    void shouldBlockProdCreateFromSaleWhenRuntimeIsNotProductionReadyWithoutConsumingCorrelative() {
+        BillingSeries prodSeries = createProdReceiptSeries("20999999991", "B101");
         saleReadPort.sales.put(8L, completedSale(8L));
 
-        ElectronicDocument doc = documentService.createFromSale(8L, new CreateElectronicDocumentFromSaleCommand(
+        int documentsBefore = documentRepository.storage.size();
+
+        BillingConflictException ex = assertThrows(BillingConflictException.class, () -> documentService.createFromSale(8L, new CreateElectronicDocumentFromSaleCommand(
                 ElectronicDocumentType.RECEIPT,
                 prodSeries.id(),
                 null,
                 null
+        )));
+
+        assertEquals(BillingRuntimeSafetyPolicy.PRODUCTION_NOT_CONFIGURED_MESSAGE, ex.getMessage());
+        assertFalse(documentRepository.existsBySaleId(8L));
+        assertEquals(documentsBefore, documentRepository.storage.size());
+        assertEquals(1L, seriesRepository.findById(prodSeries.id()).orElseThrow().currentNumber());
+    }
+
+    @Test
+    void shouldBlockSigningInProdWhenRealSignatureIsNotAvailable() {
+        BillingSeries prodSeries = createProdReceiptSeries("20999999992", "B102");
+        ElectronicDocument generated = saveDocumentForSeries(8L, prodSeries, ElectronicDocumentStatus.GENERATED, Instant.now(), null, null);
+        xmlRepository.save(new BillingXmlFile(
+                null,
+                generated.id(),
+                BillingXmlFileType.GENERATED,
+                generated.fullNumber() + ".xml",
+                "<xml>generated</xml>",
+                "application/xml",
+                null,
+                "tester"
         ));
-        documentService.generateXml(doc.id());
 
-        BillingConflictException ex = assertThrows(BillingConflictException.class, () -> documentService.sign(doc.id()));
-        assertEquals("La firma en produccion requiere un certificado digital valido y firma XML real.", ex.getMessage());
+        BillingConflictException ex = assertThrows(BillingConflictException.class, () -> documentService.sign(generated.id()));
+        assertEquals(BillingRuntimeSafetyPolicy.PRODUCTION_NOT_CONFIGURED_MESSAGE, ex.getMessage());
 
-        ElectronicDocument persisted = documentRepository.findById(doc.id()).orElseThrow();
+        ElectronicDocument persisted = documentRepository.findById(generated.id()).orElseThrow();
         assertEquals(ElectronicDocumentStatus.GENERATED, persisted.status());
+        assertTrue(xmlRepository.findByElectronicDocumentIdAndFileType(generated.id(), BillingXmlFileType.SIGNED).isEmpty());
     }
 
     @Test
     void shouldBlockProdSendWhenProviderIsMockWithoutChangingStatus() {
-        profileService.create(new CreateCompanyBillingProfileCommand(
-                "20999999992",
-                "INKTOY PROD SAC 2",
-                "AV. PROD 200",
-                BillingEnvironment.PROD,
-                null,
-                null
-        ));
-        BillingSeries prodSeries = seriesService.create(new CreateBillingSeriesCommand(
-                ElectronicDocumentType.RECEIPT,
-                "B102",
-                1L,
-                BillingEnvironment.PROD
-        ));
-        saleReadPort.sales.put(9L, completedSale(9L));
-
-        ElectronicDocument created = documentService.createFromSale(9L, new CreateElectronicDocumentFromSaleCommand(
-                ElectronicDocumentType.RECEIPT,
-                prodSeries.id(),
-                null,
-                null
-        ));
-        ElectronicDocument generated = documentService.generateXml(created.id());
-
-        ElectronicDocument signed = documentRepository.save(new ElectronicDocument(
-                generated.id(),
-                generated.saleId(),
-                generated.billingSeriesId(),
-                generated.documentType(),
-                ElectronicDocumentStatus.SIGNED,
-                generated.environment(),
-                generated.series(),
-                generated.number(),
-                generated.fullNumber(),
-                generated.customerName(),
-                generated.customerDocument(),
-                generated.currencyCode(),
-                generated.subtotalAmount(),
-                generated.taxAmount(),
-                generated.totalAmount(),
-                generated.xmlGeneratedAt(),
-                Instant.now(),
-                null,
-                generated.providerTicket(),
-                generated.providerMessage(),
-                generated.createdAt(),
-                generated.updatedAt(),
-                generated.createdBy(),
-                generated.updatedBy()
-        ));
+        BillingSeries prodSeries = createProdReceiptSeries("20999999993", "B103");
+        ElectronicDocument signed = saveDocumentForSeries(9L, prodSeries, ElectronicDocumentStatus.SIGNED, Instant.now(), Instant.now(), null);
         xmlRepository.save(new BillingXmlFile(
                 null,
                 signed.id(),
@@ -721,12 +720,23 @@ class BillingApplicationServiceTest {
         ));
 
         BillingConflictException ex = assertThrows(BillingConflictException.class, () -> documentService.send(signed.id()));
-        assertEquals("El envio en produccion esta bloqueado porque no hay proveedor tributario real configurado.", ex.getMessage());
+        assertEquals(BillingRuntimeSafetyPolicy.PRODUCTION_NOT_CONFIGURED_MESSAGE, ex.getMessage());
 
         ElectronicDocument persisted = documentRepository.findById(signed.id()).orElseThrow();
         assertEquals(ElectronicDocumentStatus.SIGNED, persisted.status());
         assertNull(persisted.sentAt());
         assertFalse(historyRepository.findByElectronicDocumentId(signed.id()).stream().anyMatch(h -> h.newStatus() == ElectronicDocumentStatus.SENT));
+    }
+
+    @Test
+    void shouldNotAllowMockProviderToAcceptProdDocument() {
+        BillingSeries prodSeries = createProdReceiptSeries("20999999994", "B104");
+        ElectronicDocument signed = saveDocumentForSeries(10L, prodSeries, ElectronicDocumentStatus.SIGNED, Instant.now(), Instant.now(), null);
+
+        ProviderSendResult result = new MockElectronicBillingProviderAdapter().send(signed, "<xml>signed</xml>");
+
+        assertEquals(ElectronicDocumentStatus.ERROR, result.status());
+        assertNotEquals(ElectronicDocumentStatus.ACCEPTED, result.status());
     }
 
     @Test
@@ -757,6 +767,60 @@ class BillingApplicationServiceTest {
                 1L,
                 null,
                 null
+        ));
+    }
+
+    private BillingSeries createProdReceiptSeries(String ruc, String series) {
+        profileService.create(new CreateCompanyBillingProfileCommand(
+                ruc,
+                "INKTOY PROD SAC",
+                "AV. PROD 100",
+                BillingEnvironment.PROD,
+                null,
+                null
+        ));
+        return seriesService.create(new CreateBillingSeriesCommand(
+                ElectronicDocumentType.RECEIPT,
+                series,
+                1L,
+                BillingEnvironment.PROD
+        ));
+    }
+
+    private ElectronicDocument saveDocumentForSeries(
+            Long saleId,
+            BillingSeries series,
+            ElectronicDocumentStatus status,
+            Instant xmlGeneratedAt,
+            Instant signedAt,
+            Instant sentAt
+    ) {
+        long number = series.currentNumber();
+        return documentRepository.save(new ElectronicDocument(
+                null,
+                saleId,
+                series.id(),
+                series.documentType(),
+                status,
+                series.environment(),
+                series.series(),
+                number,
+                series.series() + "-" + String.format("%08d", number),
+                "CONSUMIDOR FINAL",
+                null,
+                "PEN",
+                BigDecimal.valueOf(20),
+                BigDecimal.ZERO,
+                BigDecimal.valueOf(20),
+                xmlGeneratedAt,
+                signedAt,
+                sentAt,
+                null,
+                null,
+                null,
+                null,
+                "tester",
+                "tester"
         ));
     }
 

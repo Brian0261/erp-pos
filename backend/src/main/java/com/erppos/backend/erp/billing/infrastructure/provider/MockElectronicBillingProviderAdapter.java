@@ -3,6 +3,7 @@ package com.erppos.backend.erp.billing.infrastructure.provider;
 import com.erppos.backend.erp.billing.domain.model.ElectronicDocument;
 import com.erppos.backend.erp.billing.domain.model.ElectronicDocumentStatus;
 import com.erppos.backend.erp.billing.domain.model.ProviderSendResult;
+import com.erppos.backend.erp.billing.domain.model.BillingEnvironment;
 import com.erppos.backend.erp.billing.domain.port.ElectronicBillingProviderPort;
 import org.springframework.stereotype.Component;
 
@@ -16,6 +17,9 @@ public class MockElectronicBillingProviderAdapter implements ElectronicBillingPr
 
     @Override
     public ProviderSendResult send(ElectronicDocument document, String signedXml) {
+        if (document.environment() == BillingEnvironment.PROD) {
+            return new ProviderSendResult(ElectronicDocumentStatus.ERROR, "MOCK-BLOCKED-" + document.id(), "Provider mock bloqueado en ambiente PROD.");
+        }
         if (document.customerName() != null && document.customerName().toUpperCase().contains("REJECT")) {
             return new ProviderSendResult(ElectronicDocumentStatus.REJECTED, "MOCK-REJ-" + document.id(), "Respuesta simulada de sandbox: rechazado.");
         }

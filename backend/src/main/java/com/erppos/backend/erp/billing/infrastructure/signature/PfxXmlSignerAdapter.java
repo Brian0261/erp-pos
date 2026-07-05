@@ -7,11 +7,12 @@ import org.springframework.stereotype.Component;
 @Component
 public class PfxXmlSignerAdapter {
 
+    public boolean supportsProduction() {
+        return false;
+    }
+
     public String sign(String xml, CompanyBillingProfile profile) {
-        if (profile.certificatePath() == null || profile.certificatePassword() == null) {
-            throw new BillingBusinessRuleException("PROD signing requires certificatePath and certificatePassword");
-        }
-        return xml + "\n<!-- SIGNATURE:PFX path=" + profile.certificatePath() + " -->";
+        throw new BillingBusinessRuleException("Firma XML productiva no configurada.");
     }
 }
 

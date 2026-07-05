@@ -4,6 +4,17 @@
 
 Estandarizar cambios tecnicos para reducir regresiones y mantener trazabilidad en etapa pre-piloto.
 
+## Control fiscal
+
+### Cierre Fiscal production safety hardening
+
+- Tipo: hardening backend de seguridad productiva fiscal.
+- Alcance implementado: politica central `BillingRuntimeSafetyPolicy` para reglas runtime por ambiente; bloqueo de `PROD` antes de consumir correlativo cuando no hay provider fiscal real y firma XML real; bloqueo de firma productiva con signer no productivo; bloqueo de envio productivo con provider no productivo; defensa adicional para que `MockElectronicBillingProviderAdapter` no devuelva `ACCEPTED` en `PROD`.
+- LOCAL/BETA siguen habilitados como simulacion controlada para desarrollo, sandbox y beta interna.
+- Exclusiones confirmadas: no se implemento SUNAT directo, PSE/OSE, UBL SUNAT completo, firma digital real, CDR, PDF/ticket fiscal, QR, notas de credito/debito, comunicacion de baja ni migracion de credenciales a secret manager.
+- Seguridad operativa: no se tocaron `.env`, secretos, tokens, claves, certificados reales ni configuracion productiva real.
+- Validacion: `./mvnw -Dtest=BillingApplicationServiceTest test` con 35 tests, 0 failures, BUILD SUCCESS; `./mvnw test` backend completo con 476 tests, 0 failures, BUILD SUCCESS.
+
 ## Control ecommerce SEO-first
 
 ### Cierre Fase 0 documental ecommerce

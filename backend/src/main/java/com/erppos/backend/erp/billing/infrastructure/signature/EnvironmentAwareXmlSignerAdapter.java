@@ -23,5 +23,10 @@ public class EnvironmentAwareXmlSignerAdapter implements XmlSignerPort {
         }
         return noopXmlSignerAdapter.sign(xml);
     }
+
+    @Override
+    public boolean supportsProduction() {
+        return pfxXmlSignerAdapter.supportsProduction();
+    }
 }
 
