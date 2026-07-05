@@ -49,6 +49,7 @@ import { PosCartItem } from "../data/pos-ui.models";
             *ngFor="let item of cart; let index = index"
           >
             <div class="full-cart-product">
+              <h3>{{ item.name }}</h3>
               <div class="full-cart-product-meta-row">
                 <p class="full-cart-sku">{{ item.sku }}</p>
                 <span class="full-cart-meta-separator" aria-hidden="true">·</span>
@@ -62,75 +63,80 @@ import { PosCartItem } from "../data/pos-ui.models";
                   Sin código
                 </span>
               </div>
-              <h3>{{ item.name }}</h3>
             </div>
 
-            <label class="mini-field full-cart-quantity">
-              <span>Cantidad</span>
-              <div class="quantity-tools">
-                <button
-                  type="button"
-                  class="ui-button quantity-stepper"
-                  (click)="decrease.emit(index)"
-                  [disabled]="item.quantity <= 1"
-                >
-                  -
-                </button>
+            <div class="full-cart-actions">
+              <label class="mini-field full-cart-quantity">
+                <span>Cant.</span>
+                <div class="quantity-tools">
+                  <button
+                    type="button"
+                    class="ui-button quantity-stepper"
+                    aria-label="Disminuir cantidad"
+                    (click)="decrease.emit(index)"
+                    [disabled]="item.quantity <= 1"
+                  >
+                    -
+                  </button>
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    inputmode="numeric"
+                    pattern="[0-9]*"
+                    aria-label="Cantidad del producto"
+                    [value]="item.quantity"
+                    (focus)="quantityFocus.emit($any($event.target))"
+                    (click)="quantityFocus.emit($any($event.target))"
+                    (input)="
+                      setQuantity.emit({
+                        index: index,
+                        value: $any($event.target).value,
+                        input: $any($event.target),
+                      })
+                    "
+                  />
+                  <button
+                    type="button"
+                    class="ui-button quantity-stepper"
+                    aria-label="Aumentar cantidad"
+                    (click)="increase.emit(index)"
+                  >
+                    +
+                  </button>
+                </div>
+              </label>
+
+              <label class="mini-field full-cart-discount">
+                <span>Dscto.</span>
                 <input
                   type="number"
-                  min="1"
-                  step="1"
-                  inputmode="numeric"
-                  pattern="[0-9]*"
-                  [value]="item.quantity"
-                  (focus)="quantityFocus.emit($any($event.target))"
-                  (click)="quantityFocus.emit($any($event.target))"
+                  min="0"
+                  step="0.01"
+                  aria-label="Descuento del producto"
+                  [value]="item.discountAmount"
                   (input)="
-                    setQuantity.emit({
+                    setDiscount.emit({
                       index: index,
                       value: $any($event.target).value,
-                      input: $any($event.target),
                     })
                   "
                 />
-                <button
-                  type="button"
-                  class="ui-button quantity-stepper"
-                  (click)="increase.emit(index)"
-                >
-                  +
-                </button>
+              </label>
+
+              <div class="full-cart-line">
+                <span>Subtotal</span>
+                <strong>S/ {{ (lineTotals[index] || 0) | number: "1.2-2" }}</strong>
               </div>
-            </label>
 
-            <label class="mini-field full-cart-discount">
-              <span>Descuento</span>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                [value]="item.discountAmount"
-                (input)="
-                  setDiscount.emit({
-                    index: index,
-                    value: $any($event.target).value,
-                  })
-                "
-              />
-            </label>
-
-            <div class="full-cart-line">
-              <span>Subtotal</span>
-              <strong>S/ {{ (lineTotals[index] || 0) | number: "1.2-2" }}</strong>
+              <button
+                type="button"
+                class="ui-button ui-button--secondary pos-button pos-button--small full-cart-remove"
+                (click)="remove.emit(index)"
+              >
+                Quitar
+              </button>
             </div>
-
-            <button
-              type="button"
-              class="ui-button ui-button--secondary pos-button pos-button--small full-cart-remove"
-              (click)="remove.emit(index)"
-            >
-              Quitar
-            </button>
           </article>
         </div>
       </article>
@@ -226,28 +232,26 @@ import { PosCartItem } from "../data/pos-ui.models";
       .full-cart-list {
         display: grid;
         align-content: start;
-        gap: var(--space-2);
+        gap: 0.6rem;
         min-height: 0;
         overflow: auto;
-        padding-right: var(--space-1);
+        padding-right: 0.3rem;
       }
 
       .full-cart-row {
         display: grid;
-        grid-template-columns:
-          minmax(240px, 1.6fr) minmax(142px, 0.58fr)
-          minmax(96px, 0.36fr) minmax(108px, 0.42fr) minmax(76px, auto);
-        gap: 0.55rem;
-        align-items: center;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 0.52rem;
+        align-items: start;
         border: 1px solid color-mix(in srgb, var(--color-border-default) 86%, transparent);
         border-radius: var(--radius-lg);
         background: var(--color-bg-surface);
-        padding: 0.72rem 0.8rem;
+        padding: 0.68rem 0.78rem;
       }
 
       .full-cart-product {
         display: grid;
-        gap: 0.16rem;
+        gap: 0.18rem;
         align-content: center;
         align-items: start;
         min-width: 0;
@@ -290,6 +294,13 @@ import { PosCartItem } from "../data/pos-ui.models";
         line-height: 1.16;
       }
 
+      .full-cart-actions {
+        display: grid;
+        grid-template-columns: minmax(0, 1.5fr) minmax(0, 0.9fr) auto auto;
+        gap: 0.5rem 0.75rem;
+        align-items: center;
+      }
+
       .full-cart-product-price {
         font-weight: 600;
         color: var(--color-text-secondary);
@@ -319,17 +330,19 @@ import { PosCartItem } from "../data/pos-ui.models";
       .mini-field {
         display: grid;
         gap: var(--space-1);
+        align-self: center;
       }
 
       .mini-field > span {
         color: var(--color-text-secondary);
-        font-size: var(--font-size-sm);
+        font-size: 0.68rem;
         font-weight: 700;
+        line-height: 1.05;
       }
 
       .mini-field input {
         width: 100%;
-        min-height: 2.35rem;
+        min-height: 2.18rem;
         border: 1px solid var(--color-border-default);
         border-radius: var(--radius-md);
         background: var(--color-bg-surface);
@@ -340,7 +353,7 @@ import { PosCartItem } from "../data/pos-ui.models";
 
       .quantity-tools {
         display: grid;
-        grid-template-columns: 2.3rem minmax(3.6rem, 1fr) 2.3rem;
+        grid-template-columns: 2.2rem minmax(3.4rem, 1fr) 2.2rem;
         gap: 0.35rem;
         align-items: center;
       }
@@ -363,8 +376,10 @@ import { PosCartItem } from "../data/pos-ui.models";
         display: grid;
         gap: 0.08rem;
         align-self: center;
+        align-content: center;
         min-width: 0;
-        justify-items: end;
+        min-height: 2.1rem;
+        justify-items: center;
       }
 
       .full-cart-line strong {
@@ -393,16 +408,21 @@ import { PosCartItem } from "../data/pos-ui.models";
       }
 
       .full-cart-remove {
-        min-height: 2.2rem;
-        border-color: var(--color-border-default);
+        min-height: 2.1rem;
+        border-color: color-mix(in srgb, var(--color-danger) 22%, var(--color-border-default));
         color: var(--color-danger);
         background: color-mix(
           in srgb,
-          var(--color-danger) 8%,
+          var(--color-danger) 6%,
           var(--color-bg-surface)
         );
         box-shadow: none;
-        opacity: 0.96;
+        opacity: 0.88;
+        align-self: center;
+      }
+
+      .full-cart-discount {
+        width: min(7rem, 100%);
       }
 
       .ui-button[disabled] {
@@ -420,7 +440,7 @@ import { PosCartItem } from "../data/pos-ui.models";
       }
 
       .full-cart-list::-webkit-scrollbar {
-        width: 8px;
+        width: 6px;
       }
 
       .full-cart-list::-webkit-scrollbar-track {
@@ -429,22 +449,28 @@ import { PosCartItem } from "../data/pos-ui.models";
       }
 
       .full-cart-list::-webkit-scrollbar-thumb {
-        background: linear-gradient(
-          180deg,
-          var(--color-brand-highlight),
-          var(--color-brand-accent)
-        );
+        background: color-mix(in srgb, var(--color-brand-primary) 28%, transparent);
         border-radius: var(--radius-pill);
       }
 
       @media (max-width: 760px) {
         .full-cart-header,
-        .full-cart-row {
+        .full-cart-row,
+        .full-cart-actions {
           grid-template-columns: 1fr;
         }
 
         .full-cart-summary {
           text-align: left;
+        }
+
+        .full-cart-line {
+          justify-items: start;
+        }
+
+        .full-cart-discount,
+        .full-cart-remove {
+          width: 100%;
         }
 
         .pos-button {

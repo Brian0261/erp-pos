@@ -29,7 +29,7 @@ import { PosCartItem } from "../data/pos-ui.models";
           </button>
           <button
             type="button"
-            class="ui-button ui-button--secondary pos-button pos-button--quiet"
+            class="ui-button ui-button--secondary pos-button pos-button--quiet pos-button--danger-quiet"
             (click)="cancelSale.emit()"
             [disabled]="cart.length === 0"
           >
@@ -79,7 +79,7 @@ import { PosCartItem } from "../data/pos-ui.models";
         border: 1px solid color-mix(in srgb, var(--color-brand-primary) 12%, var(--color-border-default));
         border-radius: var(--radius-lg);
         background: var(--color-bg-surface);
-        padding: 0.75rem;
+        padding: 0.7rem;
         display: grid;
         gap: var(--space-2);
         min-height: 0;
@@ -108,14 +108,17 @@ import { PosCartItem } from "../data/pos-ui.models";
       .cart-head-actions {
         display: flex;
         justify-content: flex-end;
-        gap: var(--space-2);
+        gap: 0.45rem;
         flex-wrap: wrap;
       }
 
       .cart-panel .pos-button--quiet {
-        min-height: 2.3rem;
-        padding: 0.45rem var(--space-2);
-        font-size: var(--font-size-sm);
+        min-height: 2.2rem;
+        padding: 0.4rem 0.72rem;
+        font-size: 0.78rem;
+        border-color: var(--color-border-soft);
+        background: transparent;
+        color: var(--color-text-secondary);
       }
 
       .pos-button {
@@ -126,8 +129,14 @@ import { PosCartItem } from "../data/pos-ui.models";
       }
 
       .pos-button--quiet {
-        background: color-mix(in srgb, var(--color-text-primary) 16%, var(--color-bg-soft));
+        background: color-mix(in srgb, var(--color-text-primary) 8%, var(--color-bg-soft));
         color: var(--color-text-primary);
+      }
+
+      .pos-button--danger-quiet {
+        border-color: color-mix(in srgb, var(--color-danger) 24%, var(--color-border-default));
+        color: color-mix(in srgb, var(--color-danger) 78%, var(--color-text-secondary));
+        background: color-mix(in srgb, var(--color-danger) 4%, var(--color-bg-surface));
       }
 
       .ui-button[disabled] {
@@ -138,10 +147,10 @@ import { PosCartItem } from "../data/pos-ui.models";
       .cart-list {
         display: grid;
         align-content: start;
-        gap: 0.55rem;
+        gap: 0.45rem;
         min-height: 0;
         overflow: auto;
-        padding-right: var(--space-1);
+        padding-right: 0.22rem;
       }
 
       .empty-cart {
@@ -173,7 +182,7 @@ import { PosCartItem } from "../data/pos-ui.models";
       }
 
       .cart-list::-webkit-scrollbar {
-        width: 8px;
+        width: 6px;
       }
 
       .cart-list::-webkit-scrollbar-track {
@@ -182,11 +191,7 @@ import { PosCartItem } from "../data/pos-ui.models";
       }
 
       .cart-list::-webkit-scrollbar-thumb {
-        background: linear-gradient(
-          180deg,
-          var(--color-brand-highlight),
-          var(--color-brand-accent)
-        );
+        background: color-mix(in srgb, var(--color-brand-primary) 28%, transparent);
         border-radius: var(--radius-pill);
       }
 

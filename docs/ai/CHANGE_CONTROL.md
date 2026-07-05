@@ -326,6 +326,24 @@ Estandarizar cambios tecnicos para reducir regresiones y mantener trazabilidad e
 - Confirmaciones:
   - No se toco backend, DB, Auth/JWT, guards, rutas funcionales, caja real, ventas transaccionales, stock real, comprobantes ni Storefront.
 
+### Cierre POS Cart Density And Hierarchy Polish
+
+- Tipo: polish frontend POS + cierre QA/E2E.
+- Commit objetivo: `style(pos): polish cart density and hierarchy`.
+- Alcance real documentado:
+  - Panel `Carrito` mas compacto y legible.
+  - Fila operativa con `Cant.`, `Dscto.`, `SUBTOTAL` y `Quitar` alineada en panel y modal.
+  - Modal `Carrito completo` alineado al patron visual del panel.
+  - Microajuste final para corregir el desfase vertical entre `SUBTOTAL` y `Quitar` eliminando compensaciones manuales.
+- Validaciones:
+  - `npm run build`: PASS.
+  - `E2E_BASE_URL=http://127.0.0.1:4201 npm run e2e:no-write`: PASS.
+  - `E2E_BASE_URL=http://127.0.0.1:4201 npm run e2e:no-write:headed`: PASS.
+  - `git diff --check`: sin errores, solo advertencias LF -> CRLF.
+- Confirmaciones:
+  - No se toco backend, DB, Auth/JWT, guards, rutas funcionales, caja real, ventas transaccionales, stock real, comprobantes, layout global, sidebar ni Storefront.
+  - No se toco la logica funcional del carrito ni el flujo de cobro.
+
 ### Cierre Fase 2S.2A Catalogo Publico Navegable Minimo
 
 - Tipo: implementacion funcional Storefront Next.js + cierre documental QA.

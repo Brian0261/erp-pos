@@ -19,21 +19,22 @@ export interface PosCartItemQuantityChange extends PosCartItemValueChange {
   template: `
     <article class="cart-item">
       <div class="cart-item__main">
+        <h3>{{ item.name }}</h3>
         <div class="cart-item__meta-row">
           <p class="cart-item__sku">{{ item.sku }}</p>
           <span class="cart-item__meta-separator" aria-hidden="true">·</span>
           <p class="cart-item__stock">P.U. S/ {{ item.salePrice | number: "1.2-2" }}</p>
         </div>
-        <h3>{{ item.name }}</h3>
       </div>
 
-      <div class="cart-item__controls">
-        <label class="mini-field">
-          <span>Cantidad *</span>
+      <div class="cart-item__footer">
+        <label class="mini-field mini-field--quantity">
+          <span>Cant.</span>
           <div class="quantity-tools">
             <button
               type="button"
               class="ui-button quantity-stepper"
+              aria-label="Disminuir cantidad"
               (click)="decrease.emit(index)"
               [disabled]="item.quantity <= 1"
             >
@@ -45,6 +46,7 @@ export interface PosCartItemQuantityChange extends PosCartItemValueChange {
               step="1"
               inputmode="numeric"
               pattern="[0-9]*"
+              aria-label="Cantidad del producto"
               [value]="item.quantity"
               (focus)="quantityFocus.emit($any($event.target))"
               (click)="quantityFocus.emit($any($event.target))"
@@ -59,32 +61,32 @@ export interface PosCartItemQuantityChange extends PosCartItemValueChange {
             <button
               type="button"
               class="ui-button quantity-stepper"
+              aria-label="Aumentar cantidad"
               (click)="increase.emit(index)"
             >
               +
             </button>
           </div>
         </label>
-        <label class="mini-field">
-          <span>Descuento</span>
+        <label class="mini-field mini-field--discount">
+          <span>Dscto.</span>
           <input
             type="number"
             min="0"
             step="0.01"
+            aria-label="Descuento del producto"
             [value]="item.discountAmount"
             (input)="setDiscount.emit({ index: index, value: $any($event.target).value })"
           />
         </label>
-      </div>
 
-      <div class="cart-item__footer">
-        <div>
+        <div class="cart-item__subtotal">
           <span>Subtotal</span>
           <strong>S/ {{ lineTotal | number: "1.2-2" }}</strong>
         </div>
         <button
           type="button"
-          class="ui-button ui-button--danger pos-button pos-button--small cart-item__remove"
+          class="ui-button ui-button--secondary pos-button pos-button--small cart-item__remove"
           (click)="remove.emit(index)"
         >
           Quitar
@@ -98,17 +100,16 @@ export interface PosCartItemQuantityChange extends PosCartItemValueChange {
         border: 1px solid color-mix(in srgb, var(--color-border-default) 78%, transparent);
         border-radius: var(--radius-lg);
         background: var(--color-bg-surface);
-        padding: 0.62rem;
+        padding: 0.58rem 0.62rem;
         display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(96px, auto);
-        gap: 0.55rem var(--space-2);
+        grid-template-columns: minmax(0, 1fr);
+        gap: 0.48rem;
         align-items: start;
       }
 
       .cart-item__main {
-        grid-column: 1;
         display: grid;
-        gap: 0.22rem;
+        gap: 0.18rem;
         grid-template-columns: minmax(0, 1fr);
         align-items: start;
         align-content: start;
@@ -145,7 +146,7 @@ export interface PosCartItemQuantityChange extends PosCartItemValueChange {
       .cart-item__main h3 {
         margin: 0;
         font-size: 0.98rem;
-        line-height: 1.18;
+        line-height: 1.15;
         font-weight: 700;
       }
 
@@ -157,35 +158,24 @@ export interface PosCartItemQuantityChange extends PosCartItemValueChange {
         letter-spacing: 0.03em;
       }
 
-      .cart-item__controls {
-        grid-column: 1;
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: var(--space-2);
-        align-content: end;
-      }
-
       .cart-item__footer {
-        grid-column: 2;
-        grid-row: 1 / span 2;
         display: grid;
-        align-self: stretch;
+        grid-template-columns: minmax(0, 1.45fr) minmax(0, 0.9fr) auto auto;
+        gap: 0.5rem 0.75rem;
+        align-items: center;
+      }
+
+      .cart-item__subtotal {
+        display: grid;
+        justify-items: center;
+        align-self: center;
         align-content: center;
-        align-items: stretch;
-        gap: 0.45rem;
-        border-left: 1px solid var(--color-border-default);
-        border-top: 0;
-        padding-left: 0.75rem;
-        padding-top: 0;
+        gap: 0.08rem;
+        min-height: 2.1rem;
+        min-width: 0;
       }
 
-      .cart-item__footer div {
-        display: grid;
-        align-content: start;
-        gap: 0.06rem;
-      }
-
-      .cart-item__footer span {
+      .cart-item__subtotal span {
         color: var(--color-text-secondary);
         font-size: 0.62rem;
         font-weight: 600;
@@ -194,31 +184,42 @@ export interface PosCartItemQuantityChange extends PosCartItemValueChange {
         line-height: 1.05;
       }
 
-      .cart-item__footer strong {
+      .cart-item__subtotal strong {
         font-size: 1rem;
-        line-height: 1.1;
+        font-weight: 800;
+        line-height: 1.08;
+        font-variant-numeric: tabular-nums;
       }
 
       .cart-item__remove {
-        min-height: 2.4rem;
+        min-height: 2.1rem;
+        padding-inline: 0.8rem;
+        border-color: color-mix(in srgb, var(--color-danger) 22%, var(--color-border-default));
+        color: var(--color-danger);
+        background: color-mix(in srgb, var(--color-danger) 6%, var(--color-bg-surface));
         box-shadow: none;
-        opacity: 0.92;
+        opacity: 0.88;
+        line-height: 1.1;
+        align-self: center;
       }
 
       .mini-field {
         display: grid;
-        gap: var(--space-1);
+        gap: 0.32rem;
+        min-width: 0;
+        align-self: center;
       }
 
       .mini-field > span {
         font-size: 0.68rem;
         font-weight: 700;
         color: var(--color-text-secondary);
+        line-height: 1.05;
       }
 
       .mini-field input {
         width: 100%;
-        min-height: 2.6rem;
+        min-height: 2.2rem;
         padding: 0.58rem 0.72rem;
         border-radius: var(--radius-md);
         border: 1px solid var(--color-border-default);
@@ -232,9 +233,17 @@ export interface PosCartItemQuantityChange extends PosCartItemValueChange {
         padding: 0.34rem 0.5rem;
       }
 
+      .mini-field--quantity {
+        min-width: 0;
+      }
+
+      .mini-field--discount {
+        width: min(7rem, 100%);
+      }
+
       .quantity-tools {
         display: grid;
-        grid-template-columns: 2.3rem minmax(3.6rem, 1fr) 2.3rem;
+        grid-template-columns: 2.2rem minmax(3.2rem, 1fr) 2.2rem;
         gap: 0.35rem;
         align-items: center;
       }
@@ -254,23 +263,35 @@ export interface PosCartItemQuantityChange extends PosCartItemValueChange {
       }
 
       @media (max-width: 760px) {
-        .cart-item,
-        .cart-item__controls {
+        .cart-item__footer {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          align-items: start;
+        }
+
+        .mini-field--discount,
+        .cart-item__remove {
+          width: 100%;
+        }
+
+        .cart-item__subtotal {
+          justify-items: start;
+          align-self: end;
+        }
+      }
+
+      @media (max-width: 520px) {
+        .cart-item__footer {
           grid-template-columns: 1fr;
+          gap: 0.45rem;
         }
 
-        .cart-item__main,
-        .cart-item__controls,
-        .cart-item__footer {
-          grid-column: 1;
-          grid-row: auto;
+        .mini-field--discount {
+          width: 100%;
         }
 
-        .cart-item__footer {
-          border-left: 0;
-          border-top: 1px solid var(--color-border-default);
-          padding-left: 0;
-          padding-top: var(--space-2);
+        .cart-item__subtotal,
+        .cart-item__remove {
+          justify-items: start;
         }
       }
     `,
