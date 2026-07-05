@@ -1,5 +1,12 @@
 import { CommonModule } from "@angular/common";
-import { Component, EventEmitter, Input, Output } from "@angular/core";
+import {
+  Component,
+  EventEmitter,
+  Input,
+  OnChanges,
+  Output,
+  SimpleChanges,
+} from "@angular/core";
 
 import { BillingSeriesResponse } from "../../billing/data/billing.models";
 import { PosReceiptType } from "../data/pos-ui.models";
@@ -12,7 +19,6 @@ import { PosReceiptType } from "../data/pos-ui.models";
     <section class="receipt-panel" aria-label="Comprobante de la venta">
       <header class="receipt-panel__header">
         <div>
-          <p class="checkout-section__kicker">Comprobante</p>
           <h3>Tipo de documento</h3>
         </div>
       </header>
@@ -50,13 +56,14 @@ import { PosReceiptType } from "../data/pos-ui.models";
           <select
             [value]="receiptSeriesId"
             (change)="updateReceiptSeriesId.emit($any($event.target).value)"
+            (blur)="markTouched('series')"
           >
             <option value="">Selecciona serie</option>
             <option *ngFor="let row of filteredBillingSeries" [value]="row.id">
               {{ row.series }}
             </option>
           </select>
-          <small class="field-inline-error" *ngIf="receiptSeriesInvalid">
+          <small class="field-inline-error" *ngIf="shouldShowSeriesError">
             Debes seleccionar una serie para emitir el comprobante.
           </small>
         </label>
@@ -77,11 +84,12 @@ import { PosReceiptType } from "../data/pos-ui.models";
             [value]="receiptCustomerDocument"
             maxlength="8"
             (input)="updateReceiptCustomerDocument.emit($any($event.target).value)"
+            (blur)="markTouched('boletaDocument')"
             (keydown)="receiptNumericKeydown.emit($event)"
             placeholder="Opcional"
           />
-          <small class="field-inline-error" *ngIf="boletaDniInvalid">
-            El DNI debe tener exactamente 8 digitos.
+          <small class="field-inline-error" *ngIf="shouldShowBoletaDniError">
+            El DNI debe tener exactamente 8 dígitos.
           </small>
         </label>
         <label class="mini-field mini-field--wide">
@@ -105,24 +113,32 @@ import { PosReceiptType } from "../data/pos-ui.models";
             [value]="receiptCustomerDocument"
             maxlength="11"
             (input)="updateReceiptCustomerDocument.emit($any($event.target).value)"
+            (blur)="markTouched('invoiceDocument')"
             (keydown)="receiptNumericKeydown.emit($event)"
-            placeholder="11 digitos"
+            placeholder="11 dígitos"
           />
-          <small class="field-inline-error" *ngIf="invoiceRucInvalid">
-            El RUC debe tener exactamente 11 digitos.
+          <small class="field-inline-helper" *ngIf="!shouldShowInvoiceRucError">
+            11 dígitos
+          </small>
+          <small class="field-inline-error" *ngIf="shouldShowInvoiceRucError">
+            El RUC debe tener exactamente 11 dígitos.
           </small>
         </label>
         <label class="mini-field mini-field--wide">
-          <span>Razon social *</span>
+          <span>Razón social *</span>
           <input
             type="text"
             [value]="receiptCustomerName"
             maxlength="180"
             (input)="updateReceiptCustomerName.emit($any($event.target).value)"
+            (blur)="markTouched('invoiceBusinessName')"
             placeholder="Requerido para factura"
           />
-          <small class="field-inline-error" *ngIf="invoiceBusinessNameInvalid">
-            La razon social es obligatoria.
+          <small class="field-inline-helper" *ngIf="!shouldShowInvoiceBusinessNameError">
+            Requerido para factura
+          </small>
+          <small class="field-inline-error" *ngIf="shouldShowInvoiceBusinessNameError">
+            La razón social es obligatoria.
           </small>
         </label>
       </div>
@@ -137,7 +153,7 @@ import { PosReceiptType } from "../data/pos-ui.models";
         </button>
 
         <label class="mini-field" *ngIf="showFiscalDetails">
-          <span>Direccion fiscal</span>
+          <span>Dirección fiscal</span>
           <input
             type="text"
             [value]="receiptCustomerAddress"
@@ -147,10 +163,6 @@ import { PosReceiptType } from "../data/pos-ui.models";
           />
         </label>
       </div>
-
-      <small class="field-inline-error" *ngIf="receiptValidationError">
-        {{ receiptValidationError }}
-      </small>
     </section>
   `,
   styles: [
@@ -177,15 +189,6 @@ import { PosReceiptType } from "../data/pos-ui.models";
         font-size: var(--font-size-lg);
       }
 
-      .checkout-section__kicker {
-        margin: 0 0 0.2rem;
-        color: var(--color-brand-primary);
-        font-size: var(--font-size-xs);
-        font-weight: 700;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-      }
-
       .receipt-extra-toggle {
         min-height: 2.35rem;
       }
@@ -197,7 +200,7 @@ import { PosReceiptType } from "../data/pos-ui.models";
 
       .mini-field > span {
         color: var(--color-text-secondary);
-        font-size: var(--font-size-sm);
+        font-size: 0.72rem;
         font-weight: 700;
       }
 
@@ -262,6 +265,13 @@ import { PosReceiptType } from "../data/pos-ui.models";
         font-weight: 600;
       }
 
+      .field-inline-helper {
+        margin: 0;
+        color: var(--color-text-secondary);
+        font-size: var(--font-size-xs);
+        font-weight: 600;
+      }
+
       @media (max-width: 640px) {
         .receipt-panel__header,
         .receipt-type-list,
@@ -277,7 +287,7 @@ import { PosReceiptType } from "../data/pos-ui.models";
     `,
   ],
 })
-export class PosCheckoutReceiptSectionComponent {
+export class PosCheckoutReceiptSectionComponent implements OnChanges {
   @Input({ required: true }) receiptType: PosReceiptType = "TICKET";
   @Input({ required: true }) receiptSeriesId = "";
   @Input({ required: true }) receiptCustomerDocument = "";
@@ -292,6 +302,7 @@ export class PosCheckoutReceiptSectionComponent {
   @Input({ required: true }) invoiceRucInvalid = false;
   @Input({ required: true }) invoiceBusinessNameInvalid = false;
   @Input({ required: true }) receiptValidationError = "";
+  @Input({ required: true }) submitAttempted = false;
 
   @Output() readonly updateReceiptType = new EventEmitter<PosReceiptType>();
   @Output() readonly updateReceiptSeriesId = new EventEmitter<string>();
@@ -300,4 +311,49 @@ export class PosCheckoutReceiptSectionComponent {
   @Output() readonly updateReceiptCustomerAddress = new EventEmitter<string>();
   @Output() readonly toggleFiscalDetails = new EventEmitter<void>();
   @Output() readonly receiptNumericKeydown = new EventEmitter<KeyboardEvent>();
+
+  private touched = {
+    series: false,
+    boletaDocument: false,
+    invoiceDocument: false,
+    invoiceBusinessName: false,
+  };
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes["receiptType"]) {
+      this.resetTouched();
+    }
+  }
+
+  get shouldShowSeriesError(): boolean {
+    return this.receiptSeriesInvalid && (this.submitAttempted || this.touched.series);
+  }
+
+  get shouldShowBoletaDniError(): boolean {
+    return this.boletaDniInvalid && (this.submitAttempted || this.touched.boletaDocument);
+  }
+
+  get shouldShowInvoiceRucError(): boolean {
+    return this.invoiceRucInvalid && (this.submitAttempted || this.touched.invoiceDocument);
+  }
+
+  get shouldShowInvoiceBusinessNameError(): boolean {
+    return (
+      this.invoiceBusinessNameInvalid &&
+      (this.submitAttempted || this.touched.invoiceBusinessName)
+    );
+  }
+
+  markTouched(field: keyof PosCheckoutReceiptSectionComponent["touched"]): void {
+    this.touched[field] = true;
+  }
+
+  private resetTouched(): void {
+    this.touched = {
+      series: false,
+      boletaDocument: false,
+      invoiceDocument: false,
+      invoiceBusinessName: false,
+    };
+  }
 }

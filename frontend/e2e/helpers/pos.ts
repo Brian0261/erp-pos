@@ -83,11 +83,14 @@ export async function openCheckoutAndValidateNoWritePaymentControls(page: Page):
   await page.getByRole("button", { name: /^COBRAR$/ }).click();
   const checkout = page.getByRole("dialog", { name: "Cobrar venta" });
   await expect(checkout).toBeVisible();
-  await expect(checkout.getByText("Checkout de cobro")).toBeVisible();
+  await expect(checkout.getByRole("heading", { name: "Cobrar venta" })).toBeVisible();
+  await expect(checkout.getByRole("button", { name: "Cerrar" })).toBeVisible();
+  await expect(checkout.getByRole("button", { name: "Seguir editando" })).toBeVisible();
+  await expect(checkout.getByRole("button", { name: /^COBRAR$/ })).toBeVisible();
   await expect(checkout.getByLabel("Pagos de la venta")).toBeVisible();
-  await checkout.getByLabel("Metodo *").selectOption("CARD");
+  await checkout.getByLabel("Método *").selectOption("CARD");
   await checkout.getByLabel("Monto *").fill("0.01");
-  await expect(checkout.getByLabel("Metodo *")).toHaveValue("CARD");
+  await expect(checkout.getByLabel("Método *")).toHaveValue("CARD");
   await expect(checkout.getByLabel("Monto *")).toHaveValue("0.01");
   await expect(checkout.getByText(/Pagado:\s*S\/\s*0\.01/)).toBeVisible();
   await checkout.getByRole("button", { name: "Seguir editando" }).click();

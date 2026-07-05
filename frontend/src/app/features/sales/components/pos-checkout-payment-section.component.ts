@@ -11,7 +11,6 @@ import { PaymentLine } from "../data/pos-ui.models";
     <section class="payment-panel" aria-label="Pagos de la venta">
       <header class="payment-panel__header">
         <div>
-          <p class="checkout-section__kicker">Cobro</p>
           <h3>Pagos</h3>
         </div>
         <button
@@ -29,7 +28,7 @@ import { PaymentLine } from "../data/pos-ui.models";
           *ngFor="let payment of payments; let index = index"
         >
           <label class="mini-field">
-            <span>Metodo *</span>
+            <span>Método *</span>
             <select
               [value]="payment.paymentMethod"
               (change)="
@@ -76,7 +75,7 @@ import { PaymentLine } from "../data/pos-ui.models";
           </label>
           <button
             type="button"
-            class="ui-button ui-button--danger payment-panel__remove-button"
+            class="ui-button ui-button--secondary payment-panel__remove-button"
             (click)="removePayment.emit(index)"
             [disabled]="payments.length === 1"
           >
@@ -115,31 +114,28 @@ import { PaymentLine } from "../data/pos-ui.models";
         font-size: var(--font-size-lg);
       }
 
-      .checkout-section__kicker {
-        margin: 0 0 0.2rem;
-        color: var(--color-brand-primary);
-        font-size: var(--font-size-xs);
-        font-weight: 700;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-      }
-
       .payment-panel__quiet-button,
       .payment-panel__remove-button {
         min-height: 2.35rem;
       }
 
       .payment-panel__quiet-button {
-        background: color-mix(in srgb, var(--color-text-primary) 16%, var(--color-bg-soft));
+        background: color-mix(in srgb, var(--color-text-primary) 10%, var(--color-bg-soft));
         color: var(--color-text-primary);
+      }
+
+      .payment-panel__remove-button {
+        border-color: color-mix(in srgb, var(--color-danger) 22%, var(--color-border-default));
+        color: color-mix(in srgb, var(--color-danger) 78%, var(--color-text-secondary));
+        background: color-mix(in srgb, var(--color-danger) 6%, var(--color-bg-surface));
       }
 
       .payment-list {
         display: grid;
         gap: var(--space-2);
-        max-height: 15rem;
+        max-height: 16rem;
         overflow: auto;
-        padding-right: var(--space-1);
+        padding-right: 0.2rem;
       }
 
       .payment-line {
@@ -147,7 +143,7 @@ import { PaymentLine } from "../data/pos-ui.models";
         grid-template-columns:
           minmax(136px, 0.95fr) minmax(98px, 0.58fr) minmax(140px, 1fr)
           minmax(76px, auto);
-        gap: var(--space-2);
+        gap: 0.65rem;
         align-items: end;
         border: 1px solid color-mix(in srgb, var(--color-border-default) 86%, transparent);
         border-radius: var(--radius-lg);
@@ -162,7 +158,7 @@ import { PaymentLine } from "../data/pos-ui.models";
 
       .mini-field > span {
         color: var(--color-text-secondary);
-        font-size: var(--font-size-sm);
+        font-size: 0.72rem;
         font-weight: 700;
       }
 
@@ -179,22 +175,34 @@ import { PaymentLine } from "../data/pos-ui.models";
       }
 
       .payment-panel__metrics {
-        display: flex;
-        gap: var(--space-2);
-        justify-content: flex-end;
-        flex-wrap: wrap;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.55rem;
+      }
+
+      .payment-panel__metrics span {
+        display: grid;
+        gap: 0.08rem;
+        border: 1px solid color-mix(in srgb, var(--color-border-default) 86%, transparent);
+        border-radius: var(--radius-md);
+        background: color-mix(in srgb, var(--color-bg-soft) 84%, var(--color-bg-surface));
+        padding: 0.55rem 0.7rem;
         color: var(--color-text-secondary);
-        font-size: var(--font-size-sm);
+        font-size: 0.72rem;
         font-weight: 700;
+        text-transform: uppercase;
       }
 
       .payment-panel__metrics strong {
         color: var(--color-text-primary);
+        font-size: 1rem;
+        text-transform: none;
       }
 
       @media (max-width: 640px) {
         .payment-panel__header,
-        .payment-line {
+        .payment-line,
+        .payment-panel__metrics {
           grid-template-columns: 1fr;
         }
 

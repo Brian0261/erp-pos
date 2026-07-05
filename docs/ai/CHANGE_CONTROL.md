@@ -344,6 +344,25 @@ Estandarizar cambios tecnicos para reducir regresiones y mantener trazabilidad e
   - No se toco backend, DB, Auth/JWT, guards, rutas funcionales, caja real, ventas transaccionales, stock real, comprobantes, layout global, sidebar ni Storefront.
   - No se toco la logica funcional del carrito ni el flujo de cobro.
 
+### Cierre POS Checkout Modal UX Polish
+
+- Tipo: polish frontend POS + cierre QA/E2E.
+- Commit objetivo: `style(pos): polish checkout modal UX`.
+- Alcance real documentado:
+  - Modal `Cobrar venta` mas ancho y en 2 columnas.
+  - Header compacto con resumen de items/total y accion `Cerrar` discreta.
+  - Eliminacion del texto decorativo `Checkout de cobro`.
+  - Validacion progresiva para Factura sin errores prematuros ni duplicados.
+  - Actualizacion del contrato E2E para validar elementos operativos reales.
+- Validaciones:
+  - `npm run build`: PASS.
+  - `E2E_BASE_URL=http://127.0.0.1:4201 npm run e2e:no-write`: PASS.
+  - `E2E_BASE_URL=http://127.0.0.1:4201 npm run e2e:no-write:headed`: PASS.
+  - `git diff --check`: sin errores, solo advertencias LF -> CRLF.
+- Confirmaciones:
+  - No se toco backend, DB, Auth/JWT, guards, rutas funcionales, caja real, ventas transaccionales, stock real, comprobantes reales, sidebar, layout global ni Storefront.
+  - No se toco la logica funcional critica del cobro.
+
 ### Cierre Fase 2S.2A Catalogo Publico Navegable Minimo
 
 - Tipo: implementacion funcional Storefront Next.js + cierre documental QA.
