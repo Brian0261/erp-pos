@@ -16,6 +16,8 @@ import com.erppos.backend.erp.billing.domain.model.ElectronicDocumentItem;
 import com.erppos.backend.erp.billing.domain.model.ElectronicDocumentStatus;
 import com.erppos.backend.erp.billing.domain.model.ElectronicDocumentStatusHistory;
 import com.erppos.backend.erp.billing.domain.model.ElectronicDocumentType;
+import com.erppos.backend.erp.billing.domain.model.ElectronicDocumentAttempt;
+import com.erppos.backend.erp.billing.domain.model.FiscalErrorCategory;
 import com.erppos.backend.erp.billing.domain.model.ProviderSendResult;
 import com.erppos.backend.erp.billing.domain.model.BillingEnvironment;
 import com.erppos.backend.erp.billing.domain.port.BillingSaleReadPort;
@@ -28,6 +30,7 @@ import com.erppos.backend.erp.billing.domain.port.ElectronicDocumentRepositoryPo
 import com.erppos.backend.erp.billing.domain.port.ElectronicDocumentStatusHistoryRepositoryPort;
 import com.erppos.backend.erp.billing.domain.port.UblXmlGeneratorPort;
 import com.erppos.backend.erp.billing.domain.port.XmlSignerPort;
+import org.slf4j.MDC;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,6 +43,7 @@ import java.util.List;
 public class ElectronicDocumentApplicationService implements ElectronicDocumentUseCase {
 
     private static final BigDecimal ZERO = BigDecimal.ZERO;
+    private static final String TRACE_ID_MDC_KEY = "traceId";
 
     private final ElectronicDocumentRepositoryPort documentRepositoryPort;
     private final ElectronicDocumentItemRepositoryPort itemRepositoryPort;
@@ -53,6 +57,8 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
     private final ElectronicBillingProviderPort billingProviderPort;
     private final BillingRuntimeSafetyPolicy runtimeSafetyPolicy;
     private final ElectronicDocumentLifecyclePolicy lifecyclePolicy;
+    private final FiscalAttemptAuditService attemptAuditService;
+    private final FiscalAuditSanitizer fiscalAuditSanitizer;
     private final AuditUserProvider auditUserProvider;
 
     public ElectronicDocumentApplicationService(
@@ -68,6 +74,8 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
             ElectronicBillingProviderPort billingProviderPort,
             BillingRuntimeSafetyPolicy runtimeSafetyPolicy,
             ElectronicDocumentLifecyclePolicy lifecyclePolicy,
+            FiscalAttemptAuditService attemptAuditService,
+            FiscalAuditSanitizer fiscalAuditSanitizer,
             AuditUserProvider auditUserProvider
     ) {
         this.documentRepositoryPort = documentRepositoryPort;
@@ -82,6 +90,8 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
         this.billingProviderPort = billingProviderPort;
         this.runtimeSafetyPolicy = runtimeSafetyPolicy;
         this.lifecyclePolicy = lifecyclePolicy;
+        this.attemptAuditService = attemptAuditService;
+        this.fiscalAuditSanitizer = fiscalAuditSanitizer;
         this.auditUserProvider = auditUserProvider;
     }
 
@@ -268,19 +278,39 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
     @Transactional
     public ElectronicDocument send(Long id) {
         ElectronicDocument current = getByIdForUpdate(id);
-        lifecyclePolicy.assertCanSend(current.status());
-        runtimeSafetyPolicy.assertCanSend(current.environment());
+        assertCanSendOrRecordBlocked(current);
 
-        BillingXmlFile signed = xmlFileRepositoryPort.findByElectronicDocumentIdAndFileType(id, BillingXmlFileType.SIGNED)
-                .orElseThrow(() -> new BillingNotFoundException("XML firmado no disponible. Firma el XML antes de enviar."));
+        BillingXmlFile signed = getSignedXmlOrRecordBlocked(current);
+        ElectronicDocumentAttempt attempt = attemptAuditService.startSendAttempt(
+                current,
+                attemptAuditService.hashPayload(signed.content()),
+                auditUserProvider.currentUsername(),
+                currentTraceId()
+        );
 
         ElectronicDocument sent = updateStatus(current, ElectronicDocumentStatus.SENT, sendTrackingMessage(current.environment()));
         sent = documentRepositoryPort.save(sent);
 
-        ProviderSendResult result = billingProviderPort.send(sent, signed.content());
-        ElectronicDocumentStatus finalStatus = result.status() == null ? ElectronicDocumentStatus.ERROR : result.status();
-        lifecyclePolicy.assertTransitionAllowed(sent.status(), finalStatus);
-        runtimeSafetyPolicy.assertCanAcceptProviderResult(sent.environment(), finalStatus);
+        ProviderSendResult result;
+        try {
+            result = billingProviderPort.send(sent, signed.content());
+        } catch (RuntimeException ex) {
+            FiscalErrorCategory errorCategory = classifyProviderException(ex);
+            attemptAuditService.failSendAttempt(attempt, errorCategory, isRecoverable(errorCategory), ex.getMessage());
+            throw ex;
+        }
+
+        ElectronicDocumentStatus finalStatus = result == null || result.status() == null ? ElectronicDocumentStatus.ERROR : result.status();
+        try {
+            lifecyclePolicy.assertTransitionAllowed(sent.status(), finalStatus);
+            runtimeSafetyPolicy.assertCanAcceptProviderResult(sent.environment(), finalStatus);
+        } catch (RuntimeException ex) {
+            attemptAuditService.failSendAttempt(attempt, classifyPostProviderFailure(ex), false, ex.getMessage());
+            throw ex;
+        }
+
+        String providerTicket = result == null ? null : fiscalAuditSanitizer.providerTicket(result.ticket());
+        String providerMessage = result == null ? null : fiscalAuditSanitizer.providerMessage(result.message());
 
         ElectronicDocument finalized = new ElectronicDocument(
                 sent.id(),
@@ -301,15 +331,16 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
                 sent.xmlGeneratedAt(),
                 sent.signedAt(),
                 Instant.now(),
-                trimToNull(result.ticket()),
-                trimToNull(result.message()),
+                providerTicket,
+                providerMessage,
                 sent.createdAt(),
                 sent.updatedAt(),
                 sent.createdBy(),
                 auditUserProvider.currentUsername()
         );
         ElectronicDocument saved = documentRepositoryPort.save(finalized);
-        addHistory(saved.id(), ElectronicDocumentStatus.SENT, finalStatus, result.message());
+        addHistory(saved.id(), ElectronicDocumentStatus.SENT, finalStatus, providerMessage);
+        attemptAuditService.finishSendAttempt(attempt, result, finalStatus);
         return saved;
     }
 
@@ -371,6 +402,73 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
     private ElectronicDocument getByIdForUpdate(Long id) {
         return documentRepositoryPort.findByIdForUpdate(id)
                 .orElseThrow(() -> new BillingNotFoundException("Electronic document not found"));
+    }
+
+    private void assertCanSendOrRecordBlocked(ElectronicDocument current) {
+        try {
+            lifecyclePolicy.assertCanSend(current.status());
+            runtimeSafetyPolicy.assertCanSend(current.environment());
+        } catch (BillingConflictException ex) {
+            FiscalErrorCategory errorCategory = ex.getMessage() != null
+                    && ex.getMessage().contains(BillingRuntimeSafetyPolicy.PRODUCTION_NOT_CONFIGURED_MESSAGE)
+                    ? FiscalErrorCategory.CONFIGURATION_ERROR
+                    : FiscalErrorCategory.VALIDATION_ERROR;
+            attemptAuditService.recordSendBlocked(
+                    current,
+                    errorCategory,
+                    ex.getMessage(),
+                    auditUserProvider.currentUsername(),
+                    currentTraceId()
+            );
+            throw ex;
+        }
+    }
+
+    private BillingXmlFile getSignedXmlOrRecordBlocked(ElectronicDocument current) {
+        return xmlFileRepositoryPort.findByElectronicDocumentIdAndFileType(current.id(), BillingXmlFileType.SIGNED)
+                .orElseThrow(() -> {
+                    String message = "XML firmado no disponible. Firma el XML antes de enviar.";
+                    attemptAuditService.recordSendBlocked(
+                            current,
+                            FiscalErrorCategory.VALIDATION_ERROR,
+                            message,
+                            auditUserProvider.currentUsername(),
+                            currentTraceId()
+                    );
+                    return new BillingNotFoundException(message);
+                });
+    }
+
+    private FiscalErrorCategory classifyProviderException(RuntimeException ex) {
+        String description = ((ex.getClass().getSimpleName() + " " + ex.getMessage()).toLowerCase());
+        if (description.contains("timeout") || description.contains("timed out")) {
+            return FiscalErrorCategory.PROVIDER_TIMEOUT;
+        }
+        if (description.contains("unavailable")
+                || description.contains("connection")
+                || description.contains("connect")
+                || description.contains("refused")
+                || description.contains("socket")) {
+            return FiscalErrorCategory.PROVIDER_UNAVAILABLE;
+        }
+        return FiscalErrorCategory.COMMUNICATION_ERROR;
+    }
+
+    private FiscalErrorCategory classifyPostProviderFailure(RuntimeException ex) {
+        if (ex.getMessage() != null && ex.getMessage().contains(BillingRuntimeSafetyPolicy.PRODUCTION_NOT_CONFIGURED_MESSAGE)) {
+            return FiscalErrorCategory.CONFIGURATION_ERROR;
+        }
+        return FiscalErrorCategory.INTERNAL_ERROR;
+    }
+
+    private boolean isRecoverable(FiscalErrorCategory errorCategory) {
+        return errorCategory == FiscalErrorCategory.PROVIDER_TIMEOUT
+                || errorCategory == FiscalErrorCategory.PROVIDER_UNAVAILABLE
+                || errorCategory == FiscalErrorCategory.COMMUNICATION_ERROR;
+    }
+
+    private String currentTraceId() {
+        return MDC.get(TRACE_ID_MDC_KEY);
     }
 
     private void addHistory(Long documentId, ElectronicDocumentStatus previous, ElectronicDocumentStatus next, String message) {

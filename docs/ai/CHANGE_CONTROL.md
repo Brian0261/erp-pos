@@ -57,6 +57,18 @@ Estandarizar cambios tecnicos para reducir regresiones y mantener trazabilidad e
 - Seguridad operativa: no se tocaron `.env`, secretos, tokens, claves, certificados reales, backups ni dumps; no se leyeron archivos de certificados ni passwords reales.
 - Validacion: `./mvnw -Dtest=BillingApplicationServiceTest test` con 67 tests, 0 failures, BUILD SUCCESS; `./mvnw test` backend completo con 508 tests, 0 failures, BUILD SUCCESS.
 
+### Cierre Fiscal attempt model + send audit records
+
+- Tipo: hardening backend de auditoria fiscal interna para intentos SEND, previo a retry controlado e integraciones reales.
+- Alcance implementado: migracion Flyway V23 no destructiva con tabla `electronic_document_attempts`; modelo `ElectronicDocumentAttempt`; enums `FiscalOperation`, `FiscalAttemptResult`, `FiscalErrorCategory`; puerto `ElectronicDocumentAttemptRepositoryPort`; entidad JPA, repository, mapper y persistence adapter.
+- Auditoria SEND: `ElectronicDocumentApplicationService.send()` registra attempt `STARTED` antes de llamar al provider, finaliza `SUCCESS` para `ACCEPTED`, `FAILED` para `REJECTED`/`ERROR` y `BLOCKED` para reenvios o bloqueos previos; `attemptNumber` es incremental por documento + operacion bajo lock del comprobante.
+- Seguridad de auditoria: `FiscalAuditSanitizer` trunca y sanitiza provider message/ticket/code/correlation id, remueve saltos/control chars, tokens, passwords, refs tipo `vault://`, rutas locales, archivos de certificados y XML/payloads embebidos; attempts guardan hashes SHA-256, no payloads completos.
+- Excepciones provider: `FiscalAttemptAuditService` usa transacciones `REQUIRES_NEW` para que el attempt fallido no se pierda si el provider lanza excepcion; la excepcion se relanza y no se habilita retry automatico.
+- Politica: no hay scheduler, backoff, cooldown ni retry automatico; LOCAL/BETA quedan marcados como `simulated=true`; PROD sigue bloqueado si no existe readiness productiva de provider/signer/resolver.
+- Exclusiones confirmadas: no se implemento PSE/OSE real, SUNAT directo, firma digital real, XML UBL SUNAT completo, CDR, PDF/ticket fiscal, QR, notas, comunicacion de baja, produccion real ni secret manager real.
+- Seguridad operativa: no se tocaron `.env`, secretos, tokens, claves, certificados reales, backups ni dumps; no se leyeron archivos de certificados ni passwords reales.
+- Validacion: `./mvnw -Dtest=BillingApplicationServiceTest test` con 72 tests, 0 failures, BUILD SUCCESS; `./mvnw test` backend completo con 513 tests, 0 failures, BUILD SUCCESS.
+
 ## Control ecommerce SEO-first
 
 ### Cierre Fase 0 documental ecommerce
