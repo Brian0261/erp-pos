@@ -7,6 +7,7 @@ import com.erppos.backend.erp.billing.application.service.BillingSeriesApplicati
 import com.erppos.backend.erp.billing.application.service.BillingRuntimeSafetyPolicy;
 import com.erppos.backend.erp.billing.application.service.CompanyBillingProfileApplicationService;
 import com.erppos.backend.erp.billing.application.service.ElectronicDocumentApplicationService;
+import com.erppos.backend.erp.billing.application.service.ElectronicDocumentLifecyclePolicy;
 import com.erppos.backend.erp.billing.application.usecase.CreateBillingSeriesCommand;
 import com.erppos.backend.erp.billing.application.usecase.CreateCompanyBillingProfileCommand;
 import com.erppos.backend.erp.billing.application.usecase.CreateElectronicDocumentFromSaleCommand;
@@ -76,6 +77,7 @@ class BillingApplicationServiceTest {
     private StubProvider stubProvider;
     private LocalFiscalSecretResolverAdapter localFiscalSecretResolver;
     private BillingRuntimeSafetyPolicy runtimeSafetyPolicy;
+    private ElectronicDocumentLifecyclePolicy lifecyclePolicy;
 
     private CompanyBillingProfileApplicationService profileService;
     private BillingSeriesApplicationService seriesService;
@@ -95,6 +97,7 @@ class BillingApplicationServiceTest {
         stubProvider = new StubProvider();
         localFiscalSecretResolver = new LocalFiscalSecretResolverAdapter();
         runtimeSafetyPolicy = new BillingRuntimeSafetyPolicy(stubProvider, stubXmlSigner, localFiscalSecretResolver);
+        lifecyclePolicy = new ElectronicDocumentLifecyclePolicy();
 
         AuditUserProvider auditUserProvider = new AuditUserProvider();
         profileService = new CompanyBillingProfileApplicationService(profileRepository, auditUserProvider);
@@ -111,6 +114,7 @@ class BillingApplicationServiceTest {
                 stubXmlSigner,
                 stubProvider,
                 runtimeSafetyPolicy,
+                lifecyclePolicy,
                 auditUserProvider
         );
 
@@ -715,12 +719,15 @@ class BillingApplicationServiceTest {
                 null
         ));
 
-        assertThrows(BillingConflictException.class, () -> documentService.createFromSale(1L, new CreateElectronicDocumentFromSaleCommand(
+        BillingConflictException ex = assertThrows(BillingConflictException.class, () -> documentService.createFromSale(1L, new CreateElectronicDocumentFromSaleCommand(
                 ElectronicDocumentType.INVOICE,
                 2L,
                 "Cliente Factura",
                 "10456789012"
         )));
+
+        assertEquals("La venta ya tiene un comprobante asociado.", ex.getMessage());
+        assertEquals(1L, seriesRepository.findById(2L).orElseThrow().currentNumber());
     }
 
     @Test
@@ -976,6 +983,33 @@ class BillingApplicationServiceTest {
     }
 
     @Test
+    void shouldGenerateXmlIdempotentlyWithoutDuplicateHistory() {
+        ElectronicDocument doc = createReceiptForSale(1L);
+        ElectronicDocument generated = documentService.generateXml(doc.id());
+        int historyAfterFirstGenerate = historyRepository.findByElectronicDocumentId(doc.id()).size();
+        int xmlFilesAfterFirstGenerate = xmlRepository.storage.size();
+
+        ElectronicDocument repeated = documentService.generateXml(doc.id());
+
+        assertEquals(ElectronicDocumentStatus.GENERATED, repeated.status());
+        assertEquals(generated.xmlGeneratedAt(), repeated.xmlGeneratedAt());
+        assertEquals(historyAfterFirstGenerate, historyRepository.findByElectronicDocumentId(doc.id()).size());
+        assertEquals(xmlFilesAfterFirstGenerate, xmlRepository.storage.size());
+    }
+
+    @Test
+    void shouldBlockRegeneratingXmlAfterSigning() {
+        ElectronicDocument doc = createReceiptForSale(1L);
+        documentService.generateXml(doc.id());
+        documentService.sign(doc.id());
+
+        BillingConflictException ex = assertThrows(BillingConflictException.class, () -> documentService.generateXml(doc.id()));
+
+        assertEquals("El estado actual no permite generar XML.", ex.getMessage());
+        assertEquals(2, xmlRepository.storage.size());
+    }
+
+    @Test
     void shouldSignXmlWithMockSigner() {
         ElectronicDocument doc = createReceiptForSale(1L);
         documentService.generateXml(doc.id());
@@ -985,12 +1019,135 @@ class BillingApplicationServiceTest {
     }
 
     @Test
+    void shouldBlockSigningDraftDocument() {
+        ElectronicDocument doc = createReceiptForSale(1L);
+
+        BillingConflictException ex = assertThrows(BillingConflictException.class, () -> documentService.sign(doc.id()));
+
+        assertEquals("El estado actual no permite firmar el XML.", ex.getMessage());
+        assertFalse(ex.getMessage().contains("LOCAL_"));
+        assertTrue(xmlRepository.findByElectronicDocumentIdAndFileType(doc.id(), BillingXmlFileType.SIGNED).isEmpty());
+    }
+
+    @Test
+    void shouldSignXmlIdempotentlyWithoutDuplicateHistory() {
+        ElectronicDocument doc = createReceiptForSale(1L);
+        documentService.generateXml(doc.id());
+        ElectronicDocument signed = documentService.sign(doc.id());
+        int historyAfterFirstSign = historyRepository.findByElectronicDocumentId(doc.id()).size();
+        int xmlFilesAfterFirstSign = xmlRepository.storage.size();
+
+        ElectronicDocument repeated = documentService.sign(doc.id());
+
+        assertEquals(ElectronicDocumentStatus.SIGNED, repeated.status());
+        assertEquals(signed.signedAt(), repeated.signedAt());
+        assertEquals(historyAfterFirstSign, historyRepository.findByElectronicDocumentId(doc.id()).size());
+        assertEquals(xmlFilesAfterFirstSign, xmlRepository.storage.size());
+    }
+
+    @Test
+    void shouldBlockSigningAfterSent() {
+        ElectronicDocument doc = createReceiptForSale(1L);
+        documentService.generateXml(doc.id());
+        documentService.sign(doc.id());
+        documentService.send(doc.id());
+
+        BillingConflictException ex = assertThrows(BillingConflictException.class, () -> documentService.sign(doc.id()));
+
+        assertEquals("El estado actual no permite firmar el XML.", ex.getMessage());
+    }
+
+    @Test
+    void shouldBlockSigningAcceptedDocument() {
+        ElectronicDocument doc = createReceiptForSale(1L);
+        documentService.generateXml(doc.id());
+        documentService.sign(doc.id());
+        ElectronicDocument accepted = documentService.send(doc.id());
+
+        BillingConflictException ex = assertThrows(BillingConflictException.class, () -> documentService.sign(accepted.id()));
+
+        assertEquals(ElectronicDocumentStatus.ACCEPTED, accepted.status());
+        assertEquals("El estado actual no permite firmar el XML.", ex.getMessage());
+    }
+
+    @Test
     void shouldSendAndMarkAccepted() {
         ElectronicDocument doc = createReceiptForSale(1L);
         documentService.generateXml(doc.id());
         documentService.sign(doc.id());
         ElectronicDocument sent = documentService.send(doc.id());
         assertEquals(ElectronicDocumentStatus.ACCEPTED, sent.status());
+    }
+
+    @Test
+    void shouldNotResendFinalDocument() {
+        ElectronicDocument doc = createReceiptForSale(1L);
+        documentService.generateXml(doc.id());
+        documentService.sign(doc.id());
+        ElectronicDocument accepted = documentService.send(doc.id());
+        int callsAfterFirstSend = stubProvider.sendCalls();
+
+        BillingConflictException ex = assertThrows(BillingConflictException.class, () -> documentService.send(accepted.id()));
+
+        assertEquals("El estado actual no permite enviar el comprobante.", ex.getMessage());
+        assertEquals(callsAfterFirstSend, stubProvider.sendCalls());
+    }
+
+    @Test
+    void shouldBlockResendingSentDocumentWithoutProviderCall() {
+        ElectronicDocument doc = createReceiptForSale(1L);
+        documentService.generateXml(doc.id());
+        documentService.sign(doc.id());
+        ElectronicDocument signed = documentRepository.findById(doc.id()).orElseThrow();
+        ElectronicDocument sent = documentRepository.save(new ElectronicDocument(
+                signed.id(),
+                signed.saleId(),
+                signed.billingSeriesId(),
+                signed.documentType(),
+                ElectronicDocumentStatus.SENT,
+                signed.environment(),
+                signed.series(),
+                signed.number(),
+                signed.fullNumber(),
+                signed.customerName(),
+                signed.customerDocument(),
+                signed.currencyCode(),
+                signed.subtotalAmount(),
+                signed.taxAmount(),
+                signed.totalAmount(),
+                signed.xmlGeneratedAt(),
+                signed.signedAt(),
+                Instant.now(),
+                signed.providerTicket(),
+                signed.providerMessage(),
+                signed.createdAt(),
+                signed.updatedAt(),
+                signed.createdBy(),
+                signed.updatedBy()
+        ));
+
+        BillingConflictException ex = assertThrows(BillingConflictException.class, () -> documentService.send(sent.id()));
+
+        assertEquals("El comprobante ya fue marcado como enviado. No se reenvia en esta fase.", ex.getMessage());
+        assertEquals(0, stubProvider.sendCalls());
+    }
+
+    @Test
+    void shouldSendAndMarkErrorWhenProviderReturnsError() {
+        saleReadPort.sales.put(13L, completedSale(13L));
+        ElectronicDocument doc = documentService.createFromSale(13L, new CreateElectronicDocumentFromSaleCommand(
+                ElectronicDocumentType.RECEIPT,
+                1L,
+                "CLIENTE ERROR",
+                null
+        ));
+        documentService.generateXml(doc.id());
+        documentService.sign(doc.id());
+
+        ElectronicDocument sent = documentService.send(doc.id());
+
+        assertEquals(ElectronicDocumentStatus.ERROR, sent.status());
+        assertEquals(1, stubProvider.sendCalls());
     }
 
     @Test
@@ -1417,6 +1574,11 @@ class BillingApplicationServiceTest {
         }
 
         @Override
+        public Optional<ElectronicDocument> findByIdForUpdate(Long id) {
+            return findById(id);
+        }
+
+        @Override
         public List<ElectronicDocument> findByFilters(ElectronicDocumentStatus status, ElectronicDocumentType type, Long saleId, LocalDate from, LocalDate to) {
             return storage.values().stream()
                     .filter(d -> status == null || d.status() == status)
@@ -1541,12 +1703,22 @@ class BillingApplicationServiceTest {
     }
 
     static class StubProvider implements ElectronicBillingProviderPort {
+        private int sendCalls;
+
         @Override
         public ProviderSendResult send(ElectronicDocument document, String signedXml) {
+            sendCalls++;
+            if (document.customerName() != null && document.customerName().contains("ERROR")) {
+                return new ProviderSendResult(ElectronicDocumentStatus.ERROR, "T-ERR", "Provider temporary error");
+            }
             if (document.customerName() != null && document.customerName().contains("REJECT")) {
                 return new ProviderSendResult(ElectronicDocumentStatus.REJECTED, "T-REJ", "Rejected by mock provider");
             }
             return new ProviderSendResult(ElectronicDocumentStatus.ACCEPTED, "T-ACC", "Accepted by mock provider");
+        }
+
+        int sendCalls() {
+            return sendCalls;
         }
     }
 

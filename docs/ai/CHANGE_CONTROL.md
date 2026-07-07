@@ -45,6 +45,18 @@ Estandarizar cambios tecnicos para reducir regresiones y mantener trazabilidad e
 - Seguridad operativa: no se tocaron `.env`, secretos, tokens, claves, certificados reales, backups ni dumps; no se leyeron archivos de certificados ni passwords reales.
 - Validacion: `./mvnw -Dtest=BillingApplicationServiceTest test` con 58 tests, 0 failures, BUILD SUCCESS; `./mvnw test` backend completo con 499 tests, 0 failures, BUILD SUCCESS.
 
+### Cierre Fiscal lifecycle state machine + idempotency base
+
+- Tipo: hardening backend del ciclo fiscal interno previo a integraciones reales.
+- Alcance implementado: `ElectronicDocumentLifecyclePolicy` centraliza transiciones validas e invalidas; `ElectronicDocumentRepositoryPort` agrega `findByIdForUpdate`; JPA aplica `PESSIMISTIC_WRITE` para bloquear operaciones concurrentes del mismo comprobante en `generateXml`, `sign` y `send`.
+- Idempotencia base: `generateXml` sobre `GENERATED` retorna el estado actual sin sobrescribir XML ni duplicar historial; `sign` sobre `SIGNED` retorna el estado actual sin refirmar ni duplicar historial; `send` sobre `SENT` o estados finales bloquea el reenvio y no llama al provider.
+- Proteccion documento/venta: `createFromSale` conserva el bloqueo previo antes de consumir correlativo; V22 agrega indice unico parcial `uq_electronic_documents_sale_active` por `sale_id` con `status <> 'CANCELLED'`, precedido por precheck no destructivo para detectar duplicados historicos antes de crear el indice.
+- Transiciones permitidas: `DRAFT -> GENERATED`, `GENERATED -> SIGNED`, `SIGNED -> SENT`, `SENT -> ACCEPTED/REJECTED/ERROR`.
+- Transiciones bloqueadas: `DRAFT -> SIGNED`, `ACCEPTED -> GENERATED/SIGNED/SENT`, `REJECTED -> SIGNED/SENT`, `ERROR -> SENT` y reenvios sin politica explicita de retry.
+- Exclusiones confirmadas: no se implemento retry avanzado, tabla de attempts, provider response estructurada completa, secret manager real, SUNAT directo, PSE/OSE real, UBL SUNAT completo, firma digital real, CDR, PDF/ticket fiscal, QR, notas ni bajas.
+- Seguridad operativa: no se tocaron `.env`, secretos, tokens, claves, certificados reales, backups ni dumps; no se leyeron archivos de certificados ni passwords reales.
+- Validacion: `./mvnw -Dtest=BillingApplicationServiceTest test` con 67 tests, 0 failures, BUILD SUCCESS; `./mvnw test` backend completo con 508 tests, 0 failures, BUILD SUCCESS.
+
 ## Control ecommerce SEO-first
 
 ### Cierre Fase 0 documental ecommerce

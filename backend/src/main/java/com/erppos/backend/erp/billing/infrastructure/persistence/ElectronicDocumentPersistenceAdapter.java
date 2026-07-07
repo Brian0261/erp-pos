@@ -49,6 +49,11 @@ public class ElectronicDocumentPersistenceAdapter implements ElectronicDocumentR
     }
 
     @Override
+    public Optional<ElectronicDocument> findByIdForUpdate(Long id) {
+        return documentJpaRepository.findByIdForUpdate(id).map(ElectronicDocumentMapper::toDomain);
+    }
+
+    @Override
     public List<ElectronicDocument> findByFilters(ElectronicDocumentStatus status, ElectronicDocumentType type, Long saleId, LocalDate from, LocalDate to) {
         Instant fromInstant = from == null ? MIN_INSTANT_FILTER : from.atStartOfDay().toInstant(ZoneOffset.UTC);
         Instant toInstant = to == null ? MAX_INSTANT_FILTER : to.plusDays(1).atStartOfDay().minusSeconds(1).toInstant(ZoneOffset.UTC);

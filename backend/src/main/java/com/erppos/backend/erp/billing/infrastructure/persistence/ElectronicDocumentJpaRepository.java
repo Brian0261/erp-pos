@@ -2,7 +2,9 @@ package com.erppos.backend.erp.billing.infrastructure.persistence;
 
 import com.erppos.backend.erp.billing.domain.model.ElectronicDocumentStatus;
 import com.erppos.backend.erp.billing.domain.model.ElectronicDocumentType;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -11,6 +13,10 @@ import java.util.Collection;
 import java.util.List;
 
 public interface ElectronicDocumentJpaRepository extends JpaRepository<ElectronicDocumentEntity, Long> {
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select d from ElectronicDocumentEntity d where d.id = :id")
+    java.util.Optional<ElectronicDocumentEntity> findByIdForUpdate(Long id);
 
     @Query("""
             select d from ElectronicDocumentEntity d

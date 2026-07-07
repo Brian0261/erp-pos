@@ -52,6 +52,7 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
     private final XmlSignerPort xmlSignerPort;
     private final ElectronicBillingProviderPort billingProviderPort;
     private final BillingRuntimeSafetyPolicy runtimeSafetyPolicy;
+    private final ElectronicDocumentLifecyclePolicy lifecyclePolicy;
     private final AuditUserProvider auditUserProvider;
 
     public ElectronicDocumentApplicationService(
@@ -66,6 +67,7 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
             XmlSignerPort xmlSignerPort,
             ElectronicBillingProviderPort billingProviderPort,
             BillingRuntimeSafetyPolicy runtimeSafetyPolicy,
+            ElectronicDocumentLifecyclePolicy lifecyclePolicy,
             AuditUserProvider auditUserProvider
     ) {
         this.documentRepositoryPort = documentRepositoryPort;
@@ -79,6 +81,7 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
         this.xmlSignerPort = xmlSignerPort;
         this.billingProviderPort = billingProviderPort;
         this.runtimeSafetyPolicy = runtimeSafetyPolicy;
+        this.lifecyclePolicy = lifecyclePolicy;
         this.auditUserProvider = auditUserProvider;
     }
 
@@ -203,10 +206,11 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
     @Override
     @Transactional
     public ElectronicDocument generateXml(Long id) {
-        ElectronicDocument current = getById(id);
-        if (current.status() != ElectronicDocumentStatus.DRAFT && current.status() != ElectronicDocumentStatus.GENERATED) {
-            throw new BillingConflictException("El estado actual no permite generar XML.");
+        ElectronicDocument current = getByIdForUpdate(id);
+        if (current.status() == ElectronicDocumentStatus.GENERATED) {
+            return current;
         }
+        lifecyclePolicy.assertCanGenerateXml(current.status());
 
         CompanyBillingProfile profile = profileRepositoryPort.findActiveByEnvironment(current.environment())
                 .orElseThrow(() -> new BillingNotFoundException("Billing profile not found for document environment"));
@@ -231,10 +235,12 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
     @Override
     @Transactional
     public ElectronicDocument sign(Long id) {
-        ElectronicDocument current = getById(id);
-        if (current.status() != ElectronicDocumentStatus.GENERATED && current.status() != ElectronicDocumentStatus.SIGNED) {
-            throw new BillingConflictException("El estado actual no permite firmar el XML.");
+        ElectronicDocument current = getByIdForUpdate(id);
+        if (current.status() == ElectronicDocumentStatus.SIGNED) {
+            runtimeSafetyPolicy.assertCanSign(current.environment());
+            return current;
         }
+        lifecyclePolicy.assertCanSign(current.status());
         runtimeSafetyPolicy.assertCanSign(current.environment());
 
         BillingXmlFile generated = xmlFileRepositoryPort.findByElectronicDocumentIdAndFileType(id, BillingXmlFileType.GENERATED)
@@ -261,10 +267,8 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
     @Override
     @Transactional
     public ElectronicDocument send(Long id) {
-        ElectronicDocument current = getById(id);
-        if (current.status() != ElectronicDocumentStatus.SIGNED) {
-            throw new BillingConflictException("El estado actual no permite enviar el comprobante.");
-        }
+        ElectronicDocument current = getByIdForUpdate(id);
+        lifecyclePolicy.assertCanSend(current.status());
         runtimeSafetyPolicy.assertCanSend(current.environment());
 
         BillingXmlFile signed = xmlFileRepositoryPort.findByElectronicDocumentIdAndFileType(id, BillingXmlFileType.SIGNED)
@@ -275,6 +279,7 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
 
         ProviderSendResult result = billingProviderPort.send(sent, signed.content());
         ElectronicDocumentStatus finalStatus = result.status() == null ? ElectronicDocumentStatus.ERROR : result.status();
+        lifecyclePolicy.assertTransitionAllowed(sent.status(), finalStatus);
         runtimeSafetyPolicy.assertCanAcceptProviderResult(sent.environment(), finalStatus);
 
         ElectronicDocument finalized = new ElectronicDocument(
@@ -329,6 +334,10 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
     }
 
     private ElectronicDocument updateStatus(ElectronicDocument current, ElectronicDocumentStatus next, String message) {
+        if (current.status() == next) {
+            return current;
+        }
+        lifecyclePolicy.assertTransitionAllowed(current.status(), next);
         ElectronicDocument updated = new ElectronicDocument(
                 current.id(),
                 current.saleId(),
@@ -357,6 +366,11 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
         );
         addHistory(current.id(), current.status(), next, message);
         return updated;
+    }
+
+    private ElectronicDocument getByIdForUpdate(Long id) {
+        return documentRepositoryPort.findByIdForUpdate(id)
+                .orElseThrow(() -> new BillingNotFoundException("Electronic document not found"));
     }
 
     private void addHistory(Long documentId, ElectronicDocumentStatus previous, ElectronicDocumentStatus next, String message) {

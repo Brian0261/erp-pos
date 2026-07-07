@@ -11,6 +11,7 @@ import java.util.Optional;
 public interface ElectronicDocumentRepositoryPort {
     ElectronicDocument save(ElectronicDocument document);
     Optional<ElectronicDocument> findById(Long id);
+    Optional<ElectronicDocument> findByIdForUpdate(Long id);
     List<ElectronicDocument> findByFilters(ElectronicDocumentStatus status, ElectronicDocumentType type, Long saleId, LocalDate from, LocalDate to);
     boolean existsBySaleId(Long saleId);
     Optional<Long> findMaxIssuedNumberByBillingSeriesId(Long billingSeriesId);
