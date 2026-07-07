@@ -51,9 +51,7 @@ public class BillingRuntimeSafetyPolicy {
     }
 
     public void assertCanSign(BillingEnvironment environment) {
-        if (environment == BillingEnvironment.PROD && !xmlSignerPort.supportsProduction()) {
-            throw new BillingConflictException(PRODUCTION_NOT_CONFIGURED_MESSAGE);
-        }
+        assertProductionReady(environment);
     }
 
     public void assertCanSend(BillingEnvironment environment) {
@@ -63,7 +61,7 @@ public class BillingRuntimeSafetyPolicy {
     public void assertCanAcceptProviderResult(BillingEnvironment environment, ElectronicDocumentStatus status) {
         if (environment == BillingEnvironment.PROD
                 && status == ElectronicDocumentStatus.ACCEPTED
-                && !billingProviderPort.supportsProduction()) {
+                && !isProductionReady()) {
             throw new BillingConflictException(PRODUCTION_NOT_CONFIGURED_MESSAGE);
         }
     }

@@ -35,6 +35,16 @@ Estandarizar cambios tecnicos para reducir regresiones y mantener trazabilidad e
 - Exclusiones confirmadas: no se leyeron `.env`, archivos, certificados, passwords, keystores, claves privadas, backups ni dumps; no se implemento secret manager real, SUNAT directo, PSE/OSE real, UBL SUNAT completo, firma digital real, CDR, PDF/ticket fiscal, QR, notas ni bajas.
 - Validacion: `./mvnw -Dtest=BillingApplicationServiceTest test` con 49 tests, 0 failures, BUILD SUCCESS; `./mvnw test` backend completo con 490 tests, 0 failures, BUILD SUCCESS.
 
+### Cierre Fiscal PROD enforcement / secret manager readiness
+
+- Tipo: hardening backend de configuracion fiscal productiva y readiness para secret manager futuro.
+- Alcance implementado: propiedades no sensibles `billing.secrets.provider`, `billing.secrets.production-enabled`, `billing.electronic.provider` y `billing.signer.provider` con defaults seguros LOCAL/MOCK/NOOP; validador startup `BillingFiscalStartupValidator` para fail-fast cuando `production-enabled=true` no tiene configuracion y beans productivos; `BillingRuntimeSafetyPolicy` exige readiness completa para create/sign/send y para resultados ACCEPTED en PROD.
+- Reglas de perfil fiscal: perfiles PROD activos rechazan placeholders `LOCAL_*`/`BETA_*` en refs/alias y rechazan `secretProvider` `LOCAL`, `MOCK` o `NOOP`; los errores no incluyen los valores recibidos.
+- Readiness futura: `SECRET_MANAGER`/`EXTERNAL` quedan como nombres de configuracion permitidos para integraciones futuras, sin adapter real ni lectura de secretos.
+- Exclusiones confirmadas: no se implemento secret manager real, AWS Secrets Manager, Vault, GCP Secret Manager, Azure Key Vault, SUNAT directo, PSE/OSE real, UBL SUNAT completo, firma digital real, CDR, PDF/ticket fiscal, QR, notas ni bajas.
+- Seguridad operativa: no se tocaron `.env`, secretos, tokens, claves, certificados reales, backups ni dumps; no se leyeron archivos de certificados ni passwords reales.
+- Validacion: `./mvnw -Dtest=BillingApplicationServiceTest test` con 58 tests, 0 failures, BUILD SUCCESS; `./mvnw test` backend completo con 499 tests, 0 failures, BUILD SUCCESS.
+
 ## Control ecommerce SEO-first
 
 ### Cierre Fase 0 documental ecommerce

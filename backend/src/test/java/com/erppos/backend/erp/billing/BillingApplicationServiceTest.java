@@ -38,9 +38,12 @@ import com.erppos.backend.erp.billing.domain.port.ElectronicBillingProviderPort;
 import com.erppos.backend.erp.billing.domain.port.ElectronicDocumentItemRepositoryPort;
 import com.erppos.backend.erp.billing.domain.port.ElectronicDocumentRepositoryPort;
 import com.erppos.backend.erp.billing.domain.port.ElectronicDocumentStatusHistoryRepositoryPort;
+import com.erppos.backend.erp.billing.domain.port.FiscalSecretResolverPort;
 import com.erppos.backend.erp.billing.domain.port.UblXmlGeneratorPort;
 import com.erppos.backend.erp.billing.domain.port.XmlSignerPort;
 import com.erppos.backend.erp.billing.infrastructure.provider.MockElectronicBillingProviderAdapter;
+import com.erppos.backend.erp.billing.infrastructure.config.BillingFiscalProperties;
+import com.erppos.backend.erp.billing.infrastructure.config.BillingFiscalStartupValidator;
 import com.erppos.backend.erp.billing.infrastructure.secret.LocalFiscalSecretResolverAdapter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -551,6 +554,159 @@ class BillingApplicationServiceTest {
     }
 
     @Test
+    void shouldRejectLocalPlaceholderRefsForActiveProdProfile() {
+        CreateCompanyBillingProfileCommand command = new CreateCompanyBillingProfileCommand(
+                "20987654328",
+                "EMPRESA PROD SAC",
+                "AV. PROD 200",
+                BillingEnvironment.PROD,
+                null,
+                null,
+                "LOCAL_NOOP_CERT",
+                "vault://billing/prod/certificate-password",
+                "vault://billing/prod/provider",
+                "prod-certificate",
+                "VAULT"
+        );
+
+        BillingBusinessRuleException ex = assertThrows(BillingBusinessRuleException.class, () -> profileService.create(command));
+
+        assertEquals("certificateSecretRef must not use development placeholders in PROD", ex.getMessage());
+        assertFalse(ex.getMessage().contains("LOCAL_NOOP_CERT"));
+    }
+
+    @Test
+    void shouldRejectBetaPlaceholderRefsForActiveProdProfile() {
+        CreateCompanyBillingProfileCommand command = new CreateCompanyBillingProfileCommand(
+                "20987654329",
+                "EMPRESA PROD SAC",
+                "AV. PROD 200",
+                BillingEnvironment.PROD,
+                null,
+                null,
+                "vault://billing/prod/certificate",
+                "BETA_SANDBOX_CERT_PASSWORD",
+                "vault://billing/prod/provider",
+                "prod-certificate",
+                "VAULT"
+        );
+
+        BillingBusinessRuleException ex = assertThrows(BillingBusinessRuleException.class, () -> profileService.create(command));
+
+        assertEquals("certificatePasswordSecretRef must not use development placeholders in PROD", ex.getMessage());
+        assertFalse(ex.getMessage().contains("BETA_SANDBOX_CERT_PASSWORD"));
+    }
+
+    @Test
+    void shouldRejectLocalSecretProviderForActiveProdProfile() {
+        CreateCompanyBillingProfileCommand command = new CreateCompanyBillingProfileCommand(
+                "20987654330",
+                "EMPRESA PROD SAC",
+                "AV. PROD 200",
+                BillingEnvironment.PROD,
+                null,
+                null,
+                "vault://billing/prod/certificate",
+                "vault://billing/prod/certificate-password",
+                "vault://billing/prod/provider",
+                "prod-certificate",
+                "LOCAL"
+        );
+
+        BillingBusinessRuleException ex = assertThrows(BillingBusinessRuleException.class, () -> profileService.create(command));
+
+        assertEquals("secretProvider must be production managed for PROD", ex.getMessage());
+    }
+
+    @Test
+    void shouldAllowStartupWithDefaultNonProductionFiscalConfig() {
+        BillingFiscalProperties properties = new BillingFiscalProperties();
+        BillingFiscalStartupValidator validator = new BillingFiscalStartupValidator(
+                properties,
+                stubProvider,
+                stubXmlSigner,
+                localFiscalSecretResolver
+        );
+
+        assertDoesNotThrow(validator::validate);
+    }
+
+    @Test
+    void shouldFailFastWhenProductionEnabledWithLocalFiscalSecretProvider() {
+        BillingFiscalProperties properties = productionEnabledFiscalProperties();
+        properties.getSecrets().setProvider(BillingFiscalProperties.SecretProvider.LOCAL);
+
+        BillingFiscalStartupValidator validator = new BillingFiscalStartupValidator(
+                properties,
+                new ProductionReadyProvider(),
+                new ProductionReadySigner(),
+                new ProductionReadyFiscalSecretResolver()
+        );
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, validator::validate);
+
+        assertTrue(ex.getMessage().contains("Configuracion fiscal productiva incompleta"));
+        assertFalse(ex.getMessage().contains("LOCAL_NOOP_CERT"));
+    }
+
+    @Test
+    void shouldFailFastWhenProductionEnabledWithMockElectronicProviderConfig() {
+        BillingFiscalProperties properties = productionEnabledFiscalProperties();
+        properties.getElectronic().setProvider(BillingFiscalProperties.ElectronicProvider.MOCK);
+
+        BillingFiscalStartupValidator validator = new BillingFiscalStartupValidator(
+                properties,
+                new ProductionReadyProvider(),
+                new ProductionReadySigner(),
+                new ProductionReadyFiscalSecretResolver()
+        );
+
+        assertThrows(IllegalStateException.class, validator::validate);
+    }
+
+    @Test
+    void shouldFailFastWhenProductionEnabledWithNoopSignerConfig() {
+        BillingFiscalProperties properties = productionEnabledFiscalProperties();
+        properties.getSigner().setProvider(BillingFiscalProperties.SignerProvider.NOOP);
+
+        BillingFiscalStartupValidator validator = new BillingFiscalStartupValidator(
+                properties,
+                new ProductionReadyProvider(),
+                new ProductionReadySigner(),
+                new ProductionReadyFiscalSecretResolver()
+        );
+
+        assertThrows(IllegalStateException.class, validator::validate);
+    }
+
+    @Test
+    void shouldFailFastWhenProductionEnabledWithNonProductionBeans() {
+        BillingFiscalProperties properties = productionEnabledFiscalProperties();
+
+        BillingFiscalStartupValidator validator = new BillingFiscalStartupValidator(
+                properties,
+                stubProvider,
+                stubXmlSigner,
+                localFiscalSecretResolver
+        );
+
+        assertThrows(IllegalStateException.class, validator::validate);
+    }
+
+    @Test
+    void shouldAllowStartupWhenProductionEnabledWithProductionConfigAndBeans() {
+        BillingFiscalProperties properties = productionEnabledFiscalProperties();
+        BillingFiscalStartupValidator validator = new BillingFiscalStartupValidator(
+                properties,
+                new ProductionReadyProvider(),
+                new ProductionReadySigner(),
+                new ProductionReadyFiscalSecretResolver()
+        );
+
+        assertDoesNotThrow(validator::validate);
+    }
+
+    @Test
     void shouldRejectSecondDocumentForSameSaleEvenWithDifferentType() {
         documentService.createFromSale(1L, new CreateElectronicDocumentFromSaleCommand(
                 ElectronicDocumentType.RECEIPT,
@@ -1034,6 +1190,15 @@ class BillingApplicationServiceTest {
         );
     }
 
+    private BillingFiscalProperties productionEnabledFiscalProperties() {
+        BillingFiscalProperties properties = new BillingFiscalProperties();
+        properties.getSecrets().setProductionEnabled(true);
+        properties.getSecrets().setProvider(BillingFiscalProperties.SecretProvider.SECRET_MANAGER);
+        properties.getElectronic().setProvider(BillingFiscalProperties.ElectronicProvider.EXTERNAL);
+        properties.getSigner().setProvider(BillingFiscalProperties.SignerProvider.EXTERNAL);
+        return properties;
+    }
+
     private ElectronicDocument saveDocumentForSeries(
             Long saleId,
             BillingSeries series,
@@ -1401,6 +1566,28 @@ class BillingApplicationServiceTest {
         @Override
         public ProviderSendResult send(ElectronicDocument document, String signedXml) {
             return new ProviderSendResult(ElectronicDocumentStatus.ACCEPTED, "T-PROD", "Accepted by production-ready stub");
+        }
+
+        @Override
+        public boolean supportsProduction() {
+            return true;
+        }
+    }
+
+    static class ProductionReadyFiscalSecretResolver implements FiscalSecretResolverPort {
+        @Override
+        public FiscalSecretResolution resolveCertificate(String certificateRef, BillingEnvironment environment) {
+            return new FiscalSecretResolution(FiscalSecretType.CERTIFICATE, environment, false);
+        }
+
+        @Override
+        public FiscalSecretResolution resolveCertificatePassword(String certificatePasswordRef, BillingEnvironment environment) {
+            return new FiscalSecretResolution(FiscalSecretType.CERTIFICATE_PASSWORD, environment, false);
+        }
+
+        @Override
+        public FiscalSecretResolution resolveProviderCredentials(String providerRef, BillingEnvironment environment) {
+            return new FiscalSecretResolution(FiscalSecretType.PROVIDER_CREDENTIALS, environment, false);
         }
 
         @Override

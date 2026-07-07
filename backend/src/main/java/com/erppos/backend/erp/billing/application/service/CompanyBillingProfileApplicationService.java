@@ -167,6 +167,11 @@ public class CompanyBillingProfileApplicationService implements CompanyBillingPr
             if (secretProvider == null) {
                 throw new BillingBusinessRuleException("PROD billing profile requires secretProvider");
             }
+            validateNoProdPlaceholder("certificateSecretRef", certificateSecretRef);
+            validateNoProdPlaceholder("certificatePasswordSecretRef", certificatePasswordSecretRef);
+            validateNoProdPlaceholder("providerSecretRef", providerSecretRef);
+            validateNoProdPlaceholder("certificateAlias", certificateAlias);
+            validateProductionSecretProvider(secretProvider);
         }
 
         return new FiscalSecretConfig(
@@ -212,6 +217,24 @@ public class CompanyBillingProfileApplicationService implements CompanyBillingPr
         }
         if (containsControlCharacter(value) || !value.matches("^[A-Z0-9][A-Z0-9_-]*$")) {
             throw new BillingBusinessRuleException(fieldName + " contains invalid characters");
+        }
+    }
+
+    private void validateNoProdPlaceholder(String fieldName, String value) {
+        if (value == null) {
+            return;
+        }
+        String normalized = value.trim().toUpperCase(Locale.ROOT);
+        if (normalized.startsWith("LOCAL_") || normalized.startsWith("BETA_")) {
+            throw new BillingBusinessRuleException(fieldName + " must not use development placeholders in PROD");
+        }
+    }
+
+    private void validateProductionSecretProvider(String secretProvider) {
+        String normalized = secretProvider.trim().toUpperCase(Locale.ROOT);
+        if (normalized.equals("LOCAL") || normalized.equals("MOCK") || normalized.equals("NOOP")
+                || normalized.startsWith("LOCAL_") || normalized.startsWith("BETA_")) {
+            throw new BillingBusinessRuleException("secretProvider must be production managed for PROD");
         }
     }
 
