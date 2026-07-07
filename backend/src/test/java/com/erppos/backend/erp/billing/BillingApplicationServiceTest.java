@@ -27,6 +27,8 @@ import com.erppos.backend.erp.billing.domain.model.ElectronicDocumentItem;
 import com.erppos.backend.erp.billing.domain.model.ElectronicDocumentStatus;
 import com.erppos.backend.erp.billing.domain.model.ElectronicDocumentStatusHistory;
 import com.erppos.backend.erp.billing.domain.model.ElectronicDocumentType;
+import com.erppos.backend.erp.billing.domain.model.FiscalSecretResolution;
+import com.erppos.backend.erp.billing.domain.model.FiscalSecretType;
 import com.erppos.backend.erp.billing.domain.model.ProviderSendResult;
 import com.erppos.backend.erp.billing.domain.port.BillingSaleReadPort;
 import com.erppos.backend.erp.billing.domain.port.BillingSeriesRepositoryPort;
@@ -39,6 +41,7 @@ import com.erppos.backend.erp.billing.domain.port.ElectronicDocumentStatusHistor
 import com.erppos.backend.erp.billing.domain.port.UblXmlGeneratorPort;
 import com.erppos.backend.erp.billing.domain.port.XmlSignerPort;
 import com.erppos.backend.erp.billing.infrastructure.provider.MockElectronicBillingProviderAdapter;
+import com.erppos.backend.erp.billing.infrastructure.secret.LocalFiscalSecretResolverAdapter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -68,6 +71,7 @@ class BillingApplicationServiceTest {
     private StubXmlGenerator stubXmlGenerator;
     private StubXmlSigner stubXmlSigner;
     private StubProvider stubProvider;
+    private LocalFiscalSecretResolverAdapter localFiscalSecretResolver;
     private BillingRuntimeSafetyPolicy runtimeSafetyPolicy;
 
     private CompanyBillingProfileApplicationService profileService;
@@ -86,7 +90,8 @@ class BillingApplicationServiceTest {
         stubXmlGenerator = new StubXmlGenerator();
         stubXmlSigner = new StubXmlSigner();
         stubProvider = new StubProvider();
-        runtimeSafetyPolicy = new BillingRuntimeSafetyPolicy(stubProvider, stubXmlSigner);
+        localFiscalSecretResolver = new LocalFiscalSecretResolverAdapter();
+        runtimeSafetyPolicy = new BillingRuntimeSafetyPolicy(stubProvider, stubXmlSigner, localFiscalSecretResolver);
 
         AuditUserProvider auditUserProvider = new AuditUserProvider();
         profileService = new CompanyBillingProfileApplicationService(profileRepository, auditUserProvider);
@@ -456,6 +461,96 @@ class BillingApplicationServiceTest {
     }
 
     @Test
+    void shouldResolveAllowedLocalAndBetaFiscalPlaceholders() {
+        FiscalSecretResolution localCertificate = localFiscalSecretResolver.resolveCertificate(
+                "LOCAL_NOOP_CERT",
+                BillingEnvironment.LOCAL
+        );
+        FiscalSecretResolution localPassword = localFiscalSecretResolver.resolveCertificatePassword(
+                "LOCAL_NOOP_CERT_PASSWORD",
+                BillingEnvironment.LOCAL
+        );
+        FiscalSecretResolution betaProvider = localFiscalSecretResolver.resolveProviderCredentials(
+                "BETA_SANDBOX_PROVIDER",
+                BillingEnvironment.BETA
+        );
+
+        assertEquals(FiscalSecretType.CERTIFICATE, localCertificate.type());
+        assertEquals(FiscalSecretType.CERTIFICATE_PASSWORD, localPassword.type());
+        assertEquals(FiscalSecretType.PROVIDER_CREDENTIALS, betaProvider.type());
+        assertTrue(localCertificate.placeholder());
+        assertTrue(localPassword.placeholder());
+        assertTrue(betaProvider.placeholder());
+        assertFalse(localFiscalSecretResolver.supportsProduction());
+    }
+
+    @Test
+    void shouldRejectFiscalSecretRefsWithPathTraversal() {
+        BillingBusinessRuleException ex = assertThrows(BillingBusinessRuleException.class, () -> localFiscalSecretResolver.resolveCertificate(
+                "../LOCAL_NOOP_CERT",
+                BillingEnvironment.LOCAL
+        ));
+
+        assertEquals("Referencia fiscal no debe contener rutas.", ex.getMessage());
+        assertFalse(ex.getMessage().contains("LOCAL_NOOP_CERT"));
+    }
+
+    @Test
+    void shouldRejectFiscalSecretRefsWithAbsolutePaths() {
+        BillingBusinessRuleException ex = assertThrows(BillingBusinessRuleException.class, () -> localFiscalSecretResolver.resolveCertificate(
+                "/etc/ssl/prod.pfx",
+                BillingEnvironment.LOCAL
+        ));
+
+        assertEquals("Referencia fiscal no debe contener rutas.", ex.getMessage());
+        assertFalse(ex.getMessage().contains("prod.pfx"));
+    }
+
+    @Test
+    void shouldRejectFiscalSecretRefsWithWindowsDrivePaths() {
+        BillingBusinessRuleException ex = assertThrows(BillingBusinessRuleException.class, () -> localFiscalSecretResolver.resolveCertificate(
+                "C:\\certs\\prod.pfx",
+                BillingEnvironment.LOCAL
+        ));
+
+        assertEquals("Referencia fiscal no debe contener rutas.", ex.getMessage());
+        assertFalse(ex.getMessage().contains("prod.pfx"));
+    }
+
+    @Test
+    void shouldRejectFiscalSecretRefsThatLookLikeCertificateFiles() {
+        BillingBusinessRuleException ex = assertThrows(BillingBusinessRuleException.class, () -> localFiscalSecretResolver.resolveCertificate(
+                "PROD_CERTIFICATE.PFX",
+                BillingEnvironment.LOCAL
+        ));
+
+        assertEquals("Referencia fiscal no debe apuntar a archivos de certificado.", ex.getMessage());
+        assertFalse(ex.getMessage().contains("PROD_CERTIFICATE"));
+    }
+
+    @Test
+    void shouldRejectProdFiscalSecretResolutionWithMockResolver() {
+        BillingConflictException ex = assertThrows(BillingConflictException.class, () -> localFiscalSecretResolver.resolveCertificate(
+                "LOCAL_NOOP_CERT",
+                BillingEnvironment.PROD
+        ));
+
+        assertEquals(LocalFiscalSecretResolverAdapter.PRODUCTIVE_RESOLVER_NOT_CONFIGURED_MESSAGE, ex.getMessage());
+    }
+
+    @Test
+    void shouldNotExposeSensitiveFiscalRefValuesInResolverErrorsOrToString() {
+        String sensitiveLookingRef = "SUPER-SECRET-PASSWORD.PEM";
+        BillingBusinessRuleException ex = assertThrows(BillingBusinessRuleException.class, () -> localFiscalSecretResolver.resolveCertificatePassword(
+                sensitiveLookingRef,
+                BillingEnvironment.LOCAL
+        ));
+
+        assertFalse(ex.getMessage().contains(sensitiveLookingRef));
+        assertFalse(new FiscalSecretResolution(FiscalSecretType.CERTIFICATE_PASSWORD, BillingEnvironment.LOCAL, true).toString().contains(sensitiveLookingRef));
+    }
+
+    @Test
     void shouldRejectSecondDocumentForSameSaleEvenWithDifferentType() {
         documentService.createFromSale(1L, new CreateElectronicDocumentFromSaleCommand(
                 ElectronicDocumentType.RECEIPT,
@@ -808,6 +903,20 @@ class BillingApplicationServiceTest {
         assertFalse(documentRepository.existsBySaleId(8L));
         assertEquals(documentsBefore, documentRepository.storage.size());
         assertEquals(1L, seriesRepository.findById(prodSeries.id()).orElseThrow().currentNumber());
+    }
+
+    @Test
+    void shouldBlockProdWhenOnlyMockSecretResolverIsAvailableEvenIfProviderAndSignerAreProductionReady() {
+        BillingRuntimeSafetyPolicy policy = new BillingRuntimeSafetyPolicy(
+                new ProductionReadyProvider(),
+                new ProductionReadySigner(),
+                localFiscalSecretResolver
+        );
+
+        BillingConflictException ex = assertThrows(BillingConflictException.class, () -> policy.assertCanCreateFromSale(BillingEnvironment.PROD));
+
+        assertFalse(policy.isProductionReady());
+        assertEquals(BillingRuntimeSafetyPolicy.PRODUCTION_NOT_CONFIGURED_MESSAGE, ex.getMessage());
     }
 
     @Test
@@ -1273,6 +1382,30 @@ class BillingApplicationServiceTest {
                 return new ProviderSendResult(ElectronicDocumentStatus.REJECTED, "T-REJ", "Rejected by mock provider");
             }
             return new ProviderSendResult(ElectronicDocumentStatus.ACCEPTED, "T-ACC", "Accepted by mock provider");
+        }
+    }
+
+    static class ProductionReadySigner implements XmlSignerPort {
+        @Override
+        public String signXml(String xml, CompanyBillingProfile profile) {
+            return xml + "-SIGNED";
+        }
+
+        @Override
+        public boolean supportsProduction() {
+            return true;
+        }
+    }
+
+    static class ProductionReadyProvider implements ElectronicBillingProviderPort {
+        @Override
+        public ProviderSendResult send(ElectronicDocument document, String signedXml) {
+            return new ProviderSendResult(ElectronicDocumentStatus.ACCEPTED, "T-PROD", "Accepted by production-ready stub");
+        }
+
+        @Override
+        public boolean supportsProduction() {
+            return true;
         }
     }
 }

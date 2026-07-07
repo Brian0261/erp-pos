@@ -25,6 +25,16 @@ Estandarizar cambios tecnicos para reducir regresiones y mantener trazabilidad e
 - Seguridad operativa: no se tocaron `.env`, secretos, tokens, claves, certificados reales, backups ni dumps.
 - Validacion: `./mvnw -Dtest=BillingApplicationServiceTest test` con 41 tests, 0 failures, BUILD SUCCESS; `./mvnw test` backend completo con 482 tests, 0 failures, BUILD SUCCESS; `npm run build` frontend, BUILD SUCCESS.
 
+### Cierre Fiscal secret resolver mock/local
+
+- Tipo: hardening backend arquitectonico para resolver referencias fiscales sin secretos reales.
+- Alcance implementado: `FiscalSecretResolverPort` desacopla aplicacion/dominio de infraestructura; `LocalFiscalSecretResolverAdapter` resuelve solo placeholders seguros para LOCAL/BETA y declara `supportsProduction=false`.
+- Placeholders permitidos: `LOCAL_NOOP_CERT`, `LOCAL_NOOP_CERT_PASSWORD`, `LOCAL_NOOP_PROVIDER`, `BETA_SANDBOX_REF`, `BETA_SANDBOX_CERT_PASSWORD`, `BETA_SANDBOX_PROVIDER`.
+- Reglas defensivas: rechaza refs vacias, path traversal, rutas absolutas, rutas con drive Windows, `file:`, whitespace/control chars, extensiones de certificado/keystore y valores demasiado largos; los errores no incluyen el valor recibido.
+- Integracion runtime: `BillingRuntimeSafetyPolicy` requiere provider, signer y resolver productivos para considerar PROD listo; con resolver local/mock, PROD sigue bloqueado con `Emision electronica productiva no configurada...` y el adapter falla en PROD con `Resolver de secretos productivo no configurado.`
+- Exclusiones confirmadas: no se leyeron `.env`, archivos, certificados, passwords, keystores, claves privadas, backups ni dumps; no se implemento secret manager real, SUNAT directo, PSE/OSE real, UBL SUNAT completo, firma digital real, CDR, PDF/ticket fiscal, QR, notas ni bajas.
+- Validacion: `./mvnw -Dtest=BillingApplicationServiceTest test` con 49 tests, 0 failures, BUILD SUCCESS; `./mvnw test` backend completo con 490 tests, 0 failures, BUILD SUCCESS.
+
 ## Control ecommerce SEO-first
 
 ### Cierre Fase 0 documental ecommerce

@@ -4,6 +4,7 @@ import com.erppos.backend.erp.billing.domain.exception.BillingConflictException;
 import com.erppos.backend.erp.billing.domain.model.BillingEnvironment;
 import com.erppos.backend.erp.billing.domain.model.ElectronicDocumentStatus;
 import com.erppos.backend.erp.billing.domain.port.ElectronicBillingProviderPort;
+import com.erppos.backend.erp.billing.domain.port.FiscalSecretResolverPort;
 import com.erppos.backend.erp.billing.domain.port.XmlSignerPort;
 import org.springframework.stereotype.Service;
 
@@ -15,10 +16,16 @@ public class BillingRuntimeSafetyPolicy {
 
     private final ElectronicBillingProviderPort billingProviderPort;
     private final XmlSignerPort xmlSignerPort;
+    private final FiscalSecretResolverPort fiscalSecretResolverPort;
 
-    public BillingRuntimeSafetyPolicy(ElectronicBillingProviderPort billingProviderPort, XmlSignerPort xmlSignerPort) {
+    public BillingRuntimeSafetyPolicy(
+            ElectronicBillingProviderPort billingProviderPort,
+            XmlSignerPort xmlSignerPort,
+            FiscalSecretResolverPort fiscalSecretResolverPort
+    ) {
         this.billingProviderPort = billingProviderPort;
         this.xmlSignerPort = xmlSignerPort;
+        this.fiscalSecretResolverPort = fiscalSecretResolverPort;
     }
 
     public boolean allowsSimulation(BillingEnvironment environment) {
@@ -34,7 +41,9 @@ public class BillingRuntimeSafetyPolicy {
     }
 
     public boolean isProductionReady() {
-        return billingProviderPort.supportsProduction() && xmlSignerPort.supportsProduction();
+        return billingProviderPort.supportsProduction()
+                && xmlSignerPort.supportsProduction()
+                && fiscalSecretResolverPort.supportsProduction();
     }
 
     public void assertCanCreateFromSale(BillingEnvironment environment) {
