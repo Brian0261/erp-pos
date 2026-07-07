@@ -19,8 +19,11 @@ export interface CompanyBillingProfileRequest {
   legalName: string;
   fiscalAddress: string;
   environment: BillingEnvironment;
-  certificatePath?: string | null;
-  certificatePassword?: string | null;
+  certificateSecretRef?: string | null;
+  certificatePasswordSecretRef?: string | null;
+  providerSecretRef?: string | null;
+  certificateAlias?: string | null;
+  secretProvider?: string | null;
   active?: boolean | null;
 }
 
@@ -30,7 +33,10 @@ export interface CompanyBillingProfileResponse {
   legalName: string;
   fiscalAddress: string;
   environment: BillingEnvironment;
-  certificatePath: string | null;
+  certificateConfigured: boolean;
+  providerConfigured: boolean;
+  certificateAlias: string | null;
+  secretProvider: string | null;
   active: boolean;
   createdAt: string;
   updatedAt: string;

@@ -11,6 +11,7 @@ import com.erppos.backend.erp.billing.application.usecase.CreateBillingSeriesCom
 import com.erppos.backend.erp.billing.application.usecase.CreateCompanyBillingProfileCommand;
 import com.erppos.backend.erp.billing.application.usecase.CreateElectronicDocumentFromSaleCommand;
 import com.erppos.backend.erp.billing.application.usecase.UpdateBillingSeriesCommand;
+import com.erppos.backend.erp.billing.application.usecase.UpdateCompanyBillingProfileCommand;
 import com.erppos.backend.erp.billing.domain.exception.BillingBusinessRuleException;
 import com.erppos.backend.erp.billing.domain.exception.BillingConflictException;
 import com.erppos.backend.erp.billing.domain.exception.BillingNotFoundException;
@@ -324,6 +325,134 @@ class BillingApplicationServiceTest {
                 null,
                 null
         )));
+    }
+
+    @Test
+    void shouldStoreFiscalSecretReferencesWithoutPlainCertificatePassword() {
+        CompanyBillingProfile created = profileService.create(new CreateCompanyBillingProfileCommand(
+                "20987654322",
+                "EMPRESA REF SAC",
+                "CALLE REF 100",
+                BillingEnvironment.BETA,
+                "beta-certificate-placeholder",
+                "plain-password-ignored",
+                "vault://billing/beta/certificate",
+                "vault://billing/beta/certificate-password",
+                "vault://billing/beta/provider",
+                "beta-certificate",
+                "vault"
+        ));
+
+        assertEquals("beta-certificate-placeholder", created.certificatePath());
+        assertEquals("vault://billing/beta/certificate", created.certificateSecretRef());
+        assertEquals("vault://billing/beta/certificate-password", created.certificatePasswordSecretRef());
+        assertEquals("vault://billing/beta/provider", created.providerSecretRef());
+        assertEquals("beta-certificate", created.certificateAlias());
+        assertEquals("VAULT", created.secretProvider());
+    }
+
+    @Test
+    void shouldRejectPlainCertificatePasswordForProdProfile() {
+        BillingBusinessRuleException ex = assertThrows(BillingBusinessRuleException.class, () -> profileService.create(new CreateCompanyBillingProfileCommand(
+                "20987654323",
+                "EMPRESA PROD SAC",
+                "AV. PROD 200",
+                BillingEnvironment.PROD,
+                null,
+                "plain-password-not-allowed",
+                "vault://billing/prod/certificate",
+                "vault://billing/prod/certificate-password",
+                "vault://billing/prod/provider",
+                "prod-certificate",
+                "VAULT"
+        )));
+
+        assertEquals("certificatePassword is not accepted for PROD; use certificatePasswordSecretRef", ex.getMessage());
+    }
+
+    @Test
+    void shouldRejectLegacyCertificatePathForProdProfile() {
+        BillingBusinessRuleException ex = assertThrows(BillingBusinessRuleException.class, () -> profileService.create(new CreateCompanyBillingProfileCommand(
+                "20987654324",
+                "EMPRESA PROD SAC",
+                "AV. PROD 200",
+                BillingEnvironment.PROD,
+                "C:\\certs\\prod.pfx",
+                null,
+                "vault://billing/prod/certificate",
+                "vault://billing/prod/certificate-password",
+                "vault://billing/prod/provider",
+                "prod-certificate",
+                "VAULT"
+        )));
+
+        assertEquals("certificatePath is deprecated for PROD; use certificateSecretRef or certificateAlias", ex.getMessage());
+    }
+
+    @Test
+    void shouldRequireSecureReferencesForActiveProdProfile() {
+        BillingBusinessRuleException ex = assertThrows(BillingBusinessRuleException.class, () -> profileService.create(new CreateCompanyBillingProfileCommand(
+                "20987654325",
+                "EMPRESA PROD SAC",
+                "AV. PROD 200",
+                BillingEnvironment.PROD,
+                null,
+                null
+        )));
+
+        assertEquals("PROD billing profile requires certificateSecretRef or certificateAlias", ex.getMessage());
+    }
+
+    @Test
+    void shouldAllowProdProfileWithSecureSecretReferences() {
+        CompanyBillingProfile created = profileService.create(secureProdProfileCommand("20987654326"));
+
+        assertEquals(BillingEnvironment.PROD, created.environment());
+        assertNull(created.certificatePath());
+        assertEquals("vault://billing/prod/20987654326/certificate", created.certificateSecretRef());
+        assertEquals("vault://billing/prod/20987654326/certificate-password", created.certificatePasswordSecretRef());
+        assertEquals("vault://billing/prod/20987654326/provider", created.providerSecretRef());
+        assertEquals("prod-certificate-20987654326", created.certificateAlias());
+        assertEquals("VAULT", created.secretProvider());
+    }
+
+    @Test
+    void shouldPreserveSecretReferencesWhenUpdatingWithoutNewWriteOnlyValues() {
+        CompanyBillingProfile created = profileService.create(new CreateCompanyBillingProfileCommand(
+                "20987654327",
+                "EMPRESA BETA SAC",
+                "AV. BETA 200",
+                BillingEnvironment.BETA,
+                null,
+                null,
+                "vault://billing/beta/current-certificate",
+                "vault://billing/beta/current-certificate-password",
+                "vault://billing/beta/current-provider",
+                "beta-current-certificate",
+                "VAULT"
+        ));
+
+        CompanyBillingProfile updated = profileService.update(new UpdateCompanyBillingProfileCommand(
+                created.ruc(),
+                "EMPRESA BETA ACTUALIZADA SAC",
+                created.fiscalAddress(),
+                created.environment(),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                true
+        ));
+
+        assertEquals("EMPRESA BETA ACTUALIZADA SAC", updated.legalName());
+        assertEquals(created.certificateSecretRef(), updated.certificateSecretRef());
+        assertEquals(created.certificatePasswordSecretRef(), updated.certificatePasswordSecretRef());
+        assertEquals(created.providerSecretRef(), updated.providerSecretRef());
+        assertEquals(created.certificateAlias(), updated.certificateAlias());
+        assertEquals(created.secretProvider(), updated.secretProvider());
     }
 
     @Test
@@ -771,20 +900,29 @@ class BillingApplicationServiceTest {
     }
 
     private BillingSeries createProdReceiptSeries(String ruc, String series) {
-        profileService.create(new CreateCompanyBillingProfileCommand(
-                ruc,
-                "INKTOY PROD SAC",
-                "AV. PROD 100",
-                BillingEnvironment.PROD,
-                null,
-                null
-        ));
+        profileService.create(secureProdProfileCommand(ruc));
         return seriesService.create(new CreateBillingSeriesCommand(
                 ElectronicDocumentType.RECEIPT,
                 series,
                 1L,
                 BillingEnvironment.PROD
         ));
+    }
+
+    private CreateCompanyBillingProfileCommand secureProdProfileCommand(String ruc) {
+        return new CreateCompanyBillingProfileCommand(
+                ruc,
+                "INKTOY PROD SAC",
+                "AV. PROD 100",
+                BillingEnvironment.PROD,
+                null,
+                null,
+                "vault://billing/prod/" + ruc + "/certificate",
+                "vault://billing/prod/" + ruc + "/certificate-password",
+                "vault://billing/prod/" + ruc + "/provider",
+                "prod-certificate-" + ruc,
+                "VAULT"
+        );
     }
 
     private ElectronicDocument saveDocumentForSeries(
@@ -884,7 +1022,11 @@ class BillingApplicationServiceTest {
                     profile.fiscalAddress(),
                     profile.environment(),
                     profile.certificatePath(),
-                    profile.certificatePassword(),
+                    profile.certificateSecretRef(),
+                    profile.certificatePasswordSecretRef(),
+                    profile.providerSecretRef(),
+                    profile.certificateAlias(),
+                    profile.secretProvider(),
                     profile.active(),
                     profile.createdAt() == null ? Instant.now() : profile.createdAt(),
                     Instant.now(),

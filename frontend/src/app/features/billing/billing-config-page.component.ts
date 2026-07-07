@@ -211,34 +211,79 @@ interface BillingProfileExtras {
 
             <section class="form-section">
               <header class="section-head">
-                <h2>Certificado</h2>
+                <h2>Referencias fiscales</h2>
               </header>
 
-              <div class="form-grid">
+              <div class="form-grid form-grid--two">
                 <label class="field full">
-                  <span>Ruta o alias del certificado</span>
+                  <span>Alias del certificado</span>
                   <input
                     type="text"
-                    maxlength="240"
-                    formControlName="certificatePath"
+                    maxlength="120"
+                    formControlName="certificateAlias"
+                    placeholder="prod-certificate-empresa"
                   />
+                  <small class="field-help">
+                    Metadata segura visible. No pegues rutas locales ni certificados.
+                  </small>
+                </label>
+
+                <label class="field">
+                  <span>Proveedor de secretos</span>
+                  <input
+                    type="text"
+                    maxlength="60"
+                    formControlName="secretProvider"
+                    placeholder="VAULT"
+                  />
+                  <small class="field-help">Codigo del proveedor. Ejemplo: VAULT.</small>
                 </label>
 
                 <label class="field full">
-                  <span>Contrasena del certificado</span>
+                  <span>Referencia del certificado</span>
                   <input
-                    type="password"
-                    maxlength="120"
-                    formControlName="certificatePassword"
+                    type="text"
+                    maxlength="300"
+                    formControlName="certificateSecretRef"
+                    placeholder="vault://billing/prod/certificate"
                   />
+                  <small class="field-help">
+                    Referencia write-only al material del certificado. Dejalo vacio al actualizar para conservar la referencia actual.
+                  </small>
+                </label>
+
+                <label class="field full">
+                  <span>Referencia de contrasena del certificado</span>
+                  <input
+                    type="text"
+                    maxlength="300"
+                    formControlName="certificatePasswordSecretRef"
+                    placeholder="vault://billing/prod/certificate-password"
+                  />
+                  <small class="field-help">
+                    Guarda solo la referencia administrada, nunca la contrasena real.
+                  </small>
+                </label>
+
+                <label class="field full">
+                  <span>Referencia de credenciales del proveedor fiscal</span>
+                  <input
+                    type="text"
+                    maxlength="300"
+                    formControlName="providerSecretRef"
+                    placeholder="vault://billing/prod/provider"
+                  />
+                  <small class="field-help">
+                    Referencia write-only para credenciales PSE/OSE/SUNAT futuras. No configura envio real en esta fase.
+                  </small>
                 </label>
               </div>
 
               <p class="ui-alert ui-alert--info" *ngIf="selectedEnvironment === 'LOCAL' || selectedEnvironment === 'BETA'">
-                En Local/Beta puedes trabajar con simulacion. El certificado puede quedar vacio si no se realizara firma real.
+                En Local/Beta puedes trabajar con simulacion. Las referencias pueden quedar vacias si no se realizara firma real.
               </p>
               <p class="ui-alert ui-alert--warning" *ngIf="selectedEnvironment === 'PROD'">
-                En Produccion se requiere certificado digital valido y proveedor tributario real. Actualmente el envio productivo esta bloqueado.
+                En Produccion se requieren referencias seguras para certificado, contrasena y proveedor. El envio productivo sigue bloqueado hasta implementar firma y proveedor reales.
               </p>
             </section>
 
@@ -458,8 +503,11 @@ export class BillingConfigPageComponent implements OnInit, OnDestroy {
     province: ["", Validators.maxLength(120)],
     district: ["", Validators.maxLength(120)],
     environment: ["LOCAL" as BillingEnvironment, Validators.required],
-    certificatePath: ["", Validators.maxLength(240)],
-    certificatePassword: ["", Validators.maxLength(120)],
+    certificateSecretRef: ["", Validators.maxLength(300)],
+    certificatePasswordSecretRef: ["", Validators.maxLength(300)],
+    providerSecretRef: ["", Validators.maxLength(300)],
+    certificateAlias: ["", Validators.maxLength(120)],
+    secretProvider: ["", Validators.maxLength(60)],
     active: [true],
   });
 
@@ -600,13 +648,18 @@ export class BillingConfigPageComponent implements OnInit, OnDestroy {
   }
 
   signatureStatusLabel(environmentValue: BillingEnvironment): string {
+    const profile = this.profilesByEnvironment[environmentValue];
     if (environmentValue === "PROD") {
-      return "Bloqueada";
+      return profile?.certificateConfigured ? "Referenciada" : "Refs pendientes";
     }
-    return "Simulada";
+    return profile?.certificateConfigured ? "Referenciada" : "Simulada";
   }
 
   providerStatusLabel(environmentValue: BillingEnvironment): string {
+    const profile = this.profilesByEnvironment[environmentValue];
+    if (profile?.providerConfigured) {
+      return profile.secretProvider ? `Ref ${profile.secretProvider}` : "Referenciado";
+    }
     if (environmentValue === "LOCAL") {
       return "Mock local";
     }
@@ -617,11 +670,15 @@ export class BillingConfigPageComponent implements OnInit, OnDestroy {
   }
 
   environmentReadinessLabel(environmentValue: BillingEnvironment): string {
-    if (environmentValue === "PROD") {
-      return "Produccion bloqueada";
-    }
-    if (!this.profilesByEnvironment[environmentValue]) {
+    const profile = this.profilesByEnvironment[environmentValue];
+    if (!profile) {
       return "Incompleto";
+    }
+    if (environmentValue === "PROD") {
+      if (profile.certificateConfigured && profile.providerConfigured) {
+        return "Refs listas; PROD bloqueado";
+      }
+      return "Refs pendientes";
     }
     if (this.activeSeriesCount(environmentValue) <= 0) {
       return "Incompleto";
@@ -730,8 +787,11 @@ export class BillingConfigPageComponent implements OnInit, OnDestroy {
         legalName: profile.legalName,
         fiscalAddress: profile.fiscalAddress,
         environment: profile.environment,
-        certificatePath: profile.certificatePath || "",
-        certificatePassword: "",
+        certificateSecretRef: "",
+        certificatePasswordSecretRef: "",
+        providerSecretRef: "",
+        certificateAlias: profile.certificateAlias || "",
+        secretProvider: profile.secretProvider || "",
         active: profile.active,
       });
       this.patchExtras(profile.environment);
@@ -745,8 +805,11 @@ export class BillingConfigPageComponent implements OnInit, OnDestroy {
       ruc: "",
       legalName: "",
       fiscalAddress: "",
-      certificatePath: "",
-      certificatePassword: "",
+      certificateSecretRef: "",
+      certificatePasswordSecretRef: "",
+      providerSecretRef: "",
+      certificateAlias: "",
+      secretProvider: "",
       active: true,
     });
     this.patchExtras(environmentValue);
@@ -771,8 +834,11 @@ export class BillingConfigPageComponent implements OnInit, OnDestroy {
       legalName: String(raw.legalName || "").trim(),
       fiscalAddress: String(raw.fiscalAddress || "").trim(),
       environment: (raw.environment || "LOCAL") as BillingEnvironment,
-      certificatePath: this.normalizeOptional(raw.certificatePath),
-      certificatePassword: this.normalizeOptional(raw.certificatePassword),
+      certificateSecretRef: this.normalizeOptional(raw.certificateSecretRef),
+      certificatePasswordSecretRef: this.normalizeOptional(raw.certificatePasswordSecretRef),
+      providerSecretRef: this.normalizeOptional(raw.providerSecretRef),
+      certificateAlias: this.normalizeOptional(raw.certificateAlias),
+      secretProvider: this.normalizeCodeOptional(raw.secretProvider),
       active: !!raw.active,
     };
 
@@ -799,7 +865,11 @@ export class BillingConfigPageComponent implements OnInit, OnDestroy {
           ? "Perfil tributario guardado correctamente."
           : "Perfil tributario creado correctamente.";
         this.form.patchValue({
-          certificatePassword: "",
+          certificateSecretRef: "",
+          certificatePasswordSecretRef: "",
+          providerSecretRef: "",
+          certificateAlias: profile.certificateAlias || "",
+          secretProvider: profile.secretProvider || "",
         });
       },
       error: (error: unknown) => {
@@ -873,5 +943,9 @@ export class BillingConfigPageComponent implements OnInit, OnDestroy {
   private normalizeOptional(value: unknown): string | null {
     const text = String(value ?? "").trim();
     return text ? text : null;
+  }
+
+  private normalizeCodeOptional(value: unknown): string | null {
+    return this.normalizeOptional(value)?.toUpperCase() || null;
   }
 }

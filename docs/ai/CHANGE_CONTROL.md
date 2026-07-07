@@ -15,6 +15,16 @@ Estandarizar cambios tecnicos para reducir regresiones y mantener trazabilidad e
 - Seguridad operativa: no se tocaron `.env`, secretos, tokens, claves, certificados reales ni configuracion productiva real.
 - Validacion: `./mvnw -Dtest=BillingApplicationServiceTest test` con 35 tests, 0 failures, BUILD SUCCESS; `./mvnw test` backend completo con 476 tests, 0 failures, BUILD SUCCESS.
 
+### Cierre Fiscal secrets DB/API foundation
+
+- Tipo: hardening backend/frontend de configuracion fiscal y base DB/API para referencias de secretos.
+- Alcance implementado: migracion Flyway V21 no destructiva con columnas `certificate_secret_ref`, `certificate_password_secret_ref`, `provider_secret_ref`, `certificate_alias` y `secret_provider`; DTOs/use cases/domain/entity/mapper actualizados para refs fiscales; `CompanyBillingProfileResponse` expone solo flags seguros (`certificateConfigured`, `providerConfigured`) y metadata (`certificateAlias`, `secretProvider`), sin `certificatePath` ni `certificatePassword`.
+- Reglas backend: `certificatePassword` legado se acepta solo por compatibilidad de request pero no se persiste; el mapper limpia `certificate_password` al guardar perfiles; PROD rechaza `certificatePassword` plano y `certificatePath` directo; PROD activo exige `certificateSecretRef` o `certificateAlias`, `certificatePasswordSecretRef`, `providerSecretRef` y `secretProvider`; actualizaciones preservan refs write-only existentes cuando el request las omite.
+- Frontend Angular: pantalla Configuracion tributaria reemplaza ruta/password por referencias write-only y metadata segura; resumen por ambiente muestra refs de firma/proveedor sin revelar valores; Local/Beta siguen como simulacion controlada y PROD continua bloqueado para emision real.
+- Exclusiones confirmadas: no se implemento secret manager real, resolver de secretos, SUNAT directo, PSE/OSE real, UBL SUNAT completo, firma digital real, CDR, PDF/ticket fiscal, QR, notas, bajas ni produccion real.
+- Seguridad operativa: no se tocaron `.env`, secretos, tokens, claves, certificados reales, backups ni dumps.
+- Validacion: `./mvnw -Dtest=BillingApplicationServiceTest test` con 41 tests, 0 failures, BUILD SUCCESS; `./mvnw test` backend completo con 482 tests, 0 failures, BUILD SUCCESS; `npm run build` frontend, BUILD SUCCESS.
+
 ## Control ecommerce SEO-first
 
 ### Cierre Fase 0 documental ecommerce

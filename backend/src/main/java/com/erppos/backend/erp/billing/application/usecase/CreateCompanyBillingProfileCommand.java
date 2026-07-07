@@ -8,7 +8,22 @@ public record CreateCompanyBillingProfileCommand(
         String fiscalAddress,
         BillingEnvironment environment,
         String certificatePath,
-        String certificatePassword
+        String certificatePassword,
+        String certificateSecretRef,
+        String certificatePasswordSecretRef,
+        String providerSecretRef,
+        String certificateAlias,
+        String secretProvider
 ) {
+    public CreateCompanyBillingProfileCommand(
+            String ruc,
+            String legalName,
+            String fiscalAddress,
+            BillingEnvironment environment,
+            String certificatePath,
+            String certificatePassword
+    ) {
+        this(ruc, legalName, fiscalAddress, environment, certificatePath, certificatePassword, null, null, null, null, null);
+    }
 }
 

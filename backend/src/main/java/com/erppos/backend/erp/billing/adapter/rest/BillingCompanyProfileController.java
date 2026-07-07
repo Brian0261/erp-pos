@@ -39,7 +39,12 @@ public class BillingCompanyProfileController {
                 request.fiscalAddress(),
                 request.environment(),
                 request.certificatePath(),
-                request.certificatePassword()
+                request.certificatePassword(),
+                request.certificateSecretRef(),
+                request.certificatePasswordSecretRef(),
+                request.providerSecretRef(),
+                request.certificateAlias(),
+                request.secretProvider()
         ));
         return ResponseEntity.created(URI.create("/api/v1/billing/company-profile")).body(toResponse(created));
     }
@@ -60,6 +65,11 @@ public class BillingCompanyProfileController {
                 request.environment(),
                 request.certificatePath(),
                 request.certificatePassword(),
+                request.certificateSecretRef(),
+                request.certificatePasswordSecretRef(),
+                request.providerSecretRef(),
+                request.certificateAlias(),
+                request.secretProvider(),
                 request.active()
         ));
         return ResponseEntity.ok(toResponse(updated));
@@ -72,11 +82,18 @@ public class BillingCompanyProfileController {
                 profile.legalName(),
                 profile.fiscalAddress(),
                 profile.environment(),
-                profile.certificatePath(),
+                isConfigured(profile.certificateSecretRef()) || isConfigured(profile.certificateAlias()),
+                isConfigured(profile.providerSecretRef()),
+                profile.certificateAlias(),
+                profile.secretProvider(),
                 profile.active(),
                 profile.createdAt(),
                 profile.updatedAt()
         );
+    }
+
+    private boolean isConfigured(String value) {
+        return value != null && !value.trim().isEmpty();
     }
 }
 

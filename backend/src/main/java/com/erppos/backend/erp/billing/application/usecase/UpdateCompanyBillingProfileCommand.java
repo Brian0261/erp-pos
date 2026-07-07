@@ -9,7 +9,23 @@ public record UpdateCompanyBillingProfileCommand(
         BillingEnvironment environment,
         String certificatePath,
         String certificatePassword,
+        String certificateSecretRef,
+        String certificatePasswordSecretRef,
+        String providerSecretRef,
+        String certificateAlias,
+        String secretProvider,
         Boolean active
 ) {
+    public UpdateCompanyBillingProfileCommand(
+            String ruc,
+            String legalName,
+            String fiscalAddress,
+            BillingEnvironment environment,
+            String certificatePath,
+            String certificatePassword,
+            Boolean active
+    ) {
+        this(ruc, legalName, fiscalAddress, environment, certificatePath, certificatePassword, null, null, null, null, null, active);
+    }
 }
 

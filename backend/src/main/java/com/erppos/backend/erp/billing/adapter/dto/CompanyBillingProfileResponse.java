@@ -10,7 +10,10 @@ public record CompanyBillingProfileResponse(
         String legalName,
         String fiscalAddress,
         BillingEnvironment environment,
-        String certificatePath,
+        boolean certificateConfigured,
+        boolean providerConfigured,
+        String certificateAlias,
+        String secretProvider,
         boolean active,
         Instant createdAt,
         Instant updatedAt

@@ -41,6 +41,21 @@ public class CompanyBillingProfileEntity {
     @Column(name = "certificate_password", length = 200)
     private String certificatePassword;
 
+    @Column(name = "certificate_secret_ref", length = 300)
+    private String certificateSecretRef;
+
+    @Column(name = "certificate_password_secret_ref", length = 300)
+    private String certificatePasswordSecretRef;
+
+    @Column(name = "provider_secret_ref", length = 300)
+    private String providerSecretRef;
+
+    @Column(name = "certificate_alias", length = 120)
+    private String certificateAlias;
+
+    @Column(name = "secret_provider", length = 60)
+    private String secretProvider;
+
     @Column(name = "active", nullable = false)
     private boolean active;
 
@@ -81,6 +96,16 @@ public class CompanyBillingProfileEntity {
     public void setCertificatePath(String certificatePath) { this.certificatePath = certificatePath; }
     public String getCertificatePassword() { return certificatePassword; }
     public void setCertificatePassword(String certificatePassword) { this.certificatePassword = certificatePassword; }
+    public String getCertificateSecretRef() { return certificateSecretRef; }
+    public void setCertificateSecretRef(String certificateSecretRef) { this.certificateSecretRef = certificateSecretRef; }
+    public String getCertificatePasswordSecretRef() { return certificatePasswordSecretRef; }
+    public void setCertificatePasswordSecretRef(String certificatePasswordSecretRef) { this.certificatePasswordSecretRef = certificatePasswordSecretRef; }
+    public String getProviderSecretRef() { return providerSecretRef; }
+    public void setProviderSecretRef(String providerSecretRef) { this.providerSecretRef = providerSecretRef; }
+    public String getCertificateAlias() { return certificateAlias; }
+    public void setCertificateAlias(String certificateAlias) { this.certificateAlias = certificateAlias; }
+    public String getSecretProvider() { return secretProvider; }
+    public void setSecretProvider(String secretProvider) { this.secretProvider = secretProvider; }
     public boolean isActive() { return active; }
     public void setActive(boolean active) { this.active = active; }
     public Instant getCreatedAt() { return createdAt; }

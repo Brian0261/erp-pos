@@ -10,8 +10,15 @@ public record CompanyBillingProfileRequest(
         @NotBlank String legalName,
         @NotBlank String fiscalAddress,
         @NotNull BillingEnvironment environment,
+        @Deprecated
         String certificatePath,
+        @Deprecated
         String certificatePassword,
+        String certificateSecretRef,
+        String certificatePasswordSecretRef,
+        String providerSecretRef,
+        String certificateAlias,
+        String secretProvider,
         Boolean active
 ) {
 }

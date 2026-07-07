@@ -12,6 +12,8 @@ import com.erppos.backend.erp.billing.domain.port.CompanyBillingProfileRepositor
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
+
 @Service
 public class CompanyBillingProfileApplicationService implements CompanyBillingProfileUseCase {
 
@@ -30,6 +32,17 @@ public class CompanyBillingProfileApplicationService implements CompanyBillingPr
     @Transactional
     public CompanyBillingProfile create(CreateCompanyBillingProfileCommand command) {
         validate(command.ruc(), command.legalName(), command.fiscalAddress(), command.environment());
+        FiscalSecretConfig fiscalSecretConfig = validateFiscalSecretConfig(
+                command.environment(),
+                true,
+                trimToNull(command.certificatePath()),
+                trimToNull(command.certificatePassword()),
+                trimToNull(command.certificateSecretRef()),
+                trimToNull(command.certificatePasswordSecretRef()),
+                trimToNull(command.providerSecretRef()),
+                trimToNull(command.certificateAlias()),
+                normalizeCode(command.secretProvider())
+        );
         if (profileRepositoryPort.findActiveByEnvironment(command.environment()).isPresent()) {
             throw new BillingConflictException("There is already an active billing profile for environment " + command.environment());
         }
@@ -41,8 +54,12 @@ public class CompanyBillingProfileApplicationService implements CompanyBillingPr
                 command.legalName().trim(),
                 command.fiscalAddress().trim(),
                 command.environment(),
-                trimToNull(command.certificatePath()),
-                trimToNull(command.certificatePassword()),
+                fiscalSecretConfig.certificatePath(),
+                fiscalSecretConfig.certificateSecretRef(),
+                fiscalSecretConfig.certificatePasswordSecretRef(),
+                fiscalSecretConfig.providerSecretRef(),
+                fiscalSecretConfig.certificateAlias(),
+                fiscalSecretConfig.secretProvider(),
                 true,
                 null,
                 null,
@@ -65,15 +82,32 @@ public class CompanyBillingProfileApplicationService implements CompanyBillingPr
         CompanyBillingProfile current = profileRepositoryPort.findActiveByEnvironment(command.environment())
                 .orElseThrow(() -> new BillingNotFoundException("Billing profile not found for environment " + command.environment()));
 
+        boolean active = command.active() == null || command.active();
+        FiscalSecretConfig fiscalSecretConfig = validateFiscalSecretConfig(
+                command.environment(),
+                active,
+                preferRequestedOrCurrent(command.certificatePath(), current.certificatePath()),
+                trimToNull(command.certificatePassword()),
+                preferRequestedOrCurrent(command.certificateSecretRef(), current.certificateSecretRef()),
+                preferRequestedOrCurrent(command.certificatePasswordSecretRef(), current.certificatePasswordSecretRef()),
+                preferRequestedOrCurrent(command.providerSecretRef(), current.providerSecretRef()),
+                preferRequestedOrCurrent(command.certificateAlias(), current.certificateAlias()),
+                preferRequestedOrCurrentCode(command.secretProvider(), current.secretProvider())
+        );
+
         return profileRepositoryPort.save(new CompanyBillingProfile(
                 current.id(),
                 command.ruc().trim(),
                 command.legalName().trim(),
                 command.fiscalAddress().trim(),
                 command.environment(),
-                trimToNull(command.certificatePath()),
-                trimToNull(command.certificatePassword()),
-                command.active() == null || command.active(),
+                fiscalSecretConfig.certificatePath(),
+                fiscalSecretConfig.certificateSecretRef(),
+                fiscalSecretConfig.certificatePasswordSecretRef(),
+                fiscalSecretConfig.providerSecretRef(),
+                fiscalSecretConfig.certificateAlias(),
+                fiscalSecretConfig.secretProvider(),
+                active,
                 current.createdAt(),
                 current.updatedAt(),
                 current.createdBy(),
@@ -96,12 +130,145 @@ public class CompanyBillingProfileApplicationService implements CompanyBillingPr
         }
     }
 
+    private FiscalSecretConfig validateFiscalSecretConfig(
+            BillingEnvironment environment,
+            boolean active,
+            String certificatePath,
+            String certificatePassword,
+            String certificateSecretRef,
+            String certificatePasswordSecretRef,
+            String providerSecretRef,
+            String certificateAlias,
+            String secretProvider
+    ) {
+        validateLength("certificatePath", certificatePath, 300);
+        validateSecretReference("certificateSecretRef", certificateSecretRef, 300);
+        validateSecretReference("certificatePasswordSecretRef", certificatePasswordSecretRef, 300);
+        validateSecretReference("providerSecretRef", providerSecretRef, 300);
+        validateAlias(certificateAlias);
+        validateCode("secretProvider", secretProvider, 60);
+
+        if (certificatePassword != null && environment == BillingEnvironment.PROD) {
+            throw new BillingBusinessRuleException("certificatePassword is not accepted for PROD; use certificatePasswordSecretRef");
+        }
+        if (certificatePath != null && environment == BillingEnvironment.PROD) {
+            throw new BillingBusinessRuleException("certificatePath is deprecated for PROD; use certificateSecretRef or certificateAlias");
+        }
+        if (active && environment == BillingEnvironment.PROD) {
+            if (certificateSecretRef == null && certificateAlias == null) {
+                throw new BillingBusinessRuleException("PROD billing profile requires certificateSecretRef or certificateAlias");
+            }
+            if (certificatePasswordSecretRef == null) {
+                throw new BillingBusinessRuleException("PROD billing profile requires certificatePasswordSecretRef");
+            }
+            if (providerSecretRef == null) {
+                throw new BillingBusinessRuleException("PROD billing profile requires providerSecretRef");
+            }
+            if (secretProvider == null) {
+                throw new BillingBusinessRuleException("PROD billing profile requires secretProvider");
+            }
+        }
+
+        return new FiscalSecretConfig(
+                certificatePath,
+                certificateSecretRef,
+                certificatePasswordSecretRef,
+                providerSecretRef,
+                certificateAlias,
+                secretProvider
+        );
+    }
+
+    private void validateSecretReference(String fieldName, String value, int maxLength) {
+        validateLength(fieldName, value, maxLength);
+        if (value == null) {
+            return;
+        }
+        if (containsWhitespace(value) || containsControlCharacter(value) || !value.matches("^[A-Za-z0-9][A-Za-z0-9._:/@+=-]*$")) {
+            throw new BillingBusinessRuleException(fieldName + " contains invalid characters");
+        }
+        if (looksLikeDirectPath(value)) {
+            throw new BillingBusinessRuleException(fieldName + " must reference managed secret storage, not a local path");
+        }
+    }
+
+    private void validateAlias(String value) {
+        validateLength("certificateAlias", value, 120);
+        if (value == null) {
+            return;
+        }
+        if (containsWhitespace(value) || containsControlCharacter(value) || !value.matches("^[A-Za-z0-9][A-Za-z0-9._:/@+=-]*$")) {
+            throw new BillingBusinessRuleException("certificateAlias contains invalid characters");
+        }
+        if (looksLikeDirectPath(value)) {
+            throw new BillingBusinessRuleException("certificateAlias must not be a local path");
+        }
+    }
+
+    private void validateCode(String fieldName, String value, int maxLength) {
+        validateLength(fieldName, value, maxLength);
+        if (value == null) {
+            return;
+        }
+        if (containsControlCharacter(value) || !value.matches("^[A-Z0-9][A-Z0-9_-]*$")) {
+            throw new BillingBusinessRuleException(fieldName + " contains invalid characters");
+        }
+    }
+
+    private void validateLength(String fieldName, String value, int maxLength) {
+        if (value != null && value.length() > maxLength) {
+            throw new BillingBusinessRuleException(fieldName + " exceeds max length");
+        }
+    }
+
+    private String preferRequestedOrCurrent(String requested, String current) {
+        String normalized = trimToNull(requested);
+        return normalized != null ? normalized : current;
+    }
+
+    private String preferRequestedOrCurrentCode(String requested, String current) {
+        String normalized = normalizeCode(requested);
+        return normalized != null ? normalized : normalizeCode(current);
+    }
+
+    private String normalizeCode(String value) {
+        String trimmed = trimToNull(value);
+        return trimmed == null ? null : trimmed.toUpperCase(Locale.ROOT);
+    }
+
     private String trimToNull(String value) {
         if (value == null) {
             return null;
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private boolean containsWhitespace(String value) {
+        return value.chars().anyMatch(Character::isWhitespace);
+    }
+
+    private boolean containsControlCharacter(String value) {
+        return value.chars().anyMatch(ch -> Character.isISOControl(ch));
+    }
+
+    private boolean looksLikeDirectPath(String value) {
+        String normalized = value.trim().toLowerCase(Locale.ROOT);
+        return normalized.matches("^[a-z]:[\\\\/].*")
+                || normalized.startsWith("/")
+                || normalized.startsWith("\\\\")
+                || normalized.startsWith("~")
+                || normalized.startsWith("file:");
+    }
+
+    private record FiscalSecretConfig(
+            String certificatePath,
+            String certificateSecretRef,
+            String certificatePasswordSecretRef,
+            String providerSecretRef,
+            String certificateAlias,
+            String secretProvider
+    ) {
     }
 }
 

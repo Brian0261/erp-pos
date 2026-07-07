@@ -15,7 +15,11 @@ public final class CompanyBillingProfileMapper {
                 entity.getFiscalAddress(),
                 entity.getEnvironment(),
                 entity.getCertificatePath(),
-                entity.getCertificatePassword(),
+                entity.getCertificateSecretRef(),
+                entity.getCertificatePasswordSecretRef(),
+                entity.getProviderSecretRef(),
+                entity.getCertificateAlias(),
+                entity.getSecretProvider(),
                 entity.isActive(),
                 entity.getCreatedAt(),
                 entity.getUpdatedAt(),
@@ -36,7 +40,12 @@ public final class CompanyBillingProfileMapper {
         entity.setFiscalAddress(profile.fiscalAddress());
         entity.setEnvironment(profile.environment());
         entity.setCertificatePath(profile.certificatePath());
-        entity.setCertificatePassword(profile.certificatePassword());
+        entity.setCertificatePassword(null);
+        entity.setCertificateSecretRef(profile.certificateSecretRef());
+        entity.setCertificatePasswordSecretRef(profile.certificatePasswordSecretRef());
+        entity.setProviderSecretRef(profile.providerSecretRef());
+        entity.setCertificateAlias(profile.certificateAlias());
+        entity.setSecretProvider(profile.secretProvider());
         entity.setActive(profile.active());
         entity.setCreatedBy(profile.createdBy());
         entity.setUpdatedBy(profile.updatedBy());
