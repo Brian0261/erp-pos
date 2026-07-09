@@ -146,3 +146,4 @@
 - Flujo de consulta/polling/reconciliacion de `PENDING` queda diferido.
 - Provider PSE/OSE/SUNAT real queda fuera de alcance.
 - Readiness productiva real, secret manager real y firma digital real quedan fuera de alcance.
+- Fase 3B-4 agrega el contrato documental de readiness para UI/API futura sin cambiar esta politica backend.

@@ -93,6 +93,14 @@ Estandarizar cambios tecnicos para reducir regresiones y mantener trazabilidad e
 - Seguridad operativa: no se tocaron `.env`, secretos, tokens, claves, certificados reales, backups ni dumps; no se leyeron archivos de certificados ni passwords reales.
 - Validacion: `./mvnw -Dtest=BillingApplicationServiceTest test` con 96 tests, 0 failures, BUILD SUCCESS; `./mvnw test` backend completo con 537 tests, 0 failures, BUILD SUCCESS.
 
+### Cierre Fiscal frontend-readiness contract documental
+
+- Tipo: documentacion/readiness-only para futura UI/API fiscal.
+- Alcance implementado: contrato `docs/billing/FISCAL_FRONTEND_READINESS_CONTRACT.md`, draft API `docs/api/BILLING_FISCAL_READINESS_API_DRAFT.md` y QA `docs/qa/FISCAL_FRONTEND_READINESS_CONTRACT_QA.md`; actualizacion de `docs/ai/CURRENT_STATUS.md` y referencias cruzadas en QA fiscal.
+- Contenido: matriz de estados fiscales, acciones futuras, reglas de retry readiness, mensajes operativos, roles/permisos, auditoria visible, datos prohibidos, draft read-only de readiness y draft diferido `retry-send`.
+- Exclusiones confirmadas: no se creo endpoint REST, no se toco controller, no se toco frontend, no se modificaron DTOs ni servicios, no se creo migracion, no se implemento retry automatico, scheduler, backoff, polling, PSE/OSE/SUNAT real, firma real, CDR, PDF/ticket fiscal, QR, notas ni produccion real.
+- Seguridad operativa: no se tocaron `.env`, secretos, tokens, claves, certificados reales, backups ni dumps; no se leyeron archivos de certificados ni passwords reales.
+
 ## Control ecommerce SEO-first
 
 ### Cierre Fase 0 documental ecommerce
