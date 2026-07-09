@@ -110,6 +110,17 @@ Estandarizar cambios tecnicos para reducir regresiones y mantener trazabilidad e
 - Exclusiones confirmadas: no se reemplazo `billing_xml_files`, no se modificaron `send`, `retrySend` ni `sign`, no se creo endpoint REST, no se toco frontend, no se implemento storage real, no se guardaron payloads completos, no se implemento PSE/OSE/SUNAT real.
 - Validacion: `./mvnw -Dtest=BillingApplicationServiceTest test` con 109 tests, 0 failures, BUILD SUCCESS; `./mvnw test` backend completo con 551 tests, 0 failures, BUILD SUCCESS.
 
+### Cierre Fiscal evidence write/read contract interno
+
+- Tipo: implementacion backend interna metadata-only para evidencias fiscales, sin endpoint REST.
+- Alcance implementado: `ElectronicDocumentApplicationService` registra `SIGNED_XML` al firmar o confirmar XML firmado, confirma esa metadata antes de `send()`/`retrySend()` si falta, registra `PROVIDER_RESPONSE_METADATA` despues de respuesta provider y finalizacion de attempt, y expone lectura interna via `ElectronicDocumentUseCase.evidence(Long id)`.
+- Metadata `SIGNED_XML`: `storageProvider=DB_LEGACY`, `storageKey` relativo, `fileName`/`mimeType`/`sizeBytes`, SHA-256 del XML firmado legacy, `simulated=true` en LOCAL/BETA y sin copiar XML a evidence.
+- Metadata provider: `storageProvider=NONE`, ligada al attempt `SEND`, status/ticket/correlation id sanitizados, checksum SHA-256 de metadata segura y sin request/response crudos.
+- Idempotencia: no duplica `SIGNED_XML` activo; no duplica misma evidencia provider por attempt/tipo/checksum; permite evidencias provider de attempts distintos.
+- Exclusiones confirmadas: no se creo endpoint REST, no se tocaron controllers ni frontend, no se implemento storage real filesystem/S3/GCS, descargas, XML/CDR/PDF/QR reales, PSE/OSE/SUNAT real, firma real, produccion real, scheduler, polling ni retry automatico.
+- Seguridad operativa: no se tocaron `.env`, secretos, tokens, claves, certificados reales, backups ni dumps; no se guardaron payloads completos.
+- Validacion: `./mvnw -Dtest=BillingApplicationServiceTest test` con 111 tests, 0 failures, BUILD SUCCESS; `./mvnw test` backend completo con 553 tests, 0 failures, BUILD SUCCESS.
+
 ## Control ecommerce SEO-first
 
 ### Cierre Fase 0 documental ecommerce

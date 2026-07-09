@@ -12,12 +12,16 @@ import com.erppos.backend.erp.billing.domain.model.BillingSaleItemSnapshot;
 import com.erppos.backend.erp.billing.domain.model.BillingSaleSnapshot;
 import com.erppos.backend.erp.billing.domain.model.CompanyBillingProfile;
 import com.erppos.backend.erp.billing.domain.model.ElectronicDocument;
+import com.erppos.backend.erp.billing.domain.model.ElectronicDocumentEvidence;
 import com.erppos.backend.erp.billing.domain.model.ElectronicDocumentItem;
 import com.erppos.backend.erp.billing.domain.model.ElectronicDocumentStatus;
 import com.erppos.backend.erp.billing.domain.model.ElectronicDocumentStatusHistory;
 import com.erppos.backend.erp.billing.domain.model.ElectronicDocumentType;
 import com.erppos.backend.erp.billing.domain.model.ElectronicDocumentAttempt;
 import com.erppos.backend.erp.billing.domain.model.FiscalAttemptResult;
+import com.erppos.backend.erp.billing.domain.model.FiscalEvidenceMetadataStatus;
+import com.erppos.backend.erp.billing.domain.model.FiscalEvidenceStorageProvider;
+import com.erppos.backend.erp.billing.domain.model.FiscalEvidenceType;
 import com.erppos.backend.erp.billing.domain.model.FiscalErrorCategory;
 import com.erppos.backend.erp.billing.domain.model.FiscalOperation;
 import com.erppos.backend.erp.billing.domain.model.ProviderSendResult;
@@ -28,6 +32,7 @@ import com.erppos.backend.erp.billing.domain.port.BillingXmlFileRepositoryPort;
 import com.erppos.backend.erp.billing.domain.port.CompanyBillingProfileRepositoryPort;
 import com.erppos.backend.erp.billing.domain.port.ElectronicBillingProviderPort;
 import com.erppos.backend.erp.billing.domain.port.ElectronicDocumentAttemptRepositoryPort;
+import com.erppos.backend.erp.billing.domain.port.ElectronicDocumentEvidenceRepositoryPort;
 import com.erppos.backend.erp.billing.domain.port.ElectronicDocumentItemRepositoryPort;
 import com.erppos.backend.erp.billing.domain.port.ElectronicDocumentRepositoryPort;
 import com.erppos.backend.erp.billing.domain.port.ElectronicDocumentStatusHistoryRepositoryPort;
@@ -38,6 +43,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -52,6 +58,7 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
     private final ElectronicDocumentItemRepositoryPort itemRepositoryPort;
     private final ElectronicDocumentStatusHistoryRepositoryPort historyRepositoryPort;
     private final ElectronicDocumentAttemptRepositoryPort attemptRepositoryPort;
+    private final ElectronicDocumentEvidenceRepositoryPort evidenceRepositoryPort;
     private final BillingSeriesRepositoryPort seriesRepositoryPort;
     private final CompanyBillingProfileRepositoryPort profileRepositoryPort;
     private final BillingSaleReadPort saleReadPort;
@@ -71,6 +78,7 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
             ElectronicDocumentItemRepositoryPort itemRepositoryPort,
             ElectronicDocumentStatusHistoryRepositoryPort historyRepositoryPort,
             ElectronicDocumentAttemptRepositoryPort attemptRepositoryPort,
+            ElectronicDocumentEvidenceRepositoryPort evidenceRepositoryPort,
             BillingSeriesRepositoryPort seriesRepositoryPort,
             CompanyBillingProfileRepositoryPort profileRepositoryPort,
             BillingSaleReadPort saleReadPort,
@@ -89,6 +97,7 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
         this.itemRepositoryPort = itemRepositoryPort;
         this.historyRepositoryPort = historyRepositoryPort;
         this.attemptRepositoryPort = attemptRepositoryPort;
+        this.evidenceRepositoryPort = evidenceRepositoryPort;
         this.seriesRepositoryPort = seriesRepositoryPort;
         this.profileRepositoryPort = profileRepositoryPort;
         this.saleReadPort = saleReadPort;
@@ -257,6 +266,8 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
         ElectronicDocument current = getByIdForUpdate(id);
         if (current.status() == ElectronicDocumentStatus.SIGNED) {
             runtimeSafetyPolicy.assertCanSign(current.environment());
+            xmlFileRepositoryPort.findByElectronicDocumentIdAndFileType(id, BillingXmlFileType.SIGNED)
+                    .ifPresent(signed -> recordSignedXmlEvidenceIfMissing(current, signed));
             return current;
         }
         lifecyclePolicy.assertCanSign(current.status());
@@ -268,7 +279,7 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
                 .orElseThrow(() -> new BillingNotFoundException("Billing profile not found for document environment"));
 
         String signedXml = xmlSignerPort.signXml(generated.content(), profile);
-        xmlFileRepositoryPort.save(new BillingXmlFile(
+        BillingXmlFile signedFile = xmlFileRepositoryPort.save(new BillingXmlFile(
                 null,
                 id,
                 BillingXmlFileType.SIGNED,
@@ -280,7 +291,9 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
         ));
 
         ElectronicDocument updated = updateStatus(current, ElectronicDocumentStatus.SIGNED, "XML signed");
-        return documentRepositoryPort.save(updated);
+        ElectronicDocument saved = documentRepositoryPort.save(updated);
+        recordSignedXmlEvidenceIfMissing(saved, signedFile);
+        return saved;
     }
 
     @Override
@@ -290,6 +303,7 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
         assertCanSendOrRecordBlocked(current);
 
         BillingXmlFile signed = getSignedXmlOrRecordBlocked(current);
+        recordSignedXmlEvidenceIfMissing(current, signed);
         ElectronicDocumentAttempt attempt = attemptAuditService.startSendAttempt(
                 current,
                 attemptAuditService.hashPayload(signed.content()),
@@ -353,7 +367,8 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
         if (finalStatus != ElectronicDocumentStatus.SENT) {
             addHistory(saved.id(), ElectronicDocumentStatus.SENT, finalStatus, providerMessage);
         }
-        attemptAuditService.finishSendAttempt(attempt, result, classification);
+        ElectronicDocumentAttempt finishedAttempt = attemptAuditService.finishSendAttempt(attempt, result, classification);
+        recordProviderResponseEvidenceIfMissing(saved, finishedAttempt, result, classification);
         return saved;
     }
 
@@ -364,6 +379,7 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
         assertCanRetrySendOrRecordBlocked(current);
 
         BillingXmlFile signed = getSignedXmlOrRecordBlocked(current);
+        recordSignedXmlEvidenceIfMissing(current, signed);
         ElectronicDocumentAttempt attempt = attemptAuditService.startSendAttempt(
                 current,
                 attemptAuditService.hashPayload(signed.content()),
@@ -427,7 +443,8 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
         if (finalStatus != ElectronicDocumentStatus.SENT) {
             addHistory(saved.id(), ElectronicDocumentStatus.SENT, finalStatus, providerMessage);
         }
-        attemptAuditService.finishSendAttempt(attempt, result, classification);
+        ElectronicDocumentAttempt finishedAttempt = attemptAuditService.finishSendAttempt(attempt, result, classification);
+        recordProviderResponseEvidenceIfMissing(saved, finishedAttempt, result, classification);
         return saved;
     }
 
@@ -443,6 +460,12 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
         return xmlFileRepositoryPort.findByElectronicDocumentIdAndFileType(id, BillingXmlFileType.SIGNED)
                 .or(() -> xmlFileRepositoryPort.findByElectronicDocumentIdAndFileType(id, BillingXmlFileType.GENERATED))
                 .orElseThrow(() -> new BillingNotFoundException("XML file not found"));
+    }
+
+    @Override
+    public List<ElectronicDocumentEvidence> evidence(Long id) {
+        getById(id);
+        return evidenceRepositoryPort.findByElectronicDocumentId(id);
     }
 
     @Override
@@ -583,6 +606,100 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
                 });
     }
 
+    private void recordSignedXmlEvidenceIfMissing(ElectronicDocument document, BillingXmlFile signed) {
+        boolean activeSignedXmlExists = evidenceRepositoryPort.findByElectronicDocumentId(document.id()).stream()
+                .anyMatch(evidence -> evidence.evidenceType() == FiscalEvidenceType.SIGNED_XML
+                        && evidence.metadataStatus() != FiscalEvidenceMetadataStatus.REVOKED);
+        if (activeSignedXmlExists) {
+            return;
+        }
+        String checksum = attemptAuditService.hashPayload(signed.content());
+        if (checksum == null) {
+            return;
+        }
+        evidenceRepositoryPort.save(new ElectronicDocumentEvidence(
+                null,
+                document.id(),
+                null,
+                FiscalEvidenceType.SIGNED_XML,
+                document.environment(),
+                isSimulated(document.environment()),
+                FiscalEvidenceStorageProvider.DB_LEGACY,
+                evidenceStorageKey(document, FiscalEvidenceType.SIGNED_XML, checksum),
+                signed.fileName(),
+                signed.mimeType(),
+                (long) signed.content().getBytes(StandardCharsets.UTF_8).length,
+                checksum,
+                checksum,
+                null,
+                null,
+                null,
+                FiscalEvidenceMetadataStatus.REGISTERED,
+                null,
+                auditUserProvider.currentUsername(),
+                fiscalAuditSanitizer.traceId(currentTraceId()),
+                "Signed XML metadata registered from legacy DB storage"
+        ));
+    }
+
+    private void recordProviderResponseEvidenceIfMissing(
+            ElectronicDocument document,
+            ElectronicDocumentAttempt attempt,
+            ProviderSendResult result,
+            FiscalProviderResultClassification classification
+    ) {
+        String providerStatus = classification.providerStatus() == null ? null : classification.providerStatus().name();
+        String providerTicket = result == null ? null : fiscalAuditSanitizer.providerTicket(result.ticket());
+        String providerCorrelationId = result == null ? null : fiscalAuditSanitizer.providerCorrelationId(result.providerCorrelationId());
+        String providerCode = result == null ? null : fiscalAuditSanitizer.providerCode(result.providerCode());
+        String providerMessage = result == null ? null : fiscalAuditSanitizer.providerMessage(result.message());
+        String material = String.join("|",
+                providerStatus == null ? "" : providerStatus,
+                providerCode == null ? "" : providerCode,
+                providerTicket == null ? "" : providerTicket,
+                providerCorrelationId == null ? "" : providerCorrelationId,
+                providerMessage == null ? "" : providerMessage,
+                classification.errorCategory() == null ? "" : classification.errorCategory().name()
+        );
+        String checksum = attemptAuditService.hashPayload(material);
+        if (checksum == null) {
+            return;
+        }
+        boolean duplicateExists = evidenceRepositoryPort.findByAttemptId(attempt.id()).stream()
+                .anyMatch(evidence -> evidence.evidenceType() == FiscalEvidenceType.PROVIDER_RESPONSE_METADATA
+                        && checksum.equals(evidence.checksumSha256()));
+        if (duplicateExists) {
+            return;
+        }
+        evidenceRepositoryPort.save(new ElectronicDocumentEvidence(
+                null,
+                document.id(),
+                attempt.id(),
+                FiscalEvidenceType.PROVIDER_RESPONSE_METADATA,
+                document.environment(),
+                isSimulated(document.environment()),
+                FiscalEvidenceStorageProvider.NONE,
+                null,
+                null,
+                null,
+                null,
+                checksum,
+                null,
+                providerTicket,
+                providerCorrelationId,
+                providerStatus,
+                FiscalEvidenceMetadataStatus.REGISTERED,
+                null,
+                attempt.actor(),
+                attempt.traceId(),
+                "Provider response metadata registered without raw payload"
+        ));
+    }
+
+    private String evidenceStorageKey(ElectronicDocument document, FiscalEvidenceType evidenceType, String checksum) {
+        return "billing/" + document.environment().name() + "/" + document.id() + "/" + evidenceType.name() + "/" + checksum;
+    }
+
     private ElectronicDocument markManualRetryAsSent(ElectronicDocument current) {
         addHistory(current.id(), current.status(), ElectronicDocumentStatus.SENT, "Retry fiscal manual iniciado.");
         return new ElectronicDocument(
@@ -689,6 +806,10 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
             return "Envio simulado en entorno sandbox.";
         }
         return "Comprobante enviado.";
+    }
+
+    private boolean isSimulated(BillingEnvironment environment) {
+        return environment == BillingEnvironment.LOCAL || environment == BillingEnvironment.BETA;
     }
 
     private BigDecimal normalize(BigDecimal value) {

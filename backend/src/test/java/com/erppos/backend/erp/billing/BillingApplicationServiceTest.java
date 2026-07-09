@@ -131,6 +131,7 @@ class BillingApplicationServiceTest {
                 itemRepository,
                 historyRepository,
                 attemptRepository,
+                evidenceRepository,
                 seriesRepository,
                 profileRepository,
                 saleReadPort,
@@ -1047,6 +1048,29 @@ class BillingApplicationServiceTest {
     }
 
     @Test
+    void shouldRegisterSignedXmlEvidenceMetadataWhenSigning() {
+        ElectronicDocument doc = createReceiptForSale(1L);
+        documentService.generateXml(doc.id());
+
+        ElectronicDocument signed = documentService.sign(doc.id());
+
+        List<ElectronicDocumentEvidence> evidence = documentService.evidence(signed.id());
+        assertEquals(1, evidence.size());
+        ElectronicDocumentEvidence signedXml = evidence.get(0);
+        assertEquals(FiscalEvidenceType.SIGNED_XML, signedXml.evidenceType());
+        assertEquals(FiscalEvidenceStorageProvider.DB_LEGACY, signedXml.storageProvider());
+        assertEquals(FiscalEvidenceMetadataStatus.REGISTERED, signedXml.metadataStatus());
+        assertEquals(BillingEnvironment.LOCAL, signedXml.environment());
+        assertTrue(signedXml.simulated());
+        assertEquals(signed.fullNumber() + "-signed.xml", signedXml.fileName());
+        assertEquals("application/xml", signedXml.mimeType());
+        assertEquals(64, signedXml.checksumSha256().length());
+        assertEquals(signedXml.checksumSha256(), signedXml.contentHashSha256());
+        assertNull(signedXml.providerTicket());
+        assertNull(signedXml.attemptId());
+    }
+
+    @Test
     void shouldBlockSigningDraftDocument() {
         ElectronicDocument doc = createReceiptForSale(1L);
 
@@ -1064,6 +1088,7 @@ class BillingApplicationServiceTest {
         ElectronicDocument signed = documentService.sign(doc.id());
         int historyAfterFirstSign = historyRepository.findByElectronicDocumentId(doc.id()).size();
         int xmlFilesAfterFirstSign = xmlRepository.storage.size();
+        int evidenceAfterFirstSign = evidenceRepository.findByElectronicDocumentId(doc.id()).size();
 
         ElectronicDocument repeated = documentService.sign(doc.id());
 
@@ -1071,6 +1096,7 @@ class BillingApplicationServiceTest {
         assertEquals(signed.signedAt(), repeated.signedAt());
         assertEquals(historyAfterFirstSign, historyRepository.findByElectronicDocumentId(doc.id()).size());
         assertEquals(xmlFilesAfterFirstSign, xmlRepository.storage.size());
+        assertEquals(evidenceAfterFirstSign, evidenceRepository.findByElectronicDocumentId(doc.id()).size());
     }
 
     @Test
@@ -1130,6 +1156,30 @@ class BillingApplicationServiceTest {
         assertEquals(64, attempt.requestHash().length());
         assertEquals(64, attempt.responseHash().length());
         assertTrue(attempt.simulated());
+    }
+
+    @Test
+    void shouldRegisterProviderResponseEvidenceMetadataOnSend() {
+        ElectronicDocument doc = createSignedReceiptForSale(1L);
+
+        documentService.send(doc.id());
+
+        ElectronicDocumentAttempt attempt = attemptRepository.findByElectronicDocumentId(doc.id()).get(0);
+        List<ElectronicDocumentEvidence> evidence = documentService.evidence(doc.id());
+        ElectronicDocumentEvidence providerEvidence = evidence.stream()
+                .filter(item -> item.evidenceType() == FiscalEvidenceType.PROVIDER_RESPONSE_METADATA)
+                .findFirst()
+                .orElseThrow();
+        assertEquals(2, evidence.size());
+        assertEquals(attempt.id(), providerEvidence.attemptId());
+        assertEquals(FiscalEvidenceStorageProvider.NONE, providerEvidence.storageProvider());
+        assertEquals(FiscalEvidenceMetadataStatus.REGISTERED, providerEvidence.metadataStatus());
+        assertEquals("ACCEPTED", providerEvidence.providerStatus());
+        assertEquals("T-ACC", providerEvidence.providerTicket());
+        assertEquals(64, providerEvidence.checksumSha256().length());
+        assertNull(providerEvidence.contentHashSha256());
+        assertNull(providerEvidence.storageKey());
+        assertTrue(providerEvidence.simulated());
     }
 
     @Test
@@ -1614,7 +1664,7 @@ class BillingApplicationServiceTest {
 
     @Test
     void shouldPersistSignedXmlEvidenceMetadataWithoutPayload() {
-        ElectronicDocument doc = createSignedReceiptForSale(1L);
+        ElectronicDocument doc = createReceiptForSale(1L);
         ElectronicDocumentEvidence evidence = signedXmlEvidence(doc.id(), "a".repeat(64));
 
         ElectronicDocumentEvidence saved = evidenceRepository.save(evidence);
@@ -1771,7 +1821,7 @@ class BillingApplicationServiceTest {
     }
 
     @Test
-    void shouldNotRecordEvidenceAutomaticallyDuringSendOrRetry() {
+    void shouldRecordProviderResponseEvidenceForSendAndRetryWithoutDuplicatingSignedXml() {
         ElectronicDocument doc = createSignedReceiptForSale(1L);
         stubProvider.nextResult(ProviderSendResult.timeout("T-TIMEOUT", "Provider timeout"));
         ElectronicDocument failed = documentService.send(doc.id());
@@ -1779,7 +1829,22 @@ class BillingApplicationServiceTest {
 
         documentService.retrySend(failed.id());
 
-        assertTrue(evidenceRepository.findByElectronicDocumentId(doc.id()).isEmpty());
+        List<ElectronicDocumentEvidence> evidence = evidenceRepository.findByElectronicDocumentId(doc.id());
+        long signedXmlCount = evidence.stream()
+                .filter(item -> item.evidenceType() == FiscalEvidenceType.SIGNED_XML)
+                .count();
+        List<ElectronicDocumentEvidence> providerEvidence = evidence.stream()
+                .filter(item -> item.evidenceType() == FiscalEvidenceType.PROVIDER_RESPONSE_METADATA)
+                .toList();
+        List<ElectronicDocumentAttempt> attempts = attemptRepository.findByElectronicDocumentId(doc.id());
+
+        assertEquals(3, evidence.size());
+        assertEquals(1, signedXmlCount);
+        assertEquals(2, providerEvidence.size());
+        assertEquals(attempts.get(0).id(), providerEvidence.get(0).attemptId());
+        assertEquals(attempts.get(1).id(), providerEvidence.get(1).attemptId());
+        assertEquals("TIMEOUT", providerEvidence.get(0).providerStatus());
+        assertEquals("ACCEPTED", providerEvidence.get(1).providerStatus());
     }
 
     @Test

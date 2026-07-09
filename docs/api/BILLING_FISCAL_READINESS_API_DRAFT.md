@@ -3,6 +3,7 @@
 ## Status
 
 Draft only. This document does not represent an implementation.
+Backend 3C-2 already has internal evidence metadata read/write, but no REST endpoint exposes it yet.
 
 ## Proposed Endpoints
 
@@ -226,4 +227,5 @@ Draft only. This document does not represent an implementation.
 
 - The frontend must not calculate retry eligibility on its own.
 - `retry-send` remains deferred in 3B-4.
+- Evidence metadata remains internal in 3C-2; any REST exposure must be designed separately and stay metadata-only.
 - All payloads must remain sanitized and omit secrets/payloads.

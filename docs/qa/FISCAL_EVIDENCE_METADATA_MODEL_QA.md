@@ -1,9 +1,9 @@
-# Fiscal Evidence Metadata Model QA - Fase 3C-1
+# Fiscal Evidence Metadata Model QA - Fase 3C-1/3C-2
 
 ## Resultado
 
 - Estado: PASS.
-- Alcance: backend billing + migracion metadata-only.
+- Alcance: backend billing + migracion metadata-only + escritura/lectura interna 3C-2.
 - Endpoint REST: no creado.
 - Frontend: no tocado.
 - Storage real: no implementado.
@@ -18,6 +18,9 @@
 - Entidad JPA, repository, mapper y adapter.
 - Validacion de metadata segura.
 - Defensa append-only/no duplicidad.
+- Registro automatico `SIGNED_XML` desde `sign()` y confirmacion de XML firmado.
+- Registro automatico `PROVIDER_RESPONSE_METADATA` desde `send()` y `retrySend()` tras respuesta provider.
+- Lectura interna por documento con `ElectronicDocumentUseCase.evidence(Long id)`.
 
 ## Seguridad
 
@@ -30,9 +33,7 @@
 ## Compatibilidad
 
 - `billing_xml_files` no se reemplaza.
-- `send()` no se modifica.
-- `retrySend()` no se modifica.
-- `sign()` no se modifica.
+- `send()`, `retrySend()` y `sign()` mantienen reglas fiscales/estado; solo agregan metadata segura interna.
 - No se crea endpoint REST.
 - No se toca frontend.
 
@@ -49,17 +50,19 @@
 - Rechazo de hash SHA-256 invalido.
 - Aceptacion de hash SHA-256 valido.
 - `simulated=true` para LOCAL/BETA.
-- No escritura automatica desde `send()`/`retrySend()`.
+- Escritura automatica de `SIGNED_XML` al firmar, sin duplicar en firma idempotente.
+- Lectura interna de evidencias por documento.
+- Escritura automatica de `PROVIDER_RESPONSE_METADATA` en `send()` ligada al attempt.
+- Escritura automatica de `PROVIDER_RESPONSE_METADATA` en `retrySend()` ligada al nuevo attempt, sin duplicar `SIGNED_XML`.
 - Migracion V24 crea tabla y columnas core.
 
 ## Validaciones Ejecutadas
 
-- `cd backend && .\mvnw -Dtest=BillingApplicationServiceTest test`: PASS, 109 tests, 0 failures, 0 errors.
-- `cd backend && .\mvnw test`: PASS, 551 tests, 0 failures, 0 errors.
+- `cd backend && .\mvnw -Dtest=BillingApplicationServiceTest test`: PASS, 111 tests, 0 failures, 0 errors.
+- `cd backend && .\mvnw test`: PASS, 553 tests, 0 failures, 0 errors.
 
 ## Limitaciones Pendientes
 
-- 3C-2: integracion automatica controlada de metadata desde flujos internos, si se autoriza.
 - 3C-3: readiness/API para evidence summary, sin payloads.
 - 3C-4: storage real seguro, solo con decision explicita.
 - Endpoint REST diferido.

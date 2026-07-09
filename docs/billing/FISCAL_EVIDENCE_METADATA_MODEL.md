@@ -1,8 +1,8 @@
-# Fiscal Evidence Metadata Model - Fase 3C-1
+# Fiscal Evidence Metadata Model - Fase 3C-1/3C-2
 
 ## Proposito
 
-Fase 3C-1 crea la base DB/backend para registrar metadata de evidencias fiscales sin almacenar payloads completos ni integrar storage real.
+Fase 3C-1 crea la base DB/backend para registrar metadata de evidencias fiscales sin almacenar payloads completos ni integrar storage real. Fase 3C-2 conecta esa base a los flujos internos de firma/envio/retry y agrega lectura interna por documento, sin endpoint REST.
 
 ## Alcance Metadata-Only
 
@@ -11,6 +11,9 @@ Fase 3C-1 crea la base DB/backend para registrar metadata de evidencias fiscales
 - Tipos de evidencia, storage provider y status de metadata como enums.
 - Puerto, entidad JPA, mapper y adapter de persistencia.
 - Validaciones defensivas para impedir payloads, secretos, rutas absolutas y hashes invalidos.
+- Escritura interna de metadata `SIGNED_XML` desde firma o confirmacion de XML firmado.
+- Escritura interna de metadata `PROVIDER_RESPONSE_METADATA` tras respuestas provider de `send()` y `retrySend()`.
+- Lectura interna `ElectronicDocumentUseCase.evidence(Long id)` por documento.
 
 ## Evidencias Modeladas
 
@@ -29,7 +32,37 @@ Fase 3C-1 crea la base DB/backend para registrar metadata de evidencias fiscales
 - `S3`: reservado para storage objeto futuro.
 - `GCS`: reservado para storage objeto futuro.
 
-3C-1 no implementa storage real. Solo registra metadata segura.
+3C-1/3C-2 no implementan storage real. Solo registran metadata segura.
+
+## Contrato Interno 3C-2
+
+- `sign(id)` registra `SIGNED_XML` cuando crea el XML firmado y tambien al confirmar un documento ya `SIGNED` con XML firmado legacy existente.
+- `send(id)` y `retrySend(id)` confirman metadata `SIGNED_XML` si falta antes de llamar al provider.
+- `send(id)` y `retrySend(id)` registran `PROVIDER_RESPONSE_METADATA` solo despues de recibir respuesta provider y finalizar el attempt.
+- Excepciones provider y bloqueos previos no crean evidence metadata automatica; se mantienen auditados por attempts.
+- `ElectronicDocumentUseCase.evidence(id)` devuelve metadata interna por documento despues de validar existencia del comprobante.
+- No existe endpoint REST para evidencias en 3C-2.
+- No se copia XML, CDR, PDF, QR ni request/response completo a `electronic_document_evidence`.
+
+## Metadata Registrada por Flujo
+
+### `SIGNED_XML`
+
+- `storageProvider=DB_LEGACY` porque el XML firmado sigue viviendo en `billing_xml_files`.
+- `storageKey=billing/{environment}/{documentId}/SIGNED_XML/{checksum}` como clave relativa/opaque.
+- `fileName`, `mimeType` y `sizeBytes` vienen del XML firmado legacy.
+- `checksumSha256` y `contentHashSha256` son SHA-256 del XML firmado existente.
+- `simulated=true` para `LOCAL` y `BETA`.
+- `attemptId=null` porque la firma no pertenece a un attempt `SEND`.
+
+### `PROVIDER_RESPONSE_METADATA`
+
+- `storageProvider=NONE` porque no hay payload ni storage materializado.
+- `attemptId` apunta al attempt `SEND` finalizado cuando existe.
+- `providerStatus`, `providerTicket` y `providerCorrelationId` se guardan sanitizados.
+- `checksumSha256` se calcula sobre metadata segura de provider, no sobre payload crudo.
+- `contentHashSha256=null` porque no hay archivo/contenido asociado.
+- `simulated=true` para `LOCAL` y `BETA`.
 
 ## Metadata Status
 
@@ -81,26 +114,24 @@ La metadata rechaza:
 - Se evita duplicado por `attempt_id + evidence_type + checksum_sha256` cuando `attempt_id` y checksum existen.
 - Se evita mas de un `SIGNED_XML` activo por documento mientras `metadata_status <> REVOKED`.
 - Se permiten multiples evidencias por documento cuando pertenecen a attempts distintos o tipos distintos.
+- `send()` y `retrySend()` pueden registrar una evidencia provider por cada attempt distinto.
 
 ## LOCAL/BETA/PROD
 
 - LOCAL/BETA pueden registrar metadata simulada con `simulated=true`.
 - LOCAL/BETA pueden usar `storage_provider=NONE` o `DB_LEGACY`.
 - PROD no queda habilitado para evidencia real sin storage productivo futuro.
-- 3C-1 no activa storage productivo.
+- 3C-1/3C-2 no activan storage productivo.
 
 ## Compatibilidad
 
 - No reemplaza `billing_xml_files`.
-- No modifica `send()`.
-- No modifica `retrySend()`.
-- No modifica `sign()`.
+- `sign()`, `send()` y `retrySend()` conservan su contrato fiscal y reglas de estado; solo agregan side-effect interno de metadata segura.
 - No crea endpoint REST.
 - No toca frontend.
 
 ## Fuera de Alcance
 
-- Escritura automatica de evidencia desde `sign`, `send` o `retrySend`.
 - Endpoint REST.
 - Descarga de archivos.
 - Storage real filesystem/S3/GCS.

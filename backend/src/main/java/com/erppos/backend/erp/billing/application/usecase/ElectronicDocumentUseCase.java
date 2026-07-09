@@ -2,6 +2,7 @@ package com.erppos.backend.erp.billing.application.usecase;
 
 import com.erppos.backend.erp.billing.domain.model.BillingXmlFile;
 import com.erppos.backend.erp.billing.domain.model.ElectronicDocument;
+import com.erppos.backend.erp.billing.domain.model.ElectronicDocumentEvidence;
 import com.erppos.backend.erp.billing.domain.model.ElectronicDocumentItem;
 import com.erppos.backend.erp.billing.domain.model.ElectronicDocumentStatus;
 import com.erppos.backend.erp.billing.domain.model.ElectronicDocumentStatusHistory;
@@ -20,6 +21,7 @@ public interface ElectronicDocumentUseCase {
     ElectronicDocument retrySend(Long id);
     List<ElectronicDocumentItem> items(Long id);
     BillingXmlFile getXml(Long id);
+    List<ElectronicDocumentEvidence> evidence(Long id);
     List<ElectronicDocumentStatusHistory> history(Long id);
 }
 
