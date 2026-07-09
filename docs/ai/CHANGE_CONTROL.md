@@ -80,6 +80,19 @@ Estandarizar cambios tecnicos para reducir regresiones y mantener trazabilidad e
 - Seguridad operativa: no se tocaron `.env`, secretos, tokens, claves, certificados reales, backups ni dumps; no se leyeron archivos de certificados ni passwords reales.
 - Validacion: `./mvnw -Dtest=BillingApplicationServiceTest test` con 79 tests, 0 failures, BUILD SUCCESS; `./mvnw test` backend completo con 520 tests, 0 failures, BUILD SUCCESS.
 
+### Cierre Fiscal manual retry policy backend-only
+
+- Tipo: hardening backend de retry manual/controlado para envio fiscal, sin endpoint REST en esta fase.
+- Alcance implementado: contrato `ElectronicDocumentUseCase.retrySend(Long)` y metodo `ElectronicDocumentApplicationService.retrySend(Long)` separado de `send()`; consulta del ultimo attempt `SEND` via `ElectronicDocumentAttemptRepositoryPort.findLatestByElectronicDocumentIdAndOperation`; adapter JPA con finder por documento, operacion y `attemptNumber desc`.
+- Politica de retry: solo desde documento `ERROR`, bajo lock `findByIdForUpdate`, con ultimo attempt `SEND` `FAILED`, `recoverable=true`, categoria clara y reintentable (`PROVIDER_TIMEOUT`, `PROVIDER_UNAVAILABLE`, `COMMUNICATION_ERROR`) y XML firmado disponible.
+- Bloqueos: `DRAFT`, `GENERATED`, `SIGNED`, `SENT`, `ACCEPTED`, `REJECTED`, `CANCELLED`; categorias `PROVIDER_REJECTED`, `PROVIDER_OBSERVED`, `PROVIDER_PENDING`, `CONFIGURATION_ERROR`, `INTERNAL_ERROR`, `VALIDATION_ERROR`, categoria ausente y cualquier attempt `recoverable=false`.
+- PENDING/OBSERVED: `PENDING` queda como documento `SENT` reservado para consulta/polling/reconciliacion futura; `OBSERVED` queda `ACCEPTED` con observaciones y no es reintentable.
+- Auditoria: cada retry permitido crea nuevo attempt `SEND` incremental, registra `STARTED` antes del provider y finaliza con `SUCCESS`, `FAILED` o `PENDING` segun `FiscalProviderResultClassifier`; retry bloqueado registra `BLOCKED` usando el patron seguro existente; hashes SHA-256 y sanitizacion se mantienen.
+- Idempotencia/prevention: no se consume correlativo, no se regenera XML, no se refirma, no se duplica evidencia firmada, no hay scheduler, no hay backoff, no hay retry automatico.
+- Exclusiones confirmadas: no se creo endpoint REST, no se tocaron controllers, no se creo migracion Flyway, no se implemento PSE/OSE/SUNAT real, firma real, CDR, XML UBL completo, PDF/ticket fiscal, QR, notas, bajas, produccion real ni secret manager real.
+- Seguridad operativa: no se tocaron `.env`, secretos, tokens, claves, certificados reales, backups ni dumps; no se leyeron archivos de certificados ni passwords reales.
+- Validacion: `./mvnw -Dtest=BillingApplicationServiceTest test` con 96 tests, 0 failures, BUILD SUCCESS; `./mvnw test` backend completo con 537 tests, 0 failures, BUILD SUCCESS.
+
 ## Control ecommerce SEO-first
 
 ### Cierre Fase 0 documental ecommerce

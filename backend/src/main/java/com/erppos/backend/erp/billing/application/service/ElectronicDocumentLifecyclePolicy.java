@@ -61,6 +61,18 @@ public class ElectronicDocumentLifecyclePolicy {
         }
     }
 
+    public void assertCanRetrySend(ElectronicDocumentStatus currentStatus) {
+        if (currentStatus == ElectronicDocumentStatus.SIGNED) {
+            throw new BillingConflictException("El comprobante firmado debe enviarse con el envio normal, no con retry manual.");
+        }
+        if (currentStatus == ElectronicDocumentStatus.SENT) {
+            throw new BillingConflictException("El retry manual no aplica a comprobantes SENT/PENDING; queda reservado para consulta o reconciliacion.");
+        }
+        if (currentStatus != ElectronicDocumentStatus.ERROR) {
+            throw new BillingConflictException("El retry manual solo esta permitido para comprobantes en ERROR.");
+        }
+    }
+
     public void assertTransitionAllowed(ElectronicDocumentStatus currentStatus, ElectronicDocumentStatus nextStatus) {
         if (!VALID_TRANSITIONS.getOrDefault(currentStatus, Set.of()).contains(nextStatus)) {
             throw new BillingConflictException("Transicion fiscal no permitida para el estado actual.");

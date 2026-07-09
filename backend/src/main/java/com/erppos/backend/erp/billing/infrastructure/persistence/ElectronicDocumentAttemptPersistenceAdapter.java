@@ -7,6 +7,7 @@ import com.erppos.backend.erp.billing.infrastructure.mapper.ElectronicDocumentAt
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Optional;
 
 @Component
 public class ElectronicDocumentAttemptPersistenceAdapter implements ElectronicDocumentAttemptRepositoryPort {
@@ -47,5 +48,11 @@ public class ElectronicDocumentAttemptPersistenceAdapter implements ElectronicDo
                 .stream()
                 .map(ElectronicDocumentAttemptMapper::toDomain)
                 .toList();
+    }
+
+    @Override
+    public Optional<ElectronicDocumentAttempt> findLatestByElectronicDocumentIdAndOperation(Long electronicDocumentId, FiscalOperation operation) {
+        return attemptJpaRepository.findFirstByElectronicDocument_IdAndOperationOrderByAttemptNumberDesc(electronicDocumentId, operation)
+                .map(ElectronicDocumentAttemptMapper::toDomain);
     }
 }

@@ -17,7 +17,9 @@ import com.erppos.backend.erp.billing.domain.model.ElectronicDocumentStatus;
 import com.erppos.backend.erp.billing.domain.model.ElectronicDocumentStatusHistory;
 import com.erppos.backend.erp.billing.domain.model.ElectronicDocumentType;
 import com.erppos.backend.erp.billing.domain.model.ElectronicDocumentAttempt;
+import com.erppos.backend.erp.billing.domain.model.FiscalAttemptResult;
 import com.erppos.backend.erp.billing.domain.model.FiscalErrorCategory;
+import com.erppos.backend.erp.billing.domain.model.FiscalOperation;
 import com.erppos.backend.erp.billing.domain.model.ProviderSendResult;
 import com.erppos.backend.erp.billing.domain.model.BillingEnvironment;
 import com.erppos.backend.erp.billing.domain.port.BillingSaleReadPort;
@@ -25,6 +27,7 @@ import com.erppos.backend.erp.billing.domain.port.BillingSeriesRepositoryPort;
 import com.erppos.backend.erp.billing.domain.port.BillingXmlFileRepositoryPort;
 import com.erppos.backend.erp.billing.domain.port.CompanyBillingProfileRepositoryPort;
 import com.erppos.backend.erp.billing.domain.port.ElectronicBillingProviderPort;
+import com.erppos.backend.erp.billing.domain.port.ElectronicDocumentAttemptRepositoryPort;
 import com.erppos.backend.erp.billing.domain.port.ElectronicDocumentItemRepositoryPort;
 import com.erppos.backend.erp.billing.domain.port.ElectronicDocumentRepositoryPort;
 import com.erppos.backend.erp.billing.domain.port.ElectronicDocumentStatusHistoryRepositoryPort;
@@ -48,6 +51,7 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
     private final ElectronicDocumentRepositoryPort documentRepositoryPort;
     private final ElectronicDocumentItemRepositoryPort itemRepositoryPort;
     private final ElectronicDocumentStatusHistoryRepositoryPort historyRepositoryPort;
+    private final ElectronicDocumentAttemptRepositoryPort attemptRepositoryPort;
     private final BillingSeriesRepositoryPort seriesRepositoryPort;
     private final CompanyBillingProfileRepositoryPort profileRepositoryPort;
     private final BillingSaleReadPort saleReadPort;
@@ -66,6 +70,7 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
             ElectronicDocumentRepositoryPort documentRepositoryPort,
             ElectronicDocumentItemRepositoryPort itemRepositoryPort,
             ElectronicDocumentStatusHistoryRepositoryPort historyRepositoryPort,
+            ElectronicDocumentAttemptRepositoryPort attemptRepositoryPort,
             BillingSeriesRepositoryPort seriesRepositoryPort,
             CompanyBillingProfileRepositoryPort profileRepositoryPort,
             BillingSaleReadPort saleReadPort,
@@ -83,6 +88,7 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
         this.documentRepositoryPort = documentRepositoryPort;
         this.itemRepositoryPort = itemRepositoryPort;
         this.historyRepositoryPort = historyRepositoryPort;
+        this.attemptRepositoryPort = attemptRepositoryPort;
         this.seriesRepositoryPort = seriesRepositoryPort;
         this.profileRepositoryPort = profileRepositoryPort;
         this.saleReadPort = saleReadPort;
@@ -352,6 +358,80 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
     }
 
     @Override
+    @Transactional
+    public ElectronicDocument retrySend(Long id) {
+        ElectronicDocument current = getByIdForUpdate(id);
+        assertCanRetrySendOrRecordBlocked(current);
+
+        BillingXmlFile signed = getSignedXmlOrRecordBlocked(current);
+        ElectronicDocumentAttempt attempt = attemptAuditService.startSendAttempt(
+                current,
+                attemptAuditService.hashPayload(signed.content()),
+                auditUserProvider.currentUsername(),
+                currentTraceId()
+        );
+
+        ElectronicDocument sent = markManualRetryAsSent(current);
+        sent = documentRepositoryPort.save(sent);
+
+        ProviderSendResult result;
+        try {
+            result = billingProviderPort.send(sent, signed.content());
+        } catch (RuntimeException ex) {
+            attemptAuditService.failSendAttempt(attempt, providerResultClassifier.classifyException(ex), ex.getMessage());
+            throw ex;
+        }
+
+        FiscalProviderResultClassification classification = providerResultClassifier.classify(result);
+        ElectronicDocumentStatus finalStatus = classification.finalDocumentStatus();
+        try {
+            if (finalStatus != ElectronicDocumentStatus.SENT) {
+                lifecyclePolicy.assertTransitionAllowed(sent.status(), finalStatus);
+            }
+            runtimeSafetyPolicy.assertCanAcceptProviderResult(sent.environment(), finalStatus);
+        } catch (RuntimeException ex) {
+            attemptAuditService.failSendAttempt(attempt, providerResultClassifier.failure(classifyPostProviderFailure(ex)), ex.getMessage());
+            throw ex;
+        }
+
+        String providerTicket = result == null ? null : fiscalAuditSanitizer.providerTicket(result.ticket());
+        String providerMessage = result == null ? null : fiscalAuditSanitizer.providerMessage(result.message());
+
+        ElectronicDocument finalized = new ElectronicDocument(
+                sent.id(),
+                sent.saleId(),
+                sent.billingSeriesId(),
+                sent.documentType(),
+                finalStatus,
+                sent.environment(),
+                sent.series(),
+                sent.number(),
+                sent.fullNumber(),
+                sent.customerName(),
+                sent.customerDocument(),
+                sent.currencyCode(),
+                sent.subtotalAmount(),
+                sent.taxAmount(),
+                sent.totalAmount(),
+                sent.xmlGeneratedAt(),
+                sent.signedAt(),
+                Instant.now(),
+                providerTicket,
+                providerMessage,
+                sent.createdAt(),
+                sent.updatedAt(),
+                sent.createdBy(),
+                auditUserProvider.currentUsername()
+        );
+        ElectronicDocument saved = documentRepositoryPort.save(finalized);
+        if (finalStatus != ElectronicDocumentStatus.SENT) {
+            addHistory(saved.id(), ElectronicDocumentStatus.SENT, finalStatus, providerMessage);
+        }
+        attemptAuditService.finishSendAttempt(attempt, result, classification);
+        return saved;
+    }
+
+    @Override
     public List<ElectronicDocumentItem> items(Long id) {
         getById(id);
         return itemRepositoryPort.findByElectronicDocumentId(id);
@@ -411,6 +491,63 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
                 .orElseThrow(() -> new BillingNotFoundException("Electronic document not found"));
     }
 
+    private void assertCanRetrySendOrRecordBlocked(ElectronicDocument current) {
+        try {
+            lifecyclePolicy.assertCanRetrySend(current.status());
+        } catch (BillingConflictException ex) {
+            throw recordManualRetryBlocked(current, FiscalErrorCategory.VALIDATION_ERROR, ex.getMessage());
+        }
+
+        ElectronicDocumentAttempt lastAttempt = attemptRepositoryPort.findLatestByElectronicDocumentIdAndOperation(current.id(), FiscalOperation.SEND)
+                .orElseThrow(() -> recordManualRetryBlocked(
+                        current,
+                        FiscalErrorCategory.VALIDATION_ERROR,
+                        "No existe un attempt SEND fallido recuperable para reintentar."
+                ));
+
+        if (lastAttempt.result() != FiscalAttemptResult.FAILED) {
+            throw recordManualRetryBlocked(
+                    current,
+                    categoryOrValidation(lastAttempt.errorCategory()),
+                    "El ultimo attempt SEND no esta fallido; no permite retry manual."
+            );
+        }
+        if (!lastAttempt.recoverable()) {
+            throw recordManualRetryBlocked(
+                    current,
+                    categoryOrValidation(lastAttempt.errorCategory()),
+                    "El ultimo attempt SEND no es recuperable para retry manual."
+            );
+        }
+        if (lastAttempt.errorCategory() == null) {
+            throw recordManualRetryBlocked(
+                    current,
+                    FiscalErrorCategory.VALIDATION_ERROR,
+                    "El ultimo attempt SEND no tiene categoria fiscal clara para retry manual."
+            );
+        }
+        if (!isManualRetryAllowedCategory(lastAttempt.errorCategory())) {
+            throw recordManualRetryBlocked(
+                    current,
+                    lastAttempt.errorCategory(),
+                    "La categoria fiscal del ultimo attempt SEND no permite retry manual."
+            );
+        }
+        if (attemptRepositoryPort.nextAttemptNumber(current.id(), FiscalOperation.SEND) != lastAttempt.attemptNumber() + 1) {
+            throw recordManualRetryBlocked(
+                    current,
+                    FiscalErrorCategory.VALIDATION_ERROR,
+                    "El ultimo attempt SEND cambio antes de iniciar el retry manual."
+            );
+        }
+
+        try {
+            runtimeSafetyPolicy.assertCanSend(current.environment());
+        } catch (BillingConflictException ex) {
+            throw recordManualRetryBlocked(current, blockedCategoryForMessage(ex.getMessage()), ex.getMessage());
+        }
+    }
+
     private void assertCanSendOrRecordBlocked(ElectronicDocument current) {
         try {
             lifecyclePolicy.assertCanSend(current.status());
@@ -444,6 +581,64 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
                     );
                     return new BillingNotFoundException(message);
                 });
+    }
+
+    private ElectronicDocument markManualRetryAsSent(ElectronicDocument current) {
+        addHistory(current.id(), current.status(), ElectronicDocumentStatus.SENT, "Retry fiscal manual iniciado.");
+        return new ElectronicDocument(
+                current.id(),
+                current.saleId(),
+                current.billingSeriesId(),
+                current.documentType(),
+                ElectronicDocumentStatus.SENT,
+                current.environment(),
+                current.series(),
+                current.number(),
+                current.fullNumber(),
+                current.customerName(),
+                current.customerDocument(),
+                current.currencyCode(),
+                current.subtotalAmount(),
+                current.taxAmount(),
+                current.totalAmount(),
+                current.xmlGeneratedAt(),
+                current.signedAt(),
+                current.sentAt(),
+                current.providerTicket(),
+                current.providerMessage(),
+                current.createdAt(),
+                current.updatedAt(),
+                current.createdBy(),
+                auditUserProvider.currentUsername()
+        );
+    }
+
+    private BillingConflictException recordManualRetryBlocked(ElectronicDocument current, FiscalErrorCategory category, String message) {
+        attemptAuditService.recordSendBlocked(
+                current,
+                category,
+                message,
+                auditUserProvider.currentUsername(),
+                currentTraceId()
+        );
+        return new BillingConflictException(message);
+    }
+
+    private FiscalErrorCategory categoryOrValidation(FiscalErrorCategory category) {
+        return category == null ? FiscalErrorCategory.VALIDATION_ERROR : category;
+    }
+
+    private FiscalErrorCategory blockedCategoryForMessage(String message) {
+        if (message != null && message.contains(BillingRuntimeSafetyPolicy.PRODUCTION_NOT_CONFIGURED_MESSAGE)) {
+            return FiscalErrorCategory.CONFIGURATION_ERROR;
+        }
+        return FiscalErrorCategory.VALIDATION_ERROR;
+    }
+
+    private boolean isManualRetryAllowedCategory(FiscalErrorCategory category) {
+        return category == FiscalErrorCategory.PROVIDER_TIMEOUT
+                || category == FiscalErrorCategory.PROVIDER_UNAVAILABLE
+                || category == FiscalErrorCategory.COMMUNICATION_ERROR;
     }
 
     private FiscalErrorCategory classifyPostProviderFailure(RuntimeException ex) {

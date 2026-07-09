@@ -17,6 +17,7 @@ public interface ElectronicDocumentUseCase {
     ElectronicDocument generateXml(Long id);
     ElectronicDocument sign(Long id);
     ElectronicDocument send(Long id);
+    ElectronicDocument retrySend(Long id);
     List<ElectronicDocumentItem> items(Long id);
     BillingXmlFile getXml(Long id);
     List<ElectronicDocumentStatusHistory> history(Long id);

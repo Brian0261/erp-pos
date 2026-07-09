@@ -123,6 +123,7 @@ class BillingApplicationServiceTest {
                 documentRepository,
                 itemRepository,
                 historyRepository,
+                attemptRepository,
                 seriesRepository,
                 profileRepository,
                 saleReadPort,
@@ -1310,6 +1311,301 @@ class BillingApplicationServiceTest {
     }
 
     @Test
+    void shouldRetryManualFromErrorAfterTimeoutWithoutConsumingCorrelativeOrRebuildingEvidence() {
+        ElectronicDocument doc = createSignedReceiptForSale(1L);
+        long currentNumberBeforeRetry = seriesRepository.findById(1L).orElseThrow().currentNumber();
+        int generatorCallsBeforeRetry = stubXmlGenerator.generateCalls();
+        int signerCallsBeforeRetry = stubXmlSigner.signCalls();
+        stubProvider.nextResult(ProviderSendResult.timeout("T-TIMEOUT", "Provider timeout"));
+        ElectronicDocument failed = documentService.send(doc.id());
+        stubProvider.nextResult(ProviderSendResult.accepted("T-RETRY", "Accepted after retry"));
+
+        ElectronicDocument retried = documentService.retrySend(failed.id());
+
+        List<ElectronicDocumentAttempt> attempts = attemptRepository.findByElectronicDocumentId(doc.id());
+        ElectronicDocumentAttempt retryAttempt = attempts.get(1);
+        assertEquals(ElectronicDocumentStatus.ERROR, failed.status());
+        assertEquals(ElectronicDocumentStatus.ACCEPTED, retried.status());
+        assertEquals(2, stubProvider.sendCalls());
+        assertEquals(2, attempts.size());
+        assertEquals(FiscalAttemptResult.FAILED, attempts.get(0).result());
+        assertEquals(FiscalErrorCategory.PROVIDER_TIMEOUT, attempts.get(0).errorCategory());
+        assertEquals(2, retryAttempt.attemptNumber());
+        assertEquals(FiscalAttemptResult.SUCCESS, retryAttempt.result());
+        assertTrue(retryAttempt.simulated());
+        assertEquals(currentNumberBeforeRetry, seriesRepository.findById(1L).orElseThrow().currentNumber());
+        assertEquals(generatorCallsBeforeRetry, stubXmlGenerator.generateCalls());
+        assertEquals(signerCallsBeforeRetry, stubXmlSigner.signCalls());
+    }
+
+    @Test
+    void shouldRetryManualFromErrorAfterProviderUnavailable() {
+        ElectronicDocument retried = retryRecoverableFailure(ProviderSendResult.unavailable("T-UNAVAILABLE", "Provider unavailable"));
+        List<ElectronicDocumentAttempt> attempts = attemptRepository.findByElectronicDocumentId(retried.id());
+
+        assertEquals(ElectronicDocumentStatus.ACCEPTED, retried.status());
+        assertEquals(2, stubProvider.sendCalls());
+        assertEquals(FiscalErrorCategory.PROVIDER_UNAVAILABLE, attempts.get(0).errorCategory());
+        assertEquals(FiscalAttemptResult.SUCCESS, attempts.get(1).result());
+        assertEquals(2, attempts.get(1).attemptNumber());
+    }
+
+    @Test
+    void shouldRetryManualFromErrorAfterCommunicationError() {
+        ElectronicDocument retried = retryRecoverableFailure(ProviderSendResult.communicationError("T-COMM", "Communication error"));
+        List<ElectronicDocumentAttempt> attempts = attemptRepository.findByElectronicDocumentId(retried.id());
+
+        assertEquals(ElectronicDocumentStatus.ACCEPTED, retried.status());
+        assertEquals(2, stubProvider.sendCalls());
+        assertEquals(FiscalErrorCategory.COMMUNICATION_ERROR, attempts.get(0).errorCategory());
+        assertEquals(FiscalAttemptResult.SUCCESS, attempts.get(1).result());
+        assertEquals(2, attempts.get(1).attemptNumber());
+    }
+
+    @Test
+    void shouldBlockManualRetryFromErrorWhenLastAttemptWasProviderRejected() {
+        ElectronicDocument error = createErroredSignedReceiptWithLastAttempt(FiscalErrorCategory.PROVIDER_REJECTED, true);
+
+        BillingConflictException ex = assertThrows(BillingConflictException.class, () -> documentService.retrySend(error.id()));
+
+        List<ElectronicDocumentAttempt> attempts = attemptRepository.findByElectronicDocumentId(error.id());
+        assertEquals("La categoria fiscal del ultimo attempt SEND no permite retry manual.", ex.getMessage());
+        assertEquals(0, stubProvider.sendCalls());
+        assertEquals(ElectronicDocumentStatus.ERROR, documentRepository.findById(error.id()).orElseThrow().status());
+        assertEquals(FiscalAttemptResult.BLOCKED, attempts.get(1).result());
+        assertEquals(FiscalErrorCategory.PROVIDER_REJECTED, attempts.get(1).errorCategory());
+    }
+
+    @Test
+    void shouldBlockManualRetryFromErrorWhenLastAttemptWasConfigurationError() {
+        ElectronicDocument doc = createSignedReceiptForSale(1L);
+        stubProvider.nextResult(ProviderSendResult.configurationError("T-CONFIG", "Configuration error"));
+        ElectronicDocument failed = documentService.send(doc.id());
+        stubProvider.nextResult(ProviderSendResult.accepted("T-RETRY", "Accepted after retry"));
+
+        BillingConflictException ex = assertThrows(BillingConflictException.class, () -> documentService.retrySend(failed.id()));
+
+        List<ElectronicDocumentAttempt> attempts = attemptRepository.findByElectronicDocumentId(doc.id());
+        assertEquals("El ultimo attempt SEND no es recuperable para retry manual.", ex.getMessage());
+        assertEquals(1, stubProvider.sendCalls());
+        assertEquals(ElectronicDocumentStatus.ERROR, documentRepository.findById(doc.id()).orElseThrow().status());
+        assertEquals(FiscalAttemptResult.BLOCKED, attempts.get(1).result());
+        assertEquals(FiscalErrorCategory.CONFIGURATION_ERROR, attempts.get(1).errorCategory());
+    }
+
+    @Test
+    void shouldBlockManualRetryFromErrorWhenLastAttemptWasInternalError() {
+        ElectronicDocument error = createErroredSignedReceiptWithLastAttempt(FiscalErrorCategory.INTERNAL_ERROR, true);
+
+        BillingConflictException ex = assertThrows(BillingConflictException.class, () -> documentService.retrySend(error.id()));
+
+        List<ElectronicDocumentAttempt> attempts = attemptRepository.findByElectronicDocumentId(error.id());
+        assertEquals("La categoria fiscal del ultimo attempt SEND no permite retry manual.", ex.getMessage());
+        assertEquals(0, stubProvider.sendCalls());
+        assertEquals(FiscalAttemptResult.BLOCKED, attempts.get(1).result());
+        assertEquals(FiscalErrorCategory.INTERNAL_ERROR, attempts.get(1).errorCategory());
+    }
+
+    @Test
+    void shouldBlockManualRetryFromErrorWhenLastAttemptIsNotRecoverable() {
+        ElectronicDocument error = createErroredSignedReceiptWithLastAttempt(FiscalErrorCategory.PROVIDER_TIMEOUT, false);
+
+        BillingConflictException ex = assertThrows(BillingConflictException.class, () -> documentService.retrySend(error.id()));
+
+        List<ElectronicDocumentAttempt> attempts = attemptRepository.findByElectronicDocumentId(error.id());
+        assertEquals("El ultimo attempt SEND no es recuperable para retry manual.", ex.getMessage());
+        assertEquals(0, stubProvider.sendCalls());
+        assertEquals(FiscalAttemptResult.BLOCKED, attempts.get(1).result());
+        assertEquals(FiscalErrorCategory.PROVIDER_TIMEOUT, attempts.get(1).errorCategory());
+    }
+
+    @Test
+    void shouldBlockManualRetryFromErrorWhenNoLastSendAttemptExists() {
+        ElectronicDocument signed = createSignedReceiptForSale(1L);
+        ElectronicDocument error = saveDocumentWithStatus(signed, ElectronicDocumentStatus.ERROR);
+
+        BillingConflictException ex = assertThrows(BillingConflictException.class, () -> documentService.retrySend(error.id()));
+
+        List<ElectronicDocumentAttempt> attempts = attemptRepository.findByElectronicDocumentId(error.id());
+        assertEquals("No existe un attempt SEND fallido recuperable para reintentar.", ex.getMessage());
+        assertEquals(0, stubProvider.sendCalls());
+        assertEquals(1, attempts.size());
+        assertEquals(FiscalAttemptResult.BLOCKED, attempts.get(0).result());
+        assertEquals(FiscalErrorCategory.VALIDATION_ERROR, attempts.get(0).errorCategory());
+    }
+
+    @Test
+    void shouldBlockManualRetryFromErrorWhenSignedXmlIsMissing() {
+        ElectronicDocument error = createErroredSignedReceiptWithLastAttempt(FiscalErrorCategory.PROVIDER_TIMEOUT, true);
+        xmlRepository.storage.remove(error.id() + "-" + BillingXmlFileType.SIGNED);
+
+        BillingNotFoundException ex = assertThrows(BillingNotFoundException.class, () -> documentService.retrySend(error.id()));
+
+        List<ElectronicDocumentAttempt> attempts = attemptRepository.findByElectronicDocumentId(error.id());
+        assertEquals("XML firmado no disponible. Firma el XML antes de enviar.", ex.getMessage());
+        assertEquals(0, stubProvider.sendCalls());
+        assertEquals(ElectronicDocumentStatus.ERROR, documentRepository.findById(error.id()).orElseThrow().status());
+        assertEquals(FiscalAttemptResult.BLOCKED, attempts.get(1).result());
+        assertEquals(FiscalErrorCategory.VALIDATION_ERROR, attempts.get(1).errorCategory());
+    }
+
+    @Test
+    void shouldBlockManualRetryFromSignedDocumentAndIndicateNormalSend() {
+        ElectronicDocument signed = createSignedReceiptForSale(1L);
+
+        BillingConflictException ex = assertThrows(BillingConflictException.class, () -> documentService.retrySend(signed.id()));
+
+        assertEquals("El comprobante firmado debe enviarse con el envio normal, no con retry manual.", ex.getMessage());
+        assertEquals(0, stubProvider.sendCalls());
+        assertEquals(ElectronicDocumentStatus.SIGNED, documentRepository.findById(signed.id()).orElseThrow().status());
+        assertEquals(ElectronicDocumentStatus.ACCEPTED, documentService.send(signed.id()).status());
+    }
+
+    @Test
+    void shouldBlockManualRetryFromSentPendingDocument() {
+        ElectronicDocument doc = createSignedReceiptForSale(1L);
+        stubProvider.nextResult(ProviderSendResult.pending("T-PENDING", "Provider pending"));
+        ElectronicDocument pending = documentService.send(doc.id());
+
+        BillingConflictException ex = assertThrows(BillingConflictException.class, () -> documentService.retrySend(pending.id()));
+
+        List<ElectronicDocumentAttempt> attempts = attemptRepository.findByElectronicDocumentId(doc.id());
+        assertEquals("El retry manual no aplica a comprobantes SENT/PENDING; queda reservado para consulta o reconciliacion.", ex.getMessage());
+        assertEquals(ElectronicDocumentStatus.SENT, pending.status());
+        assertEquals(1, stubProvider.sendCalls());
+        assertEquals(FiscalAttemptResult.PENDING, attempts.get(0).result());
+        assertEquals(FiscalAttemptResult.BLOCKED, attempts.get(1).result());
+    }
+
+    @Test
+    void shouldBlockManualRetryFromAcceptedDocument() {
+        ElectronicDocument doc = createSignedReceiptForSale(1L);
+        ElectronicDocument accepted = documentService.send(doc.id());
+
+        BillingConflictException ex = assertThrows(BillingConflictException.class, () -> documentService.retrySend(accepted.id()));
+
+        assertEquals("El retry manual solo esta permitido para comprobantes en ERROR.", ex.getMessage());
+        assertEquals(ElectronicDocumentStatus.ACCEPTED, documentRepository.findById(doc.id()).orElseThrow().status());
+        assertEquals(1, stubProvider.sendCalls());
+    }
+
+    @Test
+    void shouldBlockManualRetryFromRejectedDocument() {
+        ElectronicDocument doc = createSignedReceiptForSale(1L);
+        stubProvider.nextResult(ProviderSendResult.rejected("T-REJ", "Rejected by provider"));
+        ElectronicDocument rejected = documentService.send(doc.id());
+
+        BillingConflictException ex = assertThrows(BillingConflictException.class, () -> documentService.retrySend(rejected.id()));
+
+        assertEquals("El retry manual solo esta permitido para comprobantes en ERROR.", ex.getMessage());
+        assertEquals(ElectronicDocumentStatus.REJECTED, documentRepository.findById(doc.id()).orElseThrow().status());
+        assertEquals(1, stubProvider.sendCalls());
+    }
+
+    @Test
+    void shouldSanitizeProviderMetadataSavedByManualRetryAttempt() {
+        ElectronicDocument doc = createSignedReceiptForSale(1L);
+        stubProvider.nextResult(ProviderSendResult.timeout("T-TIMEOUT", "Provider timeout"));
+        ElectronicDocument failed = documentService.send(doc.id());
+        String unsafeCode = "CODE token=secret vault://billing/prod/provider C:\\certs\\real.pfx " + "x".repeat(120);
+        String unsafeCorrelationId = "CORR\n password=hidden file:/tmp/cert.pem <xml>payload</xml>";
+        String unsafeMessage = "Accepted token=super-secret vault://billing/prod/provider C:\\certs\\real.pfx <xml>payload</xml>";
+        stubProvider.nextResult(new ProviderSendResult(
+                ElectronicDocumentStatus.ACCEPTED,
+                "T-RETRY token=hidden",
+                unsafeMessage,
+                ProviderSendStatus.ACCEPTED,
+                unsafeCode,
+                unsafeCorrelationId,
+                null,
+                false,
+                false,
+                false,
+                false
+        ));
+
+        ElectronicDocument retried = documentService.retrySend(failed.id());
+
+        ElectronicDocumentAttempt retryAttempt = attemptRepository.findByElectronicDocumentId(doc.id()).get(1);
+        assertEquals(ElectronicDocumentStatus.ACCEPTED, retried.status());
+        assertSanitizedProviderText(retried.providerMessage());
+        assertSanitizedProviderText(retryAttempt.providerMessage());
+        assertSanitizedProviderText(retryAttempt.providerTicket());
+        assertSanitizedProviderText(retryAttempt.providerCode());
+        assertSanitizedProviderText(retryAttempt.providerCorrelationId());
+        assertEquals(64, retryAttempt.requestHash().length());
+        assertEquals(64, retryAttempt.responseHash().length());
+    }
+
+    @Test
+    void shouldKeepManualRetryAttemptsSimulatedInBeta() {
+        profileService.create(new CreateCompanyBillingProfileCommand(
+                "20999999995",
+                "INKTOY BETA RETRY SAC",
+                "AV. BETA 200",
+                BillingEnvironment.BETA,
+                null,
+                null
+        ));
+        BillingSeries betaSeries = seriesService.create(new CreateBillingSeriesCommand(
+                ElectronicDocumentType.RECEIPT,
+                "B302",
+                1L,
+                BillingEnvironment.BETA
+        ));
+        saleReadPort.sales.put(6L, completedSale(6L));
+        ElectronicDocument doc = documentService.createFromSale(6L, new CreateElectronicDocumentFromSaleCommand(
+                ElectronicDocumentType.RECEIPT,
+                betaSeries.id(),
+                null,
+                null
+        ));
+        documentService.generateXml(doc.id());
+        documentService.sign(doc.id());
+        stubProvider.nextResult(ProviderSendResult.unavailable("T-BETA-ERR", "Provider unavailable"));
+        ElectronicDocument failed = documentService.send(doc.id());
+        stubProvider.nextResult(ProviderSendResult.accepted("T-BETA-RETRY", "Accepted after retry"));
+
+        documentService.retrySend(failed.id());
+
+        List<ElectronicDocumentAttempt> attempts = attemptRepository.findByElectronicDocumentId(doc.id());
+        assertTrue(attempts.get(0).simulated());
+        assertTrue(attempts.get(1).simulated());
+    }
+
+    @Test
+    void shouldKeepProdManualRetryBlockedWithoutProductionReadiness() {
+        BillingSeries prodSeries = createProdReceiptSeries("20999999996", "B105");
+        ElectronicDocument error = saveDocumentForSeries(11L, prodSeries, ElectronicDocumentStatus.ERROR, Instant.now(), Instant.now(), Instant.now());
+        saveSignedXml(error, "<xml>signed-prod</xml>");
+        saveSendAttempt(error, 1, FiscalAttemptResult.FAILED, FiscalErrorCategory.PROVIDER_TIMEOUT, true, "TIMEOUT");
+
+        BillingConflictException ex = assertThrows(BillingConflictException.class, () -> documentService.retrySend(error.id()));
+
+        List<ElectronicDocumentAttempt> attempts = attemptRepository.findByElectronicDocumentId(error.id());
+        assertEquals(BillingRuntimeSafetyPolicy.PRODUCTION_NOT_CONFIGURED_MESSAGE, ex.getMessage());
+        assertEquals(0, stubProvider.sendCalls());
+        assertEquals(ElectronicDocumentStatus.ERROR, documentRepository.findById(error.id()).orElseThrow().status());
+        assertEquals(FiscalAttemptResult.BLOCKED, attempts.get(1).result());
+        assertEquals(FiscalErrorCategory.CONFIGURATION_ERROR, attempts.get(1).errorCategory());
+    }
+
+    @Test
+    void shouldNotRetryAutomaticallyAfterRecoverableFailure() {
+        ElectronicDocument doc = createSignedReceiptForSale(1L);
+        stubProvider.nextResult(ProviderSendResult.timeout("T-TIMEOUT", "Provider timeout"));
+
+        ElectronicDocument failed = documentService.send(doc.id());
+
+        List<ElectronicDocumentAttempt> attempts = attemptRepository.findByElectronicDocumentId(doc.id());
+        assertEquals(ElectronicDocumentStatus.ERROR, failed.status());
+        assertEquals(1, stubProvider.sendCalls());
+        assertEquals(1, attempts.size());
+        assertEquals(FiscalAttemptResult.FAILED, attempts.get(0).result());
+        assertTrue(attempts.get(0).recoverable());
+    }
+
+    @Test
     void shouldSanitizeProviderMessageBeforeSavingAttemptAndDocument() {
         ElectronicDocument doc = createReceiptForSale(1L);
         documentService.generateXml(doc.id());
@@ -1620,6 +1916,108 @@ class BillingApplicationServiceTest {
         ElectronicDocument doc = createReceiptForSale(saleId);
         documentService.generateXml(doc.id());
         return documentService.sign(doc.id());
+    }
+
+    private ElectronicDocument retryRecoverableFailure(ProviderSendResult firstResult) {
+        ElectronicDocument doc = createSignedReceiptForSale(1L);
+        stubProvider.nextResult(firstResult);
+        ElectronicDocument failed = documentService.send(doc.id());
+        stubProvider.nextResult(ProviderSendResult.accepted("T-RETRY", "Accepted after retry"));
+        return documentService.retrySend(failed.id());
+    }
+
+    private ElectronicDocument createErroredSignedReceiptWithLastAttempt(FiscalErrorCategory category, boolean recoverable) {
+        ElectronicDocument signed = createSignedReceiptForSale(1L);
+        ElectronicDocument error = saveDocumentWithStatus(signed, ElectronicDocumentStatus.ERROR);
+        saveSendAttempt(error, 1, FiscalAttemptResult.FAILED, category, recoverable, providerStatusFor(category));
+        return error;
+    }
+
+    private ElectronicDocument saveDocumentWithStatus(ElectronicDocument current, ElectronicDocumentStatus status) {
+        return documentRepository.save(new ElectronicDocument(
+                current.id(),
+                current.saleId(),
+                current.billingSeriesId(),
+                current.documentType(),
+                status,
+                current.environment(),
+                current.series(),
+                current.number(),
+                current.fullNumber(),
+                current.customerName(),
+                current.customerDocument(),
+                current.currencyCode(),
+                current.subtotalAmount(),
+                current.taxAmount(),
+                current.totalAmount(),
+                current.xmlGeneratedAt(),
+                current.signedAt(),
+                status == ElectronicDocumentStatus.ERROR || status == ElectronicDocumentStatus.SENT ? Instant.now() : current.sentAt(),
+                current.providerTicket(),
+                current.providerMessage(),
+                current.createdAt(),
+                current.updatedAt(),
+                current.createdBy(),
+                current.updatedBy()
+        ));
+    }
+
+    private ElectronicDocumentAttempt saveSendAttempt(
+            ElectronicDocument document,
+            int attemptNumber,
+            FiscalAttemptResult result,
+            FiscalErrorCategory category,
+            boolean recoverable,
+            String providerStatus
+    ) {
+        Instant now = Instant.now();
+        return attemptRepository.save(new ElectronicDocumentAttempt(
+                null,
+                document.id(),
+                FiscalOperation.SEND,
+                attemptNumber,
+                result,
+                category,
+                recoverable,
+                providerStatus,
+                null,
+                "Seeded attempt",
+                null,
+                null,
+                "a".repeat(64),
+                "b".repeat(64),
+                now,
+                now,
+                "tester",
+                null,
+                document.environment() == BillingEnvironment.LOCAL || document.environment() == BillingEnvironment.BETA
+        ));
+    }
+
+    private void saveSignedXml(ElectronicDocument document, String content) {
+        xmlRepository.save(new BillingXmlFile(
+                null,
+                document.id(),
+                BillingXmlFileType.SIGNED,
+                document.fullNumber() + "-signed.xml",
+                content,
+                "application/xml",
+                null,
+                "tester"
+        ));
+    }
+
+    private String providerStatusFor(FiscalErrorCategory category) {
+        return switch (category) {
+            case PROVIDER_TIMEOUT -> "TIMEOUT";
+            case PROVIDER_UNAVAILABLE -> "UNAVAILABLE";
+            case COMMUNICATION_ERROR -> "COMMUNICATION_ERROR";
+            case CONFIGURATION_ERROR -> "CONFIGURATION_ERROR";
+            case PROVIDER_REJECTED -> "REJECTED";
+            case PROVIDER_OBSERVED -> "OBSERVED";
+            case PROVIDER_PENDING -> "PENDING";
+            default -> "ERROR";
+        };
     }
 
     private void assertSanitizedProviderText(String value) {
@@ -1964,6 +2362,13 @@ class BillingApplicationServiceTest {
         public List<ElectronicDocumentAttempt> findByElectronicDocumentId(Long electronicDocumentId) {
             return byDocument.getOrDefault(electronicDocumentId, List.of());
         }
+
+        @Override
+        public Optional<ElectronicDocumentAttempt> findLatestByElectronicDocumentIdAndOperation(Long electronicDocumentId, FiscalOperation operation) {
+            return byDocument.getOrDefault(electronicDocumentId, List.of()).stream()
+                    .filter(attempt -> attempt.operation() == operation)
+                    .max((left, right) -> Integer.compare(left.attemptNumber(), right.attemptNumber()));
+        }
     }
 
     static class InMemoryElectronicDocumentItemRepository implements ElectronicDocumentItemRepositoryPort {
@@ -2054,16 +2459,30 @@ class BillingApplicationServiceTest {
     }
 
     static class StubXmlGenerator implements UblXmlGeneratorPort {
+        private int generateCalls;
+
         @Override
         public String generate(ElectronicDocument document, CompanyBillingProfile profile, List<ElectronicDocumentItem> items) {
+            generateCalls++;
             return "<xml>" + document.fullNumber() + "</xml>";
+        }
+
+        int generateCalls() {
+            return generateCalls;
         }
     }
 
     static class StubXmlSigner implements XmlSignerPort {
+        private int signCalls;
+
         @Override
         public String signXml(String xml, CompanyBillingProfile profile) {
+            signCalls++;
             return xml + "-SIGNED";
+        }
+
+        int signCalls() {
+            return signCalls;
         }
     }
 

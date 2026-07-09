@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface ElectronicDocumentAttemptJpaRepository extends JpaRepository<ElectronicDocumentAttemptEntity, Long> {
 
@@ -21,4 +22,9 @@ public interface ElectronicDocumentAttemptJpaRepository extends JpaRepository<El
     );
 
     List<ElectronicDocumentAttemptEntity> findByElectronicDocument_IdOrderByAttemptNumberAsc(Long electronicDocumentId);
+
+    Optional<ElectronicDocumentAttemptEntity> findFirstByElectronicDocument_IdAndOperationOrderByAttemptNumberDesc(
+            Long electronicDocumentId,
+            FiscalOperation operation
+    );
 }
