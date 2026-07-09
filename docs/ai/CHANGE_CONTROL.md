@@ -121,6 +121,15 @@ Estandarizar cambios tecnicos para reducir regresiones y mantener trazabilidad e
 - Seguridad operativa: no se tocaron `.env`, secretos, tokens, claves, certificados reales, backups ni dumps; no se guardaron payloads completos.
 - Validacion: `./mvnw -Dtest=BillingApplicationServiceTest test` con 111 tests, 0 failures, BUILD SUCCESS; `./mvnw test` backend completo con 553 tests, 0 failures, BUILD SUCCESS.
 
+### Cierre Fiscal evidence readiness/API draft update
+
+- Tipo: documentacion fiscal/API/QA only.
+- Alcance implementado: cierre documental de contrato futuro `evidenceSummary` metadata-only en `docs/api/BILLING_FISCAL_READINESS_API_DRAFT.md`; alineacion de `docs/billing/FISCAL_FRONTEND_READINESS_CONTRACT.md` al resumen seguro de evidencias; ajuste de `docs/billing/FISCAL_EVIDENCE_METADATA_MODEL.md` para distinguir 3C-2 vs 3C-3; actualizacion de QA y estado global.
+- Contrato futuro: `evidenceSummary` propone banderas/resumen seguros (`hasSignedXml`, `hasProviderMetadata`, `evidenceCount`, `lastEvidenceAt`, `evidenceTypes`, `lastProviderStatus`, `lastProviderTicketMasked`, `lastProviderCorrelationIdMasked`, `simulated`, `storageProviderSummary`, `availableActions`, `operatorSeverity`, `displayMessage`) sin XML/CDR/PDF/QR completos, sin storage keys sensibles, sin payloads, sin tokens, sin headers, sin certificados ni rutas locales.
+- Exclusiones confirmadas: no se creo endpoint REST, no se toco backend funcional, no se tocaron tests, no se toco frontend, no se agrego storage real, no se implemento PSE/OSE/SUNAT real, no se habilito retry automatico, scheduler, backoff ni polling, no se inicio 3B-3B, no se hizo commit ni push.
+- Seguridad operativa: no se tocaron `.env`, secretos, tokens, claves, certificados reales, backups ni dumps.
+- Validacion: revisiones read-only del backend de billing y de los documentos afectados; sin ejecucion de pruebas funcionales porque 3C-3 es documental-only.
+
 ## Control ecommerce SEO-first
 
 ### Cierre Fase 0 documental ecommerce

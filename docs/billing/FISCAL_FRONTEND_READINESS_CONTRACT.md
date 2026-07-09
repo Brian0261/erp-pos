@@ -70,9 +70,13 @@ Definir el contrato documental de readiness para una futura UI fiscal y para una
 ## Evidence Metadata Futura
 
 - El backend ya registra metadata interna de `SIGNED_XML` y `PROVIDER_RESPONSE_METADATA` sin payloads.
-- La UI futura puede mostrar resumen de evidencia registrada, por ejemplo XML firmado registrado, CDR pendiente o PDF no disponible.
+- La UI futura puede mostrar si existe XML firmado y si existe metadata provider, sin descargar nada.
+- La UI futura puede mostrar si el flujo está simulado en LOCAL/BETA.
 - La UI no debe descargar ni renderizar evidencia desde readiness.
-- La UI no debe mostrar storage keys tecnicos, rutas locales, secret refs ni payloads.
+- La UI no debe mostrar storage keys tecnicos, rutas locales, secret refs, tokens, certificados ni payloads.
+- La UI no debe presentar CDR/PDF/QR como disponibles si solo existe metadata futura.
+- La UI no debe habilitar retry desde frontend todavía.
+- La UI no debe inferir elegibilidad de retry solo por el estado visual.
 - El detalle de evidencias debe venir de un contrato backend futuro y sanitizado.
 - En la fase actual no existe endpoint REST de evidencias ni cambios frontend.
 

@@ -4,12 +4,38 @@
 
 Draft only. This document does not represent an implementation.
 Backend 3C-2 already has internal evidence metadata read/write, but no REST endpoint exposes it yet.
+3C-3 closes the future evidence readiness contract only; it does not create an endpoint.
 
 ## Proposed Endpoints
 
 - `GET /api/v1/billing/documents/{id}/fiscal-readiness`
 - `GET /api/v1/billing/documents/{id}/attempts`
 - `POST /api/v1/billing/documents/{id}/retry-send` (deferred, not implemented in 3B-4)
+
+## Future `evidenceSummary`
+
+This is a future metadata-only contract. It is not implemented as REST yet.
+
+```json
+{
+  "documentId": 123,
+  "hasSignedXml": true,
+  "hasProviderMetadata": true,
+  "evidenceCount": 2,
+  "lastEvidenceAt": "2026-07-09T00:00:00Z",
+  "evidenceTypes": ["SIGNED_XML", "PROVIDER_RESPONSE_METADATA"],
+  "lastProviderStatus": "ACCEPTED",
+  "lastProviderTicketMasked": "T-ACC***",
+  "lastProviderCorrelationIdMasked": "CORR***",
+  "simulated": true,
+  "storageProviderSummary": "DB_LEGACY + NONE",
+  "availableActions": ["VIEW_HISTORY", "VIEW_ATTEMPTS"],
+  "operatorSeverity": "INFO",
+  "displayMessage": "Evidencia fiscal registrada sin exponer payloads."
+}
+```
+
+`storageProviderSummary` must not reveal real paths, internal keys, raw storage identifiers, tokens, headers, certificates or provider payloads.
 
 ## Minimal `fiscal-readiness` Response
 
@@ -76,10 +102,19 @@ Backend 3C-2 already has internal evidence metadata read/write, but no REST endp
 
 ## `evidenceSummary` Structure
 
-- `signedXmlRegistered`
-- `cdrRegistered`
-- `pdfRegistered`
-- `latestEvidenceAt`
+- `hasSignedXml`
+- `hasProviderMetadata`
+- `evidenceCount`
+- `lastEvidenceAt`
+- `evidenceTypes`
+- `lastProviderStatus`
+- `lastProviderTicketMasked`
+- `lastProviderCorrelationIdMasked`
+- `simulated`
+- `storageProviderSummary`
+- `availableActions`
+- `operatorSeverity`
+- `displayMessage`
 
 `evidenceSummary` must expose metadata only. It must not expose XML, CDR, PDF, QR, storage secrets, headers, tokens, local paths or provider payloads.
 

@@ -19,6 +19,7 @@
 - [ ] `docs/qa/FISCAL_FRONTEND_READINESS_CONTRACT_QA.md` creado.
 - [ ] `docs/ai/CURRENT_STATUS.md` actualizado.
 - [ ] `docs/ai/CHANGE_CONTROL.md` actualizado.
+- [ ] `docs/billing/FISCAL_EVIDENCE_METADATA_MODEL.md` alineado a evidencia interna 3C-2 y readiness 3C-3.
 
 ## Checklist de Exclusiones
 
@@ -42,6 +43,15 @@
 - [ ] `lastAttempt` sanitizado definido.
 - [ ] Endpoint read-only draft definido.
 - [ ] Endpoint `retry-send` diferido definido.
+- [ ] `evidenceSummary` definido como contrato futuro metadata-only.
+
+## Cierre 3C-3
+
+- PASS documental/readiness-only.
+- Se cerró el contrato futuro `evidenceSummary` sin crear endpoint REST.
+- Se confirmo que la UI futura solo debe mostrar metadata segura resumida.
+- Se confirmo que no existe descargas, storage real ni payloads completos.
+- Se confirmo que no se modifico backend funcional ni frontend.
 
 ## Limitaciones Pendientes
 

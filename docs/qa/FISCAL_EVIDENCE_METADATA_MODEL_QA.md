@@ -63,8 +63,17 @@
 
 ## Limitaciones Pendientes
 
-- 3C-3: readiness/API para evidence summary, sin payloads.
+- 3C-3 cerrada documentalmente: readiness/API para evidence summary, sin payloads.
 - 3C-4: storage real seguro, solo con decision explicita.
 - Endpoint REST diferido.
 - Frontend fiscal UX diferido.
 - PSE/OSE/SUNAT real diferido.
+
+## Cierre 3C-3
+
+- Se revisaron `docs/api/BILLING_FISCAL_READINESS_API_DRAFT.md`, `docs/billing/FISCAL_FRONTEND_READINESS_CONTRACT.md`, `docs/billing/FISCAL_EVIDENCE_METADATA_MODEL.md`, `docs/qa/FISCAL_EVIDENCE_METADATA_MODEL_QA.md`, `docs/qa/FISCAL_FRONTEND_READINESS_CONTRACT_QA.md`, `docs/ai/CURRENT_STATUS.md` y `docs/ai/CHANGE_CONTROL.md`.
+- Se actualizo el draft con `evidenceSummary` futuro metadata-only.
+- Se alineo el contrato de frontend readiness a banderas de evidencia seguras.
+- Se documento que `SIGNED_XML` y `PROVIDER_RESPONSE_METADATA` ya existen como metadata interna, pero el resumen API sigue siendo futuro.
+- Quedo fuera: endpoint REST, controller, DTO operativo, frontend, storage real, payloads completos, descargas y cualquier exposicion de secretos o rutas.
+- Confirmacion: no se modifico codigo funcional, no se toco backend, no se tocaron tests.

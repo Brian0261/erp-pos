@@ -44,6 +44,15 @@ Fase 3C-1 crea la base DB/backend para registrar metadata de evidencias fiscales
 - No existe endpoint REST para evidencias en 3C-2.
 - No se copia XML, CDR, PDF, QR ni request/response completo a `electronic_document_evidence`.
 
+## Readiness / API Draft 3C-3
+
+- 3C-3 cierra solo el contrato documental para una futura consulta de resumen de evidencias.
+- El draft propone `evidenceSummary` metadata-only con banderas y resúmenes seguros.
+- El contrato futuro no debe revelar XML/CDR/PDF/QR completos, storage keys sensibles, payloads crudos, tokens, headers, certificados ni rutas locales.
+- El resumen debe ser apto para UI/readiness y para una futura API read-only separada.
+- `storageProviderSummary` debe ser un agregado seguro, nunca una ruta o clave real.
+- 3C-3 no implementa endpoint REST, controller, DTO operativo ni storage real.
+
 ## Metadata Registrada por Flujo
 
 ### `SIGNED_XML`
@@ -129,6 +138,7 @@ La metadata rechaza:
 - `sign()`, `send()` y `retrySend()` conservan su contrato fiscal y reglas de estado; solo agregan side-effect interno de metadata segura.
 - No crea endpoint REST.
 - No toca frontend.
+- 3C-3 solo ajusta contrato documental para lectura futura.
 
 ## Fuera de Alcance
 
