@@ -59,6 +59,7 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
     private final ElectronicDocumentLifecyclePolicy lifecyclePolicy;
     private final FiscalAttemptAuditService attemptAuditService;
     private final FiscalAuditSanitizer fiscalAuditSanitizer;
+    private final FiscalProviderResultClassifier providerResultClassifier;
     private final AuditUserProvider auditUserProvider;
 
     public ElectronicDocumentApplicationService(
@@ -76,6 +77,7 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
             ElectronicDocumentLifecyclePolicy lifecyclePolicy,
             FiscalAttemptAuditService attemptAuditService,
             FiscalAuditSanitizer fiscalAuditSanitizer,
+            FiscalProviderResultClassifier providerResultClassifier,
             AuditUserProvider auditUserProvider
     ) {
         this.documentRepositoryPort = documentRepositoryPort;
@@ -92,6 +94,7 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
         this.lifecyclePolicy = lifecyclePolicy;
         this.attemptAuditService = attemptAuditService;
         this.fiscalAuditSanitizer = fiscalAuditSanitizer;
+        this.providerResultClassifier = providerResultClassifier;
         this.auditUserProvider = auditUserProvider;
     }
 
@@ -295,17 +298,19 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
         try {
             result = billingProviderPort.send(sent, signed.content());
         } catch (RuntimeException ex) {
-            FiscalErrorCategory errorCategory = classifyProviderException(ex);
-            attemptAuditService.failSendAttempt(attempt, errorCategory, isRecoverable(errorCategory), ex.getMessage());
+            attemptAuditService.failSendAttempt(attempt, providerResultClassifier.classifyException(ex), ex.getMessage());
             throw ex;
         }
 
-        ElectronicDocumentStatus finalStatus = result == null || result.status() == null ? ElectronicDocumentStatus.ERROR : result.status();
+        FiscalProviderResultClassification classification = providerResultClassifier.classify(result);
+        ElectronicDocumentStatus finalStatus = classification.finalDocumentStatus();
         try {
-            lifecyclePolicy.assertTransitionAllowed(sent.status(), finalStatus);
+            if (finalStatus != ElectronicDocumentStatus.SENT) {
+                lifecyclePolicy.assertTransitionAllowed(sent.status(), finalStatus);
+            }
             runtimeSafetyPolicy.assertCanAcceptProviderResult(sent.environment(), finalStatus);
         } catch (RuntimeException ex) {
-            attemptAuditService.failSendAttempt(attempt, classifyPostProviderFailure(ex), false, ex.getMessage());
+            attemptAuditService.failSendAttempt(attempt, providerResultClassifier.failure(classifyPostProviderFailure(ex)), ex.getMessage());
             throw ex;
         }
 
@@ -339,8 +344,10 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
                 auditUserProvider.currentUsername()
         );
         ElectronicDocument saved = documentRepositoryPort.save(finalized);
-        addHistory(saved.id(), ElectronicDocumentStatus.SENT, finalStatus, providerMessage);
-        attemptAuditService.finishSendAttempt(attempt, result, finalStatus);
+        if (finalStatus != ElectronicDocumentStatus.SENT) {
+            addHistory(saved.id(), ElectronicDocumentStatus.SENT, finalStatus, providerMessage);
+        }
+        attemptAuditService.finishSendAttempt(attempt, result, classification);
         return saved;
     }
 
@@ -439,32 +446,11 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
                 });
     }
 
-    private FiscalErrorCategory classifyProviderException(RuntimeException ex) {
-        String description = ((ex.getClass().getSimpleName() + " " + ex.getMessage()).toLowerCase());
-        if (description.contains("timeout") || description.contains("timed out")) {
-            return FiscalErrorCategory.PROVIDER_TIMEOUT;
-        }
-        if (description.contains("unavailable")
-                || description.contains("connection")
-                || description.contains("connect")
-                || description.contains("refused")
-                || description.contains("socket")) {
-            return FiscalErrorCategory.PROVIDER_UNAVAILABLE;
-        }
-        return FiscalErrorCategory.COMMUNICATION_ERROR;
-    }
-
     private FiscalErrorCategory classifyPostProviderFailure(RuntimeException ex) {
         if (ex.getMessage() != null && ex.getMessage().contains(BillingRuntimeSafetyPolicy.PRODUCTION_NOT_CONFIGURED_MESSAGE)) {
             return FiscalErrorCategory.CONFIGURATION_ERROR;
         }
         return FiscalErrorCategory.INTERNAL_ERROR;
-    }
-
-    private boolean isRecoverable(FiscalErrorCategory errorCategory) {
-        return errorCategory == FiscalErrorCategory.PROVIDER_TIMEOUT
-                || errorCategory == FiscalErrorCategory.PROVIDER_UNAVAILABLE
-                || errorCategory == FiscalErrorCategory.COMMUNICATION_ERROR;
     }
 
     private String currentTraceId() {

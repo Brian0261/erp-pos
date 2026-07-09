@@ -69,6 +69,17 @@ Estandarizar cambios tecnicos para reducir regresiones y mantener trazabilidad e
 - Seguridad operativa: no se tocaron `.env`, secretos, tokens, claves, certificados reales, backups ni dumps; no se leyeron archivos de certificados ni passwords reales.
 - Validacion: `./mvnw -Dtest=BillingApplicationServiceTest test` con 72 tests, 0 failures, BUILD SUCCESS; `./mvnw test` backend completo con 513 tests, 0 failures, BUILD SUCCESS.
 
+### Cierre Fiscal error taxonomy + provider response mapping
+
+- Tipo: hardening backend de taxonomia fiscal interna y mapping de respuestas de provider.
+- Alcance implementado: `ProviderSendResult` mantiene constructor legacy `status/ticket/message` y agrega modelo enriquecido con `ProviderSendStatus`, `providerCode`, `providerCorrelationId`, `FiscalErrorCategory`, `recoverable`, `observed`, `pending` y `simulated`; se agrego `FiscalProviderResultClassifier` y `FiscalProviderResultClassification` como mapping central.
+- Mapping fiscal: `ACCEPTED` -> attempt `SUCCESS`, documento `ACCEPTED`; `OBSERVED` -> attempt `SUCCESS`, documento `ACCEPTED`, categoria `PROVIDER_OBSERVED`; `REJECTED` -> attempt `FAILED`, documento `REJECTED`, categoria `PROVIDER_REJECTED`; `PENDING` -> attempt `PENDING`, documento queda `SENT` sin transicion final ni reenvio; `TIMEOUT`, `UNAVAILABLE` y `COMMUNICATION_ERROR` -> attempt `FAILED`, documento `ERROR`, categorias recuperables; `CONFIGURATION_ERROR` -> attempt `FAILED`, documento `ERROR`, no recuperable.
+- Integracion SEND: `ElectronicDocumentApplicationService` usa el clasificador para finalizar attempts, guardar provider status/code/message/ticket/correlation id sanitizados y preservar el bloqueo de reenvio; no usa providerMessage crudo para decisiones criticas cuando existe status/categoria explicita.
+- Politica: no hay retry automatico, scheduler, backoff, polling ni consulta real de estado; `PENDING` queda modelado solo como preparacion interna y no activa reenvio.
+- Exclusiones confirmadas: no se implemento PSE/OSE real, SUNAT directo, firma digital real, XML UBL SUNAT completo, CDR, PDF/ticket fiscal, QR, notas, comunicacion de baja, produccion real ni secret manager real.
+- Seguridad operativa: no se tocaron `.env`, secretos, tokens, claves, certificados reales, backups ni dumps; no se leyeron archivos de certificados ni passwords reales.
+- Validacion: `./mvnw -Dtest=BillingApplicationServiceTest test` con 79 tests, 0 failures, BUILD SUCCESS; `./mvnw test` backend completo con 520 tests, 0 failures, BUILD SUCCESS.
+
 ## Control ecommerce SEO-first
 
 ### Cierre Fase 0 documental ecommerce

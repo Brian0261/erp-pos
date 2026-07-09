@@ -10,6 +10,7 @@ import com.erppos.backend.erp.billing.application.service.ElectronicDocumentAppl
 import com.erppos.backend.erp.billing.application.service.ElectronicDocumentLifecyclePolicy;
 import com.erppos.backend.erp.billing.application.service.FiscalAttemptAuditService;
 import com.erppos.backend.erp.billing.application.service.FiscalAuditSanitizer;
+import com.erppos.backend.erp.billing.application.service.FiscalProviderResultClassifier;
 import com.erppos.backend.erp.billing.application.usecase.CreateBillingSeriesCommand;
 import com.erppos.backend.erp.billing.application.usecase.CreateCompanyBillingProfileCommand;
 import com.erppos.backend.erp.billing.application.usecase.CreateElectronicDocumentFromSaleCommand;
@@ -37,6 +38,7 @@ import com.erppos.backend.erp.billing.domain.model.FiscalOperation;
 import com.erppos.backend.erp.billing.domain.model.FiscalSecretResolution;
 import com.erppos.backend.erp.billing.domain.model.FiscalSecretType;
 import com.erppos.backend.erp.billing.domain.model.ProviderSendResult;
+import com.erppos.backend.erp.billing.domain.model.ProviderSendStatus;
 import com.erppos.backend.erp.billing.domain.port.BillingSaleReadPort;
 import com.erppos.backend.erp.billing.domain.port.BillingSeriesRepositoryPort;
 import com.erppos.backend.erp.billing.domain.port.BillingXmlFileRepositoryPort;
@@ -88,6 +90,7 @@ class BillingApplicationServiceTest {
     private ElectronicDocumentLifecyclePolicy lifecyclePolicy;
     private FiscalAuditSanitizer fiscalAuditSanitizer;
     private FiscalAttemptAuditService attemptAuditService;
+    private FiscalProviderResultClassifier providerResultClassifier;
 
     private CompanyBillingProfileApplicationService profileService;
     private BillingSeriesApplicationService seriesService;
@@ -111,6 +114,7 @@ class BillingApplicationServiceTest {
         lifecyclePolicy = new ElectronicDocumentLifecyclePolicy();
         fiscalAuditSanitizer = new FiscalAuditSanitizer();
         attemptAuditService = new FiscalAttemptAuditService(attemptRepository, fiscalAuditSanitizer);
+        providerResultClassifier = new FiscalProviderResultClassifier();
 
         AuditUserProvider auditUserProvider = new AuditUserProvider();
         profileService = new CompanyBillingProfileApplicationService(profileRepository, auditUserProvider);
@@ -130,6 +134,7 @@ class BillingApplicationServiceTest {
                 lifecyclePolicy,
                 attemptAuditService,
                 fiscalAuditSanitizer,
+                providerResultClassifier,
                 auditUserProvider
         );
 
@@ -1206,6 +1211,105 @@ class BillingApplicationServiceTest {
     }
 
     @Test
+    void shouldClassifyTimeoutProviderResultWithoutRetry() {
+        ElectronicDocument doc = createSignedReceiptForSale(1L);
+        stubProvider.nextResult(ProviderSendResult.timeout("T-TIMEOUT", "Provider timeout"));
+
+        ElectronicDocument sent = documentService.send(doc.id());
+
+        ElectronicDocumentAttempt attempt = attemptRepository.findByElectronicDocumentId(doc.id()).get(0);
+        assertEquals(ElectronicDocumentStatus.ERROR, sent.status());
+        assertEquals(1, stubProvider.sendCalls());
+        assertEquals(FiscalAttemptResult.FAILED, attempt.result());
+        assertEquals(FiscalErrorCategory.PROVIDER_TIMEOUT, attempt.errorCategory());
+        assertTrue(attempt.recoverable());
+        assertEquals("TIMEOUT", attempt.providerStatus());
+    }
+
+    @Test
+    void shouldClassifyUnavailableProviderResultWithoutRetry() {
+        ElectronicDocument doc = createSignedReceiptForSale(1L);
+        stubProvider.nextResult(ProviderSendResult.unavailable("T-UNAVAILABLE", "Provider unavailable"));
+
+        ElectronicDocument sent = documentService.send(doc.id());
+
+        ElectronicDocumentAttempt attempt = attemptRepository.findByElectronicDocumentId(doc.id()).get(0);
+        assertEquals(ElectronicDocumentStatus.ERROR, sent.status());
+        assertEquals(1, stubProvider.sendCalls());
+        assertEquals(FiscalAttemptResult.FAILED, attempt.result());
+        assertEquals(FiscalErrorCategory.PROVIDER_UNAVAILABLE, attempt.errorCategory());
+        assertTrue(attempt.recoverable());
+        assertEquals("UNAVAILABLE", attempt.providerStatus());
+    }
+
+    @Test
+    void shouldClassifyCommunicationProviderResultWithoutRetry() {
+        ElectronicDocument doc = createSignedReceiptForSale(1L);
+        stubProvider.nextResult(ProviderSendResult.communicationError("T-COMM", "Communication error"));
+
+        ElectronicDocument sent = documentService.send(doc.id());
+
+        ElectronicDocumentAttempt attempt = attemptRepository.findByElectronicDocumentId(doc.id()).get(0);
+        assertEquals(ElectronicDocumentStatus.ERROR, sent.status());
+        assertEquals(1, stubProvider.sendCalls());
+        assertEquals(FiscalAttemptResult.FAILED, attempt.result());
+        assertEquals(FiscalErrorCategory.COMMUNICATION_ERROR, attempt.errorCategory());
+        assertTrue(attempt.recoverable());
+        assertEquals("COMMUNICATION_ERROR", attempt.providerStatus());
+    }
+
+    @Test
+    void shouldClassifyConfigurationProviderResultWithoutRetry() {
+        ElectronicDocument doc = createSignedReceiptForSale(1L);
+        stubProvider.nextResult(ProviderSendResult.configurationError("T-CONFIG", "Configuration error"));
+
+        ElectronicDocument sent = documentService.send(doc.id());
+
+        ElectronicDocumentAttempt attempt = attemptRepository.findByElectronicDocumentId(doc.id()).get(0);
+        assertEquals(ElectronicDocumentStatus.ERROR, sent.status());
+        assertEquals(1, stubProvider.sendCalls());
+        assertEquals(FiscalAttemptResult.FAILED, attempt.result());
+        assertEquals(FiscalErrorCategory.CONFIGURATION_ERROR, attempt.errorCategory());
+        assertFalse(attempt.recoverable());
+        assertEquals("CONFIGURATION_ERROR", attempt.providerStatus());
+    }
+
+    @Test
+    void shouldClassifyObservedProviderResultAsAcceptedWithObservation() {
+        ElectronicDocument doc = createSignedReceiptForSale(1L);
+        stubProvider.nextResult(ProviderSendResult.observed("T-OBS", "Accepted with observations"));
+
+        ElectronicDocument sent = documentService.send(doc.id());
+
+        ElectronicDocumentAttempt attempt = attemptRepository.findByElectronicDocumentId(doc.id()).get(0);
+        assertEquals(ElectronicDocumentStatus.ACCEPTED, sent.status());
+        assertEquals(FiscalAttemptResult.SUCCESS, attempt.result());
+        assertEquals(FiscalErrorCategory.PROVIDER_OBSERVED, attempt.errorCategory());
+        assertFalse(attempt.recoverable());
+        assertEquals("OBSERVED", attempt.providerStatus());
+    }
+
+    @Test
+    void shouldClassifyPendingProviderResultWithoutFinalTransitionOrRetry() {
+        ElectronicDocument doc = createSignedReceiptForSale(1L);
+        int historyBeforeSend = historyRepository.findByElectronicDocumentId(doc.id()).size();
+        stubProvider.nextResult(ProviderSendResult.pending("T-PENDING", "Provider pending"));
+
+        ElectronicDocument sent = documentService.send(doc.id());
+
+        List<ElectronicDocumentStatusHistory> history = historyRepository.findByElectronicDocumentId(doc.id());
+        ElectronicDocumentAttempt attempt = attemptRepository.findByElectronicDocumentId(doc.id()).get(0);
+        assertEquals(ElectronicDocumentStatus.SENT, sent.status());
+        assertEquals(1, stubProvider.sendCalls());
+        assertEquals(historyBeforeSend + 1, history.size());
+        assertEquals(ElectronicDocumentStatus.SENT, history.get(history.size() - 1).newStatus());
+        assertEquals(FiscalAttemptResult.PENDING, attempt.result());
+        assertEquals(FiscalErrorCategory.PROVIDER_PENDING, attempt.errorCategory());
+        assertFalse(attempt.recoverable());
+        assertEquals("PENDING", attempt.providerStatus());
+    }
+
+    @Test
     void shouldSanitizeProviderMessageBeforeSavingAttemptAndDocument() {
         ElectronicDocument doc = createReceiptForSale(1L);
         documentService.generateXml(doc.id());
@@ -1222,6 +1326,34 @@ class BillingApplicationServiceTest {
         assertSanitizedProviderText(attempt.providerTicket());
         assertTrue(attempt.providerMessage().length() <= 400);
         assertEquals(sent.providerMessage(), attempt.providerMessage());
+    }
+
+    @Test
+    void shouldSanitizeProviderCodeAndCorrelationIdBeforeSavingAttempt() {
+        ElectronicDocument doc = createSignedReceiptForSale(1L);
+        String unsafeCode = "CODE token=secret vault://billing/prod/provider C:\\certs\\real.pfx " + "x".repeat(120);
+        String unsafeCorrelationId = "CORR\n password=hidden file:/tmp/cert.pem <xml>payload</xml>";
+        stubProvider.nextResult(new ProviderSendResult(
+                ElectronicDocumentStatus.ACCEPTED,
+                "T-ACC",
+                "Accepted",
+                ProviderSendStatus.ACCEPTED,
+                unsafeCode,
+                unsafeCorrelationId,
+                null,
+                false,
+                false,
+                false,
+                false
+        ));
+
+        documentService.send(doc.id());
+
+        ElectronicDocumentAttempt attempt = attemptRepository.findByElectronicDocumentId(doc.id()).get(0);
+        assertSanitizedProviderText(attempt.providerCode());
+        assertSanitizedProviderText(attempt.providerCorrelationId());
+        assertTrue(attempt.providerCode().length() <= 80);
+        assertTrue(attempt.providerCorrelationId().length() <= 120);
     }
 
     @Test
@@ -1261,6 +1393,7 @@ class BillingApplicationServiceTest {
         assertEquals(FiscalAttemptResult.FAILED, attempt.result());
         assertEquals(FiscalErrorCategory.PROVIDER_TIMEOUT, attempt.errorCategory());
         assertTrue(attempt.recoverable());
+        assertEquals("TIMEOUT", attempt.providerStatus());
         assertSanitizedProviderText(attempt.providerMessage());
         assertEquals(1, stubProvider.sendCalls());
     }
@@ -1481,6 +1614,12 @@ class BillingApplicationServiceTest {
                 null,
                 null
         ));
+    }
+
+    private ElectronicDocument createSignedReceiptForSale(Long saleId) {
+        ElectronicDocument doc = createReceiptForSale(saleId);
+        documentService.generateXml(doc.id());
+        return documentService.sign(doc.id());
     }
 
     private void assertSanitizedProviderText(String value) {
@@ -1943,12 +2082,12 @@ class BillingApplicationServiceTest {
                 return nextResult;
             }
             if (document.customerName() != null && document.customerName().contains("ERROR")) {
-                return new ProviderSendResult(ElectronicDocumentStatus.ERROR, "T-ERR", "Provider temporary error");
+                return ProviderSendResult.unavailable("T-ERR", "Provider temporary error");
             }
             if (document.customerName() != null && document.customerName().contains("REJECT")) {
-                return new ProviderSendResult(ElectronicDocumentStatus.REJECTED, "T-REJ", "Rejected by mock provider");
+                return ProviderSendResult.rejected("T-REJ", "Rejected by mock provider");
             }
-            return new ProviderSendResult(ElectronicDocumentStatus.ACCEPTED, "T-ACC", "Accepted by mock provider");
+            return ProviderSendResult.accepted("T-ACC", "Accepted by mock provider");
         }
 
         int sendCalls() {
@@ -1979,7 +2118,7 @@ class BillingApplicationServiceTest {
     static class ProductionReadyProvider implements ElectronicBillingProviderPort {
         @Override
         public ProviderSendResult send(ElectronicDocument document, String signedXml) {
-            return new ProviderSendResult(ElectronicDocumentStatus.ACCEPTED, "T-PROD", "Accepted by production-ready stub");
+            return ProviderSendResult.accepted("T-PROD", "Accepted by production-ready stub");
         }
 
         @Override

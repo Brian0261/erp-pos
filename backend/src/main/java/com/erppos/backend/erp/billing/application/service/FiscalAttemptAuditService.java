@@ -99,42 +99,38 @@ public class FiscalAttemptAuditService {
     public ElectronicDocumentAttempt finishSendAttempt(
             ElectronicDocumentAttempt attempt,
             ProviderSendResult result,
-            ElectronicDocumentStatus finalStatus
+            FiscalProviderResultClassification classification
     ) {
-        FiscalAttemptResult attemptResult = finalStatus == ElectronicDocumentStatus.ACCEPTED
-                ? FiscalAttemptResult.SUCCESS
-                : FiscalAttemptResult.FAILED;
-        FiscalErrorCategory errorCategory = errorCategoryFor(finalStatus);
-        boolean recoverable = isRecoverable(errorCategory);
-        String providerStatus = finalStatus == null ? null : finalStatus.name();
+        String providerStatus = classification.providerStatus() == null ? null : classification.providerStatus().name();
         String providerTicket = result == null ? null : result.ticket();
         String providerMessage = result == null ? null : result.message();
+        String providerCode = result == null ? null : result.providerCode();
+        String providerCorrelationId = result == null ? null : result.providerCorrelationId();
         return attemptRepositoryPort.save(copy(
                 attempt,
-                attemptResult,
-                errorCategory,
-                recoverable,
+                classification.attemptResult(),
+                classification.errorCategory(),
+                classification.recoverable(),
                 providerStatus,
-                null,
+                providerCode,
                 providerMessage,
                 providerTicket,
-                null
+                providerCorrelationId
         ));
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public ElectronicDocumentAttempt failSendAttempt(
             ElectronicDocumentAttempt attempt,
-            FiscalErrorCategory errorCategory,
-            boolean recoverable,
+            FiscalProviderResultClassification classification,
             String message
     ) {
         return attemptRepositoryPort.save(copy(
                 attempt,
-                FiscalAttemptResult.FAILED,
-                errorCategory,
-                recoverable,
-                null,
+                classification.attemptResult(),
+                classification.errorCategory(),
+                classification.recoverable(),
+                classification.providerStatus() == null ? null : classification.providerStatus().name(),
                 null,
                 message,
                 null,
@@ -191,22 +187,6 @@ public class FiscalAttemptAuditService {
                 attempt.traceId(),
                 attempt.simulated()
         );
-    }
-
-    private FiscalErrorCategory errorCategoryFor(ElectronicDocumentStatus status) {
-        if (status == ElectronicDocumentStatus.REJECTED) {
-            return FiscalErrorCategory.PROVIDER_REJECTED;
-        }
-        if (status == ElectronicDocumentStatus.ERROR) {
-            return FiscalErrorCategory.PROVIDER_UNAVAILABLE;
-        }
-        return null;
-    }
-
-    private boolean isRecoverable(FiscalErrorCategory errorCategory) {
-        return errorCategory == FiscalErrorCategory.PROVIDER_TIMEOUT
-                || errorCategory == FiscalErrorCategory.PROVIDER_UNAVAILABLE
-                || errorCategory == FiscalErrorCategory.COMMUNICATION_ERROR;
     }
 
     private boolean isSimulated(BillingEnvironment environment) {
