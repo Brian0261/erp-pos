@@ -101,6 +101,15 @@ Estandarizar cambios tecnicos para reducir regresiones y mantener trazabilidad e
 - Exclusiones confirmadas: no se creo endpoint REST, no se toco controller, no se toco frontend, no se modificaron DTOs ni servicios, no se creo migracion, no se implemento retry automatico, scheduler, backoff, polling, PSE/OSE/SUNAT real, firma real, CDR, PDF/ticket fiscal, QR, notas ni produccion real.
 - Seguridad operativa: no se tocaron `.env`, secretos, tokens, claves, certificados reales, backups ni dumps; no se leyeron archivos de certificados ni passwords reales.
 
+### Cierre Fiscal evidence metadata DB foundation
+
+- Tipo: foundation backend/DB metadata-only para evidencias fiscales.
+- Alcance implementado: migracion V24 `electronic_document_evidence`; modelo `ElectronicDocumentEvidence`; enums de evidence type, storage provider y metadata status; puerto, entidad JPA, mapper y adapter de persistencia.
+- Seguridad: validaciones rechazan XML/CDR/PDF/QR crudos, base64 embebido, tokens, passwords, secret refs, rutas absolutas, certificados, claves privadas y hashes SHA-256 invalidos; `storageKey` debe ser relativo u opaque.
+- Trazabilidad: evidencia ligada siempre a documento y opcionalmente a attempt; adapter valida que el attempt pertenezca al mismo documento; modelo append-only sin sobrescritura.
+- Exclusiones confirmadas: no se reemplazo `billing_xml_files`, no se modificaron `send`, `retrySend` ni `sign`, no se creo endpoint REST, no se toco frontend, no se implemento storage real, no se guardaron payloads completos, no se implemento PSE/OSE/SUNAT real.
+- Validacion: `./mvnw -Dtest=BillingApplicationServiceTest test` con 109 tests, 0 failures, BUILD SUCCESS; `./mvnw test` backend completo con 551 tests, 0 failures, BUILD SUCCESS.
+
 ## Control ecommerce SEO-first
 
 ### Cierre Fase 0 documental ecommerce

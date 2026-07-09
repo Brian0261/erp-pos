@@ -67,6 +67,13 @@ Definir el contrato documental de readiness para una futura UI fiscal y para una
 - `finishedAt`
 - `simulated`
 
+## Evidence Metadata Futura
+
+- La UI puede mostrar resumen de evidencia registrada, por ejemplo XML firmado registrado, CDR pendiente o PDF no disponible.
+- La UI no debe descargar ni renderizar evidencia desde readiness.
+- La UI no debe mostrar storage keys tecnicos, rutas locales, secret refs ni payloads.
+- El detalle de evidencias debe venir de un contrato backend futuro y sanitizado.
+
 ## Datos que Nunca Deben Exponerse
 
 - payloads completos

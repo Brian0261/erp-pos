@@ -27,4 +27,11 @@ public interface ElectronicDocumentAttemptJpaRepository extends JpaRepository<El
             Long electronicDocumentId,
             FiscalOperation operation
     );
+
+    @Query("""
+            select a.electronicDocument.id
+            from ElectronicDocumentAttemptEntity a
+            where a.id = :attemptId
+            """)
+    Optional<Long> findElectronicDocumentIdById(@Param("attemptId") Long attemptId);
 }

@@ -27,12 +27,16 @@ import com.erppos.backend.erp.billing.domain.model.BillingXmlFile;
 import com.erppos.backend.erp.billing.domain.model.BillingXmlFileType;
 import com.erppos.backend.erp.billing.domain.model.CompanyBillingProfile;
 import com.erppos.backend.erp.billing.domain.model.ElectronicDocument;
+import com.erppos.backend.erp.billing.domain.model.ElectronicDocumentEvidence;
 import com.erppos.backend.erp.billing.domain.model.ElectronicDocumentAttempt;
 import com.erppos.backend.erp.billing.domain.model.ElectronicDocumentItem;
 import com.erppos.backend.erp.billing.domain.model.ElectronicDocumentStatus;
 import com.erppos.backend.erp.billing.domain.model.ElectronicDocumentStatusHistory;
 import com.erppos.backend.erp.billing.domain.model.ElectronicDocumentType;
 import com.erppos.backend.erp.billing.domain.model.FiscalAttemptResult;
+import com.erppos.backend.erp.billing.domain.model.FiscalEvidenceMetadataStatus;
+import com.erppos.backend.erp.billing.domain.model.FiscalEvidenceStorageProvider;
+import com.erppos.backend.erp.billing.domain.model.FiscalEvidenceType;
 import com.erppos.backend.erp.billing.domain.model.FiscalErrorCategory;
 import com.erppos.backend.erp.billing.domain.model.FiscalOperation;
 import com.erppos.backend.erp.billing.domain.model.FiscalSecretResolution;
@@ -45,6 +49,7 @@ import com.erppos.backend.erp.billing.domain.port.BillingXmlFileRepositoryPort;
 import com.erppos.backend.erp.billing.domain.port.CompanyBillingProfileRepositoryPort;
 import com.erppos.backend.erp.billing.domain.port.ElectronicBillingProviderPort;
 import com.erppos.backend.erp.billing.domain.port.ElectronicDocumentAttemptRepositoryPort;
+import com.erppos.backend.erp.billing.domain.port.ElectronicDocumentEvidenceRepositoryPort;
 import com.erppos.backend.erp.billing.domain.port.ElectronicDocumentItemRepositoryPort;
 import com.erppos.backend.erp.billing.domain.port.ElectronicDocumentRepositoryPort;
 import com.erppos.backend.erp.billing.domain.port.ElectronicDocumentStatusHistoryRepositoryPort;
@@ -78,6 +83,7 @@ class BillingApplicationServiceTest {
     private InMemoryBillingSeriesRepository seriesRepository;
     private InMemoryElectronicDocumentRepository documentRepository;
     private InMemoryElectronicDocumentAttemptRepository attemptRepository;
+    private InMemoryElectronicDocumentEvidenceRepository evidenceRepository;
     private InMemoryElectronicDocumentItemRepository itemRepository;
     private InMemoryElectronicDocumentStatusHistoryRepository historyRepository;
     private InMemoryBillingXmlFileRepository xmlRepository;
@@ -102,6 +108,7 @@ class BillingApplicationServiceTest {
         seriesRepository = new InMemoryBillingSeriesRepository();
         documentRepository = new InMemoryElectronicDocumentRepository();
         attemptRepository = new InMemoryElectronicDocumentAttemptRepository();
+        evidenceRepository = new InMemoryElectronicDocumentEvidenceRepository();
         itemRepository = new InMemoryElectronicDocumentItemRepository();
         historyRepository = new InMemoryElectronicDocumentStatusHistoryRepository();
         xmlRepository = new InMemoryBillingXmlFileRepository();
@@ -1606,6 +1613,176 @@ class BillingApplicationServiceTest {
     }
 
     @Test
+    void shouldPersistSignedXmlEvidenceMetadataWithoutPayload() {
+        ElectronicDocument doc = createSignedReceiptForSale(1L);
+        ElectronicDocumentEvidence evidence = signedXmlEvidence(doc.id(), "a".repeat(64));
+
+        ElectronicDocumentEvidence saved = evidenceRepository.save(evidence);
+
+        assertNotNull(saved.id());
+        assertEquals(doc.id(), saved.electronicDocumentId());
+        assertEquals(FiscalEvidenceType.SIGNED_XML, saved.evidenceType());
+        assertEquals(FiscalEvidenceStorageProvider.DB_LEGACY, saved.storageProvider());
+        assertEquals("billing/LOCAL/" + doc.id() + "/SIGNED_XML/" + "a".repeat(64), saved.storageKey());
+        assertEquals("application/xml", saved.mimeType());
+        assertEquals("a".repeat(64), saved.checksumSha256());
+        assertTrue(saved.simulated());
+        assertEquals(1, evidenceRepository.findByElectronicDocumentId(doc.id()).size());
+    }
+
+    @Test
+    void shouldPersistProviderResponseEvidenceMetadataLinkedToAttempt() {
+        ElectronicDocument doc = createSignedReceiptForSale(1L);
+        ElectronicDocument error = saveDocumentWithStatus(doc, ElectronicDocumentStatus.ERROR);
+        ElectronicDocumentAttempt attempt = saveSendAttempt(error, 1, FiscalAttemptResult.FAILED, FiscalErrorCategory.PROVIDER_TIMEOUT, true, "TIMEOUT");
+        ElectronicDocumentEvidence evidence = new ElectronicDocumentEvidence(
+                null,
+                error.id(),
+                attempt.id(),
+                FiscalEvidenceType.PROVIDER_RESPONSE_METADATA,
+                BillingEnvironment.LOCAL,
+                true,
+                FiscalEvidenceStorageProvider.NONE,
+                null,
+                null,
+                null,
+                null,
+                "b".repeat(64),
+                null,
+                "T-TIMEOUT",
+                "CORR-123",
+                "TIMEOUT",
+                FiscalEvidenceMetadataStatus.REGISTERED,
+                null,
+                "tester",
+                "trace-123",
+                "Provider metadata only"
+        );
+
+        ElectronicDocumentEvidence saved = evidenceRepository.save(evidence);
+
+        assertEquals(attempt.id(), saved.attemptId());
+        assertEquals(FiscalEvidenceType.PROVIDER_RESPONSE_METADATA, saved.evidenceType());
+        assertEquals(1, evidenceRepository.findByAttemptId(attempt.id()).size());
+    }
+
+    @Test
+    void shouldRejectEvidenceMetadataWithRawXml() {
+        BillingBusinessRuleException ex = assertThrows(BillingBusinessRuleException.class, () -> new ElectronicDocumentEvidence(
+                null, 1L, null, FiscalEvidenceType.CDR, BillingEnvironment.LOCAL, true,
+                FiscalEvidenceStorageProvider.NONE, null, null, null, null, null, null,
+                null, null, null, FiscalEvidenceMetadataStatus.REGISTERED, null, "tester", null,
+                "<xml>raw payload</xml>"
+        ));
+
+        assertTrue(ex.getMessage().contains("unsafe fiscal metadata"));
+    }
+
+    @Test
+    void shouldRejectEvidenceMetadataWithCertificateOrPrivateKeyMaterial() {
+        assertThrows(BillingBusinessRuleException.class, () -> evidenceWithNotes("-----BEGIN CERTIFICATE-----"));
+        assertThrows(BillingBusinessRuleException.class, () -> evidenceWithNotes("-----BEGIN PRIVATE KEY-----"));
+    }
+
+    @Test
+    void shouldRejectEvidenceMetadataWithTokensPasswordsOrSecretRefs() {
+        assertThrows(BillingBusinessRuleException.class, () -> evidenceWithNotes("token=secret"));
+        assertThrows(BillingBusinessRuleException.class, () -> evidenceWithNotes("password=secret"));
+        assertThrows(BillingBusinessRuleException.class, () -> evidenceWithNotes("vault://billing/prod/provider"));
+    }
+
+    @Test
+    void shouldRejectWindowsAbsoluteStorageKey() {
+        BillingBusinessRuleException ex = assertThrows(BillingBusinessRuleException.class, () -> evidenceWithStorageKey("C:\\billing\\signed.xml"));
+
+        assertEquals("storageKey must be a relative opaque key", ex.getMessage());
+    }
+
+    @Test
+    void shouldRejectLinuxAbsoluteStorageKey() {
+        BillingBusinessRuleException ex = assertThrows(BillingBusinessRuleException.class, () -> evidenceWithStorageKey("/etc/billing/signed.xml"));
+
+        assertEquals("storageKey must be a relative opaque key", ex.getMessage());
+    }
+
+    @Test
+    void shouldRejectParentTraversalStorageKey() {
+        BillingBusinessRuleException ex = assertThrows(BillingBusinessRuleException.class, () -> evidenceWithStorageKey("billing/LOCAL/../signed.xml"));
+
+        assertEquals("storageKey must be a relative opaque key", ex.getMessage());
+    }
+
+    @Test
+    void shouldRejectInvalidEvidenceSha256Hash() {
+        BillingBusinessRuleException ex = assertThrows(BillingBusinessRuleException.class, () -> signedXmlEvidence(1L, "abc"));
+
+        assertEquals("checksumSha256 must be a valid SHA-256 hex digest", ex.getMessage());
+    }
+
+    @Test
+    void shouldAcceptValidEvidenceSha256Hash() {
+        ElectronicDocumentEvidence evidence = signedXmlEvidence(1L, "ABCDEF" + "a".repeat(58));
+
+        assertEquals("abcdef" + "a".repeat(58), evidence.checksumSha256());
+    }
+
+    @Test
+    void shouldKeepEvidenceMetadataSimulatedForLocalAndBeta() {
+        ElectronicDocumentEvidence local = signedXmlEvidence(1L, "a".repeat(64));
+        ElectronicDocumentEvidence beta = new ElectronicDocumentEvidence(
+                null,
+                2L,
+                null,
+                FiscalEvidenceType.SIGNED_XML,
+                BillingEnvironment.BETA,
+                true,
+                FiscalEvidenceStorageProvider.DB_LEGACY,
+                "billing/BETA/2/SIGNED_XML/" + "b".repeat(64),
+                "B001-00000002-signed.xml",
+                "application/xml",
+                128L,
+                "b".repeat(64),
+                "b".repeat(64),
+                null,
+                null,
+                null,
+                FiscalEvidenceMetadataStatus.REGISTERED,
+                null,
+                "tester",
+                null,
+                "Metadata only"
+        );
+
+        assertTrue(local.simulated());
+        assertTrue(beta.simulated());
+    }
+
+    @Test
+    void shouldRejectDuplicateEvidenceForSameAttemptTypeAndChecksum() {
+        ElectronicDocument doc = createSignedReceiptForSale(1L);
+        ElectronicDocument error = saveDocumentWithStatus(doc, ElectronicDocumentStatus.ERROR);
+        ElectronicDocumentAttempt attempt = saveSendAttempt(error, 1, FiscalAttemptResult.FAILED, FiscalErrorCategory.PROVIDER_TIMEOUT, true, "TIMEOUT");
+        ElectronicDocumentEvidence evidence = providerEvidence(error.id(), attempt.id(), "c".repeat(64));
+        evidenceRepository.save(evidence);
+
+        BillingConflictException ex = assertThrows(BillingConflictException.class, () -> evidenceRepository.save(providerEvidence(error.id(), attempt.id(), "c".repeat(64))));
+
+        assertEquals("La evidencia fiscal ya esta registrada para este intento.", ex.getMessage());
+    }
+
+    @Test
+    void shouldNotRecordEvidenceAutomaticallyDuringSendOrRetry() {
+        ElectronicDocument doc = createSignedReceiptForSale(1L);
+        stubProvider.nextResult(ProviderSendResult.timeout("T-TIMEOUT", "Provider timeout"));
+        ElectronicDocument failed = documentService.send(doc.id());
+        stubProvider.nextResult(ProviderSendResult.accepted("T-RETRY", "Accepted after retry"));
+
+        documentService.retrySend(failed.id());
+
+        assertTrue(evidenceRepository.findByElectronicDocumentId(doc.id()).isEmpty());
+    }
+
+    @Test
     void shouldSanitizeProviderMessageBeforeSavingAttemptAndDocument() {
         ElectronicDocument doc = createReceiptForSale(1L);
         documentService.generateXml(doc.id());
@@ -1916,6 +2093,75 @@ class BillingApplicationServiceTest {
         ElectronicDocument doc = createReceiptForSale(saleId);
         documentService.generateXml(doc.id());
         return documentService.sign(doc.id());
+    }
+
+    private ElectronicDocumentEvidence signedXmlEvidence(Long documentId, String checksum) {
+        return new ElectronicDocumentEvidence(
+                null,
+                documentId,
+                null,
+                FiscalEvidenceType.SIGNED_XML,
+                BillingEnvironment.LOCAL,
+                true,
+                FiscalEvidenceStorageProvider.DB_LEGACY,
+                "billing/LOCAL/" + documentId + "/SIGNED_XML/" + checksum.toLowerCase(),
+                "B001-00000001-signed.xml",
+                "application/xml",
+                128L,
+                checksum,
+                checksum,
+                null,
+                null,
+                null,
+                FiscalEvidenceMetadataStatus.REGISTERED,
+                null,
+                "tester",
+                "trace-123",
+                "Metadata only"
+        );
+    }
+
+    private ElectronicDocumentEvidence providerEvidence(Long documentId, Long attemptId, String checksum) {
+        return new ElectronicDocumentEvidence(
+                null,
+                documentId,
+                attemptId,
+                FiscalEvidenceType.PROVIDER_RESPONSE_METADATA,
+                BillingEnvironment.LOCAL,
+                true,
+                FiscalEvidenceStorageProvider.NONE,
+                null,
+                null,
+                null,
+                null,
+                checksum,
+                null,
+                "T-1",
+                "CORR-1",
+                "TIMEOUT",
+                FiscalEvidenceMetadataStatus.REGISTERED,
+                null,
+                "tester",
+                null,
+                "Metadata only"
+        );
+    }
+
+    private ElectronicDocumentEvidence evidenceWithNotes(String notes) {
+        return new ElectronicDocumentEvidence(
+                null, 1L, null, FiscalEvidenceType.PROVIDER_RESPONSE_METADATA, BillingEnvironment.LOCAL, true,
+                FiscalEvidenceStorageProvider.NONE, null, null, null, null, "a".repeat(64), null,
+                null, null, null, FiscalEvidenceMetadataStatus.REGISTERED, null, "tester", null, notes
+        );
+    }
+
+    private ElectronicDocumentEvidence evidenceWithStorageKey(String storageKey) {
+        return new ElectronicDocumentEvidence(
+                null, 1L, null, FiscalEvidenceType.SIGNED_XML, BillingEnvironment.LOCAL, true,
+                FiscalEvidenceStorageProvider.DB_LEGACY, storageKey, "B001-00000001-signed.xml", "application/xml", 128L,
+                "a".repeat(64), "a".repeat(64), null, null, null, FiscalEvidenceMetadataStatus.REGISTERED,
+                null, "tester", null, "Metadata only"
+        );
     }
 
     private ElectronicDocument retryRecoverableFailure(ProviderSendResult firstResult) {
@@ -2368,6 +2614,76 @@ class BillingApplicationServiceTest {
             return byDocument.getOrDefault(electronicDocumentId, List.of()).stream()
                     .filter(attempt -> attempt.operation() == operation)
                     .max((left, right) -> Integer.compare(left.attemptNumber(), right.attemptNumber()));
+        }
+    }
+
+    static class InMemoryElectronicDocumentEvidenceRepository implements ElectronicDocumentEvidenceRepositoryPort {
+        private final AtomicLong seq = new AtomicLong(1);
+        private final Map<Long, ElectronicDocumentEvidence> storage = new HashMap<>();
+        private final Map<Long, List<ElectronicDocumentEvidence>> byDocument = new HashMap<>();
+        private final Map<Long, List<ElectronicDocumentEvidence>> byAttempt = new HashMap<>();
+
+        @Override
+        public ElectronicDocumentEvidence save(ElectronicDocumentEvidence evidence) {
+            if (evidence.id() != null) {
+                throw new BillingBusinessRuleException("Electronic document evidence is append-only.");
+            }
+            if (evidence.attemptId() != null && evidence.checksumSha256() != null) {
+                boolean duplicate = byAttempt.getOrDefault(evidence.attemptId(), List.of()).stream()
+                        .anyMatch(existing -> existing.evidenceType() == evidence.evidenceType()
+                                && evidence.checksumSha256().equals(existing.checksumSha256()));
+                if (duplicate) {
+                    throw new BillingConflictException("La evidencia fiscal ya esta registrada para este intento.");
+                }
+            }
+            if (evidence.evidenceType() == FiscalEvidenceType.SIGNED_XML && evidence.metadataStatus() != FiscalEvidenceMetadataStatus.REVOKED) {
+                boolean signedXmlExists = byDocument.getOrDefault(evidence.electronicDocumentId(), List.of()).stream()
+                        .anyMatch(existing -> existing.evidenceType() == FiscalEvidenceType.SIGNED_XML
+                                && existing.metadataStatus() != FiscalEvidenceMetadataStatus.REVOKED);
+                if (signedXmlExists) {
+                    throw new BillingConflictException("La evidencia SIGNED_XML activa ya esta registrada para este comprobante.");
+                }
+            }
+            Long id = seq.getAndIncrement();
+            ElectronicDocumentEvidence stored = new ElectronicDocumentEvidence(
+                    id,
+                    evidence.electronicDocumentId(),
+                    evidence.attemptId(),
+                    evidence.evidenceType(),
+                    evidence.environment(),
+                    evidence.simulated(),
+                    evidence.storageProvider(),
+                    evidence.storageKey(),
+                    evidence.fileName(),
+                    evidence.mimeType(),
+                    evidence.sizeBytes(),
+                    evidence.checksumSha256(),
+                    evidence.contentHashSha256(),
+                    evidence.providerTicket(),
+                    evidence.providerCorrelationId(),
+                    evidence.providerStatus(),
+                    evidence.metadataStatus(),
+                    evidence.createdAt() == null ? Instant.now() : evidence.createdAt(),
+                    evidence.createdBy(),
+                    evidence.traceId(),
+                    evidence.notes()
+            );
+            storage.put(id, stored);
+            byDocument.computeIfAbsent(stored.electronicDocumentId(), k -> new ArrayList<>()).add(stored);
+            if (stored.attemptId() != null) {
+                byAttempt.computeIfAbsent(stored.attemptId(), k -> new ArrayList<>()).add(stored);
+            }
+            return stored;
+        }
+
+        @Override
+        public List<ElectronicDocumentEvidence> findByElectronicDocumentId(Long electronicDocumentId) {
+            return byDocument.getOrDefault(electronicDocumentId, List.of());
+        }
+
+        @Override
+        public List<ElectronicDocumentEvidence> findByAttemptId(Long attemptId) {
+            return byAttempt.getOrDefault(attemptId, List.of());
         }
     }
 

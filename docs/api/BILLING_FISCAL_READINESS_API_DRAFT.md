@@ -30,6 +30,12 @@ Draft only. This document does not represent an implementation.
   "operatorSeverity": "WARNING",
   "requiresConfirmation": true,
   "displayMessage": "El envio fallo por una condicion recuperable. Puede reintentarse manualmente.",
+  "evidenceSummary": {
+    "signedXmlRegistered": true,
+    "cdrRegistered": false,
+    "pdfRegistered": false,
+    "latestEvidenceAt": "2026-07-09T00:00:00Z"
+  },
   "lastAttempt": {
     "operation": "SEND",
     "attemptNumber": 1,
@@ -66,6 +72,15 @@ Draft only. This document does not represent an implementation.
 - `startedAt`
 - `finishedAt`
 - `simulated`
+
+## `evidenceSummary` Structure
+
+- `signedXmlRegistered`
+- `cdrRegistered`
+- `pdfRegistered`
+- `latestEvidenceAt`
+
+`evidenceSummary` must expose metadata only. It must not expose XML, CDR, PDF, QR, storage secrets, headers, tokens, local paths or provider payloads.
 
 ## Example Payloads
 

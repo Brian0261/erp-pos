@@ -1,0 +1,110 @@
+# Fiscal Evidence Metadata Model - Fase 3C-1
+
+## Proposito
+
+Fase 3C-1 crea la base DB/backend para registrar metadata de evidencias fiscales sin almacenar payloads completos ni integrar storage real.
+
+## Alcance Metadata-Only
+
+- Nueva tabla `electronic_document_evidence` mediante migracion V24.
+- Nuevo modelo de dominio `ElectronicDocumentEvidence`.
+- Tipos de evidencia, storage provider y status de metadata como enums.
+- Puerto, entidad JPA, mapper y adapter de persistencia.
+- Validaciones defensivas para impedir payloads, secretos, rutas absolutas y hashes invalidos.
+
+## Evidencias Modeladas
+
+- `SIGNED_XML`: metadata del XML firmado existente o futuro.
+- `CDR`: metadata futura de constancia de recepcion, sin CDR real.
+- `PDF`: metadata futura de PDF/ticket, sin PDF real.
+- `TICKET`: metadata de ticket/acuse externo.
+- `QR`: metadata futura de QR, sin QR real/base64.
+- `PROVIDER_RESPONSE_METADATA`: metadata sanitizada de respuesta provider ligada opcionalmente a attempt.
+
+## Storage Provider
+
+- `NONE`: no existe storage materializado.
+- `DB_LEGACY`: referencia metadata a evidencia legacy/mock existente, por ejemplo `billing_xml_files`.
+- `FILESYSTEM`: reservado para storage seguro futuro.
+- `S3`: reservado para storage objeto futuro.
+- `GCS`: reservado para storage objeto futuro.
+
+3C-1 no implementa storage real. Solo registra metadata segura.
+
+## Metadata Status
+
+- `REGISTERED`: metadata registrada.
+- `AVAILABLE`: evidencia declarada disponible en storage futuro.
+- `MISSING`: evidencia esperada pero no disponible.
+- `REVOKED`: metadata revocada sin borrar historial.
+
+## Relaciones
+
+- `electronic_document_id`: obligatorio, apunta a `electronic_documents`.
+- `attempt_id`: opcional, apunta a `electronic_document_attempts`.
+- Si `attempt_id` se informa, el adapter valida que pertenezca al mismo documento.
+- `SIGNED_XML` puede existir sin attempt porque nace del flujo de firma.
+- `PROVIDER_RESPONSE_METADATA`, `CDR` y `TICKET` normalmente deberian ligarse a un attempt `SEND` en fases futuras.
+
+## Reglas de Seguridad
+
+La metadata rechaza:
+
+- XML/CDR completo o fragmentos XML crudos.
+- PDF real, QR real o base64 embebido.
+- Headers, authorization, bearer tokens, tokens, passwords y API keys.
+- Secret refs como `vault://` o `secret://`.
+- `file:` y rutas locales absolutas.
+- Rutas Windows como `C:\...`.
+- Rutas Linux sensibles como `/etc/...`, `/home/...` o `/var/...`.
+- Material de certificados o claves privadas (`BEGIN CERTIFICATE`, `BEGIN PRIVATE KEY`).
+
+## Reglas de Hashes
+
+- `checksum_sha256` es opcional, pero si existe debe ser 64 hex.
+- `content_hash_sha256` es opcional, pero si existe debe ser 64 hex.
+- Los hashes se normalizan a lowercase.
+
+## Reglas de Storage Key
+
+- Debe ser relativa u opaque.
+- No debe ser path absoluto.
+- No debe contener drive Windows.
+- No debe contener backslash.
+- No debe contener `..`.
+- Formato futuro recomendado: `billing/{environment}/{documentId}/{evidenceType}/{hash-or-id}`.
+
+## Append-Only y Duplicidad
+
+- El adapter rechaza guardar evidencia con `id` existente.
+- No se sobrescribe evidencia registrada.
+- Se evita duplicado por `attempt_id + evidence_type + checksum_sha256` cuando `attempt_id` y checksum existen.
+- Se evita mas de un `SIGNED_XML` activo por documento mientras `metadata_status <> REVOKED`.
+- Se permiten multiples evidencias por documento cuando pertenecen a attempts distintos o tipos distintos.
+
+## LOCAL/BETA/PROD
+
+- LOCAL/BETA pueden registrar metadata simulada con `simulated=true`.
+- LOCAL/BETA pueden usar `storage_provider=NONE` o `DB_LEGACY`.
+- PROD no queda habilitado para evidencia real sin storage productivo futuro.
+- 3C-1 no activa storage productivo.
+
+## Compatibilidad
+
+- No reemplaza `billing_xml_files`.
+- No modifica `send()`.
+- No modifica `retrySend()`.
+- No modifica `sign()`.
+- No crea endpoint REST.
+- No toca frontend.
+
+## Fuera de Alcance
+
+- Escritura automatica de evidencia desde `sign`, `send` o `retrySend`.
+- Endpoint REST.
+- Descarga de archivos.
+- Storage real filesystem/S3/GCS.
+- XML/CDR/PDF/QR completos.
+- PSE/OSE/SUNAT real.
+- Firma digital real.
+- Produccion real.
