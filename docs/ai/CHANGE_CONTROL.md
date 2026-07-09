@@ -130,6 +130,16 @@ Estandarizar cambios tecnicos para reducir regresiones y mantener trazabilidad e
 - Seguridad operativa: no se tocaron `.env`, secretos, tokens, claves, certificados reales, backups ni dumps.
 - Validacion: revisiones read-only del backend de billing y de los documentos afectados; sin ejecucion de pruebas funcionales porque 3C-3 es documental-only.
 
+### Cierre Fiscal evidence storage architecture 3C-4A
+
+- Tipo: documentacion/arquitectura only para storage fiscal futuro.
+- Alcance implementado: ADR `docs/billing/FISCAL_EVIDENCE_STORAGE_ADR.md`, threat model `docs/billing/FISCAL_EVIDENCE_STORAGE_THREAT_MODEL.md`, politica preliminar `docs/billing/FISCAL_EVIDENCE_RETENTION_ENCRYPTION_POLICY.md`, runbook preliminar `docs/billing/FISCAL_EVIDENCE_BACKUP_RESTORE_RUNBOOK.md` y QA `docs/qa/FISCAL_EVIDENCE_STORAGE_ARCHITECTURE_QA.md`.
+- Decision: storage real sigue diferido; primero debe disenarse `FiscalEvidenceStoragePort` y resolver proveedor, retencion, legal hold, cifrado, auditoria, permisos y migracion desde `DB_LEGACY`.
+- Subfases oficiales: 3C-4A Documental/arquitectura; 3C-4B Modelo/migracion avanzada; 3C-4C Puerto + adapters no productivos; 3C-4D Filesystem LOCAL/BETA opcional; 3C-4E S3/GCS PROD futuro; 3C-4F Descarga/API/auditoria.
+- Exclusiones confirmadas: no se modifico codigo backend, no se modificaron tests, no se creo migracion, no se creo endpoint REST, no se tocaron controllers, no se toco frontend, no se creo storage real, no se crearon adapters filesystem/S3/GCS, no se guardaron XML/CDR/PDF/QR completos, no se implemento PSE/OSE/SUNAT real, no se habilito retry automatico, scheduler, backoff ni polling, no se inicio 3B-3B.
+- Seguridad operativa: no se tocaron `.env`, secretos, tokens, claves, certificados reales, buckets, IAM, KMS, backups reales ni dumps.
+- Validacion: inspeccion read-only de modelo evidence, storage providers y migracion V24; cambios limitados a documentacion permitida.
+
 ## Control ecommerce SEO-first
 
 ### Cierre Fase 0 documental ecommerce

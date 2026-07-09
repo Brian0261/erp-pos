@@ -53,6 +53,22 @@ Fase 3C-1 crea la base DB/backend para registrar metadata de evidencias fiscales
 - `storageProviderSummary` debe ser un agregado seguro, nunca una ruta o clave real.
 - 3C-3 no implementa endpoint REST, controller, DTO operativo ni storage real.
 
+## Storage Fiscal Futuro 3C-4A
+
+- 3C-4A es documental/arquitectura: ADR, threat model, politica de retencion/cifrado/auditoria y runbook preliminar.
+- Storage real sigue diferido; no se implementa filesystem, S3 ni GCS.
+- Antes de storage real se debe disenar `FiscalEvidenceStoragePort` y resolver proveedor, cifrado, retencion, legal hold, auditoria y roles.
+- V24 basta para metadata base; 3C-4B podria agregar modelo/migracion avanzada si se aprueban campos como `retentionUntil`, `immutable`, `encryptionMode`, `storageRegion`, `versionId` o auditoria de descarga.
+
+## Subfases 3C-4
+
+- 3C-4A: Documental/arquitectura.
+- 3C-4B: Modelo/migracion avanzada.
+- 3C-4C: Puerto + adapters no productivos.
+- 3C-4D: Filesystem LOCAL/BETA opcional.
+- 3C-4E: S3/GCS PROD futuro.
+- 3C-4F: Descarga/API/auditoria.
+
 ## Metadata Registrada por Flujo
 
 ### `SIGNED_XML`
@@ -139,12 +155,15 @@ La metadata rechaza:
 - No crea endpoint REST.
 - No toca frontend.
 - 3C-3 solo ajusta contrato documental para lectura futura.
+- 3C-4A solo define arquitectura; no crea storage real ni adapters.
 
 ## Fuera de Alcance
 
 - Endpoint REST.
 - Descarga de archivos.
 - Storage real filesystem/S3/GCS.
+- Adapters filesystem/S3/GCS.
+- Descarga/API de archivos.
 - XML/CDR/PDF/QR completos.
 - PSE/OSE/SUNAT real.
 - Firma digital real.

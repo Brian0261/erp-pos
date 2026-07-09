@@ -79,6 +79,8 @@ Definir el contrato documental de readiness para una futura UI fiscal y para una
 - La UI no debe inferir elegibilidad de retry solo por el estado visual.
 - El detalle de evidencias debe venir de un contrato backend futuro y sanitizado.
 - En la fase actual no existe endpoint REST de evidencias ni cambios frontend.
+- 3C-4A solo documenta arquitectura de storage futuro; la UI no debe asumir descargas ni disponibilidad fisica.
+- Si en el futuro existe storage real, la UI seguira mostrando solo resumen seguro hasta que una API de descarga auditada sea aprobada.
 
 ## Datos que Nunca Deben Exponerse
 
@@ -98,5 +100,11 @@ Definir el contrato documental de readiness para una futura UI fiscal y para una
 - Endpoint REST diferido.
 - Frontend fiscal UX diferido.
 - Attempts read-only endpoint diferido.
+- 3C-4B modelo/migracion avanzada diferida.
+- 3C-4C puerto + adapters no productivos diferida.
+- 3C-4D filesystem LOCAL/BETA diferida.
+- 3C-4E S3/GCS PROD diferida.
+- 3C-4F descarga/API/auditoria diferida.
+- 3B-3B endpoint REST protegido diferida.
 - Polling/consulta real diferido.
 - PSE/OSE/SUNAT real diferido.

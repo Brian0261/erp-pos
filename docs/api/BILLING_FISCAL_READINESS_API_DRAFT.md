@@ -5,6 +5,7 @@
 Draft only. This document does not represent an implementation.
 Backend 3C-2 already has internal evidence metadata read/write, but no REST endpoint exposes it yet.
 3C-3 closes the future evidence readiness contract only; it does not create an endpoint.
+3C-4A documents future fiscal evidence storage architecture only; it does not create storage, adapters or download APIs.
 
 ## Proposed Endpoints
 
@@ -36,6 +37,7 @@ This is a future metadata-only contract. It is not implemented as REST yet.
 ```
 
 `storageProviderSummary` must not reveal real paths, internal keys, raw storage identifiers, tokens, headers, certificates or provider payloads.
+Future 3C-4 storage phases must keep `evidenceSummary` metadata-only even if object storage exists.
 
 ## Minimal `fiscal-readiness` Response
 
@@ -264,3 +266,4 @@ This is a future metadata-only contract. It is not implemented as REST yet.
 - `retry-send` remains deferred in 3B-4.
 - Evidence metadata remains internal in 3C-2; any REST exposure must be designed separately and stay metadata-only.
 - All payloads must remain sanitized and omit secrets/payloads.
+- Storage real remains deferred after 3C-4A; 3C-4B to 3C-4F must be approved separately.
