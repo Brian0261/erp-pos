@@ -1,8 +1,16 @@
-# Fiscal Evidence Retention, Encryption and Audit Policy - Fase 3C-4A
+# Fiscal Evidence Retention, Encryption and Audit Policy - Fase 3C-4A/3C-4C
 
 ## Estado
 
-Politica preliminar documental. No habilita storage real, cifrado real, retencion real ni descarga.
+Politica preliminar documental. 3C-4C agrega puerto/adapters no productivos para metadata segura, pero no habilita storage real, cifrado real, retencion real ni descarga.
+
+## Estado 3C-4C
+
+- `NoopFiscalEvidenceStorageAdapter` no materializa archivos ni evidencia.
+- `LegacyBillingXmlEvidenceStorageAdapter` no migra ni reemplaza `billing_xml_files`.
+- No existe `openRead`, signed URL, descarga, endpoint REST ni access audit operativo.
+- No se agrego V25; campos avanzados de retencion/cifrado siguen diferidos.
+- `FILESYSTEM`, `S3` y `GCS` siguen reservados sin adapters productivos.
 
 ## Retencion
 

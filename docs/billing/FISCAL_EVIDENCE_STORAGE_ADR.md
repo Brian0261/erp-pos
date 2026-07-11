@@ -1,4 +1,4 @@
-# Fiscal Evidence Storage ADR - Fase 3C-4A
+# Fiscal Evidence Storage ADR - Fase 3C-4A/3C-4C
 
 ## Contexto
 
@@ -10,7 +10,8 @@ La evidencia actual de `SIGNED_XML` referencia `billing_xml_files` mediante `DB_
 
 - Storage real sigue diferido.
 - 3C-4A es solo arquitectura/documentacion.
-- Antes de implementar storage real debe disenarse un `FiscalEvidenceStoragePort` y sus contratos de seguridad.
+- 3C-4C introduce `FiscalEvidenceStoragePort` y contratos internos metadata-only, sin lectura/descarga de contenido.
+- Antes de implementar storage real debe existir una fase separada con proveedor, cifrado, retencion, auditoria y permisos cerrados.
 - No se debe crear filesystem/S3/GCS real hasta cerrar proveedor, cifrado, retencion, auditoria y permisos.
 
 ## Opciones Evaluadas
@@ -43,7 +44,18 @@ La evidencia actual de `SIGNED_XML` referencia `billing_xml_files` mediante `DB_
 
 - Ventaja: permite introducir puerto sin storage real ni secretos.
 - Riesgo: confundirse con storage productivo si no se etiqueta claramente.
-- Decision: primer adapter recomendado para una fase futura 3C-4C.
+- Decision: implementado en 3C-4C como seam no productivo.
+
+## Cierre 3C-4C
+
+- `FiscalEvidenceStoragePort` existe como puerto interno de billing.
+- El contrato incluye `store`, `exists`, `verifyChecksum` y `metadataOnly`.
+- No existe `openRead`; la lectura/descarga de contenido queda diferida a 3C-4F.
+- `NoopFiscalEvidenceStorageAdapter` soporta solo `NONE`, no escribe DB/filesystem/red y devuelve metadata segura.
+- `LegacyBillingXmlEvidenceStorageAdapter` soporta solo `DB_LEGACY` + `SIGNED_XML`, consulta `billing_xml_files`, puede verificar checksum internamente y no expone XML.
+- No se integraron los adapters con `sign()`, `send()` ni `retrySend()`.
+- No se creo migracion V25; V24 sigue siendo suficiente para metadata base.
+- No se crearon adapters `FILESYSTEM`, `S3` ni `GCS`.
 
 ## Recomendacion LOCAL/BETA
 
@@ -60,8 +72,8 @@ La evidencia actual de `SIGNED_XML` referencia `billing_xml_files` mediante `DB_
 ## Consecuencias
 
 - Se evita implementar storage inseguro prematuramente.
-- 3C-4B probablemente requerira migracion si se agregan campos avanzados.
-- 3C-4C puede introducir puerto/adapters no productivos sin dependencias cloud.
+- 3C-4B sigue diferida hasta que exista necesidad real de campos avanzados.
+- 3C-4C introdujo puerto/adapters no productivos sin dependencias cloud.
 - Descargas y endpoint REST deben quedar para una fase separada.
 
 ## Riesgos
@@ -83,12 +95,12 @@ La evidencia actual de `SIGNED_XML` referencia `billing_xml_files` mediante `DB_
 
 ## Fuera de Alcance
 
-- Implementar `FiscalEvidenceStoragePort` en codigo.
 - Crear adapters reales.
 - Crear filesystem/S3/GCS real.
 - Configurar buckets, IAM o KMS.
 - Crear endpoint REST, controller o descarga.
 - Guardar XML/CDR/PDF/QR completos.
+- Integrar storage con `sign()`, `send()` o `retrySend()`.
 - Implementar SUNAT/PSE/OSE, firma real, CDR/PDF/QR real, produccion real o retry automatico.
 
 ## Subfases 3C-4

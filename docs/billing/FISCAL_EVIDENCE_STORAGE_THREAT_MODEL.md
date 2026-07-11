@@ -1,8 +1,8 @@
-# Fiscal Evidence Storage Threat Model - Fase 3C-4A
+# Fiscal Evidence Storage Threat Model - Fase 3C-4A/3C-4C
 
 ## Alcance
 
-Este threat model cubre storage fiscal futuro para evidencias `SIGNED_XML`, `CDR`, `PDF`, `TICKET`, `QR` y metadata provider. No implementa storage real ni endpoint REST.
+Este threat model cubre storage fiscal futuro para evidencias `SIGNED_XML`, `CDR`, `PDF`, `TICKET`, `QR` y metadata provider. 3C-4C agrega un puerto interno y adapters no productivos, pero no implementa storage real ni endpoint REST.
 
 ## Activos Protegidos
 
@@ -32,14 +32,17 @@ Este threat model cubre storage fiscal futuro para evidencias `SIGNED_XML`, `CDR
 ## Controles Base Existentes
 
 - `ElectronicDocumentEvidence` valida hashes y metadata insegura.
+- `FiscalEvidenceStoragePort` no tiene `openRead` ni contrato de descarga.
+- Los value objects de storage rechazan metadata insegura, rutas absolutas, backslash, `..`, secretos, certificados, headers y payloads embebidos.
+- `NoopFiscalEvidenceStorageAdapter` no escribe DB/filesystem/red y solo soporta `NONE`.
+- `LegacyBillingXmlEvidenceStorageAdapter` solo consulta existencia/checksum de `SIGNED_XML` legacy y no expone XML.
 - `storageKey` rechaza rutas absolutas, `..` y backslash.
 - V24 evita duplicado por attempt/tipo/checksum y mas de un `SIGNED_XML` activo.
 - `DB_LEGACY` se mantiene como legacy/mock, no como storage productivo.
 
 ## Controles Futuros Requeridos
 
-- `FiscalEvidenceStoragePort` con contrato put-if-absent.
-- Adapter `Noop/Legacy` antes de adapters reales.
+- Integracion futura del puerto con flujos fiscales solo si no cambia comportamiento tributario.
 - Versioning/object lock o equivalente para PROD.
 - Cifrado KMS/SSE o equivalente.
 - Auditoria de descarga con actor, traceId, fecha, resultado y motivo.
@@ -47,8 +50,8 @@ Este threat model cubre storage fiscal futuro para evidencias `SIGNED_XML`, `CDR
 
 ## Supuestos
 
-- No hay storage real en 3C-4A.
-- No hay endpoint de descarga en 3C-4A.
+- No hay storage real en 3C-4C.
+- No hay endpoint de descarga en 3C-4C.
 - No se usan secretos reales, certificados ni buckets reales.
 
 ## Fuera de Alcance

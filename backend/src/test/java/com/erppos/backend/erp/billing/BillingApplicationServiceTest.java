@@ -35,7 +35,10 @@ import com.erppos.backend.erp.billing.domain.model.ElectronicDocumentStatusHisto
 import com.erppos.backend.erp.billing.domain.model.ElectronicDocumentType;
 import com.erppos.backend.erp.billing.domain.model.FiscalAttemptResult;
 import com.erppos.backend.erp.billing.domain.model.FiscalEvidenceMetadataStatus;
+import com.erppos.backend.erp.billing.domain.model.FiscalEvidenceStorageMetadata;
 import com.erppos.backend.erp.billing.domain.model.FiscalEvidenceStorageProvider;
+import com.erppos.backend.erp.billing.domain.model.FiscalEvidenceStorageRef;
+import com.erppos.backend.erp.billing.domain.model.FiscalEvidenceStoreCommand;
 import com.erppos.backend.erp.billing.domain.model.FiscalEvidenceType;
 import com.erppos.backend.erp.billing.domain.model.FiscalErrorCategory;
 import com.erppos.backend.erp.billing.domain.model.FiscalOperation;
@@ -53,12 +56,15 @@ import com.erppos.backend.erp.billing.domain.port.ElectronicDocumentEvidenceRepo
 import com.erppos.backend.erp.billing.domain.port.ElectronicDocumentItemRepositoryPort;
 import com.erppos.backend.erp.billing.domain.port.ElectronicDocumentRepositoryPort;
 import com.erppos.backend.erp.billing.domain.port.ElectronicDocumentStatusHistoryRepositoryPort;
+import com.erppos.backend.erp.billing.domain.port.FiscalEvidenceStoragePort;
 import com.erppos.backend.erp.billing.domain.port.FiscalSecretResolverPort;
 import com.erppos.backend.erp.billing.domain.port.UblXmlGeneratorPort;
 import com.erppos.backend.erp.billing.domain.port.XmlSignerPort;
 import com.erppos.backend.erp.billing.infrastructure.provider.MockElectronicBillingProviderAdapter;
 import com.erppos.backend.erp.billing.infrastructure.config.BillingFiscalProperties;
 import com.erppos.backend.erp.billing.infrastructure.config.BillingFiscalStartupValidator;
+import com.erppos.backend.erp.billing.infrastructure.persistence.LegacyBillingXmlEvidenceStorageAdapter;
+import com.erppos.backend.erp.billing.infrastructure.persistence.NoopFiscalEvidenceStorageAdapter;
 import com.erppos.backend.erp.billing.infrastructure.secret.LocalFiscalSecretResolverAdapter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -69,6 +75,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -2145,6 +2152,131 @@ class BillingApplicationServiceTest {
         assertFalse(preAuthorize.value().contains("CAJERO"));
     }
 
+    @Test
+    void shouldExposeFiscalEvidenceStoragePortWithoutOpenReadOrPayloadFields() {
+        assertTrue(Arrays.stream(FiscalEvidenceStoragePort.class.getMethods())
+                .noneMatch(method -> method.getName().equals("openRead")));
+        assertTrue(Arrays.stream(FiscalEvidenceStoreCommand.class.getRecordComponents())
+                .map(component -> component.getName().toLowerCase())
+                .noneMatch(name -> name.contains("payload")
+                        || name.equals("content")
+                        || name.contains("xml")
+                        || name.contains("cdr")
+                        || name.contains("pdf")
+                        || name.contains("qr")
+                        || name.contains("token")
+                        || name.contains("password")
+                        || name.contains("certificate")));
+    }
+
+    @Test
+    void shouldUseNoopFiscalEvidenceStorageWithoutPersistingPayload() {
+        NoopFiscalEvidenceStorageAdapter adapter = new NoopFiscalEvidenceStorageAdapter();
+
+        FiscalEvidenceStoreCommand command = storageCommand(FiscalEvidenceStorageProvider.NONE, "billing/LOCAL/1/SIGNED_XML/noop");
+
+        FiscalEvidenceStorageMetadata metadata = adapter.store(command).metadata();
+
+        assertEquals(FiscalEvidenceStorageProvider.NONE, metadata.storageProvider());
+        assertTrue(metadata.simulated());
+        assertTrue(adapter.exists(metadata.ref()));
+        assertFalse(metadata.toString().contains("<xml>"));
+        assertFalse(metadata.toString().contains("SIGNED-CONTENT"));
+        assertTrue(xmlRepository.storage.isEmpty());
+    }
+
+    @Test
+    void shouldReturnSafeNoopMetadataOnly() {
+        NoopFiscalEvidenceStorageAdapter adapter = new NoopFiscalEvidenceStorageAdapter();
+        FiscalEvidenceStorageRef ref = storageRef(FiscalEvidenceStorageProvider.NONE, "billing/LOCAL/1/SIGNED_XML/noop");
+
+        FiscalEvidenceStorageMetadata metadata = adapter.metadataOnly(ref);
+
+        assertEquals(FiscalEvidenceStorageProvider.NONE, metadata.storageProvider());
+        assertNull(metadata.checksumSha256());
+        assertNull(metadata.contentHashSha256());
+        assertFalse(metadata.toString().contains("<xml>"));
+    }
+
+    @Test
+    void shouldRejectUnsafeFiscalEvidenceStorageMetadata() {
+        BillingBusinessRuleException ex = assertThrows(BillingBusinessRuleException.class, () -> new FiscalEvidenceStoreCommand(
+                1L,
+                null,
+                FiscalEvidenceType.SIGNED_XML,
+                BillingEnvironment.LOCAL,
+                FiscalEvidenceStorageProvider.NONE,
+                "billing/LOCAL/1/SIGNED_XML/noop",
+                "<?xml version=\"1.0\"?><Invoice/>",
+                "application/xml",
+                0L,
+                null,
+                null,
+                true
+        ));
+
+        assertTrue(ex.getMessage().contains("unsafe fiscal metadata"));
+    }
+
+    @Test
+    void shouldFindLegacySignedXmlWithoutExposingContent() {
+        xmlRepository.save(new BillingXmlFile(
+                null,
+                1L,
+                BillingXmlFileType.SIGNED,
+                "B001-00000001-signed.xml",
+                "<xml>SIGNED-CONTENT</xml>",
+                "application/xml",
+                null,
+                "tester"
+        ));
+        LegacyBillingXmlEvidenceStorageAdapter adapter = new LegacyBillingXmlEvidenceStorageAdapter(xmlRepository);
+        FiscalEvidenceStorageRef ref = storageRef(FiscalEvidenceStorageProvider.DB_LEGACY, "billing/LOCAL/1/SIGNED_XML/legacy");
+
+        FiscalEvidenceStorageMetadata metadata = adapter.metadataOnly(ref);
+
+        assertTrue(adapter.exists(ref));
+        assertEquals(FiscalEvidenceStorageProvider.DB_LEGACY, metadata.storageProvider());
+        assertEquals("B001-00000001-signed.xml", metadata.fileName());
+        assertEquals("application/xml", metadata.mimeType());
+        assertNotNull(metadata.checksumSha256());
+        assertFalse(metadata.toString().contains("SIGNED-CONTENT"));
+        assertFalse(metadata.toString().contains("<xml>"));
+    }
+
+    @Test
+    void shouldVerifyLegacySignedXmlChecksumInternally() {
+        xmlRepository.save(new BillingXmlFile(
+                null,
+                1L,
+                BillingXmlFileType.SIGNED,
+                "B001-00000001-signed.xml",
+                "<xml>SIGNED-CONTENT</xml>",
+                "application/xml",
+                null,
+                "tester"
+        ));
+        LegacyBillingXmlEvidenceStorageAdapter adapter = new LegacyBillingXmlEvidenceStorageAdapter(xmlRepository);
+        FiscalEvidenceStorageRef ref = storageRef(FiscalEvidenceStorageProvider.DB_LEGACY, "billing/LOCAL/1/SIGNED_XML/legacy");
+        String checksum = adapter.metadataOnly(ref).checksumSha256();
+
+        assertTrue(adapter.verifyChecksum(ref, checksum).matches());
+        assertFalse(adapter.verifyChecksum(ref, "0".repeat(64)).matches());
+    }
+
+    @Test
+    void shouldRejectProductiveEvidenceStorageProvidersInNonProductiveAdapters() {
+        NoopFiscalEvidenceStorageAdapter noop = new NoopFiscalEvidenceStorageAdapter();
+        LegacyBillingXmlEvidenceStorageAdapter legacy = new LegacyBillingXmlEvidenceStorageAdapter(xmlRepository);
+
+        assertThrows(BillingBusinessRuleException.class, () -> noop.exists(storageRef(FiscalEvidenceStorageProvider.FILESYSTEM, "billing/LOCAL/1/SIGNED_XML/fs")));
+        assertThrows(BillingBusinessRuleException.class, () -> legacy.exists(storageRef(FiscalEvidenceStorageProvider.S3, "billing/LOCAL/1/SIGNED_XML/s3")));
+        assertThrows(BillingBusinessRuleException.class, () -> legacy.exists(storageRef(FiscalEvidenceStorageProvider.GCS, "billing/LOCAL/1/SIGNED_XML/gcs")));
+        assertThrows(ClassNotFoundException.class, () -> Class.forName("com.erppos.backend.erp.billing.infrastructure.persistence.FilesystemFiscalEvidenceStorageAdapter"));
+        assertThrows(ClassNotFoundException.class, () -> Class.forName("com.erppos.backend.erp.billing.infrastructure.persistence.S3FiscalEvidenceStorageAdapter"));
+        assertThrows(ClassNotFoundException.class, () -> Class.forName("com.erppos.backend.erp.billing.infrastructure.persistence.GcsFiscalEvidenceStorageAdapter"));
+    }
+
     private ElectronicDocument createReceiptForSale(Long saleId) {
         return documentService.createFromSale(saleId, new CreateElectronicDocumentFromSaleCommand(
                 ElectronicDocumentType.RECEIPT,
@@ -2152,6 +2284,35 @@ class BillingApplicationServiceTest {
                 null,
                 null
         ));
+    }
+
+    private FiscalEvidenceStoreCommand storageCommand(FiscalEvidenceStorageProvider provider, String storageKey) {
+        return new FiscalEvidenceStoreCommand(
+                1L,
+                null,
+                FiscalEvidenceType.SIGNED_XML,
+                BillingEnvironment.LOCAL,
+                provider,
+                storageKey,
+                "B001-00000001-signed.xml",
+                "application/xml",
+                0L,
+                null,
+                null,
+                true
+        );
+    }
+
+    private FiscalEvidenceStorageRef storageRef(FiscalEvidenceStorageProvider provider, String storageKey) {
+        return new FiscalEvidenceStorageRef(
+                1L,
+                null,
+                FiscalEvidenceType.SIGNED_XML,
+                BillingEnvironment.LOCAL,
+                provider,
+                storageKey,
+                true
+        );
     }
 
     private ElectronicDocument createSignedReceiptForSale(Long saleId) {

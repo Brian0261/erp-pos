@@ -140,6 +140,17 @@ Estandarizar cambios tecnicos para reducir regresiones y mantener trazabilidad e
 - Seguridad operativa: no se tocaron `.env`, secretos, tokens, claves, certificados reales, buckets, IAM, KMS, backups reales ni dumps.
 - Validacion: inspeccion read-only de modelo evidence, storage providers y migracion V24; cambios limitados a documentacion permitida.
 
+### Cierre Fiscal evidence storage port and non-productive adapters 3C-4C
+
+- Tipo: backend billing arquitectonico metadata-only, sin storage real.
+- Alcance implementado: `FiscalEvidenceStoragePort` con `store`, `exists`, `verifyChecksum` y `metadataOnly`; value objects `FiscalEvidenceStoreCommand`, `FiscalEvidenceStorageRef`, `FiscalEvidenceStorageMetadata`, `FiscalEvidenceVerificationResult` y `StorageStoreResult`; guardia interna de metadata segura.
+- Adapters: `NoopFiscalEvidenceStorageAdapter` para `NONE` sin DB/filesystem/red; `LegacyBillingXmlEvidenceStorageAdapter` para `DB_LEGACY` + `SIGNED_XML`, consultando `BillingXmlFileRepositoryPort` y verificando checksum internamente sin exponer XML.
+- Seguridad: el contrato no incluye `openRead`; rechaza payloads completos, XML/CDR/PDF/QR, base64, headers, tokens, passwords, certificados, claves privadas, rutas absolutas, backslash, `..`, `vault://`, `file:` y referencias cloud sensibles.
+- Exclusiones confirmadas: no se creo migracion V25, no se modifico V24, no se integro con `sign`, `send` ni `retrySend`, no se creo endpoint REST, no se toco frontend, no se creo storage real, no se crearon adapters filesystem/S3/GCS, no se implemento descarga/API/auditoria, no se guardaron XML/CDR/PDF/QR completos.
+- Seguridad operativa: no se tocaron `.env`, secretos, tokens, claves, certificados reales, buckets, IAM, KMS, backups reales ni dumps.
+- Validacion: `./mvnw -Dtest=BillingApplicationServiceTest test` con 118 tests, 0 failures, BUILD SUCCESS; `./mvnw test` con 560 tests, 0 failures, BUILD SUCCESS.
+- Siguientes fases: 3C-4D filesystem LOCAL/BETA opcional, 3C-4E S3/GCS PROD futuro y 3C-4F descarga/API/auditoria. 3B-3B endpoint retry protegido sigue diferida.
+
 ## Control ecommerce SEO-first
 
 ### Cierre Fase 0 documental ecommerce

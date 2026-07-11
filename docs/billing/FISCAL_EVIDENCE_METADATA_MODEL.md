@@ -1,4 +1,4 @@
-# Fiscal Evidence Metadata Model - Fase 3C-1/3C-2
+# Fiscal Evidence Metadata Model - Fase 3C-1/3C-4C
 
 ## Proposito
 
@@ -60,11 +60,28 @@ Fase 3C-1 crea la base DB/backend para registrar metadata de evidencias fiscales
 - Antes de storage real se debe disenar `FiscalEvidenceStoragePort` y resolver proveedor, cifrado, retencion, legal hold, auditoria y roles.
 - V24 basta para metadata base; 3C-4B podria agregar modelo/migracion avanzada si se aprueban campos como `retentionUntil`, `immutable`, `encryptionMode`, `storageRegion`, `versionId` o auditoria de descarga.
 
+## Puerto Interno 3C-4C
+
+- `FiscalEvidenceStoragePort` prepara el seam arquitectonico para storage fiscal sin conectarse a flujos existentes.
+- Metodos actuales: `store`, `exists`, `verifyChecksum` y `metadataOnly`.
+- No existe `openRead`; descarga y lectura de contenido quedan diferidas a 3C-4F.
+- Value objects: `FiscalEvidenceStoreCommand`, `FiscalEvidenceStorageRef`, `FiscalEvidenceStorageMetadata`, `FiscalEvidenceVerificationResult` y `StorageStoreResult`.
+- Los value objects solo transportan metadata permitida: documento, attempt, tipo, ambiente, provider, storage key, nombre, MIME, tamanio, hashes y flag `simulated`.
+- El contrato rechaza payloads completos, XML/CDR/PDF/QR, base64, headers, tokens, passwords, certificados, claves privadas, rutas absolutas, backslash, `..`, `vault://`, `file:` y referencias cloud sensibles.
+
+## Adapters No Productivos 3C-4C
+
+- `NoopFiscalEvidenceStorageAdapter`: soporta `NONE`, no escribe DB/filesystem/red y devuelve metadata-only segura.
+- `LegacyBillingXmlEvidenceStorageAdapter`: soporta `DB_LEGACY` y `SIGNED_XML`, consulta `BillingXmlFileRepositoryPort`, valida existencia logica y verifica checksum internamente cuando se solicita.
+- Legacy no expone XML firmado, no devuelve contenido, no crea storage nuevo, no modifica `billing_xml_files` y no reemplaza el almacenamiento legacy.
+- No existen adapters `FILESYSTEM`, `S3` ni `GCS` en 3C-4C.
+- `sign()`, `send()` y `retrySend()` no fueron conectados a este puerto en 3C-4C.
+
 ## Subfases 3C-4
 
 - 3C-4A: Documental/arquitectura.
 - 3C-4B: Modelo/migracion avanzada.
-- 3C-4C: Puerto + adapters no productivos.
+- 3C-4C: Puerto + adapters no productivos implementados, sin storage real.
 - 3C-4D: Filesystem LOCAL/BETA opcional.
 - 3C-4E: S3/GCS PROD futuro.
 - 3C-4F: Descarga/API/auditoria.
@@ -155,7 +172,7 @@ La metadata rechaza:
 - No crea endpoint REST.
 - No toca frontend.
 - 3C-3 solo ajusta contrato documental para lectura futura.
-- 3C-4A solo define arquitectura; no crea storage real ni adapters.
+- 3C-4A define arquitectura; 3C-4C crea puerto/adapters no productivos sin storage real ni integracion funcional.
 
 ## Fuera de Alcance
 
