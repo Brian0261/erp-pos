@@ -1,4 +1,4 @@
-# Fiscal Evidence Storage ADR - Fase 3C-4A/3C-4C
+# Fiscal Evidence Storage ADR - Fase 3C-4A/3C-4D-1
 
 ## Contexto
 
@@ -8,9 +8,10 @@ La evidencia actual de `SIGNED_XML` referencia `billing_xml_files` mediante `DB_
 
 ## Decision
 
-- Storage real sigue diferido.
+- Storage real fiscal sigue diferido.
 - 3C-4A es solo arquitectura/documentacion.
 - 3C-4C introduce `FiscalEvidenceStoragePort` y contratos internos metadata-only, sin lectura/descarga de contenido.
+- 3C-4D-1 introduce un adapter filesystem LOCAL/BETA solo para payload sintetico no fiscal, deshabilitado por defecto.
 - Antes de implementar storage real debe existir una fase separada con proveedor, cifrado, retencion, auditoria y permisos cerrados.
 - No se debe crear filesystem/S3/GCS real hasta cerrar proveedor, cifrado, retencion, auditoria y permisos.
 
@@ -26,7 +27,7 @@ La evidencia actual de `SIGNED_XML` referencia `billing_xml_files` mediante `DB_
 
 - Ventaja: permite validar IO real sin cloud.
 - Riesgo: path traversal, rutas absolutas, permisos del servidor, backups inconsistentes.
-- Decision: opcion futura solo para LOCAL/BETA, con base dir segura, claves opacas y sin PROD.
+- Decision: 3C-4D-1 lo habilita solo como adapter no productivo para payload sintetico LOCAL/BETA, con base dir explicita y sin PROD.
 
 ### S3
 
@@ -61,7 +62,18 @@ La evidencia actual de `SIGNED_XML` referencia `billing_xml_files` mediante `DB_
 
 - Mantener `DB_LEGACY` como default para `SIGNED_XML`.
 - Usar `NONE` para metadata sin archivo.
-- Si se aprueba prueba de IO real, agregar filesystem solo LOCAL/BETA con base dir no sensible y sin rutas absolutas expuestas.
+- `FilesystemFiscalEvidenceStorageAdapter` queda disponible solo para pruebas controladas con payload sintetico no fiscal.
+- La configuracion interna queda deshabilitada por defecto y exige base dir explicita.
+- No se exponen rutas absolutas en metadata/resultados.
+
+## Cierre 3C-4D-1
+
+- Se agrega `FiscalEvidenceFilesystemStoreCommand` como contrato explicito de contenido sintetico controlado.
+- Se agrega `FilesystemFiscalEvidenceStorageAdapter` para `FILESYSTEM`, LOCAL/BETA only.
+- El adapter rechaza PROD, configuracion deshabilitada, base dir ausente, path traversal, rutas absolutas, drive Windows, `file:` y backslash.
+- El adapter usa escritura temporal dentro del arbol seguro, no overwrite, checksum SHA-256, size check y cleanup de temporales.
+- No existe `openRead`, descarga, endpoint REST, access audit ni integracion con `sign()`, `send()` o `retrySend()`.
+- No se guardan XML/CDR/PDF/QR fiscales reales.
 
 ## Recomendacion PROD Futura
 
@@ -96,7 +108,7 @@ La evidencia actual de `SIGNED_XML` referencia `billing_xml_files` mediante `DB_
 ## Fuera de Alcance
 
 - Crear adapters reales.
-- Crear filesystem/S3/GCS real.
+- Crear storage fiscal real para XML/CDR/PDF/QR.
 - Configurar buckets, IAM o KMS.
 - Crear endpoint REST, controller o descarga.
 - Guardar XML/CDR/PDF/QR completos.

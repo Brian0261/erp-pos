@@ -1,8 +1,8 @@
-# Fiscal Evidence Storage Threat Model - Fase 3C-4A/3C-4C
+# Fiscal Evidence Storage Threat Model - Fase 3C-4A/3C-4D-1
 
 ## Alcance
 
-Este threat model cubre storage fiscal futuro para evidencias `SIGNED_XML`, `CDR`, `PDF`, `TICKET`, `QR` y metadata provider. 3C-4C agrega un puerto interno y adapters no productivos, pero no implementa storage real ni endpoint REST.
+Este threat model cubre storage fiscal futuro para evidencias `SIGNED_XML`, `CDR`, `PDF`, `TICKET`, `QR` y metadata provider. 3C-4D-1 agrega IO filesystem solo LOCAL/BETA para payload sintetico no fiscal, pero no implementa storage fiscal real ni endpoint REST.
 
 ## Activos Protegidos
 
@@ -28,6 +28,8 @@ Este threat model cubre storage fiscal futuro para evidencias `SIGNED_XML`, `CDR
 | Mezcla LOCAL/BETA con PROD | Evidencia simulada tratada como real. | Separacion de ambientes en bucket/base path y flag `simulated`. |
 | Descarga sin auditoria | Falta de trazabilidad de acceso. | Tabla o mecanismo de access audit antes de habilitar descarga. |
 | Migracion insegura desde `DB_LEGACY` | Perdida, duplicado o hash incorrecto. | Migracion por lotes con hash, size y verificacion; no sobrescribir. |
+| Symlink escape | Escritura fuera de base dir mediante enlaces. | Rechazar symlinks en componentes existentes y validar que el destino normalizado queda bajo base dir. |
+| Archivo parcial | Evidencia incompleta tras error de IO/hash/size. | Escribir temporal en el mismo arbol, verificar y mover sin overwrite; borrar temporales al fallar. |
 
 ## Controles Base Existentes
 
@@ -36,6 +38,8 @@ Este threat model cubre storage fiscal futuro para evidencias `SIGNED_XML`, `CDR
 - Los value objects de storage rechazan metadata insegura, rutas absolutas, backslash, `..`, secretos, certificados, headers y payloads embebidos.
 - `NoopFiscalEvidenceStorageAdapter` no escribe DB/filesystem/red y solo soporta `NONE`.
 - `LegacyBillingXmlEvidenceStorageAdapter` solo consulta existencia/checksum de `SIGNED_XML` legacy y no expone XML.
+- `FilesystemFiscalEvidenceStorageAdapter` esta deshabilitado por defecto, exige base dir explicita, bloquea PROD y acepta solo payload sintetico no fiscal.
+- Filesystem usa put-if-absent, checksum, size y cleanup de temporales.
 - `storageKey` rechaza rutas absolutas, `..` y backslash.
 - V24 evita duplicado por attempt/tipo/checksum y mas de un `SIGNED_XML` activo.
 - `DB_LEGACY` se mantiene como legacy/mock, no como storage productivo.
@@ -50,8 +54,8 @@ Este threat model cubre storage fiscal futuro para evidencias `SIGNED_XML`, `CDR
 
 ## Supuestos
 
-- No hay storage real en 3C-4C.
-- No hay endpoint de descarga en 3C-4C.
+- No hay storage fiscal real en 3C-4D-1.
+- No hay endpoint de descarga en 3C-4D-1.
 - No se usan secretos reales, certificados ni buckets reales.
 
 ## Fuera de Alcance

@@ -34,6 +34,7 @@ import com.erppos.backend.erp.billing.domain.model.ElectronicDocumentStatus;
 import com.erppos.backend.erp.billing.domain.model.ElectronicDocumentStatusHistory;
 import com.erppos.backend.erp.billing.domain.model.ElectronicDocumentType;
 import com.erppos.backend.erp.billing.domain.model.FiscalAttemptResult;
+import com.erppos.backend.erp.billing.domain.model.FiscalEvidenceFilesystemStoreCommand;
 import com.erppos.backend.erp.billing.domain.model.FiscalEvidenceMetadataStatus;
 import com.erppos.backend.erp.billing.domain.model.FiscalEvidenceStorageMetadata;
 import com.erppos.backend.erp.billing.domain.model.FiscalEvidenceStorageProvider;
@@ -63,19 +64,27 @@ import com.erppos.backend.erp.billing.domain.port.XmlSignerPort;
 import com.erppos.backend.erp.billing.infrastructure.provider.MockElectronicBillingProviderAdapter;
 import com.erppos.backend.erp.billing.infrastructure.config.BillingFiscalProperties;
 import com.erppos.backend.erp.billing.infrastructure.config.BillingFiscalStartupValidator;
+import com.erppos.backend.erp.billing.infrastructure.persistence.FilesystemFiscalEvidenceStorageAdapter;
 import com.erppos.backend.erp.billing.infrastructure.persistence.LegacyBillingXmlEvidenceStorageAdapter;
 import com.erppos.backend.erp.billing.infrastructure.persistence.NoopFiscalEvidenceStorageAdapter;
 import com.erppos.backend.erp.billing.infrastructure.secret.LocalFiscalSecretResolverAdapter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.lang.reflect.Method;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HexFormat;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -2272,7 +2281,143 @@ class BillingApplicationServiceTest {
         assertThrows(BillingBusinessRuleException.class, () -> noop.exists(storageRef(FiscalEvidenceStorageProvider.FILESYSTEM, "billing/LOCAL/1/SIGNED_XML/fs")));
         assertThrows(BillingBusinessRuleException.class, () -> legacy.exists(storageRef(FiscalEvidenceStorageProvider.S3, "billing/LOCAL/1/SIGNED_XML/s3")));
         assertThrows(BillingBusinessRuleException.class, () -> legacy.exists(storageRef(FiscalEvidenceStorageProvider.GCS, "billing/LOCAL/1/SIGNED_XML/gcs")));
-        assertThrows(ClassNotFoundException.class, () -> Class.forName("com.erppos.backend.erp.billing.infrastructure.persistence.FilesystemFiscalEvidenceStorageAdapter"));
+        assertThrows(ClassNotFoundException.class, () -> Class.forName("com.erppos.backend.erp.billing.infrastructure.persistence.S3FiscalEvidenceStorageAdapter"));
+        assertThrows(ClassNotFoundException.class, () -> Class.forName("com.erppos.backend.erp.billing.infrastructure.persistence.GcsFiscalEvidenceStorageAdapter"));
+    }
+
+    @Test
+    void shouldRejectProdFilesystemEvidenceStorage(@TempDir Path tempDir) {
+        FilesystemFiscalEvidenceStorageAdapter adapter = filesystemAdapter(tempDir);
+
+        assertThrows(BillingBusinessRuleException.class, () -> adapter.storeSyntheticContent(filesystemSyntheticCommand(
+                BillingEnvironment.PROD,
+                "billing/PROD/1/SIGNED_XML/" + "a".repeat(64),
+                syntheticPayload()
+        )));
+    }
+
+    @Test
+    void shouldRejectDisabledFilesystemEvidenceStorage(@TempDir Path tempDir) {
+        FilesystemFiscalEvidenceStorageAdapter adapter = new FilesystemFiscalEvidenceStorageAdapter();
+
+        assertThrows(BillingBusinessRuleException.class, () -> adapter.storeSyntheticContent(filesystemSyntheticCommand(
+                BillingEnvironment.LOCAL,
+                filesystemStorageKey(BillingEnvironment.LOCAL, syntheticPayload()),
+                syntheticPayload()
+        )));
+    }
+
+    @Test
+    void shouldRejectFilesystemEvidenceStorageWithoutBaseDir() {
+        FilesystemFiscalEvidenceStorageAdapter adapter = new FilesystemFiscalEvidenceStorageAdapter(
+                new FilesystemFiscalEvidenceStorageAdapter.FilesystemStorageSettings(true, null)
+        );
+
+        assertThrows(BillingBusinessRuleException.class, () -> adapter.storeSyntheticContent(filesystemSyntheticCommand(
+                BillingEnvironment.LOCAL,
+                filesystemStorageKey(BillingEnvironment.LOCAL, syntheticPayload()),
+                syntheticPayload()
+        )));
+    }
+
+    @Test
+    void shouldRejectUnsafeFilesystemStorageKeys() {
+        byte[] payload = syntheticPayload();
+
+        assertThrows(BillingBusinessRuleException.class, () -> filesystemSyntheticCommand(BillingEnvironment.LOCAL, "billing/LOCAL/1/SIGNED_XML/../evil", payload));
+        assertThrows(BillingBusinessRuleException.class, () -> filesystemSyntheticCommand(BillingEnvironment.LOCAL, "billing\\LOCAL\\1\\SIGNED_XML\\evil", payload));
+        assertThrows(BillingBusinessRuleException.class, () -> filesystemSyntheticCommand(BillingEnvironment.LOCAL, "/billing/LOCAL/1/SIGNED_XML/evil", payload));
+        assertThrows(BillingBusinessRuleException.class, () -> filesystemSyntheticCommand(BillingEnvironment.LOCAL, "C:\\billing\\LOCAL\\1\\SIGNED_XML\\evil", payload));
+        assertThrows(BillingBusinessRuleException.class, () -> filesystemSyntheticCommand(BillingEnvironment.LOCAL, "file:billing/LOCAL/1/SIGNED_XML/evil", payload));
+    }
+
+    @Test
+    void shouldStoreSyntheticFilesystemEvidenceInLocalWithoutExposingBaseDir(@TempDir Path tempDir) throws Exception {
+        FilesystemFiscalEvidenceStorageAdapter adapter = filesystemAdapter(tempDir);
+        byte[] payload = syntheticPayload();
+        String storageKey = filesystemStorageKey(BillingEnvironment.LOCAL, payload);
+
+        FiscalEvidenceStorageMetadata metadata = adapter.storeSyntheticContent(filesystemSyntheticCommand(BillingEnvironment.LOCAL, storageKey, payload)).metadata();
+
+        assertEquals(FiscalEvidenceStorageProvider.FILESYSTEM, metadata.storageProvider());
+        assertEquals(payload.length, metadata.sizeBytes());
+        assertEquals(sha256(payload), metadata.checksumSha256());
+        assertTrue(adapter.exists(metadata.ref()));
+        assertTrue(Files.exists(tempDir.resolve(storageKey)));
+        assertFalse(metadata.toString().contains(tempDir.toString()));
+        assertFalse(metadata.toString().contains("synthetic filesystem payload"));
+    }
+
+    @Test
+    void shouldStoreSyntheticFilesystemEvidenceInBeta(@TempDir Path tempDir) {
+        FilesystemFiscalEvidenceStorageAdapter adapter = filesystemAdapter(tempDir);
+        byte[] payload = syntheticPayload();
+        String storageKey = filesystemStorageKey(BillingEnvironment.BETA, payload);
+
+        FiscalEvidenceStorageMetadata metadata = adapter.storeSyntheticContent(filesystemSyntheticCommand(BillingEnvironment.BETA, storageKey, payload)).metadata();
+
+        assertEquals(BillingEnvironment.BETA, metadata.environment());
+        assertTrue(adapter.verifyChecksum(metadata.ref(), sha256(payload)).matches());
+    }
+
+    @Test
+    void shouldNotOverwriteFilesystemEvidence(@TempDir Path tempDir) {
+        FilesystemFiscalEvidenceStorageAdapter adapter = filesystemAdapter(tempDir);
+        byte[] payload = syntheticPayload();
+        String storageKey = filesystemStorageKey(BillingEnvironment.LOCAL, payload);
+
+        adapter.storeSyntheticContent(filesystemSyntheticCommand(BillingEnvironment.LOCAL, storageKey, payload));
+
+        assertDoesNotThrow(() -> adapter.storeSyntheticContent(filesystemSyntheticCommand(BillingEnvironment.LOCAL, storageKey, payload)));
+        assertThrows(BillingConflictException.class, () -> adapter.storeSyntheticContent(filesystemSyntheticCommand(
+                BillingEnvironment.LOCAL,
+                storageKey,
+                "different synthetic payload".getBytes(StandardCharsets.UTF_8)
+        )));
+    }
+
+    @Test
+    void shouldFailFilesystemEvidenceWhenChecksumDoesNotMatchAndCleanupTemp(@TempDir Path tempDir) throws Exception {
+        FilesystemFiscalEvidenceStorageAdapter adapter = filesystemAdapter(tempDir);
+        byte[] payload = syntheticPayload();
+        FiscalEvidenceStoreCommand metadataCommand = filesystemStoreCommand(BillingEnvironment.LOCAL, filesystemStorageKey(BillingEnvironment.LOCAL, payload), payload.length, "0".repeat(64));
+        FiscalEvidenceFilesystemStoreCommand command = new FiscalEvidenceFilesystemStoreCommand(metadataCommand, payload, (long) payload.length, "0".repeat(64));
+
+        assertThrows(BillingBusinessRuleException.class, () -> adapter.storeSyntheticContent(command));
+
+        assertEquals(0, countRegularFiles(tempDir));
+    }
+
+    @Test
+    void shouldFailFilesystemEvidenceWhenContentLengthDoesNotMatchAndCleanupTemp(@TempDir Path tempDir) throws Exception {
+        FilesystemFiscalEvidenceStorageAdapter adapter = filesystemAdapter(tempDir);
+        byte[] payload = syntheticPayload();
+        String checksum = sha256(payload);
+        FiscalEvidenceStoreCommand metadataCommand = filesystemStoreCommand(BillingEnvironment.LOCAL, filesystemStorageKey(BillingEnvironment.LOCAL, payload), payload.length + 1L, checksum);
+        FiscalEvidenceFilesystemStoreCommand command = new FiscalEvidenceFilesystemStoreCommand(metadataCommand, payload, payload.length + 1L, checksum);
+
+        assertThrows(BillingBusinessRuleException.class, () -> adapter.storeSyntheticContent(command));
+
+        assertEquals(0, countRegularFiles(tempDir));
+    }
+
+    @Test
+    void shouldKeepFilesystemStorageWithoutOpenReadAndRejectFiscalPayload() {
+        assertTrue(Arrays.stream(FilesystemFiscalEvidenceStorageAdapter.class.getMethods())
+                .noneMatch(method -> method.getName().equals("openRead")));
+        assertThrows(BillingBusinessRuleException.class, () -> filesystemSyntheticCommand(
+                BillingEnvironment.LOCAL,
+                "billing/LOCAL/1/SIGNED_XML/" + "a".repeat(64),
+                "<?xml version=\"1.0\"?><Invoice/>".getBytes(StandardCharsets.UTF_8)
+        ));
+    }
+
+    @Test
+    void shouldKeepFilesystemStorageDisconnectedFromFiscalFlowsAndRest() throws ClassNotFoundException {
+        assertTrue(Arrays.stream(ElectronicDocumentApplicationService.class.getDeclaredFields())
+                .noneMatch(field -> field.getType().equals(FiscalEvidenceStoragePort.class)
+                        || field.getType().equals(FilesystemFiscalEvidenceStorageAdapter.class)));
+        assertThrows(ClassNotFoundException.class, () -> Class.forName("com.erppos.backend.erp.billing.adapter.rest.FiscalEvidenceStorageController"));
         assertThrows(ClassNotFoundException.class, () -> Class.forName("com.erppos.backend.erp.billing.infrastructure.persistence.S3FiscalEvidenceStorageAdapter"));
         assertThrows(ClassNotFoundException.class, () -> Class.forName("com.erppos.backend.erp.billing.infrastructure.persistence.GcsFiscalEvidenceStorageAdapter"));
     }
@@ -2301,6 +2446,61 @@ class BillingApplicationServiceTest {
                 null,
                 true
         );
+    }
+
+    private FilesystemFiscalEvidenceStorageAdapter filesystemAdapter(Path baseDir) {
+        return new FilesystemFiscalEvidenceStorageAdapter(
+                new FilesystemFiscalEvidenceStorageAdapter.FilesystemStorageSettings(true, baseDir)
+        );
+    }
+
+    private FiscalEvidenceFilesystemStoreCommand filesystemSyntheticCommand(BillingEnvironment environment, String storageKey, byte[] content) {
+        String checksum = sha256(content);
+        return new FiscalEvidenceFilesystemStoreCommand(
+                filesystemStoreCommand(environment, storageKey, content.length, checksum),
+                content,
+                (long) content.length,
+                checksum
+        );
+    }
+
+    private FiscalEvidenceStoreCommand filesystemStoreCommand(BillingEnvironment environment, String storageKey, long sizeBytes, String checksum) {
+        return new FiscalEvidenceStoreCommand(
+                1L,
+                null,
+                FiscalEvidenceType.SIGNED_XML,
+                environment,
+                FiscalEvidenceStorageProvider.FILESYSTEM,
+                storageKey,
+                "synthetic-evidence.txt",
+                "text/plain",
+                sizeBytes,
+                checksum,
+                checksum,
+                true
+        );
+    }
+
+    private String filesystemStorageKey(BillingEnvironment environment, byte[] content) {
+        return "billing/" + environment.name() + "/1/SIGNED_XML/" + sha256(content);
+    }
+
+    private byte[] syntheticPayload() {
+        return "synthetic filesystem payload for local beta storage".getBytes(StandardCharsets.UTF_8);
+    }
+
+    private String sha256(byte[] content) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(content));
+        } catch (NoSuchAlgorithmException ex) {
+            throw new IllegalStateException("SHA-256 algorithm is not available", ex);
+        }
+    }
+
+    private long countRegularFiles(Path baseDir) throws Exception {
+        try (java.util.stream.Stream<Path> paths = Files.walk(baseDir)) {
+            return paths.filter(path -> Files.isRegularFile(path)).count();
+        }
     }
 
     private FiscalEvidenceStorageRef storageRef(FiscalEvidenceStorageProvider provider, String storageKey) {

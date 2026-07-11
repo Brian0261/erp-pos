@@ -1,4 +1,4 @@
-# Fiscal Evidence Metadata Model - Fase 3C-1/3C-4C
+# Fiscal Evidence Metadata Model - Fase 3C-1/3C-4D-1
 
 ## Proposito
 
@@ -77,12 +77,23 @@ Fase 3C-1 crea la base DB/backend para registrar metadata de evidencias fiscales
 - No existen adapters `FILESYSTEM`, `S3` ni `GCS` en 3C-4C.
 - `sign()`, `send()` y `retrySend()` no fueron conectados a este puerto en 3C-4C.
 
+## Filesystem Sintetico 3C-4D-1
+
+- `FiscalEvidenceFilesystemStoreCommand` agrega contrato explicito para contenido sintetico controlado.
+- `FilesystemFiscalEvidenceStorageAdapter` soporta `FILESYSTEM` solo en LOCAL/BETA y con configuracion habilitada explicitamente.
+- El adapter esta deshabilitado por defecto y requiere base dir explicita.
+- El storage key sigue siendo relativo/opaco; no se expone path absoluto.
+- El adapter calcula/verifica SHA-256 y `contentLength`, usa escritura temporal, no overwrite y cleanup de temporales.
+- No existe `openRead`, descarga, endpoint REST ni access audit.
+- No se conecta a `sign()`, `send()` ni `retrySend()`.
+- No se guardan XML/CDR/PDF/QR fiscales reales.
+
 ## Subfases 3C-4
 
 - 3C-4A: Documental/arquitectura.
 - 3C-4B: Modelo/migracion avanzada.
 - 3C-4C: Puerto + adapters no productivos implementados, sin storage real.
-- 3C-4D: Filesystem LOCAL/BETA opcional.
+- 3C-4D: Filesystem LOCAL/BETA opcional; 3C-4D-1 cubre solo payload sintetico no fiscal.
 - 3C-4E: S3/GCS PROD futuro.
 - 3C-4F: Descarga/API/auditoria.
 
@@ -161,7 +172,7 @@ La metadata rechaza:
 ## LOCAL/BETA/PROD
 
 - LOCAL/BETA pueden registrar metadata simulada con `simulated=true`.
-- LOCAL/BETA pueden usar `storage_provider=NONE` o `DB_LEGACY`.
+- LOCAL/BETA pueden usar `storage_provider=NONE`, `DB_LEGACY` o `FILESYSTEM` sintetico no fiscal.
 - PROD no queda habilitado para evidencia real sin storage productivo futuro.
 - 3C-1/3C-2 no activan storage productivo.
 

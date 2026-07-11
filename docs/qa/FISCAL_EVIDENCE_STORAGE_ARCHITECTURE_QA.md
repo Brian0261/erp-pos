@@ -1,10 +1,10 @@
-# Fiscal Evidence Storage Architecture QA - Fase 3C-4A/3C-4C
+# Fiscal Evidence Storage Architecture QA - Fase 3C-4A/3C-4D-1
 
 ## Resultado
 
-- Estado: PASS arquitectura + seam no productivo 3C-4C.
-- Alcance: diseno seguro de storage fiscal futuro y puerto/adapters no productivos.
-- Storage real: no implementado.
+- Estado: PASS arquitectura + seam no productivo + filesystem sintetico 3C-4D-1.
+- Alcance: diseno seguro de storage fiscal futuro, puerto/adapters no productivos e IO filesystem sintetico LOCAL/BETA.
+- Storage fiscal real: no implementado.
 - Endpoint REST: no creado.
 - Frontend: no tocado.
 
@@ -20,6 +20,8 @@
 - `StorageStoreResult.java`
 - `NoopFiscalEvidenceStorageAdapter.java`
 - `LegacyBillingXmlEvidenceStorageAdapter.java`
+- `FiscalEvidenceFilesystemStoreCommand.java`
+- `FilesystemFiscalEvidenceStorageAdapter.java`
 - `V24__billing_document_evidence.sql`
 - `docs/billing/FISCAL_EVIDENCE_METADATA_MODEL.md`
 - `docs/api/BILLING_FISCAL_READINESS_API_DRAFT.md`
@@ -66,8 +68,11 @@
 - No se integraron `sign()`, `send()` ni `retrySend()` con el puerto.
 - No se creo endpoint REST.
 - No se toco frontend.
-- No se creo storage real.
-- No se crearon adapters filesystem/S3/GCS.
+- No se creo storage fiscal real.
+- Se creo adapter filesystem no productivo para payload sintetico LOCAL/BETA.
+- PROD queda bloqueado.
+- No hay `openRead` ni descarga.
+- No se crearon adapters S3/GCS ni filesystem productivo.
 - No se tocaron `.env`, secretos ni certificados reales.
 - No se guardaron XML/CDR/PDF/QR completos.
 - No se implemento SUNAT/PSE/OSE real.
@@ -86,7 +91,7 @@
 
 - 3C-4B: Modelo/migracion avanzada.
 - 3C-4C: Puerto + adapters no productivos cerrado.
-- 3C-4D: Filesystem LOCAL/BETA opcional.
+- 3C-4D: Filesystem LOCAL/BETA opcional; 3C-4D-1 cerrado como payload sintetico no fiscal.
 - 3C-4E: S3/GCS PROD futuro.
 - 3C-4F: Descarga/API/auditoria.
 
@@ -100,3 +105,9 @@
 
 - `./mvnw -Dtest=BillingApplicationServiceTest test`: PASS, 118 tests, 0 failures.
 - `./mvnw test`: PASS, 560 tests, 0 failures.
+
+## Validacion 3C-4D-1
+
+- `./mvnw -Dtest=BillingApplicationServiceTest test`: PASS, 129 tests, 0 failures.
+- `./mvnw test`: PASS, 571 tests, 0 failures.
+- Cobertura: PROD bloqueado, disabled default, base dir requerida, path traversal, backslash, rutas absolutas, drive Windows, `file:`, LOCAL/BETA sintetico, no overwrite, checksum, size, cleanup temporal, sin `openRead`, sin S3/GCS, sin integration fiscal.

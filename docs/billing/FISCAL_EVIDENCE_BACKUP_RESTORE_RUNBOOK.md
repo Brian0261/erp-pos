@@ -1,8 +1,16 @@
-# Fiscal Evidence Backup and Restore Runbook - Fase 3C-4A
+# Fiscal Evidence Backup and Restore Runbook - Fase 3C-4A/3C-4D-1
 
 ## Estado
 
-Runbook preliminar no operativo. No existe storage real ni restauracion automatica en esta fase.
+Runbook preliminar no operativo. 3C-4D-1 solo valida filesystem LOCAL/BETA con payload sintetico no fiscal; no existe storage fiscal real ni restauracion automatica.
+
+## Nota 3C-4D-1
+
+- Los archivos generados por pruebas filesystem son evidencia sintetica no fiscal.
+- No deben tratarse como retencion legal ni backup fiscal real.
+- La recuperacion se limita a validar checksum/size contra metadata segura.
+- No hay descarga ni auditoria de acceso.
+- PROD, S3/GCS y XML/CDR/PDF/QR reales siguen diferidos.
 
 ## Objetivo Futuro
 

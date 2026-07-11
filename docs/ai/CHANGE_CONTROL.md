@@ -151,6 +151,16 @@ Estandarizar cambios tecnicos para reducir regresiones y mantener trazabilidad e
 - Validacion: `./mvnw -Dtest=BillingApplicationServiceTest test` con 118 tests, 0 failures, BUILD SUCCESS; `./mvnw test` con 560 tests, 0 failures, BUILD SUCCESS.
 - Siguientes fases: 3C-4D filesystem LOCAL/BETA opcional, 3C-4E S3/GCS PROD futuro y 3C-4F descarga/API/auditoria. 3B-3B endpoint retry protegido sigue diferida.
 
+### Cierre Fiscal evidence filesystem synthetic adapter 3C-4D-1
+
+- Tipo: backend billing no productivo para IO filesystem LOCAL/BETA con payload sintetico no fiscal.
+- Alcance implementado: `FiscalEvidenceFilesystemStoreCommand` como contrato explicito de contenido controlado; `FilesystemFiscalEvidenceStorageAdapter` para provider `FILESYSTEM`, LOCAL/BETA only, deshabilitado por defecto y con base dir explicita.
+- Seguridad: PROD bloqueado antes de escribir; storage keys relativas/opacas; path normalization bajo base dir; rechazo de `..`, backslash, rutas absolutas, drive Windows y `file:`; no overwrite/put-if-absent; checksum SHA-256; verificacion de size; escritura temporal y cleanup ante fallos.
+- Exclusiones confirmadas: sin XML/CDR/PDF/QR fiscales reales, sin `openRead`, sin descarga, sin endpoint REST, sin frontend, sin access audit, sin V25, sin cambios a V24, sin S3/GCS, sin integracion con `sign`, `send` ni `retrySend`, sin SUNAT/PSE/OSE real y sin retry automatico/scheduler/backoff/polling.
+- Seguridad operativa: no se tocaron `.env`, secretos, certificados reales, buckets, IAM, KMS, backups reales ni dumps.
+- Validacion: `./mvnw -Dtest=BillingApplicationServiceTest test` con 129 tests, 0 failures, BUILD SUCCESS; `./mvnw test` con 571 tests, 0 failures, BUILD SUCCESS.
+- Siguientes fases: 3C-4E S3/GCS PROD futuro y 3C-4F descarga/API/auditoria siguen diferidas. 3B-3B endpoint retry protegido sigue diferida.
+
 ## Control ecommerce SEO-first
 
 ### Cierre Fase 0 documental ecommerce
