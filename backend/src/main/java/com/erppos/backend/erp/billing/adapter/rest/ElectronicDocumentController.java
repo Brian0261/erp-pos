@@ -5,8 +5,12 @@ import com.erppos.backend.erp.billing.adapter.dto.CreateElectronicDocumentFromSa
 import com.erppos.backend.erp.billing.adapter.dto.ElectronicDocumentHistoryResponse;
 import com.erppos.backend.erp.billing.adapter.dto.ElectronicDocumentItemResponse;
 import com.erppos.backend.erp.billing.adapter.dto.ElectronicDocumentResponse;
+import com.erppos.backend.erp.billing.adapter.dto.FiscalEvidenceReadinessItemResponse;
+import com.erppos.backend.erp.billing.adapter.dto.FiscalEvidenceReadinessResponse;
 import com.erppos.backend.erp.billing.application.usecase.CreateElectronicDocumentFromSaleCommand;
 import com.erppos.backend.erp.billing.application.usecase.ElectronicDocumentUseCase;
+import com.erppos.backend.erp.billing.application.usecase.FiscalEvidenceReadiness;
+import com.erppos.backend.erp.billing.application.usecase.FiscalEvidenceReadinessUseCase;
 import com.erppos.backend.erp.billing.domain.model.BillingXmlFile;
 import com.erppos.backend.erp.billing.domain.model.ElectronicDocument;
 import com.erppos.backend.erp.billing.domain.model.ElectronicDocumentItem;
@@ -36,10 +40,16 @@ import java.util.List;
 public class ElectronicDocumentController {
 
     private final ElectronicDocumentUseCase documentUseCase;
+    private final FiscalEvidenceReadinessUseCase evidenceReadinessUseCase;
     private final CatalogReadPort catalogReadPort;
 
-    public ElectronicDocumentController(ElectronicDocumentUseCase documentUseCase, CatalogReadPort catalogReadPort) {
+    public ElectronicDocumentController(
+            ElectronicDocumentUseCase documentUseCase,
+            FiscalEvidenceReadinessUseCase evidenceReadinessUseCase,
+            CatalogReadPort catalogReadPort
+    ) {
         this.documentUseCase = documentUseCase;
+        this.evidenceReadinessUseCase = evidenceReadinessUseCase;
         this.catalogReadPort = catalogReadPort;
     }
 
@@ -114,6 +124,12 @@ public class ElectronicDocumentController {
         return ResponseEntity.ok(documentUseCase.history(id).stream().map(this::toHistory).toList());
     }
 
+    @GetMapping("/{documentId}/evidence-readiness")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR','CAJERO')")
+    public ResponseEntity<FiscalEvidenceReadinessResponse> evidenceReadiness(@PathVariable Long documentId) {
+        return ResponseEntity.ok(toReadinessResponse(evidenceReadinessUseCase.getByDocumentId(documentId)));
+    }
+
     private ElectronicDocumentResponse toResponse(ElectronicDocument document) {
         List<ElectronicDocumentItemResponse> itemResponses = documentUseCase.items(document.id()).stream().map(this::toItem).toList();
         return new ElectronicDocumentResponse(
@@ -166,6 +182,24 @@ public class ElectronicDocumentController {
                 history.message(),
                 history.changedAt(),
                 history.changedBy()
+        );
+    }
+
+    private FiscalEvidenceReadinessResponse toReadinessResponse(FiscalEvidenceReadiness readiness) {
+        return new FiscalEvidenceReadinessResponse(
+                readiness.documentId(),
+                readiness.simulated(),
+                readiness.evidenceCount(),
+                readiness.lastUpdatedAt(),
+                readiness.evidence().stream().map(item -> new FiscalEvidenceReadinessItemResponse(
+                        item.evidenceId(),
+                        item.evidenceType(),
+                        item.availabilityStatus(),
+                        item.integrityStatus(),
+                        item.downloadAllowed(),
+                        item.reasonCode(),
+                        item.allowedActions()
+                )).toList()
         );
     }
 }

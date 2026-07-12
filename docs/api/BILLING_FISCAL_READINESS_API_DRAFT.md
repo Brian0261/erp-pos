@@ -2,10 +2,48 @@
 
 ## Status
 
-Draft only. This document does not represent an implementation.
-Backend 3C-2 already has internal evidence metadata read/write, but no REST endpoint exposes it yet.
+Partially implemented. 3D-A exposes only the provider-agnostic evidence readiness endpoint documented below.
+Backend 3C-2 already has internal evidence metadata read/write; detailed metadata and content remain internal.
 3C-3 closes the future evidence readiness contract only; it does not create an endpoint.
 3C-4A documents future fiscal evidence storage architecture only; it does not create storage, adapters or download APIs.
+
+## Implemented Endpoint 3D-A
+
+- `GET /api/v1/billing/documents/{documentId}/evidence-readiness`
+- Roles: `ADMIN`, `SUPERVISOR`, `CAJERO`.
+- `ALMACENERO` receives `403`; unauthenticated requests receive `401`.
+- Document not found uses the existing standard `404` error contract.
+
+```json
+{
+  "documentId": 123,
+  "simulated": true,
+  "evidenceCount": 1,
+  "lastUpdatedAt": "2026-07-11T20:00:00Z",
+  "evidence": [
+    {
+      "evidenceId": 10,
+      "evidenceType": "SIGNED_XML",
+      "availabilityStatus": "NOT_READY",
+      "integrityStatus": "NOT_VERIFIED",
+      "downloadAllowed": false,
+      "reasonCode": "EVIDENCE_NOT_READY",
+      "allowedActions": []
+    }
+  ]
+}
+```
+
+3D-A rules:
+
+- `downloadAllowed` is always `false`.
+- `allowedActions` is empty because no evidence metadata or download action exists yet.
+- Persisted `REGISTERED` is calculated conservatively as `NOT_READY`; no DB state is changed.
+- Persisted `AVAILABLE` remains `AVAILABLE`, but integrity stays `NOT_VERIFIED` without a real verification.
+- `MISSING` and `REVOKED` preserve their persisted meaning.
+- `CORRUPTED` and integrity `FAILED` are never invented without a real integrity failure.
+- Checksums, storage keys, paths, filenames, providers, buckets, URLs and fiscal payloads are excluded.
+- The endpoint performs no filesystem, cloud or content IO.
 
 ## Proposed Endpoints
 
@@ -15,7 +53,7 @@ Backend 3C-2 already has internal evidence metadata read/write, but no REST endp
 
 ## Future `evidenceSummary`
 
-This is a future metadata-only contract. It is not implemented as REST yet.
+This broader summary remains a future metadata-only contract. It is not the 3D-A endpoint.
 
 ```json
 {
@@ -265,5 +303,6 @@ Future 3C-4 storage phases must keep `evidenceSummary` metadata-only even if obj
 - The frontend must not calculate retry eligibility on its own.
 - `retry-send` remains deferred in 3B-4.
 - Evidence metadata remains internal in 3C-2; any REST exposure must be designed separately and stay metadata-only.
+- 3D-A exposes only evidence readiness; detailed metadata, content and downloads remain unavailable.
 - All payloads must remain sanitized and omit secrets/payloads.
 - Storage real remains deferred after 3C-4A; 3C-4B to 3C-4F must be approved separately.

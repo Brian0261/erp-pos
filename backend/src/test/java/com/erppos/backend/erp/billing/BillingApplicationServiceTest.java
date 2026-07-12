@@ -10,10 +10,15 @@ import com.erppos.backend.erp.billing.application.service.ElectronicDocumentAppl
 import com.erppos.backend.erp.billing.application.service.ElectronicDocumentLifecyclePolicy;
 import com.erppos.backend.erp.billing.application.service.FiscalAttemptAuditService;
 import com.erppos.backend.erp.billing.application.service.FiscalAuditSanitizer;
+import com.erppos.backend.erp.billing.application.service.FiscalEvidenceReadinessApplicationService;
 import com.erppos.backend.erp.billing.application.service.FiscalProviderResultClassifier;
 import com.erppos.backend.erp.billing.application.usecase.CreateBillingSeriesCommand;
 import com.erppos.backend.erp.billing.application.usecase.CreateCompanyBillingProfileCommand;
 import com.erppos.backend.erp.billing.application.usecase.CreateElectronicDocumentFromSaleCommand;
+import com.erppos.backend.erp.billing.application.usecase.FiscalEvidenceAvailabilityStatus;
+import com.erppos.backend.erp.billing.application.usecase.FiscalEvidenceIntegrityStatus;
+import com.erppos.backend.erp.billing.application.usecase.FiscalEvidenceReadiness;
+import com.erppos.backend.erp.billing.application.usecase.FiscalEvidenceReadinessReasonCode;
 import com.erppos.backend.erp.billing.application.usecase.UpdateBillingSeriesCommand;
 import com.erppos.backend.erp.billing.application.usecase.UpdateCompanyBillingProfileCommand;
 import com.erppos.backend.erp.billing.domain.exception.BillingBusinessRuleException;
@@ -117,6 +122,7 @@ class BillingApplicationServiceTest {
     private CompanyBillingProfileApplicationService profileService;
     private BillingSeriesApplicationService seriesService;
     private ElectronicDocumentApplicationService documentService;
+    private FiscalEvidenceReadinessApplicationService evidenceReadinessService;
 
     @BeforeEach
     void setUp() {
@@ -142,6 +148,7 @@ class BillingApplicationServiceTest {
         AuditUserProvider auditUserProvider = new AuditUserProvider();
         profileService = new CompanyBillingProfileApplicationService(profileRepository, auditUserProvider);
         seriesService = new BillingSeriesApplicationService(seriesRepository, documentRepository, auditUserProvider);
+        evidenceReadinessService = new FiscalEvidenceReadinessApplicationService(documentRepository, evidenceRepository);
         documentService = new ElectronicDocumentApplicationService(
                 documentRepository,
                 itemRepository,
@@ -2162,6 +2169,93 @@ class BillingApplicationServiceTest {
     }
 
     @Test
+    void shouldReturnSafeEmptyFiscalEvidenceReadiness() {
+        ElectronicDocument document = createReceiptForSale(1L);
+
+        FiscalEvidenceReadiness readiness = evidenceReadinessService.getByDocumentId(document.id());
+
+        assertEquals(document.id(), readiness.documentId());
+        assertTrue(readiness.simulated());
+        assertEquals(0, readiness.evidenceCount());
+        assertTrue(readiness.evidence().isEmpty());
+        assertNull(readiness.lastUpdatedAt());
+    }
+
+    @Test
+    void shouldMapFiscalEvidenceReadinessConservativelyWithoutPersistingCalculatedStates() {
+        ElectronicDocument document = createReceiptForSale(1L);
+        ElectronicDocumentEvidence registered = evidenceRepository.save(readinessEvidence(
+                document.id(), FiscalEvidenceType.CDR, FiscalEvidenceMetadataStatus.REGISTERED,
+                FiscalEvidenceStorageProvider.NONE, null
+        ));
+        evidenceRepository.save(readinessEvidence(
+                document.id(), FiscalEvidenceType.SIGNED_XML, FiscalEvidenceMetadataStatus.REGISTERED,
+                FiscalEvidenceStorageProvider.DB_LEGACY, "a".repeat(64)
+        ));
+        evidenceRepository.save(readinessEvidence(
+                document.id(), FiscalEvidenceType.PDF, FiscalEvidenceMetadataStatus.AVAILABLE,
+                FiscalEvidenceStorageProvider.FILESYSTEM, "b".repeat(64)
+        ));
+        evidenceRepository.save(readinessEvidence(
+                document.id(), FiscalEvidenceType.QR, FiscalEvidenceMetadataStatus.MISSING,
+                FiscalEvidenceStorageProvider.S3, "c".repeat(64)
+        ));
+        evidenceRepository.save(readinessEvidence(
+                document.id(), FiscalEvidenceType.TICKET, FiscalEvidenceMetadataStatus.REVOKED,
+                FiscalEvidenceStorageProvider.DB_LEGACY, "d".repeat(64)
+        ));
+
+        FiscalEvidenceReadiness readiness = evidenceReadinessService.getByDocumentId(document.id());
+
+        assertEquals(5, readiness.evidenceCount());
+        assertEquals(readiness.evidence().size(), readiness.evidenceCount());
+        assertReadiness(readiness, FiscalEvidenceType.CDR, FiscalEvidenceAvailabilityStatus.NOT_READY,
+                FiscalEvidenceIntegrityStatus.NOT_APPLICABLE, FiscalEvidenceReadinessReasonCode.EVIDENCE_NOT_MATERIALIZED);
+        assertReadiness(readiness, FiscalEvidenceType.SIGNED_XML, FiscalEvidenceAvailabilityStatus.NOT_READY,
+                FiscalEvidenceIntegrityStatus.NOT_VERIFIED, FiscalEvidenceReadinessReasonCode.EVIDENCE_NOT_READY);
+        assertReadiness(readiness, FiscalEvidenceType.PDF, FiscalEvidenceAvailabilityStatus.AVAILABLE,
+                FiscalEvidenceIntegrityStatus.NOT_VERIFIED, FiscalEvidenceReadinessReasonCode.EVIDENCE_AVAILABLE);
+        assertReadiness(readiness, FiscalEvidenceType.QR, FiscalEvidenceAvailabilityStatus.MISSING,
+                FiscalEvidenceIntegrityStatus.NOT_APPLICABLE, FiscalEvidenceReadinessReasonCode.EVIDENCE_MISSING);
+        assertReadiness(readiness, FiscalEvidenceType.TICKET, FiscalEvidenceAvailabilityStatus.REVOKED,
+                FiscalEvidenceIntegrityStatus.NOT_APPLICABLE, FiscalEvidenceReadinessReasonCode.EVIDENCE_REVOKED);
+        assertTrue(readiness.evidence().stream().noneMatch(item -> item.availabilityStatus() == FiscalEvidenceAvailabilityStatus.CORRUPTED));
+        assertTrue(readiness.evidence().stream().noneMatch(item -> item.integrityStatus() == FiscalEvidenceIntegrityStatus.VERIFIED));
+        assertTrue(readiness.evidence().stream().noneMatch(item -> item.downloadAllowed() || !item.allowedActions().isEmpty()));
+        assertEquals(FiscalEvidenceMetadataStatus.REGISTERED, evidenceRepository.storage.get(registered.id()).metadataStatus());
+        assertEquals(5, evidenceRepository.storage.size());
+    }
+
+    @Test
+    void shouldKeepEvidenceReadinessEndpointReadOnlyAndLegacyXmlEndpointUnchanged() throws NoSuchMethodException {
+        Method readinessMethod = ElectronicDocumentController.class.getMethod("evidenceReadiness", Long.class);
+        PreAuthorize readinessAuthorization = readinessMethod.getAnnotation(PreAuthorize.class);
+        org.springframework.web.bind.annotation.GetMapping readinessMapping = readinessMethod.getAnnotation(org.springframework.web.bind.annotation.GetMapping.class);
+        Method xmlMethod = ElectronicDocumentController.class.getMethod("getXml", Long.class);
+        org.springframework.web.bind.annotation.GetMapping xmlMapping = xmlMethod.getAnnotation(org.springframework.web.bind.annotation.GetMapping.class);
+
+        assertNotNull(readinessAuthorization);
+        assertTrue(readinessAuthorization.value().contains("ADMIN"));
+        assertTrue(readinessAuthorization.value().contains("SUPERVISOR"));
+        assertTrue(readinessAuthorization.value().contains("CAJERO"));
+        assertFalse(readinessAuthorization.value().contains("ALMACENERO"));
+        assertArrayEquals(new String[]{"/{documentId}/evidence-readiness"}, readinessMapping.value());
+        assertArrayEquals(new String[]{"/{id}/xml"}, xmlMapping.value());
+        assertTrue(Arrays.stream(ElectronicDocumentApplicationService.class.getDeclaredFields())
+                .noneMatch(field -> field.getType().equals(com.erppos.backend.erp.billing.application.usecase.FiscalEvidenceReadinessUseCase.class)));
+        assertTrue(Arrays.stream(FiscalEvidenceReadinessApplicationService.class.getDeclaredFields())
+                .noneMatch(field -> FiscalEvidenceStoragePort.class.isAssignableFrom(field.getType())
+                        || field.getType().equals(FilesystemFiscalEvidenceStorageAdapter.class)));
+        long evidenceEndpoints = Arrays.stream(ElectronicDocumentController.class.getDeclaredMethods())
+                .map(method -> method.getAnnotation(org.springframework.web.bind.annotation.GetMapping.class))
+                .filter(java.util.Objects::nonNull)
+                .flatMap(mapping -> Arrays.stream(mapping.value()))
+                .filter(path -> path.contains("evidence"))
+                .count();
+        assertEquals(1, evidenceEndpoints);
+    }
+
+    @Test
     void shouldExposeFiscalEvidenceStoragePortWithoutOpenReadOrPayloadFields() {
         assertTrue(Arrays.stream(FiscalEvidenceStoragePort.class.getMethods())
                 .noneMatch(method -> method.getName().equals("openRead")));
@@ -2420,6 +2514,59 @@ class BillingApplicationServiceTest {
         assertThrows(ClassNotFoundException.class, () -> Class.forName("com.erppos.backend.erp.billing.adapter.rest.FiscalEvidenceStorageController"));
         assertThrows(ClassNotFoundException.class, () -> Class.forName("com.erppos.backend.erp.billing.infrastructure.persistence.S3FiscalEvidenceStorageAdapter"));
         assertThrows(ClassNotFoundException.class, () -> Class.forName("com.erppos.backend.erp.billing.infrastructure.persistence.GcsFiscalEvidenceStorageAdapter"));
+    }
+
+    private void assertReadiness(
+            FiscalEvidenceReadiness readiness,
+            FiscalEvidenceType evidenceType,
+            FiscalEvidenceAvailabilityStatus availabilityStatus,
+            FiscalEvidenceIntegrityStatus integrityStatus,
+            FiscalEvidenceReadinessReasonCode reasonCode
+    ) {
+        var item = readiness.evidence().stream()
+                .filter(candidate -> candidate.evidenceType() == evidenceType)
+                .findFirst()
+                .orElseThrow();
+        assertEquals(availabilityStatus, item.availabilityStatus());
+        assertEquals(integrityStatus, item.integrityStatus());
+        assertEquals(reasonCode, item.reasonCode());
+        assertFalse(item.downloadAllowed());
+        assertTrue(item.allowedActions().isEmpty());
+    }
+
+    private ElectronicDocumentEvidence readinessEvidence(
+            Long documentId,
+            FiscalEvidenceType evidenceType,
+            FiscalEvidenceMetadataStatus status,
+            FiscalEvidenceStorageProvider provider,
+            String checksum
+    ) {
+        String storageKey = provider == FiscalEvidenceStorageProvider.NONE
+                ? null
+                : "billing/LOCAL/" + documentId + "/" + evidenceType.name() + "/" + checksum;
+        return new ElectronicDocumentEvidence(
+                null,
+                documentId,
+                null,
+                evidenceType,
+                BillingEnvironment.LOCAL,
+                true,
+                provider,
+                storageKey,
+                null,
+                null,
+                provider == FiscalEvidenceStorageProvider.NONE ? null : 64L,
+                checksum,
+                checksum,
+                null,
+                null,
+                null,
+                status,
+                null,
+                "tester",
+                "trace-readiness",
+                "Readiness metadata only"
+        );
     }
 
     private ElectronicDocument createReceiptForSale(Long saleId) {

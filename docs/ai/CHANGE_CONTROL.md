@@ -161,6 +161,17 @@ Estandarizar cambios tecnicos para reducir regresiones y mantener trazabilidad e
 - Validacion: `./mvnw -Dtest=BillingApplicationServiceTest test` con 129 tests, 0 failures, BUILD SUCCESS; `./mvnw test` con 571 tests, 0 failures, BUILD SUCCESS.
 - Siguientes fases: 3C-4E S3/GCS PROD futuro y 3C-4F descarga/API/auditoria siguen diferidas. 3B-3B endpoint retry protegido sigue diferida.
 
+### Cierre Fiscal evidence readiness API contract 3D-A
+
+- Tipo: backend billing read-only y provider-agnostic, sin frontend.
+- Endpoint: `GET /api/v1/billing/documents/{documentId}/evidence-readiness` con roles `ADMIN`, `SUPERVISOR`, `CAJERO`; `ALMACENERO` denegado.
+- Contrato seguro: `documentId`, `simulated`, `evidenceCount`, `lastUpdatedAt` e items con tipo, availability, integrity, `downloadAllowed=false`, reason code estable y `allowedActions=[]`.
+- Mapping conservador: `REGISTERED -> NOT_READY` sin persistencia; `AVAILABLE` no implica integridad verificada; `MISSING`/`REVOKED` preservados; `CORRUPTED` no se emite sin fallo real.
+- Arquitectura: caso de uso read-only separado sobre repositorios de documento/evidence; no se modifico `ElectronicDocumentApplicationService` ni se invocaron adapters de storage.
+- Exclusiones confirmadas: sin XML/CDR/PDF/QR, checksum, storage key/path/provider/bucket/URL, V25, access audit, descarga, AWS, frontend, metadata detallada, cambios al endpoint XML legacy, `sign`, `send`, `retrySend`, retry automatico, scheduler, backoff o polling.
+- Validacion: `./mvnw -Dtest=BillingApplicationServiceTest test` con 132 tests, 0 failures; `./mvnw -Dtest=BillingEvidenceReadinessIntegrationTest test` con 8 tests, 0 failures; `./mvnw test` con 582 tests, 0 failures.
+- 3C-4E, 3C-4F Build y 3B-3B siguen diferidas.
+
 ## Control ecommerce SEO-first
 
 ### Cierre Fase 0 documental ecommerce
