@@ -172,6 +172,13 @@ Estandarizar cambios tecnicos para reducir regresiones y mantener trazabilidad e
 - Validacion: `./mvnw -Dtest=BillingApplicationServiceTest test` con 132 tests, 0 failures; `./mvnw -Dtest=BillingEvidenceReadinessIntegrationTest test` con 8 tests, 0 failures; `./mvnw test` con 582 tests, 0 failures.
 - 3C-4E, 3C-4F Build y 3B-3B siguen diferidas.
 
+### Cierre MiFact JSON baseline 4C
+
+- Tipo: documentacion y fixtures de test-resources derivados, sin codigo funcional.
+- Alcance: ADR `CORE-ADR-004`, baseline publico por repositorio/commit/archivo/hoja, contrato provider-neutral conceptual y fixtures JSON estrictos para solicitudes, respuestas `101`/`102`/`103`/`104` y metadata de evidencia.
+- Seguridad: no se incluyen tokens, identificaciones, series, correlativos, clientes, URLs productivas, certificados ni Base64 real; token futuro se resuelve en memoria y solo entra en la frontera de transporte. HTTP 200 no significa aceptacion; timeout obliga query-before-retry y no asigna otro correlativo.
+- Exclusiones: sin Java, DTOs, mapper, cliente HTTP, WireMock, llamadas MiFact, configuracion Spring, migraciones, V25, filesystem/S3/AWS, descarga, frontend, `send`, `retrySend` o skill. 4D debe preceder a cualquier cliente HTTP; 3B-3B sigue diferida.
+
 ## Control ecommerce SEO-first
 
 ### Cierre Fase 0 documental ecommerce

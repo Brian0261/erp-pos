@@ -1,0 +1,9 @@
+{
+  "xml_enviado": "<BASE64_ZIP_XML_PLACEHOLDER_NOT_DECODABLE>",
+  "cdr_sunat": "<BASE64_ZIP_CDR_PLACEHOLDER_NOT_DECODABLE>",
+  "pdf_bytes": "<BASE64_PDF_PLACEHOLDER_NOT_DECODABLE>",
+  "codigo_hash": "<PROVIDER_HASH_PLACEHOLDER>",
+  "cadena_para_codigo_qr": "<QR_SOURCE_TEXT_PLACEHOLDER>",
+  "ticket_sunat": "<TICKET_PLACEHOLDER>",
+  "url": "<UNTRUSTED_URL_PLACEHOLDER>"
+}
