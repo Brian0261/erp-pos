@@ -179,6 +179,17 @@ Estandarizar cambios tecnicos para reducir regresiones y mantener trazabilidad e
 - Seguridad: no se incluyen tokens, identificaciones, series, correlativos, clientes, URLs productivas, certificados ni Base64 real; token futuro se resuelve en memoria y solo entra en la frontera de transporte. HTTP 200 no significa aceptacion; timeout obliga query-before-retry y no asigna otro correlativo.
 - Exclusiones: sin Java, DTOs, mapper, cliente HTTP, WireMock, llamadas MiFact, configuracion Spring, migraciones, V25, filesystem/S3/AWS, descarga, frontend, `send`, `retrySend` o skill. 4D debe preceder a cualquier cliente HTTP; 3B-3B sigue diferida.
 
+### 4D-1A PostgreSQL locking reproduction
+
+- Tipo: Build limitada a test de integracion PostgreSQL y evidencia QA.
+- Test creado: `FiscalSendTransactionIntegrationTest`.
+- Reproduccion: conexion A ejecuta `SELECT ... FOR UPDATE` sobre un documento sintetico; conexion B usa `SET LOCAL lock_timeout='1000ms'` e intenta insertar un attempt `SEND/STARTED`; una tercera conexion diagnostica el bloqueo.
+- Evidencia: A aparece en `pg_blocking_pids(B)`; `wait_event_type=Lock`; `wait_event=transactionid`; `PSQLException`; SQLSTATE `55P03`; la FK se verifica estructuralmente desde los catálogos PostgreSQL, sin depender del mensaje textual de la excepción.
+- Estabilidad: 9/9 repeticiones concluyentes, con duracion aproximada de 1 segundo y 0 attempts persistidos.
+- QA: integraciones billing relacionadas PASS (12 tests) y `BillingApplicationServiceTest` PASS (132 tests). Suite backend completa no ejecutada por tratarse de un cambio aislado de tests.
+- Documento: `docs/qa/FISCAL_SEND_LOCKING_REPRODUCTION_QA.md`.
+- Exclusiones: no se modificaron `send`, `retrySend`, attempts/audit funcional, classifiers, lifecycle, repositories productivos, series, controllers, entities, migraciones, configuracion, frontend, `.env` ni infraestructura. Sin cliente/llamadas MiFact, token, credenciales, V25, S3, skill o 4D-1B.
+
 ## Control ecommerce SEO-first
 
 ### Cierre Fase 0 documental ecommerce
