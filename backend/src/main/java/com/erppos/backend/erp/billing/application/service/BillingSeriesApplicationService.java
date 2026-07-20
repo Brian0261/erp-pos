@@ -76,9 +76,9 @@ public class BillingSeriesApplicationService implements BillingSeriesUseCase {
     @Override
     @Transactional
     public BillingSeries update(Long id, UpdateBillingSeriesCommand command) {
+        BillingSeries current = seriesRepositoryPort.findByIdForUpdate(id)
+                .orElseThrow(() -> new BillingNotFoundException("Billing series not found"));
         validate(command.documentType(), command.series(), command.currentNumber(), command.environment());
-
-        BillingSeries current = getById(id);
         String normalizedSeries = normalizeSeries(command.series());
 
         if (seriesRepositoryPort.existsByDocumentTypeAndSeriesAndEnvironment(
@@ -111,7 +111,8 @@ public class BillingSeriesApplicationService implements BillingSeriesUseCase {
     @Override
     @Transactional
     public void deactivate(Long id) {
-        BillingSeries current = getById(id);
+        BillingSeries current = seriesRepositoryPort.findByIdForUpdate(id)
+                .orElseThrow(() -> new BillingNotFoundException("Billing series not found"));
         if (!current.active()) {
             return;
         }

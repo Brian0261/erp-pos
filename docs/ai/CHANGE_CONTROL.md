@@ -209,7 +209,35 @@ Estandarizar cambios tecnicos para reducir regresiones y mantener trazabilidad e
   - Suite backend completa: 601 tests, 0 failures, 0 errors, PASS.
 - Documento: `docs/qa/FISCAL_SEND_TRANSACTION_BOUNDARY_QA.md`.
 - Exclusiones: sin controllers/REST, frontend, migraciones/V25, `.env`, infraestructura, storage, cliente/DTO/mapper/token MiFact, llamadas reales, query/reconcile, retry automatico, scheduler, polling, outbox, hardening de series, identidad por ambiente, snapshot tributario o skill.
-- Git: cambios locales de 4D-1B pendientes; sin commit, push ni tag.
+- Git: 4D-1B fue publicada posteriormente en `cd9cd21 fix(billing): harden fiscal send transaction boundaries`; sin tag.
+
+### 4D-2A Fiscal series administrative row-lock alignment
+
+- Tipo: hardening backend code-only de concurrencia administrativa de series fiscales, sin cambios de esquema ni contratos publicos.
+- Base: rama `master`, HEAD/origin `cd9cd21`; working tree inicial limpio; 4D-1B cerrada y publicada.
+- Riesgo anterior: `update()` y `deactivate()` cargaban la serie mediante lectura ordinaria. Un snapshot administrativo podia guardarse despues de una emision concurrente y restaurar un `currentNumber` anterior.
+- Flujo vigente: `update()`, reactivacion mediante `update(active=true)` y `deactivate()` cargan primero la fila con `BillingSeriesRepositoryPort.findByIdForUpdate()`. El adapter existente aplica `PESSIMISTIC_WRITE`; no se agregaron puertos ni queries.
+- Estado fresco: existencia, formato/tipo/ambiente, identidad, unicidad de serie, serie activa, `maxIssuedNumber` y correlativo propuesto se validan despues de adquirir el lock. `deactivate()` conserva el contador confirmado que observa bajo lock.
+- Orden de locks: `serie -> validaciones dependientes -> update serie -> escrituras dependientes -> commit/rollback`. No se introdujo ningun camino `documento -> serie` ni esperas externas bajo el lock.
+- PostgreSQL: `FiscalSeriesConcurrencyIntegrationTest` usa Testcontainers/PostgreSQL 16, Flyway V1-V24, conexiones/threads independientes, locks reales, `pg_blocking_pids` recursivo para la cola de waiters, timeouts acotados y cleanup inverso por FK.
+- Escenarios PASS:
+  - emision confirmada frente a update obsoleto: update espera y luego falla seguro sin reducir el correlativo;
+  - emision frente a deactivate: la desactivacion espera y conserva el incremento;
+  - serie inactiva frente a emision/reactivacion: no se consume antes de activar y el orden es lineal;
+  - dos emisiones concurrentes: numeros `N` y `N+1`, contador `N+2`, sin duplicados ni deadlock;
+  - update frente a deactivate: resultado equivalente a un orden serial, sin campos mezclados;
+  - rollback antes de escrituras y despues de incremento/documento: contador y documento revierten juntos, lock liberado;
+  - incremento confirmado frente a deactivate/reactivate obsoleto: contador preservado;
+  - consultas finales: cero numeros duplicados o confirmados reutilizados.
+- QA:
+  - `FiscalSeriesConcurrencyIntegrationTest`: 8 tests, PASS.
+  - `BillingApplicationServiceTest`: 134 tests, PASS.
+  - conjunto billing/4D (`BillingApplicationServiceTest`, 4D-1A, 4D-1B, metadata/readiness y 4D-2A): 170 tests, PASS.
+  - suite backend completa: 611 tests, 0 failures, 0 errors, 0 skipped, PASS.
+- Documento: `docs/qa/FISCAL_SERIES_CONCURRENCY_QA.md`.
+- Riesgos diferidos: 4D-2B debe resolver dos formularios administrativos obsoletos mediante version/concurrency token y contrato condicional; 4D-2C debe resolver identidad fiscal/full number por ambiente mediante Plan y migracion independientes. No se exige numeracion gapless.
+- Exclusiones: sin `@Version`, ETag, `If-Match`, migraciones/V25, constraints, indices, CAS SQL, REST/DTOs, frontend, identidad por ambiente, `fullNumber`, MiFact real, query/reconcile, retry, storage, infraestructura, `.env`, secretos, cambios 4D-1B o skill.
+- Git: cambios locales de 4D-2A pendientes; sin commit, push ni tag.
 
 ## Control ecommerce SEO-first
 

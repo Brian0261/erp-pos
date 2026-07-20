@@ -348,6 +348,7 @@ class BillingApplicationServiceTest {
 
         assertNotNull(activeSeries.id());
         assertEquals("Ya existe una serie activa para este tipo de comprobante y ambiente.", ex.getMessage());
+        assertEquals(1, seriesRepository.findByIdForUpdateCalls);
     }
 
     @Test
@@ -932,6 +933,7 @@ class BillingApplicationServiceTest {
         ));
 
         assertEquals("El proximo correlativo debe ser mayor al ultimo comprobante emitido para esta serie.", ex.getMessage());
+        assertEquals(3, seriesRepository.findByIdForUpdateCalls);
     }
 
     @Test
@@ -992,6 +994,7 @@ class BillingApplicationServiceTest {
         );
 
         assertEquals(10L, updated.currentNumber());
+        assertEquals(3, seriesRepository.findByIdForUpdateCalls);
     }
 
     @Test
@@ -1017,6 +1020,54 @@ class BillingApplicationServiceTest {
 
         assertTrue(updated.active());
         assertEquals(1L, updated.currentNumber());
+        assertEquals(1, seriesRepository.findByIdForUpdateCalls);
+    }
+
+    @Test
+    void shouldValidateUpdateAgainstFreshLockedSeriesState() {
+        BillingSeries current = seriesRepository.findById(1L).orElseThrow();
+        documentRepository.save(new ElectronicDocument(
+                null,
+                99L,
+                current.id(),
+                current.documentType(),
+                ElectronicDocumentStatus.DRAFT,
+                current.environment(),
+                current.series(),
+                1L,
+                "B001-00000001",
+                "CONSUMIDOR FINAL",
+                null,
+                "PEN",
+                BigDecimal.ONE,
+                BigDecimal.ZERO,
+                BigDecimal.ONE,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                "tester",
+                "tester"
+        ));
+        seriesRepository.beforeFindByIdForUpdate = () -> forceSeriesCurrentNumber(1L, 2L);
+
+        BillingConflictException ex = assertThrows(BillingConflictException.class, () -> seriesService.update(
+                1L,
+                new UpdateBillingSeriesCommand(
+                        ElectronicDocumentType.RECEIPT,
+                        "B001",
+                        1L,
+                        BillingEnvironment.LOCAL,
+                        true
+                )
+        ));
+
+        assertEquals("El proximo correlativo debe ser mayor al ultimo comprobante emitido para esta serie.", ex.getMessage());
+        assertEquals(2L, seriesRepository.findById(1L).orElseThrow().currentNumber());
+        assertEquals(1, seriesRepository.findByIdForUpdateCalls);
     }
 
     @Test
@@ -1037,6 +1088,19 @@ class BillingApplicationServiceTest {
         assertEquals(1L, persisted.billingSeriesId());
         assertEquals("B001", persisted.series());
         assertEquals("B001-00000001", persisted.fullNumber());
+        assertEquals(2, seriesRepository.findByIdForUpdateCalls);
+    }
+
+    @Test
+    void shouldDeactivateFreshLockedSeriesWithoutRestoringStaleCurrentNumber() {
+        seriesRepository.beforeFindByIdForUpdate = () -> forceSeriesCurrentNumber(1L, 7L);
+
+        seriesService.deactivate(1L);
+
+        BillingSeries deactivated = seriesRepository.findById(1L).orElseThrow();
+        assertFalse(deactivated.active());
+        assertEquals(7L, deactivated.currentNumber());
+        assertEquals(1, seriesRepository.findByIdForUpdateCalls);
     }
 
     @Test
@@ -3027,6 +3091,8 @@ class BillingApplicationServiceTest {
     static class InMemoryBillingSeriesRepository implements BillingSeriesRepositoryPort {
         private final AtomicLong seq = new AtomicLong(1);
         private final Map<Long, BillingSeries> storage = new HashMap<>();
+        private int findByIdForUpdateCalls;
+        private Runnable beforeFindByIdForUpdate;
 
         @Override
         public BillingSeries save(BillingSeries series) {
@@ -3054,6 +3120,12 @@ class BillingApplicationServiceTest {
 
         @Override
         public Optional<BillingSeries> findByIdForUpdate(Long id) {
+            findByIdForUpdateCalls++;
+            if (beforeFindByIdForUpdate != null) {
+                Runnable action = beforeFindByIdForUpdate;
+                beforeFindByIdForUpdate = null;
+                action.run();
+            }
             return findById(id);
         }
 
