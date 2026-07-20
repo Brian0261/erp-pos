@@ -33,7 +33,7 @@ public class FiscalAttemptAuditService {
         this.sanitizer = sanitizer;
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional(propagation = Propagation.MANDATORY)
     public ElectronicDocumentAttempt startSendAttempt(ElectronicDocument document, String requestHash, String actor, String traceId) {
         int attemptNumber = attemptRepositoryPort.nextAttemptNumber(document.id(), FiscalOperation.SEND);
         return attemptRepositoryPort.save(new ElectronicDocumentAttempt(
@@ -59,7 +59,7 @@ public class FiscalAttemptAuditService {
         ));
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional(propagation = Propagation.MANDATORY)
     public ElectronicDocumentAttempt recordSendBlocked(
             ElectronicDocument document,
             FiscalErrorCategory errorCategory,
@@ -95,7 +95,7 @@ public class FiscalAttemptAuditService {
         ));
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional(propagation = Propagation.MANDATORY)
     public ElectronicDocumentAttempt finishSendAttempt(
             ElectronicDocumentAttempt attempt,
             ProviderSendResult result,
@@ -119,7 +119,7 @@ public class FiscalAttemptAuditService {
         ));
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional(propagation = Propagation.MANDATORY)
     public ElectronicDocumentAttempt failSendAttempt(
             ElectronicDocumentAttempt attempt,
             FiscalProviderResultClassification classification,

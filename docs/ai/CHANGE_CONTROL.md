@@ -190,6 +190,27 @@ Estandarizar cambios tecnicos para reducir regresiones y mantener trazabilidad e
 - Documento: `docs/qa/FISCAL_SEND_LOCKING_REPRODUCTION_QA.md`.
 - Exclusiones: no se modificaron `send`, `retrySend`, attempts/audit funcional, classifiers, lifecycle, repositories productivos, series, controllers, entities, migraciones, configuracion, frontend, `.env` ni infraestructura. Sin cliente/llamadas MiFact, token, credenciales, V25, S3, skill o 4D-1B.
 
+### 4D-1B Fiscal submission transaction boundary hardening
+
+- Tipo: hardening backend del limite transaccional de envio fiscal, sin cambios REST ni esquema.
+- Base: rama `master`, HEAD/origin `a6eac47`; 4D-1A cerrada y publicada.
+- Flujo anterior: `send()`/`retrySend()` mantenian `@Transactional`, lock del documento y conexion PostgreSQL durante la llamada provider; attempts `REQUIRES_NEW` podian solicitar una segunda conexion e insertar contra la FK del documento bloqueado.
+- Flujo vigente: `ElectronicDocumentApplicationService.send()` es un orquestador sin transaccion exterior; `FiscalSendTransactionService.prepareSend()` confirma `SENT + STARTED`, libera lock/conexion, se invoca exactamente una vez al provider sin transaccion activa y `finalizeSend()` confirma atómicamente documento, attempt, historial y evidencia.
+- Propagacion: `FiscalAttemptAuditService` cambia los writes de attempts de `REQUIRES_NEW` a `MANDATORY`; las fases locales usan transacciones `REQUIRED` cortas. Se agrega lock pesimista por ID del attempt para finalizacion idempotente.
+- Concurrencia: el lock existente del documento serializa preparaciones; una segunda solicitud registra/reporta bloqueo sin una segunda llamada provider. No se agrego constraint ni migracion.
+- Idempotencia: repetir la misma finalizacion no duplica historial ni evidencia; una finalizacion contradictoria falla de forma segura y conserva el resultado aplicado.
+- Ambiguedad: `TIMEOUT`, `UNAVAILABLE`, `COMMUNICATION_ERROR` y excepciones potencialmente posteriores al despacho quedan como documento `SENT`, attempt `PENDING` y `recoverable=false`. Si la respuesta remota existio pero la finalizacion local revierte, se conserva `SENT + STARTED` para reconciliacion.
+- Retry: `retrySend()` permanece como contrato interno fail-closed; no llama al provider, no consume correlativo y registra `BLOCKED` cuando se invoca fuera de una transaccion exterior. Query/reconcile remoto sigue diferido.
+- QA:
+  - `FiscalSendTransactionBoundaryIntegrationTest`: 16 tests, PASS.
+  - Integraciones billing relacionadas: 28 tests, PASS.
+  - `FiscalSendTransactionIntegrationTest` 4D-1A: 3 tests, PASS; SQLSTATE `55P03`.
+  - `BillingApplicationServiceTest`: 132 tests, PASS.
+  - Suite backend completa: 601 tests, 0 failures, 0 errors, PASS.
+- Documento: `docs/qa/FISCAL_SEND_TRANSACTION_BOUNDARY_QA.md`.
+- Exclusiones: sin controllers/REST, frontend, migraciones/V25, `.env`, infraestructura, storage, cliente/DTO/mapper/token MiFact, llamadas reales, query/reconcile, retry automatico, scheduler, polling, outbox, hardening de series, identidad por ambiente, snapshot tributario o skill.
+- Git: cambios locales de 4D-1B pendientes; sin commit, push ni tag.
+
 ## Control ecommerce SEO-first
 
 ### Cierre Fase 0 documental ecommerce

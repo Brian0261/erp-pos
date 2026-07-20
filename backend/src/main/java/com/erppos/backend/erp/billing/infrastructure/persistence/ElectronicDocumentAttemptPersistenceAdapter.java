@@ -43,6 +43,12 @@ public class ElectronicDocumentAttemptPersistenceAdapter implements ElectronicDo
     }
 
     @Override
+    public Optional<ElectronicDocumentAttempt> findByIdForUpdate(Long id) {
+        return attemptJpaRepository.findByIdForUpdate(id)
+                .map(ElectronicDocumentAttemptMapper::toDomain);
+    }
+
+    @Override
     public List<ElectronicDocumentAttempt> findByElectronicDocumentId(Long electronicDocumentId) {
         return attemptJpaRepository.findByElectronicDocument_IdOrderByAttemptNumberAsc(electronicDocumentId)
                 .stream()

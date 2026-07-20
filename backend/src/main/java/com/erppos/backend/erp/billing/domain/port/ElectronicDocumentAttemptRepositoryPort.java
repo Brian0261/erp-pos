@@ -9,6 +9,7 @@ import java.util.Optional;
 public interface ElectronicDocumentAttemptRepositoryPort {
     ElectronicDocumentAttempt save(ElectronicDocumentAttempt attempt);
     int nextAttemptNumber(Long electronicDocumentId, FiscalOperation operation);
+    Optional<ElectronicDocumentAttempt> findByIdForUpdate(Long id);
     List<ElectronicDocumentAttempt> findByElectronicDocumentId(Long electronicDocumentId);
     Optional<ElectronicDocumentAttempt> findLatestByElectronicDocumentIdAndOperation(Long electronicDocumentId, FiscalOperation operation);
 }
