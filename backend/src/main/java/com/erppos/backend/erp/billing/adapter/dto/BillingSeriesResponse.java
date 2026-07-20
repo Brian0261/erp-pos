@@ -7,6 +7,7 @@ import java.time.Instant;
 
 public record BillingSeriesResponse(
         Long id,
+        long version,
         ElectronicDocumentType documentType,
         String series,
         long currentNumber,

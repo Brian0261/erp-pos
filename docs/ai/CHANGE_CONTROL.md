@@ -237,7 +237,39 @@ Estandarizar cambios tecnicos para reducir regresiones y mantener trazabilidad e
 - Documento: `docs/qa/FISCAL_SERIES_CONCURRENCY_QA.md`.
 - Riesgos diferidos: 4D-2B debe resolver dos formularios administrativos obsoletos mediante version/concurrency token y contrato condicional; 4D-2C debe resolver identidad fiscal/full number por ambiente mediante Plan y migracion independientes. No se exige numeracion gapless.
 - Exclusiones: sin `@Version`, ETag, `If-Match`, migraciones/V25, constraints, indices, CAS SQL, REST/DTOs, frontend, identidad por ambiente, `fullNumber`, MiFact real, query/reconcile, retry, storage, infraestructura, `.env`, secretos, cambios 4D-1B o skill.
-- Git: cambios locales de 4D-2A pendientes; sin commit, push ni tag.
+- Git: 4D-2A fue publicada posteriormente en `9976ec5 fix(billing): lock fiscal series administrative updates`; sin tag.
+
+### 4D-2B-1 Additive optimistic-concurrency foundation
+
+- Tipo: foundation backend aditiva de concurrencia optimista para series fiscales; 4D-2B no se declara cerrada.
+- Base: rama `master`, HEAD/origin `9976ec5`; working tree inicial limpio; 4D-2A cerrada y publicada.
+- Migracion: V25 agrega `billing_series.version BIGINT NOT NULL DEFAULT 0` y `chk_billing_series_version >= 0`. PostgreSQL/Testcontainers valida upgrade desde V24 con fila preexistente, default, NOT NULL, check, Flyway validation y migracion completa desde cero.
+- JPA: `BillingSeriesEntity.version` usa `@Version`; no existe setter. El dominio y response propagan version read-only; `BillingSeriesRequest` no la acepta; el mapper no escribe version durante merge. `saveAndFlush()` entrega la version persistida antes de construir response/ETag.
+- ETag: formato fuerte `"billing-series-{id}-v{version}"`, centralizado. Se rechazan weak tags, wildcard, listas, formato invalido e ID distinto al path.
+- REST: POST, GET por ID, PUT y DELETE emiten ETag. El listado incluye `version` por item y no usa ETag de coleccion. PUT/DELETE aceptan `If-Match` opcional: ausente mantiene compatibilidad B1; vigente muta; stale devuelve `412`; formato invalido devuelve `400`; no existe `428`.
+- Transacciones: update/reactivate/deactivate conservan `findByIdForUpdate()` antes de comparar version. Stale se detecta antes de modificar campos. `saveAndFlush()` confirma una sola version nueva. El overload legado `deactivate(id)` mantiene transaccion/lock y delega al flujo sin precondicion.
+- Rollback/concurrencia: dos requests con el mismo token confirman una sola mutacion; update frente a deactivate/reactivate produce un orden serial. Una colision durante flush revierte la mutacion exterior. Stale no cambia campos, auditoria ni `currentNumber`.
+- Emision: el incremento confirmado de `currentNumber` conserva la version observada en dominio, deja que JPA la incremente y vuelve stale cualquier token administrativo previo. El test sintetico 4D-2A incrementa `version` al simular esa escritura JPA.
+- Errores: precondicion mal formada se mapea a `400`; stale explicito y `OptimisticLockingFailureException` residual se mapean a `412` con mensajes seguros, sin clases ORM ni stack trace.
+- CORS: `If-Match` agregado a allowed headers y `ETag` a exposed headers; origins, JWT y RBAC permanecen iguales.
+- QA focal confirmado:
+  - `BillingSeriesEtagTest`: 4 PASS.
+  - `BillingSeriesOptimisticConcurrencyMigrationIntegrationTest`: 1 PASS.
+  - `BillingSeriesOptimisticConcurrencyIntegrationTest`: 14 PASS.
+  - `GlobalExceptionHandlerTest`: 6 PASS.
+  - `SecurityConfigTest`: 2 PASS.
+  - `BillingApplicationServiceTest`: 135 PASS.
+  - `FiscalSeriesConcurrencyIntegrationTest`: 9 PASS.
+- Regresiones:
+  - conjunto fiscal combinado, incluyendo 4D-1A y 4D-1B: 188 PASS;
+  - integraciones `Billing*IntegrationTest`: 24 PASS;
+  - suite backend completa: 634 PASS, 0 failures, 0 errors y 0 skipped.
+- Ajuste de QA: la primera suite completa detecto que `SecurityConfigTest` esperaba la lista CORS anterior. Se actualizo exclusivamente esa asercion para exigir `If-Match` y `ETag`; el focal y la suite completa posterior pasaron.
+- Documento: `docs/qa/FISCAL_SERIES_OPTIMISTIC_CONCURRENCY_QA.md`.
+- Rollout: B1 mantiene `If-Match` opcional y un riesgo residual last-write-wins para clientes que no lo envian. B2 debe integrar ETag en Angular; B3 debe hacerlo obligatorio y reservar `428 Precondition Required`.
+- Operacion: durante V25 no deben coexistir instancias backend anteriores y posteriores a `@Version`.
+- Exclusiones: sin Angular/frontend, B2, B3, obligatoriedad/428, 4D-2C, identidad/full number por ambiente, MiFact, query/reconcile, retry, storage, infraestructura, `.env`, secretos o skills.
+- Git: cambios 4D-2B-1 permanecen locales; sin commit, push ni tag.
 
 ## Control ecommerce SEO-first
 

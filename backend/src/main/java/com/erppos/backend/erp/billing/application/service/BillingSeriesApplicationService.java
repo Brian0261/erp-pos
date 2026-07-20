@@ -6,6 +6,7 @@ import com.erppos.backend.erp.billing.application.usecase.UpdateBillingSeriesCom
 import com.erppos.backend.erp.billing.domain.exception.BillingBusinessRuleException;
 import com.erppos.backend.erp.billing.domain.exception.BillingConflictException;
 import com.erppos.backend.erp.billing.domain.exception.BillingNotFoundException;
+import com.erppos.backend.erp.billing.domain.exception.BillingPreconditionFailedException;
 import com.erppos.backend.erp.billing.domain.model.BillingEnvironment;
 import com.erppos.backend.erp.billing.domain.model.BillingSeries;
 import com.erppos.backend.erp.billing.domain.model.ElectronicDocumentType;
@@ -51,6 +52,7 @@ public class BillingSeriesApplicationService implements BillingSeriesUseCase {
         String actor = auditUserProvider.currentUsername();
         return seriesRepositoryPort.save(new BillingSeries(
                 null,
+                null,
                 command.documentType(),
                 normalizedSeries,
                 command.currentNumber(),
@@ -78,6 +80,7 @@ public class BillingSeriesApplicationService implements BillingSeriesUseCase {
     public BillingSeries update(Long id, UpdateBillingSeriesCommand command) {
         BillingSeries current = seriesRepositoryPort.findByIdForUpdate(id)
                 .orElseThrow(() -> new BillingNotFoundException("Billing series not found"));
+        validateExpectedVersion(current, command.expectedVersion());
         validate(command.documentType(), command.series(), command.currentNumber(), command.environment());
         String normalizedSeries = normalizeSeries(command.series());
 
@@ -96,6 +99,7 @@ public class BillingSeriesApplicationService implements BillingSeriesUseCase {
 
         return seriesRepositoryPort.save(new BillingSeries(
                 current.id(),
+                current.version(),
                 command.documentType(),
                 normalizedSeries,
                 command.currentNumber(),
@@ -110,14 +114,22 @@ public class BillingSeriesApplicationService implements BillingSeriesUseCase {
 
     @Override
     @Transactional
-    public void deactivate(Long id) {
+    public BillingSeries deactivate(Long id) {
+        return deactivate(id, null);
+    }
+
+    @Override
+    @Transactional
+    public BillingSeries deactivate(Long id, Long expectedVersion) {
         BillingSeries current = seriesRepositoryPort.findByIdForUpdate(id)
                 .orElseThrow(() -> new BillingNotFoundException("Billing series not found"));
+        validateExpectedVersion(current, expectedVersion);
         if (!current.active()) {
-            return;
+            return current;
         }
-        seriesRepositoryPort.save(new BillingSeries(
+        return seriesRepositoryPort.save(new BillingSeries(
                 current.id(),
+                current.version(),
                 current.documentType(),
                 current.series(),
                 current.currentNumber(),
@@ -128,6 +140,17 @@ public class BillingSeriesApplicationService implements BillingSeriesUseCase {
                 current.createdBy(),
                 auditUserProvider.currentUsername()
         ));
+    }
+
+    private void validateExpectedVersion(BillingSeries current, Long expectedVersion) {
+        if (expectedVersion == null) {
+            return;
+        }
+        if (!expectedVersion.equals(current.version())) {
+            throw new BillingPreconditionFailedException(
+                    "La serie fue modificada desde que se consulto. Recarga su estado antes de intentar nuevamente."
+            );
+        }
     }
 
     private void validate(ElectronicDocumentType type, String series, Long currentNumber, Object environment) {

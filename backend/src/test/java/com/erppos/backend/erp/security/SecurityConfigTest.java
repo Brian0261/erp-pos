@@ -39,7 +39,11 @@ class SecurityConfigTest {
         CorsConfiguration corsConfiguration = resolveCorsConfiguration(securityConfig);
 
         assertEquals(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"), corsConfiguration.getAllowedMethods());
-        assertEquals(List.of("Authorization", "Content-Type", "Accept", "Origin", "X-Trace-Id"), corsConfiguration.getAllowedHeaders());
+        assertEquals(
+                List.of("Authorization", "Content-Type", "Accept", "Origin", "X-Trace-Id", "If-Match"),
+                corsConfiguration.getAllowedHeaders()
+        );
+        assertEquals(List.of("ETag"), corsConfiguration.getExposedHeaders());
         assertFalse(Boolean.TRUE.equals(corsConfiguration.getAllowCredentials()));
     }
 

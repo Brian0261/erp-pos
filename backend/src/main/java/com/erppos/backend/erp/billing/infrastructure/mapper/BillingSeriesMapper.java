@@ -10,6 +10,7 @@ public final class BillingSeriesMapper {
     public static BillingSeries toDomain(BillingSeriesEntity entity) {
         return new BillingSeries(
                 entity.getId(),
+                entity.getVersion(),
                 entity.getDocumentType(),
                 entity.getSeries(),
                 entity.getCurrentNumber(),

@@ -1,5 +1,7 @@
 package com.erppos.backend.erp.shared;
 
+import com.erppos.backend.erp.billing.domain.exception.BillingPreconditionFailedException;
+import com.erppos.backend.erp.billing.domain.exception.BillingPreconditionFormatException;
 import com.erppos.backend.erp.quotes.domain.exception.QuoteBusinessRuleException;
 import com.erppos.backend.erp.quotes.domain.exception.QuoteConflictException;
 import com.erppos.backend.erp.quotes.domain.exception.QuoteNotFoundException;
@@ -12,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -66,6 +69,40 @@ class GlobalExceptionHandlerTest {
         assertNotNull(response.getBody());
         assertEquals(409, response.getBody().status());
         assertEquals("El usuario ya tiene una caja abierta.", response.getBody().message());
+    }
+
+    @Test
+    void shouldMapMalformedBillingPreconditionTo400() {
+        ResponseEntity<ApiError> response = exceptionHandler.handlePreconditionFormat(
+                new BillingPreconditionFormatException("If-Match invalido"),
+                request
+        );
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals(400, response.getBody().status());
+        assertEquals("If-Match invalido", response.getBody().message());
+    }
+
+    @Test
+    void shouldMapExplicitAndResidualOptimisticConflictsTo412WithoutOrmDetails() {
+        ResponseEntity<ApiError> explicit = exceptionHandler.handlePreconditionFailed(
+                new BillingPreconditionFailedException("La serie cambio"),
+                request
+        );
+        ResponseEntity<ApiError> residual = exceptionHandler.handlePreconditionFailed(
+                new ObjectOptimisticLockingFailureException("BillingSeriesEntity", 41L),
+                request
+        );
+
+        assertEquals(HttpStatus.PRECONDITION_FAILED, explicit.getStatusCode());
+        assertEquals("La serie cambio", explicit.getBody().message());
+        assertEquals(HttpStatus.PRECONDITION_FAILED, residual.getStatusCode());
+        assertEquals(412, residual.getBody().status());
+        assertEquals(
+                "La serie fue modificada concurrentemente. Recarga su estado antes de intentar nuevamente.",
+                residual.getBody().message()
+        );
     }
 }
 

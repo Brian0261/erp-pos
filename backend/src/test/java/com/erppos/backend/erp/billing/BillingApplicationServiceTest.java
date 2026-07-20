@@ -25,6 +25,7 @@ import com.erppos.backend.erp.billing.application.usecase.UpdateCompanyBillingPr
 import com.erppos.backend.erp.billing.domain.exception.BillingBusinessRuleException;
 import com.erppos.backend.erp.billing.domain.exception.BillingConflictException;
 import com.erppos.backend.erp.billing.domain.exception.BillingNotFoundException;
+import com.erppos.backend.erp.billing.domain.exception.BillingPreconditionFailedException;
 import com.erppos.backend.erp.billing.domain.model.BillingEnvironment;
 import com.erppos.backend.erp.billing.domain.model.BillingSaleItemSnapshot;
 import com.erppos.backend.erp.billing.domain.model.BillingSaleSnapshot;
@@ -244,7 +245,51 @@ class BillingApplicationServiceTest {
                 BillingEnvironment.BETA
         ));
         assertNotNull(created.id());
+        assertEquals(0L, created.version());
         assertEquals("B777", created.series());
+    }
+
+    @Test
+    void shouldValidateOptimisticVersionOnlyAfterLoadingTheLockedSeries() {
+        BillingSeries created = seriesService.create(new CreateBillingSeriesCommand(
+                ElectronicDocumentType.RECEIPT,
+                "B778",
+                10L,
+                BillingEnvironment.BETA,
+                false
+        ));
+
+        BillingSeries updated = seriesService.update(
+                created.id(),
+                new UpdateBillingSeriesCommand(
+                        created.documentType(),
+                        created.series(),
+                        11L,
+                        created.environment(),
+                        false,
+                        created.version()
+                )
+        );
+        BillingSeries snapshotBeforeStale = seriesRepository.findById(created.id()).orElseThrow();
+
+        assertEquals(1L, updated.version());
+        assertThrows(
+                BillingPreconditionFailedException.class,
+                () -> seriesService.update(
+                        created.id(),
+                        new UpdateBillingSeriesCommand(
+                                created.documentType(),
+                                created.series(),
+                                99L,
+                                created.environment(),
+                                true,
+                                created.version()
+                        )
+                )
+        );
+
+        assertEquals(2, seriesRepository.findByIdForUpdateCalls);
+        assertEquals(snapshotBeforeStale, seriesRepository.findById(created.id()).orElseThrow());
     }
 
     @Test
@@ -3011,6 +3056,7 @@ class BillingApplicationServiceTest {
         BillingSeries current = seriesRepository.findById(seriesId).orElseThrow();
         seriesRepository.save(new BillingSeries(
                 current.id(),
+                current.version(),
                 current.documentType(),
                 current.series(),
                 currentNumber,
@@ -3097,8 +3143,12 @@ class BillingApplicationServiceTest {
         @Override
         public BillingSeries save(BillingSeries series) {
             Long id = series.id() == null ? seq.getAndIncrement() : series.id();
+            Long version = series.id() == null
+                    ? 0L
+                    : (series.version() == null ? 0L : series.version() + 1);
             BillingSeries stored = new BillingSeries(
                     id,
+                    version,
                     series.documentType(),
                     series.series(),
                     series.currentNumber(),

@@ -235,14 +235,19 @@ Incluye:
 
 ### 4D-2B
 
-4D-2A no detecta dos formularios administrativos que parten del mismo snapshot antiguo pero se ejecutan uno después del otro. Permanecen diferidos:
+4D-2A no detectaba dos formularios administrativos que parten del mismo snapshot antiguo pero se ejecutan uno después del otro. 4D-2B-1 agregó posteriormente la foundation backend aditiva:
 
 - `@Version`;
 - token de revisión;
 - ETag;
-- `If-Match`;
-- precondición REST;
-- cambios frontend.
+- `If-Match` opcional;
+- `400` para formato inválido y `412` para stale.
+
+Permanecen diferidos a 4D-2B-2/4D-2B-3:
+
+- consumo del ETag en frontend;
+- `If-Match` obligatorio;
+- `428 Precondition Required`.
 
 ### 4D-2C
 
@@ -252,7 +257,7 @@ Permanecen diferidos a Plan/migración separados:
 - unicidad global de `fullNumber`;
 - perfil/emisor congelado;
 - cambios de constraints o índices;
-- V25.
+- una migración posterior independiente.
 
 No se exige numeración gapless. Un rollback puede dejar disponible un número no confirmado y una operación administrativa autorizada puede avanzar el próximo correlativo siempre que permanezca por encima del máximo emitido.
 

@@ -28,7 +28,7 @@ public class BillingSeriesPersistenceAdapter implements BillingSeriesRepositoryP
             entity = seriesJpaRepository.findById(series.id()).orElseGet(BillingSeriesEntity::new);
             BillingSeriesMapper.merge(entity, series);
         }
-        return BillingSeriesMapper.toDomain(seriesJpaRepository.save(entity));
+        return BillingSeriesMapper.toDomain(seriesJpaRepository.saveAndFlush(entity));
     }
 
     @Override

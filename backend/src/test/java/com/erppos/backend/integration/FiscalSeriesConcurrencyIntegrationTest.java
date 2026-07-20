@@ -6,6 +6,7 @@ import com.erppos.backend.erp.billing.application.usecase.ElectronicDocumentUseC
 import com.erppos.backend.erp.billing.application.usecase.UpdateBillingSeriesCommand;
 import com.erppos.backend.erp.billing.domain.exception.BillingBusinessRuleException;
 import com.erppos.backend.erp.billing.domain.exception.BillingConflictException;
+import com.erppos.backend.erp.billing.domain.exception.BillingPreconditionFailedException;
 import com.erppos.backend.erp.billing.domain.model.BillingEnvironment;
 import com.erppos.backend.erp.billing.domain.model.BillingSeries;
 import com.erppos.backend.erp.billing.domain.model.ElectronicDocument;
@@ -377,6 +378,39 @@ class FiscalSeriesConcurrencyIntegrationTest extends AbstractHttpIntegrationTest
         assertNoDuplicateOrReusedNumbers(fixture);
     }
 
+    @Test
+    @Timeout(30)
+    void confirmedEmissionShouldInvalidateAnEarlierAdministrativeVersionToken() throws Exception {
+        Fixture fixture = createFixture(true, 1);
+        BillingSeries beforeEmission = seriesUseCase.getById(fixture.seriesId());
+
+        ElectronicDocument document = createDocument(fixture, fixture.saleIds().get(0));
+        BillingSeries afterEmission = seriesUseCase.getById(fixture.seriesId());
+
+        assertEquals(fixture.initialCurrentNumber(), document.number());
+        assertEquals(beforeEmission.version() + 1, afterEmission.version());
+        assertEquals(fixture.initialCurrentNumber() + 1, afterEmission.currentNumber());
+
+        assertThrows(
+                BillingPreconditionFailedException.class,
+                () -> seriesUseCase.update(
+                        fixture.seriesId(),
+                        new UpdateBillingSeriesCommand(
+                                afterEmission.documentType(),
+                                afterEmission.series(),
+                                afterEmission.currentNumber(),
+                                afterEmission.environment(),
+                                afterEmission.active(),
+                                beforeEmission.version()
+                        )
+                )
+        );
+
+        assertEquals(afterEmission, seriesUseCase.getById(fixture.seriesId()));
+        assertSeriesInvariant(fixture);
+        assertNoDuplicateOrReusedNumbers(fixture);
+    }
+
     private Fixture createFixture(boolean active, int saleCount) throws SQLException {
         String series = nextSeries();
         long initialCurrentNumber = 40L;
@@ -470,7 +504,14 @@ class FiscalSeriesConcurrencyIntegrationTest extends AbstractHttpIntegrationTest
         long issuedNumber = lockSeries(connection, fixture.seriesId());
         executeUpdate(
                 connection,
-                "UPDATE billing_series SET current_number = ?, updated_at = NOW(), updated_by = '4d-2a-test' WHERE id = ?",
+                """
+                        UPDATE billing_series
+                        SET current_number = ?,
+                            version = version + 1,
+                            updated_at = NOW(),
+                            updated_by = '4d-2a-test'
+                        WHERE id = ?
+                        """,
                 issuedNumber + 1,
                 fixture.seriesId()
         );

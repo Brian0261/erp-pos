@@ -167,6 +167,7 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
         long issuedNumber = series.currentNumber();
         BillingSeries nextSeries = new BillingSeries(
                 series.id(),
+                series.version(),
                 series.documentType(),
                 series.series(),
                 issuedNumber + 1,

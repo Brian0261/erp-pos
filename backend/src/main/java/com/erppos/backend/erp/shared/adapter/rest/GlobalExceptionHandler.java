@@ -7,6 +7,8 @@ import com.erppos.backend.erp.catalog.domain.exception.CatalogNotFoundException;
 import com.erppos.backend.erp.billing.domain.exception.BillingBusinessRuleException;
 import com.erppos.backend.erp.billing.domain.exception.BillingConflictException;
 import com.erppos.backend.erp.billing.domain.exception.BillingNotFoundException;
+import com.erppos.backend.erp.billing.domain.exception.BillingPreconditionFailedException;
+import com.erppos.backend.erp.billing.domain.exception.BillingPreconditionFormatException;
 import com.erppos.backend.erp.ecommerce.adapter.dto.storefront.PublicErrorResponse;
 import com.erppos.backend.erp.ecommerce.domain.exception.EcommerceBusinessRuleException;
 import com.erppos.backend.erp.ecommerce.domain.exception.EcommerceConflictException;
@@ -32,6 +34,7 @@ import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -104,6 +107,24 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> handleNotFound(RuntimeException ex, HttpServletRequest request) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(errorResponseFactory.build(request, HttpStatus.NOT_FOUND, ex.getMessage()));
+    }
+
+    @ExceptionHandler(BillingPreconditionFormatException.class)
+    public ResponseEntity<ApiError> handlePreconditionFormat(
+            BillingPreconditionFormatException ex,
+            HttpServletRequest request
+    ) {
+        return ResponseEntity.badRequest()
+                .body(errorResponseFactory.build(request, HttpStatus.BAD_REQUEST, ex.getMessage()));
+    }
+
+    @ExceptionHandler({BillingPreconditionFailedException.class, OptimisticLockingFailureException.class})
+    public ResponseEntity<ApiError> handlePreconditionFailed(Exception ex, HttpServletRequest request) {
+        String message = ex instanceof BillingPreconditionFailedException
+                ? ex.getMessage()
+                : "La serie fue modificada concurrentemente. Recarga su estado antes de intentar nuevamente.";
+        return ResponseEntity.status(HttpStatus.PRECONDITION_FAILED)
+                .body(errorResponseFactory.build(request, HttpStatus.PRECONDITION_FAILED, message));
     }
 
     @ExceptionHandler({CatalogConflictException.class, InventoryConflictException.class, PurchaseConflictException.class, SalesConflictException.class, QuoteConflictException.class, BillingConflictException.class, EcommerceConflictException.class, DataIntegrityViolationException.class})

@@ -12,6 +12,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 
 import java.time.Instant;
 
@@ -22,6 +23,10 @@ public class BillingSeriesEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Version
+    @Column(name = "version", nullable = false)
+    private Long version;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "document_type", nullable = false, length = 20)
@@ -65,6 +70,7 @@ public class BillingSeriesEntity {
     }
 
     public Long getId() { return id; }
+    public Long getVersion() { return version; }
     public ElectronicDocumentType getDocumentType() { return documentType; }
     public void setDocumentType(ElectronicDocumentType documentType) { this.documentType = documentType; }
     public String getSeries() { return series; }

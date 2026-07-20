@@ -4,6 +4,7 @@ import java.time.Instant;
 
 public record BillingSeries(
         Long id,
+        Long version,
         ElectronicDocumentType documentType,
         String series,
         long currentNumber,
