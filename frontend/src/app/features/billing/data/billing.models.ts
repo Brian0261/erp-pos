@@ -52,6 +52,8 @@ export interface BillingSeriesRequest {
 
 export interface BillingSeriesResponse {
   id: number;
+  /** Optimistic-concurrency revision supplied by the backend; never sent in mutation bodies. */
+  version: number;
   documentType: ElectronicDocumentType;
   series: string;
   currentNumber: number;

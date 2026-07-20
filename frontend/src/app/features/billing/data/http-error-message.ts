@@ -29,6 +29,8 @@ export function toHttpErrorMessage(
       return detail
         ? `Conflicto: ${detail}`
         : "Conflicto de datos. Revisa el estado actual.";
+    case 412:
+      return "La informacion cambio desde que la cargaste. Recarga y revisa la version actual antes de intentarlo nuevamente.";
     case 422:
       return detail
         ? `Validacion fallida: ${detail}`

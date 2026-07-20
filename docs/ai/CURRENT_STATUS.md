@@ -1463,3 +1463,13 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
 - No hay bloqueantes para continuar con el ERP/POS cuando el usuario defina la siguiente seccion.
 - No se inicia ninguna fase nueva automaticamente.
 - Siguiente accion: esperar definicion del usuario sobre la proxima seccion del ERP/POS.
+
+## 4D-2B-2 Angular concurrency-token adoption
+
+- Implementacion frontend-only pendiente de cierre Git.
+- `BillingSeriesResponse` incorpora `version` de solo lectura.
+- Update/reactivate/deactivate usan ETag centralizado e `If-Match`.
+- `412 Precondition Failed` invalida el snapshot local, evita reintentos y recarga la lista una vez.
+- Build PASS y Playwright focal simulado PASS (3 tests).
+- No se modifico backend, migraciones, Auth/JWT, guards ni infraestructura.
+- 4D-2B-3 y 4D-2C siguen diferidas.

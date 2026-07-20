@@ -2,6 +2,7 @@ import { CommonModule } from "@angular/common";
 import { HttpErrorResponse } from "@angular/common/http";
 import { Component, OnInit } from "@angular/core";
 import { FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
+import { Observable } from "rxjs";
 
 import { AuthService } from "../../core/auth/auth.service";
 import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.service";
@@ -637,6 +638,7 @@ export class BillingSeriesPageComponent implements OnInit {
   statusFilter: "ALL" | "ACTIVE" | "INACTIVE" = "ALL";
 
   editingId: number | null = null;
+  private editingConcurrencyToken: string | null = null;
   showForm = false;
   showHistorical = false;
   editingContext: { series: string; environment: string } | null = null;
@@ -709,6 +711,7 @@ export class BillingSeriesPageComponent implements OnInit {
   openCreateForm(): void {
     this.showForm = true;
     this.editingId = null;
+    this.editingConcurrencyToken = null;
     this.editingContext = null;
     this.form.reset({
       documentType: "RECEIPT",
@@ -785,20 +788,36 @@ export class BillingSeriesPageComponent implements OnInit {
 
     this.loading = true;
 
-    const request$ = this.editingId
-      ? this.billingSeriesService.update(this.editingId, payload)
+    const editingId = this.editingId;
+    const editingConcurrencyToken = this.editingConcurrencyToken;
+    if (editingId !== null && !editingConcurrencyToken) {
+      this.loading = false;
+      this.errorMessage =
+        "La serie está desactualizada. Vuelve a cargarla antes de editarla.";
+      return;
+    }
+
+    const request$: Observable<unknown> = editingId !== null
+      ? this.billingSeriesService.update(editingId, payload, editingConcurrencyToken as string)
       : this.billingSeriesService.create(payload);
 
     request$.subscribe({
-      next: () => {
+      next: (response) => {
         this.loading = false;
-        this.successMessage = this.editingId
+        // The service captures the response ETag; the list reload provides the
+        // next stable row token without optimistic local mutation.
+        void response;
+        this.successMessage = editingId !== null
           ? "Serie actualizada correctamente."
           : "Serie creada correctamente.";
         this.closeForm();
         this.loadSeries();
       },
       error: (error: unknown) => {
+        if (this.isConcurrencyConflict(error)) {
+          this.handleConcurrencyConflict();
+          return;
+        }
         this.loading = false;
         this.errorMessage = this.toOperationalSeriesError(
           error,
@@ -811,6 +830,7 @@ export class BillingSeriesPageComponent implements OnInit {
   edit(series: BillingSeriesResponse): void {
     this.showForm = true;
     this.editingId = series.id;
+    this.editingConcurrencyToken = this.billingSeriesService.concurrencyToken(series);
     this.editingContext = {
       series: series.series,
       environment: series.environment,
@@ -827,6 +847,7 @@ export class BillingSeriesPageComponent implements OnInit {
   closeForm(): void {
     this.showForm = false;
     this.editingId = null;
+    this.editingConcurrencyToken = null;
     this.editingContext = null;
     this.form.reset({
       documentType: "RECEIPT",
@@ -862,13 +883,19 @@ export class BillingSeriesPageComponent implements OnInit {
     this.errorMessage = "";
     this.successMessage = "";
 
-    this.billingSeriesService.deactivate(series.id).subscribe({
-      next: () => {
+    const ifMatch = this.billingSeriesService.concurrencyToken(series);
+    this.billingSeriesService.deactivate(series.id, ifMatch).subscribe({
+      next: (response) => {
         this.loading = false;
+        void response;
         this.successMessage = `Serie ${series.series} desactivada.`;
         this.loadSeries();
       },
       error: (error: unknown) => {
+        if (this.isConcurrencyConflict(error)) {
+          this.handleConcurrencyConflict();
+          return;
+        }
         this.loading = false;
         this.errorMessage = this.toOperationalSeriesError(
           error,
@@ -907,13 +934,19 @@ export class BillingSeriesPageComponent implements OnInit {
       active: true,
     };
 
-    this.billingSeriesService.update(series.id, payload).subscribe({
-      next: () => {
+    const ifMatch = this.billingSeriesService.concurrencyToken(series);
+    this.billingSeriesService.update(series.id, payload, ifMatch).subscribe({
+      next: (response) => {
         this.loading = false;
+        void response;
         this.successMessage = `Serie ${series.series} activada.`;
         this.loadSeries();
       },
       error: (error: unknown) => {
+        if (this.isConcurrencyConflict(error)) {
+          this.handleConcurrencyConflict();
+          return;
+        }
         this.loading = false;
         this.errorMessage = this.toOperationalSeriesError(
           error,
@@ -943,13 +976,15 @@ export class BillingSeriesPageComponent implements OnInit {
     return type === "INVOICE" ? "FACTURA" : "BOLETA";
   }
 
-  private loadSeries(): void {
+  private loadSeries(preserveError = false): void {
     if (!this.canManage) {
       return;
     }
 
     this.loading = true;
-    this.errorMessage = "";
+    if (!preserveError) {
+      this.errorMessage = "";
+    }
 
     this.billingSeriesService.list().subscribe({
       next: (rows) => {
@@ -967,6 +1002,9 @@ export class BillingSeriesPageComponent implements OnInit {
   }
 
   private toOperationalSeriesError(error: unknown, fallback: string): string {
+    if (this.isConcurrencyConflict(error)) {
+      return "La serie fue modificada por otro usuario o proceso desde que la cargaste. Tus cambios no fueron guardados. Revisa la información actual antes de intentarlo nuevamente.";
+    }
     if (error instanceof HttpErrorResponse && error.status === 409) {
       const detail = String((error.error && (error.error.message || error.error)) || "");
       if (
@@ -984,6 +1022,22 @@ export class BillingSeriesPageComponent implements OnInit {
       }
     }
     return toHttpErrorMessage(error, fallback);
+  }
+
+  private isConcurrencyConflict(error: unknown): boolean {
+    return error instanceof HttpErrorResponse && error.status === 412;
+  }
+
+  private handleConcurrencyConflict(): void {
+    this.loading = false;
+    this.successMessage = "";
+    this.errorMessage =
+      "La serie fue modificada por otro usuario o proceso desde que la cargaste. Tus cambios no fueron guardados. Revisa la información actual antes de intentarlo nuevamente.";
+    this.editingConcurrencyToken = null;
+    if (this.editingId !== null) {
+      this.closeForm();
+    }
+    this.loadSeries(true);
   }
 
   private isSeriesValid(

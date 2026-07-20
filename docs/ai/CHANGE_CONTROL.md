@@ -2522,4 +2522,14 @@ Solo crear tag cuando se cumpla todo:
 - Recomendacion de continuidad:
   - 2S.10D queda cerrada.
   - No iniciar otra fase automaticamente.
-  - Esperar definicion del usuario sobre la siguiente seccion del ERP/POS.
+- Esperar definicion del usuario sobre la siguiente seccion del ERP/POS.
+
+### 4D-2B-2 Angular concurrency-token adoption
+
+- Alcance autorizado: frontend Angular de administracion de series.
+- Cambios limitados a modelo, servicio, pantalla y E2E focal simulado.
+- No se modifico backend, migraciones, interceptores, guards ni permisos.
+- Las mutaciones envian `If-Match` y no reintentan automaticamente ante `412`.
+- La lista se recarga una vez tras conflicto y no se aplican cambios optimistas.
+- Validaciones: `npm run build` PASS; Playwright focal 3/3 PASS.
+- No se hizo commit, push ni tag; el cierre Git queda pendiente de autorizacion.
