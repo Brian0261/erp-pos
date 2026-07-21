@@ -26,6 +26,7 @@ import com.erppos.backend.erp.billing.domain.exception.BillingBusinessRuleExcept
 import com.erppos.backend.erp.billing.domain.exception.BillingConflictException;
 import com.erppos.backend.erp.billing.domain.exception.BillingNotFoundException;
 import com.erppos.backend.erp.billing.domain.exception.BillingPreconditionFailedException;
+import com.erppos.backend.erp.billing.domain.exception.BillingPreconditionRequiredException;
 import com.erppos.backend.erp.billing.domain.model.BillingEnvironment;
 import com.erppos.backend.erp.billing.domain.model.BillingSaleItemSnapshot;
 import com.erppos.backend.erp.billing.domain.model.BillingSaleSnapshot;
@@ -293,6 +294,33 @@ class BillingApplicationServiceTest {
     }
 
     @Test
+    void shouldRejectAdministrativeUpdateWithoutExpectedVersionInsideTheApplicationService() {
+        BillingSeries before = seriesRepository.findById(1L).orElseThrow();
+
+        BillingPreconditionRequiredException exception = assertThrows(
+                BillingPreconditionRequiredException.class,
+                () -> seriesService.update(
+                        1L,
+                        new UpdateBillingSeriesCommand(
+                                before.documentType(),
+                                before.series(),
+                                before.currentNumber() + 1,
+                                before.environment(),
+                                before.active(),
+                                null
+                        )
+                )
+        );
+
+        assertEquals(
+                "El header If-Match es obligatorio para modificar una serie. "
+                        + "Recarga la serie y vuelve a intentarlo con su versión vigente.",
+                exception.getMessage()
+        );
+        assertEquals(before, seriesRepository.findById(1L).orElseThrow());
+    }
+
+    @Test
     void shouldRejectDuplicatedSeries() {
         assertThrows(BillingConflictException.class, () -> seriesService.create(new CreateBillingSeriesCommand(
                 ElectronicDocumentType.RECEIPT,
@@ -387,7 +415,8 @@ class BillingApplicationServiceTest {
                         inactiveSeries.series(),
                         inactiveSeries.currentNumber(),
                         inactiveSeries.environment(),
-                        true
+                        true,
+                        inactiveSeries.version()
                 )
         ));
 
@@ -973,7 +1002,8 @@ class BillingApplicationServiceTest {
                         "B001",
                         1L,
                         BillingEnvironment.LOCAL,
-                        true
+                        true,
+                        seriesRepository.findById(1L).orElseThrow().version()
                 )
         ));
 
@@ -1004,7 +1034,8 @@ class BillingApplicationServiceTest {
                         "B001",
                         2L,
                         BillingEnvironment.LOCAL,
-                        true
+                        true,
+                        seriesRepository.findById(1L).orElseThrow().version()
                 )
         ));
 
@@ -1034,7 +1065,8 @@ class BillingApplicationServiceTest {
                         "B001",
                         10L,
                         BillingEnvironment.LOCAL,
-                        true
+                        true,
+                        seriesRepository.findById(1L).orElseThrow().version()
                 )
         );
 
@@ -1059,7 +1091,8 @@ class BillingApplicationServiceTest {
                         "B200",
                         1L,
                         BillingEnvironment.BETA,
-                        true
+                        true,
+                        created.version()
                 )
         );
 
@@ -1099,18 +1132,19 @@ class BillingApplicationServiceTest {
         ));
         seriesRepository.beforeFindByIdForUpdate = () -> forceSeriesCurrentNumber(1L, 2L);
 
-        BillingConflictException ex = assertThrows(BillingConflictException.class, () -> seriesService.update(
+        BillingPreconditionFailedException ex = assertThrows(BillingPreconditionFailedException.class, () -> seriesService.update(
                 1L,
                 new UpdateBillingSeriesCommand(
                         ElectronicDocumentType.RECEIPT,
                         "B001",
                         1L,
                         BillingEnvironment.LOCAL,
-                        true
+                        true,
+                        current.version()
                 )
         ));
 
-        assertEquals("El proximo correlativo debe ser mayor al ultimo comprobante emitido para esta serie.", ex.getMessage());
+        assertEquals("La serie fue modificada desde que se consulto. Recarga su estado antes de intentar nuevamente.", ex.getMessage());
         assertEquals(2L, seriesRepository.findById(1L).orElseThrow().currentNumber());
         assertEquals(1, seriesRepository.findByIdForUpdateCalls);
     }
@@ -1124,7 +1158,7 @@ class BillingApplicationServiceTest {
                 null
         ));
 
-        seriesService.deactivate(1L);
+        seriesService.deactivate(1L, seriesService.getById(1L).version());
 
         BillingSeries disabledSeries = seriesService.getById(1L);
         ElectronicDocument persisted = documentRepository.findById(created.id()).orElseThrow();
@@ -1137,13 +1171,17 @@ class BillingApplicationServiceTest {
     }
 
     @Test
-    void shouldDeactivateFreshLockedSeriesWithoutRestoringStaleCurrentNumber() {
+    void shouldRejectDeactivationWhenTheLockedSeriesHasAChangedVersion() {
+        long expectedVersion = seriesService.getById(1L).version();
         seriesRepository.beforeFindByIdForUpdate = () -> forceSeriesCurrentNumber(1L, 7L);
 
-        seriesService.deactivate(1L);
+        assertThrows(
+                BillingPreconditionFailedException.class,
+                () -> seriesService.deactivate(1L, expectedVersion)
+        );
 
         BillingSeries deactivated = seriesRepository.findById(1L).orElseThrow();
-        assertFalse(deactivated.active());
+        assertTrue(deactivated.active());
         assertEquals(7L, deactivated.currentNumber());
         assertEquals(1, seriesRepository.findByIdForUpdateCalls);
     }

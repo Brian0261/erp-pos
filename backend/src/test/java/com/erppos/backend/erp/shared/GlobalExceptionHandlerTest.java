@@ -2,6 +2,7 @@ package com.erppos.backend.erp.shared;
 
 import com.erppos.backend.erp.billing.domain.exception.BillingPreconditionFailedException;
 import com.erppos.backend.erp.billing.domain.exception.BillingPreconditionFormatException;
+import com.erppos.backend.erp.billing.domain.exception.BillingPreconditionRequiredException;
 import com.erppos.backend.erp.quotes.domain.exception.QuoteBusinessRuleException;
 import com.erppos.backend.erp.quotes.domain.exception.QuoteConflictException;
 import com.erppos.backend.erp.quotes.domain.exception.QuoteNotFoundException;
@@ -18,6 +19,7 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.springframework.http.HttpHeaders.CACHE_CONTROL;
 
 class GlobalExceptionHandlerTest {
 
@@ -82,6 +84,22 @@ class GlobalExceptionHandlerTest {
         assertNotNull(response.getBody());
         assertEquals(400, response.getBody().status());
         assertEquals("If-Match invalido", response.getBody().message());
+    }
+
+    @Test
+    void shouldMapMissingBillingPreconditionTo428WithoutCaching() {
+        String message = "El header If-Match es obligatorio para modificar una serie. Recarga la serie y vuelve a intentarlo con su versión vigente.";
+
+        ResponseEntity<ApiError> response = exceptionHandler.handlePreconditionRequired(
+                new BillingPreconditionRequiredException(message),
+                request
+        );
+
+        assertEquals(HttpStatus.PRECONDITION_REQUIRED, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals(428, response.getBody().status());
+        assertEquals(message, response.getBody().message());
+        assertEquals("no-store", response.getHeaders().getFirst(CACHE_CONTROL));
     }
 
     @Test

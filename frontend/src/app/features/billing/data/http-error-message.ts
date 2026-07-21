@@ -31,6 +31,8 @@ export function toHttpErrorMessage(
         : "Conflicto de datos. Revisa el estado actual.";
     case 412:
       return "La informacion cambio desde que la cargaste. Recarga y revisa la version actual antes de intentarlo nuevamente.";
+    case 428:
+      return "No se pudo verificar la versión vigente del recurso. Recarga la información actual antes de intentarlo nuevamente.";
     case 422:
       return detail
         ? `Validacion fallida: ${detail}`

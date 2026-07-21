@@ -814,8 +814,8 @@ export class BillingSeriesPageComponent implements OnInit {
         this.loadSeries();
       },
       error: (error: unknown) => {
-        if (this.isConcurrencyConflict(error)) {
-          this.handleConcurrencyConflict();
+        if (this.isConcurrencyPreconditionError(error)) {
+          this.handleConcurrencyPreconditionError(error);
           return;
         }
         this.loading = false;
@@ -892,8 +892,8 @@ export class BillingSeriesPageComponent implements OnInit {
         this.loadSeries();
       },
       error: (error: unknown) => {
-        if (this.isConcurrencyConflict(error)) {
-          this.handleConcurrencyConflict();
+        if (this.isConcurrencyPreconditionError(error)) {
+          this.handleConcurrencyPreconditionError(error);
           return;
         }
         this.loading = false;
@@ -943,8 +943,8 @@ export class BillingSeriesPageComponent implements OnInit {
         this.loadSeries();
       },
       error: (error: unknown) => {
-        if (this.isConcurrencyConflict(error)) {
-          this.handleConcurrencyConflict();
+        if (this.isConcurrencyPreconditionError(error)) {
+          this.handleConcurrencyPreconditionError(error);
           return;
         }
         this.loading = false;
@@ -1002,8 +1002,8 @@ export class BillingSeriesPageComponent implements OnInit {
   }
 
   private toOperationalSeriesError(error: unknown, fallback: string): string {
-    if (this.isConcurrencyConflict(error)) {
-      return "La serie fue modificada por otro usuario o proceso desde que la cargaste. Tus cambios no fueron guardados. Revisa la información actual antes de intentarlo nuevamente.";
+    if (this.isConcurrencyPreconditionError(error)) {
+      return this.concurrencyPreconditionMessage(error);
     }
     if (error instanceof HttpErrorResponse && error.status === 409) {
       const detail = String((error.error && (error.error.message || error.error)) || "");
@@ -1024,20 +1024,26 @@ export class BillingSeriesPageComponent implements OnInit {
     return toHttpErrorMessage(error, fallback);
   }
 
-  private isConcurrencyConflict(error: unknown): boolean {
-    return error instanceof HttpErrorResponse && error.status === 412;
+  private isConcurrencyPreconditionError(error: unknown): boolean {
+    return error instanceof HttpErrorResponse && (error.status === 412 || error.status === 428);
   }
 
-  private handleConcurrencyConflict(): void {
+  private handleConcurrencyPreconditionError(error: unknown): void {
     this.loading = false;
     this.successMessage = "";
-    this.errorMessage =
-      "La serie fue modificada por otro usuario o proceso desde que la cargaste. Tus cambios no fueron guardados. Revisa la información actual antes de intentarlo nuevamente.";
+    this.errorMessage = this.concurrencyPreconditionMessage(error);
     this.editingConcurrencyToken = null;
     if (this.editingId !== null) {
       this.closeForm();
     }
     this.loadSeries(true);
+  }
+
+  private concurrencyPreconditionMessage(error: unknown): string {
+    if (error instanceof HttpErrorResponse && error.status === 428) {
+      return "No se pudo verificar la versión vigente de la serie. Tus cambios no fueron guardados. Revisa la información actual antes de intentarlo nuevamente.";
+    }
+    return "La serie fue modificada por otro usuario o proceso desde que la cargaste. Tus cambios no fueron guardados. Revisa la información actual antes de intentarlo nuevamente.";
   }
 
   private isSeriesValid(

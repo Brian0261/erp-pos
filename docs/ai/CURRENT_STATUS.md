@@ -1466,10 +1466,22 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
 
 ## 4D-2B-2 Angular concurrency-token adoption
 
-- Implementacion frontend-only pendiente de cierre Git.
+- Cerrada y publicada en `d6d3467 feat(billing): adopt fiscal series concurrency tokens`.
 - `BillingSeriesResponse` incorpora `version` de solo lectura.
 - Update/reactivate/deactivate usan ETag centralizado e `If-Match`.
 - `412 Precondition Failed` invalida el snapshot local, evita reintentos y recarga la lista una vez.
 - Build PASS y Playwright focal simulado PASS (3 tests).
 - No se modifico backend, migraciones, Auth/JWT, guards ni infraestructura.
-- 4D-2B-3 y 4D-2C siguen diferidas.
+- 4D-2B-3 fue ejecutada posteriormente; 4D-2C sigue diferida.
+
+## 4D-2B-3 Mandatory precondition enforcement
+
+- Implementación funcional completada localmente; cierre Git pendiente de autorización.
+- `PUT /api/v1/billing/series/{id}` y `DELETE /api/v1/billing/series/{id}` exigen `If-Match`.
+- Ausencia: `428 Precondition Required` con `Cache-Control: no-store`; formato inválido: `400`; token obsoleto: `412`.
+- Se eliminaron overloads administrativos que admitían versión nula y el servicio mantiene validación defensiva.
+- Angular distingue `428` de `412`, invalida el contexto local, recarga una vez y no reintenta la mutación.
+- Validación: focal backend 148 PASS; REST/Testcontainers 19 PASS; concurrencia fiscal 9 PASS; suite backend 642 PASS; build Angular PASS; Playwright focal 6 PASS.
+- No se modificaron migraciones, entidades, repositorios, locks, seguridad, emisión fiscal ni infraestructura.
+- Clientes mutantes externos no verificables: inventario obligatorio como puerta previa al rollout productivo.
+- QA-FE-1 y 4D-2C no fueron iniciadas.

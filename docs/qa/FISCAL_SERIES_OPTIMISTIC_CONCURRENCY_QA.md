@@ -148,6 +148,15 @@ Secuencia:
 
 Mientras B1 permita requests sin header, esos clientes conservan el riesgo temporal de last-write-wins entre dos formularios administrativos secuenciales. Los locks de 4D-2A siguen evitando corrupción frente a emisión, pero la protección completa del cliente requiere B2/B3.
 
+## Estado posterior de B2/B3
+
+La compatibilidad temporal descrita arriba corresponde al cierre histórico de B1. Posteriormente:
+
+- 4D-2B-2 hizo que Angular enviara `If-Match` en update, reactivación y desactivación;
+- 4D-2B-3 hizo obligatoria esa precondición y eliminó los overloads administrativos con versión nula;
+- el contrato final distingue ausencia (`428`), formato inválido (`400`) y versión obsoleta (`412`);
+- los clientes externos no verificables deben inventariarse antes del despliegue y constituyen una puerta de rollout, no un fallback dentro del backend.
+
 Elementos diferidos:
 
 - Angular y manejo visual de `412`;

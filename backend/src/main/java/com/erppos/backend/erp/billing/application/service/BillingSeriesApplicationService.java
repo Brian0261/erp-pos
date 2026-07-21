@@ -7,6 +7,7 @@ import com.erppos.backend.erp.billing.domain.exception.BillingBusinessRuleExcept
 import com.erppos.backend.erp.billing.domain.exception.BillingConflictException;
 import com.erppos.backend.erp.billing.domain.exception.BillingNotFoundException;
 import com.erppos.backend.erp.billing.domain.exception.BillingPreconditionFailedException;
+import com.erppos.backend.erp.billing.domain.exception.BillingPreconditionRequiredException;
 import com.erppos.backend.erp.billing.domain.model.BillingEnvironment;
 import com.erppos.backend.erp.billing.domain.model.BillingSeries;
 import com.erppos.backend.erp.billing.domain.model.ElectronicDocumentType;
@@ -114,12 +115,6 @@ public class BillingSeriesApplicationService implements BillingSeriesUseCase {
 
     @Override
     @Transactional
-    public BillingSeries deactivate(Long id) {
-        return deactivate(id, null);
-    }
-
-    @Override
-    @Transactional
     public BillingSeries deactivate(Long id, Long expectedVersion) {
         BillingSeries current = seriesRepositoryPort.findByIdForUpdate(id)
                 .orElseThrow(() -> new BillingNotFoundException("Billing series not found"));
@@ -144,7 +139,9 @@ public class BillingSeriesApplicationService implements BillingSeriesUseCase {
 
     private void validateExpectedVersion(BillingSeries current, Long expectedVersion) {
         if (expectedVersion == null) {
-            return;
+            throw new BillingPreconditionRequiredException(
+                    "El header If-Match es obligatorio para modificar una serie. Recarga la serie y vuelve a intentarlo con su versión vigente."
+            );
         }
         if (!expectedVersion.equals(current.version())) {
             throw new BillingPreconditionFailedException(

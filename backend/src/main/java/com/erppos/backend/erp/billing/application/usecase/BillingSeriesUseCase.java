@@ -10,9 +10,5 @@ public interface BillingSeriesUseCase {
     BillingSeries getById(Long id);
     BillingSeries update(Long id, UpdateBillingSeriesCommand command);
     BillingSeries deactivate(Long id, Long expectedVersion);
-
-    default BillingSeries deactivate(Long id) {
-        return deactivate(id, null);
-    }
 }
 

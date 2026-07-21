@@ -11,14 +11,5 @@ public record UpdateBillingSeriesCommand(
         Boolean active,
         Long expectedVersion
 ) {
-    public UpdateBillingSeriesCommand(
-            ElectronicDocumentType documentType,
-            String series,
-            Long currentNumber,
-            BillingEnvironment environment,
-            Boolean active
-    ) {
-        this(documentType, series, currentNumber, environment, active, null);
-    }
 }
 

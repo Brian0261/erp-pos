@@ -2533,3 +2533,16 @@ Solo crear tag cuando se cumpla todo:
 - La lista se recarga una vez tras conflicto y no se aplican cambios optimistas.
 - Validaciones: `npm run build` PASS; Playwright focal 3/3 PASS.
 - No se hizo commit, push ni tag; el cierre Git queda pendiente de autorizacion.
+
+### 4D-2B-3 Mandatory precondition enforcement
+
+- Alcance: enforcement backend/REST, manejo Angular de `428`, pruebas y documentación del contrato de concurrencia.
+- El parser exige un único ETag fuerte de serie; null produce `BillingPreconditionRequiredException` y valores vacíos, débiles, wildcard, listas, overflow o ID distinto producen `400`.
+- El handler global traduce ausencia a `428 Precondition Required` con `Cache-Control: no-store` y mensaje estable sin detalles internos.
+- Se eliminaron el constructor administrativo sin versión y los overloads de desactivación sin versión; el servicio conserva defensa ante null antes de persistir.
+- La emisión interna sigue exenta del header HTTP y conserva lock, `@Version` e incremento de `currentNumber` existentes.
+- Angular muestra un mensaje específico para `428`, invalida token/formulario, recarga exactamente una vez y no reintenta ni reaplica cambios.
+- Pruebas: focal backend 148/148, REST/Testcontainers 19/19, concurrencia fiscal 9/9, suite backend 642/642, build Angular PASS y Playwright focal 6/6.
+- No se crearon migraciones ni se modificaron entidades, repositorios, seguridad, CORS, Auth/JWT, guards, proveedor fiscal o infraestructura.
+- No se verificaron clientes externos fuera del repositorio; deben inventariarse y actualizarse antes del rollout productivo.
+- Sin commit, push ni tag. QA-FE-1 y 4D-2C permanecen fuera de alcance.

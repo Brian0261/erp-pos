@@ -76,7 +76,7 @@ public class BillingSeriesController {
                 request.currentNumber(),
                 request.environment(),
                 request.active(),
-                BillingSeriesEtag.parseOptional(ifMatch, id)
+                BillingSeriesEtag.parseRequired(ifMatch, id)
         ));
         return ResponseEntity.ok()
                 .header(HttpHeaders.ETAG, BillingSeriesEtag.from(updated))
@@ -91,7 +91,7 @@ public class BillingSeriesController {
     ) {
         BillingSeries deactivated = seriesUseCase.deactivate(
                 id,
-                BillingSeriesEtag.parseOptional(ifMatch, id)
+                BillingSeriesEtag.parseRequired(ifMatch, id)
         );
         return ResponseEntity.noContent()
                 .header(HttpHeaders.ETAG, BillingSeriesEtag.from(deactivated))

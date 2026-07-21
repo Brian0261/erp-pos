@@ -2,6 +2,7 @@ package com.erppos.backend.erp.billing.adapter.rest;
 
 import com.erppos.backend.erp.billing.adapter.dto.BillingSeriesRequest;
 import com.erppos.backend.erp.billing.domain.exception.BillingPreconditionFormatException;
+import com.erppos.backend.erp.billing.domain.exception.BillingPreconditionRequiredException;
 import com.erppos.backend.erp.billing.domain.model.BillingEnvironment;
 import com.erppos.backend.erp.billing.domain.model.BillingSeries;
 import com.erppos.backend.erp.billing.domain.model.ElectronicDocumentType;
@@ -11,7 +12,6 @@ import java.util.Arrays;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class BillingSeriesEtagTest {
@@ -35,25 +35,34 @@ class BillingSeriesEtagTest {
         String etag = BillingSeriesEtag.from(series);
 
         assertEquals("\"billing-series-41-v7\"", etag);
-        assertEquals(7L, BillingSeriesEtag.parseOptional(etag, 41L));
-        assertNull(BillingSeriesEtag.parseOptional(null, 41L));
+        assertEquals(7L, BillingSeriesEtag.parseRequired(etag, 41L));
+    }
+
+    @Test
+    void shouldRequireIfMatchForAdministrativeMutations() {
+        assertThrows(
+                BillingPreconditionRequiredException.class,
+                () -> BillingSeriesEtag.parseRequired(null, 41L)
+        );
     }
 
     @Test
     void shouldRejectUnsupportedOrMalformedIfMatchValues() {
+        assertMalformed("");
         assertMalformed("W/\"billing-series-41-v7\"");
         assertMalformed("*");
         assertMalformed("\"billing-series-41-v7\", \"billing-series-41-v8\"");
         assertMalformed("billing-series-41-v7");
         assertMalformed("\"billing-series-0-v7\"");
         assertMalformed("\"billing-series-41-v-1\"");
+        assertMalformed("\"billing-series-41-v999999999999999999999999999999999999\"");
     }
 
     @Test
     void shouldRejectEtagForDifferentPathId() {
         assertThrows(
                 BillingPreconditionFormatException.class,
-                () -> BillingSeriesEtag.parseOptional("\"billing-series-42-v7\"", 41L)
+                () -> BillingSeriesEtag.parseRequired("\"billing-series-42-v7\"", 41L)
         );
     }
 
@@ -66,7 +75,7 @@ class BillingSeriesEtagTest {
     private void assertMalformed(String value) {
         assertThrows(
                 BillingPreconditionFormatException.class,
-                () -> BillingSeriesEtag.parseOptional(value, 41L)
+                () -> BillingSeriesEtag.parseRequired(value, 41L)
         );
     }
 }

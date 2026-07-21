@@ -101,17 +101,57 @@ class BillingSeriesOptimisticConcurrencyIntegrationTest extends AbstractHttpInte
                 created.series(),
                 11L,
                 true,
-                null
+                created.etag()
         );
         assertEquals(200, update.getResponse().getStatus());
         assertEquals(1L, readJson(update).path("version").asLong());
         assertEquals(etag(created.id(), 1L), update.getResponse().getHeader(HttpHeaders.ETAG));
 
-        MvcResult deactivate = deactivate(token, created.id(), null);
+        MvcResult deactivate = deactivate(
+                token,
+                created.id(),
+                update.getResponse().getHeader(HttpHeaders.ETAG)
+        );
         assertEquals(204, deactivate.getResponse().getStatus());
         assertEquals(etag(created.id(), 2L), deactivate.getResponse().getHeader(HttpHeaders.ETAG));
         assertEquals(2L, row(created.id()).version());
         assertFalse(row(created.id()).active());
+    }
+
+    @Test
+    void putWithoutIfMatchShouldReturn428WithoutChangingTheSeries() throws Exception {
+        String token = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        CreatedSeries created = createSeries(token, false);
+        SeriesRow before = row(created.id());
+
+        MvcResult result = update(token, created.id(), created.series(), 11L, false, null);
+
+        assertPreconditionRequired(result);
+        assertEquals(before, row(created.id()));
+    }
+
+    @Test
+    void reactivationWithoutIfMatchShouldReturn428WithoutChangingTheSeries() throws Exception {
+        String token = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        CreatedSeries created = createSeries(token, false);
+        SeriesRow before = row(created.id());
+
+        MvcResult result = update(token, created.id(), created.series(), 10L, true, null);
+
+        assertPreconditionRequired(result);
+        assertEquals(before, row(created.id()));
+    }
+
+    @Test
+    void deleteWithoutIfMatchShouldReturn428WithoutChangingTheSeries() throws Exception {
+        String token = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+        CreatedSeries created = createSeries(token, true);
+        SeriesRow before = row(created.id());
+
+        MvcResult result = deactivate(token, created.id(), null);
+
+        assertPreconditionRequired(result);
+        assertEquals(before, row(created.id()));
     }
 
     @Test
@@ -185,11 +225,13 @@ class BillingSeriesOptimisticConcurrencyIntegrationTest extends AbstractHttpInte
 
     @ParameterizedTest
     @ValueSource(strings = {
+            "",
             "W/\"billing-series-1-v0\"",
             "*",
             "\"billing-series-1-v0\", \"billing-series-1-v1\"",
             "billing-series-1-v0",
-            "\"billing-series-other-v0\""
+            "\"billing-series-other-v0\"",
+            "\"billing-series-1-v999999999999999999999999999999999999\""
     })
     void invalidIfMatchShouldReturn400(String ifMatch) throws Exception {
         String token = login(ADMIN_EMAIL, ADMIN_PASSWORD);
@@ -235,6 +277,9 @@ class BillingSeriesOptimisticConcurrencyIntegrationTest extends AbstractHttpInte
                 etag(missingId, 0L)
         );
         assertEquals(404, missing.getResponse().getStatus());
+
+        MvcResult missingDelete = deactivate(token, missingId, etag(missingId, 0L));
+        assertEquals(404, missingDelete.getResponse().getStatus());
     }
 
     @Test
@@ -472,6 +517,18 @@ class BillingSeriesOptimisticConcurrencyIntegrationTest extends AbstractHttpInte
                 .toList();
         assertEquals(1L, statuses.stream().filter(status -> status == 412).count());
         assertEquals(1L, statuses.stream().filter(successfulStatuses::contains).count());
+    }
+
+    private void assertPreconditionRequired(MvcResult result) throws Exception {
+        assertEquals(428, result.getResponse().getStatus());
+        assertEquals("no-store", result.getResponse().getHeader(HttpHeaders.CACHE_CONTROL));
+        JsonNode body = readJson(result);
+        assertEquals(428, body.path("status").asInt());
+        assertEquals(
+                "El header If-Match es obligatorio para modificar una serie. "
+                        + "Recarga la serie y vuelve a intentarlo con su versión vigente.",
+                body.path("message").asText()
+        );
     }
 
     private boolean hasOptimisticConflict(Throwable throwable) {

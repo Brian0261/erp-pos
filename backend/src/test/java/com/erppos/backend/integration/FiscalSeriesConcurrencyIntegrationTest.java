@@ -5,7 +5,6 @@ import com.erppos.backend.erp.billing.application.usecase.CreateElectronicDocume
 import com.erppos.backend.erp.billing.application.usecase.ElectronicDocumentUseCase;
 import com.erppos.backend.erp.billing.application.usecase.UpdateBillingSeriesCommand;
 import com.erppos.backend.erp.billing.domain.exception.BillingBusinessRuleException;
-import com.erppos.backend.erp.billing.domain.exception.BillingConflictException;
 import com.erppos.backend.erp.billing.domain.exception.BillingPreconditionFailedException;
 import com.erppos.backend.erp.billing.domain.model.BillingEnvironment;
 import com.erppos.backend.erp.billing.domain.model.BillingSeries;
@@ -71,6 +70,7 @@ class FiscalSeriesConcurrencyIntegrationTest extends AbstractHttpIntegrationTest
     @Timeout(30)
     void emissionCommitCannotBeOverwrittenByStaleAdministrativeUpdate() throws Exception {
         Fixture fixture = createFixture(true, 1);
+        long expectedVersion = seriesUseCase.getById(fixture.seriesId()).version();
         ExecutorService executor = Executors.newSingleThreadExecutor();
         Connection emission = dataSource.getConnection();
         Future<BillingSeries> update = null;
@@ -82,7 +82,7 @@ class FiscalSeriesConcurrencyIntegrationTest extends AbstractHttpIntegrationTest
 
             update = executor.submit(() -> seriesUseCase.update(
                     fixture.seriesId(),
-                    updateCommand(fixture, fixture.initialCurrentNumber(), true)
+                    updateCommand(fixture, fixture.initialCurrentNumber(), true, expectedVersion)
             ));
 
             awaitBlockedSessions(blockerPid, 1);
@@ -96,7 +96,7 @@ class FiscalSeriesConcurrencyIntegrationTest extends AbstractHttpIntegrationTest
                     ExecutionException.class,
                     () -> completedUpdate.get(WAIT.toMillis(), TimeUnit.MILLISECONDS)
             );
-            assertInstanceOf(BillingConflictException.class, conflict.getCause());
+            assertInstanceOf(BillingPreconditionFailedException.class, conflict.getCause());
             assertEquals(fixture.initialCurrentNumber() + 1, currentNumber(fixture.seriesId()));
             assertEquals(issuedNumber, maxIssuedNumber(fixture.seriesId()));
             assertSeriesInvariant(fixture);
@@ -115,6 +115,7 @@ class FiscalSeriesConcurrencyIntegrationTest extends AbstractHttpIntegrationTest
     @Timeout(30)
     void deactivationWaitsForEmissionAndPreservesConfirmedIncrement() throws Exception {
         Fixture fixture = createFixture(true, 1);
+        long expectedVersion = seriesUseCase.getById(fixture.seriesId()).version();
         ExecutorService executor = Executors.newSingleThreadExecutor();
         Connection emission = dataSource.getConnection();
         Future<?> deactivate = null;
@@ -124,18 +125,25 @@ class FiscalSeriesConcurrencyIntegrationTest extends AbstractHttpIntegrationTest
             int blockerPid = backendPid(emission);
             prepareSyntheticEmission(emission, fixture, fixture.saleIds().get(0));
 
-            deactivate = executor.submit(() -> seriesUseCase.deactivate(fixture.seriesId()));
+            deactivate = executor.submit(() -> seriesUseCase.deactivate(fixture.seriesId(), expectedVersion));
 
             awaitBlockedSessions(blockerPid, 1);
             assertFalse(deactivate.isDone(), "Deactivation did not wait for the series lock");
 
             emission.commit();
             committed = true;
-            deactivate.get(WAIT.toMillis(), TimeUnit.MILLISECONDS);
+            Future<?> completedDeactivate = deactivate;
+            ExecutionException stale = assertThrows(
+                    ExecutionException.class,
+                    () -> completedDeactivate.get(WAIT.toMillis(), TimeUnit.MILLISECONDS)
+            );
+            assertInstanceOf(BillingPreconditionFailedException.class, stale.getCause());
 
-            BillingSeries result = seriesUseCase.getById(fixture.seriesId());
-            assertFalse(result.active());
-            assertEquals(fixture.initialCurrentNumber() + 1, result.currentNumber());
+            BillingSeries afterEmission = seriesUseCase.getById(fixture.seriesId());
+            BillingSeries deactivated = seriesUseCase.deactivate(fixture.seriesId(), afterEmission.version());
+
+            assertFalse(deactivated.active());
+            assertEquals(fixture.initialCurrentNumber() + 1, deactivated.currentNumber());
             assertEquals(1, documentCount(fixture.seriesId()));
             assertSeriesInvariant(fixture);
             assertNoDuplicateOrReusedNumbers(fixture);
@@ -153,6 +161,7 @@ class FiscalSeriesConcurrencyIntegrationTest extends AbstractHttpIntegrationTest
     @Timeout(30)
     void inactiveEmissionAndReactivationAreLinearizedWithoutConsumingNumberEarly() throws Exception {
         Fixture fixture = createFixture(false, 2);
+        long expectedVersion = seriesUseCase.getById(fixture.seriesId()).version();
         ExecutorService executor = Executors.newFixedThreadPool(2);
         Connection blocker = dataSource.getConnection();
         Future<ElectronicDocument> emission = null;
@@ -167,7 +176,7 @@ class FiscalSeriesConcurrencyIntegrationTest extends AbstractHttpIntegrationTest
             awaitBlockedSessions(blockerPid, 1);
             reactivation = executor.submit(() -> seriesUseCase.update(
                     fixture.seriesId(),
-                    updateCommand(fixture, fixture.initialCurrentNumber(), true)
+                    updateCommand(fixture, fixture.initialCurrentNumber(), true, expectedVersion)
             ));
             awaitBlockedSessions(blockerPid, 2);
 
@@ -249,6 +258,7 @@ class FiscalSeriesConcurrencyIntegrationTest extends AbstractHttpIntegrationTest
     @Timeout(30)
     void updateAndDeactivateSerializeToAValidAdministrativeOrder() throws Exception {
         Fixture fixture = createFixture(true, 0);
+        long expectedVersion = seriesUseCase.getById(fixture.seriesId()).version();
         ExecutorService executor = Executors.newFixedThreadPool(2);
         Connection blocker = dataSource.getConnection();
         Future<BillingSeries> update = null;
@@ -262,21 +272,34 @@ class FiscalSeriesConcurrencyIntegrationTest extends AbstractHttpIntegrationTest
 
             update = executor.submit(() -> seriesUseCase.update(
                     fixture.seriesId(),
-                    updateCommand(fixture, proposedCurrentNumber, true)
+                    updateCommand(fixture, proposedCurrentNumber, true, expectedVersion)
             ));
             awaitBlockedSessions(blockerPid, 1);
-            deactivate = executor.submit(() -> seriesUseCase.deactivate(fixture.seriesId()));
+            deactivate = executor.submit(() -> seriesUseCase.deactivate(fixture.seriesId(), expectedVersion));
             awaitBlockedSessions(blockerPid, 2);
 
             blocker.commit();
             committed = true;
 
-            update.get(WAIT.toMillis(), TimeUnit.MILLISECONDS);
-            deactivate.get(WAIT.toMillis(), TimeUnit.MILLISECONDS);
+            int successes = 0;
+            int staleFailures = 0;
+            for (Future<?> operation : List.of(update, deactivate)) {
+                try {
+                    operation.get(WAIT.toMillis(), TimeUnit.MILLISECONDS);
+                    successes++;
+                } catch (ExecutionException exception) {
+                    assertInstanceOf(BillingPreconditionFailedException.class, exception.getCause());
+                    staleFailures++;
+                }
+            }
 
             BillingSeries result = seriesUseCase.getById(fixture.seriesId());
-            assertFalse(result.active());
-            assertEquals(proposedCurrentNumber, result.currentNumber());
+            assertEquals(1, successes);
+            assertEquals(1, staleFailures);
+            assertTrue(
+                    (result.active() && result.currentNumber() == proposedCurrentNumber)
+                            || (!result.active() && result.currentNumber() == fixture.initialCurrentNumber())
+            );
             assertEquals(fixture.series(), result.series());
             assertEquals(BillingEnvironment.BETA, result.environment());
             assertEquals(ElectronicDocumentType.RECEIPT, result.documentType());
@@ -307,7 +330,12 @@ class FiscalSeriesConcurrencyIntegrationTest extends AbstractHttpIntegrationTest
 
             BillingSeries updated = seriesUseCase.update(
                     fixture.seriesId(),
-                    updateCommand(fixture, fixture.initialCurrentNumber() + 2, true)
+                    updateCommand(
+                            fixture,
+                            fixture.initialCurrentNumber() + 2,
+                            true,
+                            seriesUseCase.getById(fixture.seriesId()).version()
+                    )
             );
             assertEquals(fixture.initialCurrentNumber() + 2, updated.currentNumber());
             assertSeriesLockAvailable(fixture.seriesId());
@@ -350,19 +378,21 @@ class FiscalSeriesConcurrencyIntegrationTest extends AbstractHttpIntegrationTest
         ElectronicDocument document = createDocument(fixture, fixture.saleIds().get(0));
         assertEquals(fixture.initialCurrentNumber(), document.number());
 
-        seriesUseCase.deactivate(fixture.seriesId());
+        BillingSeries afterEmission = seriesUseCase.getById(fixture.seriesId());
+        seriesUseCase.deactivate(fixture.seriesId(), afterEmission.version());
         assertEquals(fixture.initialCurrentNumber() + 1, currentNumber(fixture.seriesId()));
 
-        BillingConflictException staleReactivation = assertThrows(
-                BillingConflictException.class,
+        assertThrows(
+                BillingPreconditionFailedException.class,
                 () -> seriesUseCase.update(
                         fixture.seriesId(),
-                        updateCommand(fixture, fixture.initialCurrentNumber(), true)
+                        updateCommand(
+                                fixture,
+                                fixture.initialCurrentNumber(),
+                                true,
+                                afterEmission.version()
+                        )
                 )
-        );
-        assertEquals(
-                "El proximo correlativo debe ser mayor al ultimo comprobante emitido para esta serie.",
-                staleReactivation.getMessage()
         );
         BillingSeries stillInactive = seriesUseCase.getById(fixture.seriesId());
         assertFalse(stillInactive.active());
@@ -370,7 +400,12 @@ class FiscalSeriesConcurrencyIntegrationTest extends AbstractHttpIntegrationTest
 
         BillingSeries reactivated = seriesUseCase.update(
                 fixture.seriesId(),
-                updateCommand(fixture, fixture.initialCurrentNumber() + 1, true)
+                updateCommand(
+                        fixture,
+                        fixture.initialCurrentNumber() + 1,
+                        true,
+                        stillInactive.version()
+                )
         );
         assertTrue(reactivated.active());
         assertEquals(fixture.initialCurrentNumber() + 1, reactivated.currentNumber());
@@ -490,13 +525,19 @@ class FiscalSeriesConcurrencyIntegrationTest extends AbstractHttpIntegrationTest
         );
     }
 
-    private UpdateBillingSeriesCommand updateCommand(Fixture fixture, long currentNumber, boolean active) {
+    private UpdateBillingSeriesCommand updateCommand(
+            Fixture fixture,
+            long currentNumber,
+            boolean active,
+            long expectedVersion
+    ) {
         return new UpdateBillingSeriesCommand(
                 ElectronicDocumentType.RECEIPT,
                 fixture.series(),
                 currentNumber,
                 BillingEnvironment.BETA,
-                active
+                active,
+                expectedVersion
         );
     }
 

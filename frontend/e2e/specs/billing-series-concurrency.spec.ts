@@ -16,6 +16,8 @@ async function openSeriesPage(
   page: Page,
   method: "PUT" | "DELETE",
   active = true,
+  responseStatus = 412,
+  responseMessage = "stale series",
 ) {
   let listRequests = 0;
   const mutations: { method: string; ifMatch: string | undefined }[] = [];
@@ -52,9 +54,9 @@ async function openSeriesPage(
     expect(request.method()).toBe(method);
     expect(request.headers()["if-match"]).toBe('"billing-series-7-v3"');
     await route.fulfill({
-      status: 412,
+      status: responseStatus,
       contentType: "application/json",
-      body: JSON.stringify({ message: "stale series" }),
+      body: JSON.stringify({ message: responseMessage }),
     });
   });
 
@@ -101,3 +103,51 @@ test("stale reactivate sends one If-Match request and reloads without optimistic
   expect(state.getListRequests()).toBe(2);
   await expect(page.getByText("Serie B001 activada.")).not.toBeVisible();
 });
+
+test("missing precondition reloads once, invalidates the edit and never retries", async ({ page }) => {
+  const state = await openSeriesPage(
+    page,
+    "PUT",
+    true,
+    428,
+    "El header If-Match es obligatorio para modificar una serie.",
+  );
+
+  await page.getByRole("button", { name: "Editar", exact: true }).first().click();
+  await page.getByRole("spinbutton", { name: /Proximo correlativo/i }).fill("15");
+  await page.getByRole("button", { name: "Actualizar serie", exact: true }).click();
+  await page.getByRole("button", { name: "Activar", exact: true }).click();
+
+  await expect(page.getByText(
+    "No se pudo verificar la versión vigente de la serie. Tus cambios no fueron guardados. Revisa la información actual antes de intentarlo nuevamente.",
+  )).toBeVisible();
+  expect(state.mutations).toHaveLength(1);
+  expect(state.getListRequests()).toBe(2);
+  await expect(page.getByText("Serie actualizada correctamente.")).not.toBeVisible();
+  await expect(page.getByRole("button", { name: "Actualizar serie", exact: true })).not.toBeVisible();
+});
+
+for (const scenario of [
+  { status: 400, message: "If-Match inválido", expected: /Solicitud invalida/ },
+  { status: 409, message: "Ya existe una serie activa", expected: /Conflicto operativo/ },
+]) {
+  test(`status ${scenario.status} remains a non-428 operational error`, async ({ page }) => {
+    const state = await openSeriesPage(
+      page,
+      "PUT",
+      true,
+      scenario.status,
+      scenario.message,
+    );
+
+    await page.getByRole("button", { name: "Editar", exact: true }).first().click();
+    await page.getByRole("spinbutton", { name: /Proximo correlativo/i }).fill("15");
+    await page.getByRole("button", { name: "Actualizar serie", exact: true }).click();
+    await page.getByRole("button", { name: "Activar", exact: true }).click();
+
+    await expect(page.getByText(scenario.expected)).toBeVisible();
+    await expect(page.getByText(/No se pudo verificar la versión vigente/)).not.toBeVisible();
+    expect(state.mutations).toHaveLength(1);
+    expect(state.getListRequests()).toBe(1);
+  });
+}

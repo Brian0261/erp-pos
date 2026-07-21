@@ -243,11 +243,12 @@ Incluye:
 - `If-Match` opcional;
 - `400` para formato inválido y `412` para stale.
 
-Permanecen diferidos a 4D-2B-2/4D-2B-3:
+Estado posterior confirmado:
 
-- consumo del ETag en frontend;
-- `If-Match` obligatorio;
-- `428 Precondition Required`.
+- 4D-2B-2 adoptó el ETag en Angular para update, reactivación y desactivación;
+- 4D-2B-3 eliminó el fallback last-write-wins y exige `If-Match` en todas esas mutaciones;
+- ausencia de precondición devuelve `428 Precondition Required`, formato inválido `400` y token obsoleto `412`;
+- la emisión interna conserva su incremento bajo lock y no depende de un header HTTP administrativo.
 
 ### 4D-2C
 

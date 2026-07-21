@@ -1,6 +1,7 @@
 package com.erppos.backend.erp.billing.adapter.rest;
 
 import com.erppos.backend.erp.billing.domain.exception.BillingPreconditionFormatException;
+import com.erppos.backend.erp.billing.domain.exception.BillingPreconditionRequiredException;
 import com.erppos.backend.erp.billing.domain.model.BillingSeries;
 
 import java.util.regex.Matcher;
@@ -21,9 +22,11 @@ public final class BillingSeriesEtag {
         return "\"billing-series-" + series.id() + "-v" + series.version() + "\"";
     }
 
-    public static Long parseOptional(String ifMatch, Long expectedSeriesId) {
+    public static Long parseRequired(String ifMatch, Long expectedSeriesId) {
         if (ifMatch == null) {
-            return null;
+            throw new BillingPreconditionRequiredException(
+                    "El header If-Match es obligatorio para modificar una serie. Recarga la serie y vuelve a intentarlo con su versión vigente."
+            );
         }
         String value = ifMatch.trim();
         Matcher matcher = STRONG_ETAG_PATTERN.matcher(value);

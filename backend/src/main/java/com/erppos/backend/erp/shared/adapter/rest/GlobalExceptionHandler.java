@@ -9,6 +9,7 @@ import com.erppos.backend.erp.billing.domain.exception.BillingConflictException;
 import com.erppos.backend.erp.billing.domain.exception.BillingNotFoundException;
 import com.erppos.backend.erp.billing.domain.exception.BillingPreconditionFailedException;
 import com.erppos.backend.erp.billing.domain.exception.BillingPreconditionFormatException;
+import com.erppos.backend.erp.billing.domain.exception.BillingPreconditionRequiredException;
 import com.erppos.backend.erp.ecommerce.adapter.dto.storefront.PublicErrorResponse;
 import com.erppos.backend.erp.ecommerce.domain.exception.EcommerceBusinessRuleException;
 import com.erppos.backend.erp.ecommerce.domain.exception.EcommerceConflictException;
@@ -36,6 +37,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authorization.AuthorizationDeniedException;
@@ -116,6 +118,16 @@ public class GlobalExceptionHandler {
     ) {
         return ResponseEntity.badRequest()
                 .body(errorResponseFactory.build(request, HttpStatus.BAD_REQUEST, ex.getMessage()));
+    }
+
+    @ExceptionHandler(BillingPreconditionRequiredException.class)
+    public ResponseEntity<ApiError> handlePreconditionRequired(
+            BillingPreconditionRequiredException ex,
+            HttpServletRequest request
+    ) {
+        return ResponseEntity.status(HttpStatus.PRECONDITION_REQUIRED)
+                .header(HttpHeaders.CACHE_CONTROL, "no-store")
+                .body(errorResponseFactory.build(request, HttpStatus.PRECONDITION_REQUIRED, ex.getMessage()));
     }
 
     @ExceptionHandler({BillingPreconditionFailedException.class, OptimisticLockingFailureException.class})
