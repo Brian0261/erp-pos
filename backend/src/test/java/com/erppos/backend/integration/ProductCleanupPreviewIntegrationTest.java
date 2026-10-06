@@ -2,14 +2,18 @@ package com.erppos.backend.integration;
 
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -24,6 +28,29 @@ class ProductCleanupPreviewIntegrationTest extends AbstractHttpIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
+
+    private final List<ElectronicDocumentFixture> electronicDocumentFixtures = new ArrayList<>();
+
+    @AfterEach
+    void cleanElectronicDocumentFixtures() {
+        for (ElectronicDocumentFixture fixture : electronicDocumentFixtures) {
+            new TransactionTemplate(transactionManager).executeWithoutResult(status -> cleanElectronicDocumentFixture(fixture));
+            if (fixture.documentId != null) {
+                assertEquals(0L, countById("electronic_documents", fixture.documentId));
+            }
+            if (fixture.productId != null) {
+                assertEquals(0L, countById("products", fixture.productId));
+            }
+            if (fixture.billingSeriesId != null) {
+                assertEquals(fixture.ownsBillingSeries ? 0L : 1L,
+                        countById("billing_series", fixture.billingSeriesId));
+            }
+        }
+        electronicDocumentFixtures.clear();
+    }
 
     @Test
     void shouldForbidNonAdminPreview() throws Exception {
@@ -103,15 +130,9 @@ class ProductCleanupPreviewIntegrationTest extends AbstractHttpIntegrationTest {
     void shouldBlockWhenElectronicDocumentExists() throws Exception {
         String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
         String suffix = Long.toString(System.nanoTime());
-        long categoryId = createCategory(adminToken, suffix);
-        long unitId = createUnit(adminToken, suffix);
-        long warehouseId = createWarehouse(adminToken, suffix);
-        long productId = createProduct(adminToken, categoryId, unitId, suffix, BigDecimal.TEN);
-        registerInitialStock(adminToken, productId, warehouseId, BigDecimal.TEN, "IT doc");
-        openCash(adminToken, BigDecimal.valueOf(50), suffix);
-        long saleId = createSale(adminToken, warehouseId, new long[]{productId}, new BigDecimal[]{BigDecimal.ONE}, BigDecimal.TEN);
-        deactivateProduct(adminToken, productId);
-        insertElectronicDocument(saleId, productId, suffix);
+        ElectronicDocumentFixture fixture = createElectronicDocumentFixture(adminToken, suffix);
+        long productId = fixture.productId;
+        long saleId = fixture.saleId;
 
         mockMvc.perform(post("/api/v1/admin/test-data-cleanup/products/preview")
                         .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
@@ -486,15 +507,9 @@ class ProductCleanupPreviewIntegrationTest extends AbstractHttpIntegrationTest {
     void shouldBlockExecuteWhenElectronicDocumentExistsAndKeepDataUnchanged() throws Exception {
         String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
         String suffix = Long.toString(System.nanoTime());
-        long categoryId = createCategory(adminToken, suffix);
-        long unitId = createUnit(adminToken, suffix);
-        long warehouseId = createWarehouse(adminToken, suffix);
-        long productId = createProduct(adminToken, categoryId, unitId, suffix, BigDecimal.TEN);
-        registerInitialStock(adminToken, productId, warehouseId, BigDecimal.TEN, "IT doc");
-        openCash(adminToken, BigDecimal.valueOf(50), suffix);
-        long saleId = createSale(adminToken, warehouseId, new long[]{productId}, new BigDecimal[]{BigDecimal.ONE}, BigDecimal.TEN);
-        deactivateProduct(adminToken, productId);
-        insertElectronicDocument(saleId, productId, suffix);
+        ElectronicDocumentFixture fixture = createElectronicDocumentFixture(adminToken, suffix);
+        long productId = fixture.productId;
+        long saleId = fixture.saleId;
 
         Counts before = snapshotCounts();
 
@@ -680,10 +695,28 @@ class ProductCleanupPreviewIntegrationTest extends AbstractHttpIntegrationTest {
         return value == null ? 0L : value;
     }
 
-    private void insertElectronicDocument(long saleId, long productId, String suffix) {
-        Long seriesId = findOrCreateBillingSeries(suffix);
+    private ElectronicDocumentFixture createElectronicDocumentFixture(String adminToken, String suffix) throws Exception {
+        ElectronicDocumentFixture fixture = new ElectronicDocumentFixture();
+        electronicDocumentFixtures.add(fixture);
+        fixture.categoryId = createCategory(adminToken, suffix);
+        fixture.unitId = createUnit(adminToken, suffix);
+        fixture.warehouseId = createWarehouse(adminToken, suffix);
+        fixture.productId = createProduct(adminToken, fixture.categoryId, fixture.unitId, suffix, BigDecimal.TEN);
+        registerInitialStock(adminToken, fixture.productId, fixture.warehouseId, BigDecimal.TEN, "IT doc");
+        fixture.cashSessionId = openCash(adminToken, BigDecimal.valueOf(50), suffix);
+        fixture.saleId = createSale(adminToken, fixture.warehouseId,
+                new long[]{fixture.productId}, new BigDecimal[]{BigDecimal.ONE}, BigDecimal.TEN);
+        deactivateProduct(adminToken, fixture.productId);
+        insertElectronicDocument(fixture, suffix);
+        return fixture;
+    }
 
-        Long documentId = jdbcTemplate.queryForObject(
+    private void insertElectronicDocument(ElectronicDocumentFixture fixture, String suffix) {
+        BillingSeriesFixture series = findOrCreateBillingSeries(suffix);
+        fixture.billingSeriesId = series.id();
+        fixture.ownsBillingSeries = series.created();
+
+        fixture.documentId = jdbcTemplate.queryForObject(
                 """
                         insert into electronic_documents (
                             sale_id, billing_series_id, document_type, status, environment, series, number, full_number,
@@ -693,8 +726,8 @@ class ProductCleanupPreviewIntegrationTest extends AbstractHttpIntegrationTest {
                         returning id
                         """,
                 Long.class,
-                saleId,
-                seriesId,
+                fixture.saleId,
+                fixture.billingSeriesId,
                 "B001-" + suffix.substring(Math.max(0, suffix.length() - 8))
         );
 
@@ -703,20 +736,20 @@ class ProductCleanupPreviewIntegrationTest extends AbstractHttpIntegrationTest {
                         insert into electronic_document_items (electronic_document_id, product_id, description, quantity, unit_price, discount_amount, line_total)
                         values (?, ?, ?, 1, 10, 0, 10)
                         """,
-                documentId,
-                productId,
+                fixture.documentId,
+                fixture.productId,
                 "Producto cleanup " + suffix
         );
     }
 
-    private Long findOrCreateBillingSeries(String suffix) {
+    private BillingSeriesFixture findOrCreateBillingSeries(String suffix) {
         List<Map<String, Object>> existing = jdbcTemplate.queryForList(
                 "select id from billing_series where document_type = 'RECEIPT' and environment = 'LOCAL' and active = true"
         );
         if (existing != null && !existing.isEmpty()) {
-            return ((Number) existing.get(0).get("id")).longValue();
+            return new BillingSeriesFixture(((Number) existing.get(0).get("id")).longValue(), false);
         }
-        return jdbcTemplate.queryForObject(
+        Long id = jdbcTemplate.queryForObject(
                 """
                         insert into billing_series (document_type, series, current_number, environment, active, created_by, updated_by)
                         values ('RECEIPT', ?, 1, 'LOCAL', true, 'it-cleanup', 'it-cleanup')
@@ -725,6 +758,45 @@ class ProductCleanupPreviewIntegrationTest extends AbstractHttpIntegrationTest {
                 Long.class,
                 "B" + suffix.substring(Math.max(0, suffix.length() - 6))
         );
+        return new BillingSeriesFixture(id, true);
+    }
+
+    private void cleanElectronicDocumentFixture(ElectronicDocumentFixture fixture) {
+        if (fixture.documentId != null) {
+            jdbcTemplate.update("delete from electronic_document_items where electronic_document_id = ?", fixture.documentId);
+            jdbcTemplate.update("delete from electronic_documents where id = ?", fixture.documentId);
+        }
+        if (fixture.saleId != null) {
+            jdbcTemplate.update("delete from sale_items where sale_id = ?", fixture.saleId);
+            jdbcTemplate.update("delete from sale_payments where sale_id = ?", fixture.saleId);
+        }
+        if (fixture.productId != null && fixture.warehouseId != null) {
+            jdbcTemplate.update("delete from inventory_movements where product_id = ? and warehouse_id = ?",
+                    fixture.productId, fixture.warehouseId);
+            jdbcTemplate.update("delete from stock_balances where product_id = ? and warehouse_id = ?",
+                    fixture.productId, fixture.warehouseId);
+        }
+        if (fixture.saleId != null) {
+            jdbcTemplate.update("delete from sales where id = ?", fixture.saleId);
+        }
+        if (fixture.cashSessionId != null) {
+            jdbcTemplate.update("delete from cash_register_sessions where id = ?", fixture.cashSessionId);
+        }
+        if (fixture.productId != null) {
+            jdbcTemplate.update("delete from products where id = ?", fixture.productId);
+        }
+        if (fixture.warehouseId != null) {
+            jdbcTemplate.update("delete from warehouses where id = ?", fixture.warehouseId);
+        }
+        if (fixture.unitId != null) {
+            jdbcTemplate.update("delete from units where id = ?", fixture.unitId);
+        }
+        if (fixture.categoryId != null) {
+            jdbcTemplate.update("delete from categories where id = ?", fixture.categoryId);
+        }
+        if (fixture.ownsBillingSeries && fixture.billingSeriesId != null) {
+            jdbcTemplate.update("delete from billing_series where id = ?", fixture.billingSeriesId);
+        }
     }
 
     private Counts snapshotCounts() {
@@ -775,5 +847,20 @@ class ProductCleanupPreviewIntegrationTest extends AbstractHttpIntegrationTest {
     }
 
     private record PurchaseOrderData(long orderId, long[] itemIds) {
+    }
+
+    private record BillingSeriesFixture(long id, boolean created) {
+    }
+
+    private static final class ElectronicDocumentFixture {
+        private Long categoryId;
+        private Long unitId;
+        private Long warehouseId;
+        private Long productId;
+        private Long cashSessionId;
+        private Long saleId;
+        private Long billingSeriesId;
+        private Long documentId;
+        private boolean ownsBillingSeries;
     }
 }

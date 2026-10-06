@@ -781,15 +781,20 @@ class EcommerceAdminProfilesIntegrationTest extends AbstractHttpIntegrationTest 
         String adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
         String suffix = String.valueOf(System.nanoTime());
         long productId = createProductWithDraftProfile(adminToken, suffix, BigDecimal.valueOf(10.00));
+        String slug = "readiness-incomplete-" + suffix;
+        updateProfile(adminToken, productId, slug, "Readiness incomplete " + suffix, null, null);
 
         mockMvc.perform(get("/api/v1/ecommerce-admin/products/online-profiles")
                         .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
-                        .param("page", "0")
-                        .param("size", "20"))
+                        .param("q", slug))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.items[?(@.productId == " + productId + ")].readinessStatus").exists())
-                .andExpect(jsonPath("$.items[?(@.productId == " + productId + ")].missingRequirements").isArray())
-                .andExpect(jsonPath("$.items[?(@.productId == " + productId + ")].missingRequirements[0]").exists());
+                .andExpect(jsonPath("$.totalItems").value(1))
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.items[0].productId").value(productId))
+                .andExpect(jsonPath("$.items[0].readinessStatus").value("NEEDS_ATTENTION"))
+                .andExpect(jsonPath("$.items[0].missingRequirements").isArray())
+                .andExpect(jsonPath("$.items[0].missingRequirements",
+                        org.hamcrest.Matchers.hasItems("CATEGORY_MISSING", "BRAND_MISSING")));
     }
 
     @Test
@@ -816,10 +821,12 @@ class EcommerceAdminProfilesIntegrationTest extends AbstractHttpIntegrationTest 
 
         mockMvc.perform(get("/api/v1/ecommerce-admin/products/online-profiles")
                         .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
-                        .param("page", "0")
-                        .param("size", "20"))
+                        .param("q", "lapicero-online-" + suffix))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.items[?(@.productId == " + productId + ")].readinessStatus").value("PUBLISHED"))
-                .andExpect(jsonPath("$.items[?(@.productId == " + productId + ")].missingRequirements.length()").value(0));
+                .andExpect(jsonPath("$.totalItems").value(1))
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.items[0].productId").value(productId))
+                .andExpect(jsonPath("$.items[0].readinessStatus").value("PUBLISHED"))
+                .andExpect(jsonPath("$.items[0].missingRequirements.length()").value(0));
     }
 }

@@ -78,6 +78,57 @@ The focal Playwright spec ignores only the expected browser resource error for
 the mocked HTTP status under test. Any other `console.error` or any `pageerror`
 fails the scenario.
 
+## Backend CI failure and local test correction — 2026-10-06
+
+The initial local frontend baseline closed with PASS. The first remote workflow
+for `5cff881af35b40301523c13ac2e3c0e0e15a3a9d`
+reported backend test failures. A workflow re-run reproduced them. The
+diagnostic result was `ROOT_CAUSE_CONFIRMED`: both causes were pre-existing
+test defects, and the baseline commit did not modify the responsible backend
+tests or production code. The workflow made those backend defects visible; it
+did not introduce them.
+
+Ecommerce failures in `EcommerceAdminProfilesIntegrationTest` were
+`TEST_EXPECTATION_DEFECT`:
+
+- `incompleteProfileShouldShowMissingRequirements` and
+  `publishedProfileShouldShowPublishedReadinessStatus` created their own
+  profiles but expected to find them on `page=0&size=20` in a shared database.
+- Each test now queries by its own unique slug using the existing `q` filter,
+  and checks one result, the created product ID and the expected readiness.
+- The incomplete profile still asserts `NEEDS_ATTENTION`,
+  `CATEGORY_MISSING` and `BRAND_MISSING`.
+
+The fiscal-series collision was primarily a `TEST_CLEANUP_DEFECT`, with a
+secondary `TEST_FIXTURE_DEFECT`:
+
+- `ProductCleanupPreviewIntegrationTest` left its synthetic document fixture
+  and an owned active `RECEIPT/LOCAL` series in the shared Testcontainers
+  database. The later fiscal test then collided with the valid
+  `uq_billing_series_doc_type_environment_active` constraint.
+- The producer test now tracks fixture ownership and IDs and performs
+  targeted FK-ordered teardown. It deletes a series only if that fixture
+  created it. No global deletion or `TRUNCATE` is used.
+- `FiscalSendTransactionBoundaryIntegrationTest` was not changed; producer
+  cleanup resolved the demonstrated contamination.
+
+Local QA after the test-only correction:
+
+- Ecommerce focal methods: PASS; class: 21/21.
+- ProductCleanup focal method: PASS; class: 22/22.
+- Fiscal focal method: PASS; class: 16/16.
+- ProductCleanup → Fiscal and Fiscal → ProductCleanup: PASS, 38/38 each.
+- The three affected classes together: PASS, 59/59.
+- Backend `./mvnw -B clean verify` (Windows: `.\mvnw -B clean verify`):
+  `BUILD SUCCESS`, 642 tests, 0 failures, 0 errors, 0 skipped.
+- No production code, frontend, migrations, Flyway, fiscal constraint, CI,
+  Docker or Auth/JWT files were changed.
+
+QA-FE-1A is **not closed remotely**. Its remote closure requires publishing
+the correction in a new SHA after `5cff881af35b40301523c13ac2e3c0e0e15a3a9d`
+and obtaining a complete successful workflow for that SHA. No future SHA or
+workflow run is asserted here.
+
 ## Dependency baseline
 
 Exact additions:

@@ -2567,8 +2567,10 @@ Solo crear tag cuando se cumpla todo:
 - Documento: `docs/qa/QA_FE_1A_ANGULAR_UNIT_BASELINE_QA.md`.
 - No se actualizó Angular, CLI, build-angular, TypeScript, Node, npm, RxJS,
   Zone.js, tslib ni Playwright.
-- No backend, migraciones, Auth/JWT, guards, RBAC, Docker, infraestructura,
-  Storefront, MiFact, `.env` o secretos.
+- Durante la implementacion original del baseline no se modificaron backend,
+  migraciones, Auth/JWT, guards, RBAC, Docker, infraestructura, Storefront,
+  MiFact, `.env` o secretos. La correccion backend test-only posterior queda
+  registrada en el evento del 2026-10-06.
 - El baseline local quedó implementado y validado; el cierre remoto requiere
   sincronizar su commit de publicación con `origin/master` y que el workflow
   CI asociado a ese SHA concluya en `success`. Este registro define el
@@ -2650,3 +2652,33 @@ Solo crear tag cuando se cumpla todo:
 - QA-FE-1A queda implementada y validada localmente, pero no se declara
   cerrada remotamente hasta publicar su commit, mantener `HEAD == origin/master`
   y obtener `success` en el workflow de ese SHA. El roadmap no cambia.
+
+### QA-FE-1A — backend CI test-isolation correction (2026-10-06)
+
+- El primer workflow remoto de `5cff881af35b40301523c13ac2e3c0e0e15a3a9d`
+  informo fallos backend; un re-run los reprodujo.
+- Diagnostico: `ROOT_CAUSE_CONFIRMED`. Los defectos eran preexistentes y no
+  fueron introducidos por QA-FE-1A. El commit `5cff881` no fue modificado; la
+  ejecucion de QA-FE-1A solo hizo visibles fallos anteriores al ejecutarse el
+  workflow backend.
+- Ecommerce: `TEST_EXPECTATION_DEFECT`; dos tests dependian de encontrar sus
+  perfiles en `page=0&size=20` dentro de una base compartida. Se corrigieron
+  unicamente los tests con busqueda `q` por slug unico y assertions sobre el
+  resultado/readiness del fixture propio.
+- ProductCleanup/fiscal: causa principal `TEST_CLEANUP_DEFECT` y factor
+  secundario `TEST_FIXTURE_DEFECT`; un fixture sintetico filtraba una serie
+  activa `RECEIPT/LOCAL`. ProductCleanup ahora rastrea ownership e IDs y limpia
+  solo sus filas en orden FK. Una serie preexistente se conserva.
+- La constraint `uq_billing_series_doc_type_environment_active` sigue intacta.
+  `FiscalSendTransactionBoundaryIntegrationTest` no fue modificado; no se
+  justifico endurecimiento adicional.
+- QA local: Ecommerce 21/21; ProductCleanup 22/22; fiscal 16/16; los dos
+  ordenes cruzados 38/38 cada uno; las tres clases 59/59; `clean verify`
+  completo 642/642, `BUILD SUCCESS`, 0 failures/errors/skipped.
+- Cambios backend exclusivamente test-only. No se modificaron frontend,
+  codigo productivo, Flyway/migraciones, CI, Docker, Auth/JWT ni la constraint.
+- QA-FE-1A sigue abierta remotamente. El siguiente gate es revision final,
+  nuevo commit posterior a `5cff881`, push y workflow completo asociado en
+  `success`. No se afirma SHA ni resultado remoto futuro.
+- NG-UP-NODE permanece bloqueada hasta cumplir ese gate.
+- Esta actualizacion es documental; no ejecuta commit, push, tag ni workflow.

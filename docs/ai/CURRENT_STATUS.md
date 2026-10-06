@@ -1501,8 +1501,24 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
 - No-write general local: PARTIAL, 1 passed y 2 casos autenticados skipped por
   ausencia de credenciales QA; los skipped no se consideran PASS.
 - CI frontend preparado para `npm ci`, unit tests, build e E2E focal simulado.
-- No se modificó código funcional, backend, Node, Angular, TypeScript, Docker,
-  infraestructura ni `.env`.
+- El primer workflow remoto asociado a `5cff881af35b40301523c13ac2e3c0e0e15a3a9d`
+  detecto fallos backend, reproducidos por un re-run. El diagnostico concluyo
+  `ROOT_CAUSE_CONFIRMED`: eran defectos preexistentes de aislamiento/expectativa
+  en tests, no introducidos por QA-FE-1A.
+- La correccion backend esta limitada a tests: ecommerce consulta cada fixture
+  mediante un `slug` unico y ProductCleanup retira sus fixtures propios con
+  teardown dirigido. No se cambio codigo productivo ni la constraint fiscal.
+- QA local posterior: Ecommerce 21/21, ProductCleanup 22/22, fiscal 16/16,
+  ambos ordenes cruzados 38/38 cada uno, conjunto afectado 59/59 y backend
+  `clean verify` 642/642 (`BUILD SUCCESS`, 0 failures/errors/skipped).
+- Estado remoto: QA-FE-1A sigue abierta. El cierre exige publicar esta
+  correccion en un SHA posterior a `5cff881` y que el workflow completo de ese
+  SHA termine en `success`; no existe aun evidencia de ese nuevo workflow.
+- Working tree en esta preparacion de cierre: los dos tests backend indicados
+  mas los documentos de esta actualizacion. No se ha hecho commit, push ni tag.
+- Durante la implementación original del baseline no se modificó código
+  funcional/backend, Node, Angular, TypeScript, Docker, infraestructura ni
+  `.env`; la corrección test-only backend quedó registrada arriba.
 - Estado técnico: implementación y validación local completadas. El cierre
   remoto requiere que el commit de publicación esté sincronizado con
   `origin/master` y que el workflow CI asociado a ese SHA concluya en
@@ -1532,9 +1548,8 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
   productivo permanece bloqueado hasta completar NG-UP-NODE, NG-UP-19 y
   NG-UP-20 y repetir los audits.
 - Evidencia: `docs/qa/SEC_FE_1_FRONTEND_DEPENDENCY_TRIAGE.md`.
-- NG-UP-NODE solo puede comenzar después de satisfacer el criterio de cierre
-  remoto y verificar la puerta de despliegue Angular 18; debe iniciar
-  inmediatamente después y continuar hasta NG-UP-19 y NG-UP-20 sin pausas
-  innecesarias.
-- Siguiente fase planificada: NG-UP-NODE.
+- NG-UP-NODE permanece bloqueada hasta satisfacer el criterio de cierre
+  remoto de QA-FE-1A y verificar la puerta de despliegue Angular 18; despues
+  debe continuar hasta NG-UP-19 y NG-UP-20 sin pausas innecesarias.
+- Siguiente fase planificada, aun bloqueada: NG-UP-NODE.
 - NG-UP-19/20/CF/21, QA-FE-2 y 4D-2C permanecen diferidas.
