@@ -2,6 +2,18 @@
   "name": "erp-pos-frontend",
   "version": "0.0.1",
   "private": true,
+  "devEngines": {
+    "runtime": {
+      "name": "node",
+      "version": "22.23.3",
+      "onFail": "error"
+    },
+    "packageManager": {
+      "name": "npm",
+      "version": "10.9.9",
+      "onFail": "error"
+    }
+  },
   "scripts": {
     "start": "ng serve",
     "build": "ng build",

@@ -191,3 +191,53 @@ QA-FE-2 and 4D-2C remain deferred. QA-FE-1A remains locally implemented and
 validated but is not declared remotely closed until its publication commit is
 published, `HEAD == origin/master`, and the workflow for that SHA concludes
 in `success`. No commit, push or tag was created by this correction.
+
+## SEC-FE-1C — GHSA-pqg4-j6r4-53mv shell-quote remediation (2026-10-06)
+
+Status: **PASS LOCAL**. This is a security gate before the separate Git/CI
+closeout of NG-UP-NODE; NG-UP-NODE is not closed and NG-UP-19 has not started.
+
+- Advisory: `GHSA-pqg4-j6r4-53mv / CVE-2026-102422` (fixed from
+  `shell-quote@1.11.0`). Initial dependency: `shell-quote@1.10.0`.
+- Origin: `PREEXISTING_DEPENDENCY_NEW_ADVISORY`. Reachability classification:
+  `VULNERABLE_CODE_NOT_REACHED`. Decision: `REMEDIATE_BEFORE_NG_UP_NODE_CLOSE`.
+- The sole dev-only path remains
+  `@angular-devkit/build-angular@18.2.12 -> webpack-dev-server@5.0.4 ->
+  launch-editor@2.13.2 -> shell-quote`. The parent declares `^1.8.3`.
+- Under Node `22.23.3` and npm `10.9.9`, the scoped command
+  `npm update shell-quote --package-lock-only --save --ignore-scripts --no-audit --no-fund`
+  naturally selected `shell-quote@1.12.0`, the latest compatible resolution
+  returned by npm. This is later than the first patched version, `1.11.0`,
+  without imposing an artificial pin. The lockfile delta is only that node's
+  `version`, `resolved` and `integrity`; `dev: true` remains unchanged.
+  Initial lockfile SHA-256:
+  `F5687FB19205807537E5A705E25AFB8147E03931EE7C3F059985863331CEA344`.
+  `package.json` retains its pre-existing NG-UP-NODE-only diff: no direct
+  dependency, override or resolution was added.
+- `npm ci`: PASS (955 packages). `npm ls --all`: PASS, with only unmet
+  optional platform dependencies in its tree output. `npm ls shell-quote --all`
+  and `npm explain shell-quote` confirm one `1.12.0` copy on the same path.
+- `npm test`: 13/13 PASS, 0 skipped. Chromium used
+  `CHROMIUM_USER_FLAGS=--no-sandbox` only in an ephemeral validation
+  container; no production or repository setting changed. `npm run build`:
+  PASS, Angular 18.2.x unchanged. `npm run e2e:billing-series:ci`: 6/6 PASS.
+- Full `npm audit`: 83 before (6 low, 22 moderate, 51 high, 4 critical) to
+  82 after (6 low, 22 moderate, 51 high, 3 critical). The advisory and the
+  `shell-quote` finding are absent after remediation; no other severity
+  count changed. `npm audit --omit=dev`: unchanged at 8 (4 moderate,
+  4 high, 0 critical). Audit exit code 1 reflects remaining unrelated
+  findings and is not reported as a clean audit.
+- `tar@6.2.1` and its route remain untouched and separate. Its temporary
+  acceptance still expires at NG-UP-20 closeout or 2026-10-19, whichever
+  comes first; SEC-FE-1C neither remediates nor extends it.
+- The generated production browser bundle contains no signatures of
+  `shell-quote`, `launch-editor` or `webpack-dev-server`.
+- Docker build PASS from a temporary source context excluding dependencies,
+  artifacts and `.env` files: `node:22.23.3-alpine3.24` ran `npm ci` and
+  `npm run build`; the final Nginx image contains neither Node nor npm.
+  An initial attempt failed before compilation because a reused temporary
+  context lacked `nginx.conf`; the complete-context retry passed. The
+  temporary image tag was removed; no image was published.
+- The eight pending NG-UP-NODE files were preserved. No commit, push or tag
+  was made. NG-UP-NODE is implemented and locally validated, ready to return
+  to its own Git/CI closeout gate; it is not declared closed here.

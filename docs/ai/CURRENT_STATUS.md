@@ -1548,7 +1548,27 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
   productivo permanece bloqueado hasta completar NG-UP-NODE, NG-UP-19 y
   NG-UP-20 y repetir los audits.
 - Evidencia: `docs/qa/SEC_FE_1_FRONTEND_DEPENDENCY_TRIAGE.md`.
-- NG-UP-NODE esta DESBLOQUEADA pero no iniciada ni implementada; su Plan Mode
-  definio una baseline tecnica pendiente de implementacion.
-- Siguiente fase planificada: NG-UP-NODE.
+- NG-UP-NODE esta IMPLEMENTADA con QA funcional local PASS. El aumento
+  temporal de critical en el audit fue atendido por SEC-FE-1C, con resultado
+  `PASS LOCAL`; NG-UP-NODE queda lista para volver a su gate de cierre Git/CI,
+  pero no se declara cerrada. Baseline exacta:
+  Node `22.23.3` y npm
+  `10.9.9`, `frontend/.nvmrc` canonica, `devEngines` de enforcement,
+  GitHub Actions leyendo `.nvmrc` y build Docker fijado en
+  `node:22.23.3-alpine3.24`. Angular sigue en 18.2.x y Storefront permanece
+  intacto. QA local: `npm ci`, `npm ls --all`, unit 13/13, build Angular,
+  E2E focal 6/6 y Docker build PASS; runtime final Nginx sin Node/npm.
+  SEC-FE-1C actualizo solo la resolucion transitiva de `shell-quote` en el
+  lockfile; no cambio `package.json` ni Angular. No-write autenticado no
+  repetido por ausencia de credenciales QA verificadas.
+- Audit del 2026-10-06 antes de SEC-FE-1C: 83 findings completos (6 low,
+  22 moderate, 51 high, 4 critical). Despues: 82 (6 low, 22 moderate,
+  51 high, 3 critical), sin `GHSA-pqg4-j6r4-53mv` ni finding de
+  `shell-quote`. Produccion permanece en 8 (4 moderate, 4 high, 0 critical).
+  `shell-quote@1.12.0` es la unica copia, dev-only; `tar@6.2.1` conserva
+  la aceptacion temporal hasta NG-UP-20 o 2026-10-19, lo que ocurra primero.
+- SEC-FE-1C: `npm ci`, arbol completo, unit 13/13, build, E2E focal 6/6,
+  Docker build/runtime y `git diff --check` pasaron localmente. Siguiente
+  accion de NG-UP-NODE: revision final, commit autorizado y CI remoto.
+  No se hizo commit, push ni tag en SEC-FE-1C.
 - NG-UP-19/20/CF/21, QA-FE-2 y 4D-2C permanecen sin iniciar.

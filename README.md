@@ -316,9 +316,12 @@ Endpoints actuales:
 
 Ruta: `frontend`
 
+Requiere Node `22.23.3` y npm `10.9.9`; `frontend/.nvmrc` declara la version
+de Node. Comprueba `node --version` y `npm --version` antes de instalar.
+
 ```powershell
 Push-Location .\frontend
-npm install
+npm ci
 npm run build
 npm start
 Pop-Location
@@ -344,7 +347,8 @@ docker compose up -d
 Workflow: `.github/workflows/ci.yml`
 
 - Job backend: `mvn clean verify`
-- Job frontend: `npm install` + `npm run build`
+- Job frontend: Node desde `frontend/.nvmrc`, `npm ci`, unit tests,
+  `npm run build` y E2E focal de series.
 
 ## ADR
 

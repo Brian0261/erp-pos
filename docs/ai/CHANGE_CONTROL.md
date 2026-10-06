@@ -2698,3 +2698,73 @@ Solo crear tag cuando se cumpla todo:
 - NG-UP-NODE queda DESBLOQUEADA pero no iniciada ni implementada. Su Plan Mode
   definio una baseline tecnica pendiente de implementacion.
 - NG-UP-19, NG-UP-20, NG-UP-CF, NG-UP-21, QA-FE-2 y 4D-2C siguen sin iniciar.
+
+### NG-UP-NODE — Node/npm toolchain alignment (2026-10-06)
+
+- Estado: IMPLEMENTADA con QA funcional local PASS; resultado integral
+  `CORRECTION_REQUIRED` por aumento material de critical en el audit.
+  Pendiente de triage/decision separada antes del cierre Git/CI; no cerrada
+  y sin commit, push o tag de esta fase.
+- Entrada: `master`, HEAD y `origin/master`
+  `e4cb9146d6a08f76a42f817fb119411aa22d2b50`, working tree limpio,
+  sin tag.
+- `frontend/.nvmrc` fija Node `22.23.3`; `frontend/package.json` fija
+  Node `22.23.3` y npm `10.9.9` mediante `devEngines` sin tocar dependencias.
+  El Node local `22.16.0` y npm local `10.9.2` fueron rechazados por
+  `EBADDEVENGINES` en pruebas separadas; la baseline exacta funciono.
+- GitHub Actions frontend lee `frontend/.nvmrc` mediante
+  `actions/setup-node@v4`; conserva cache npm y los pasos existentes.
+  Backend CI no se modifico. El build stage Docker usa
+  `node:22.23.3-alpine3.24`; runtime Nginx intacto.
+- `frontend/package-lock.json` permanecio byte-for-byte intacto (SHA-256
+  inicial y final:
+  `F5687FB19205807537E5A705E25AFB8147E03931EE7C3F059985863331CEA344`).
+- QA local bajo Node `v22.23.3` y npm `10.9.9`: `npm ci` PASS (955 paquetes),
+  `npm ls --all` PASS, `npm test` 13/13 PASS (0 skipped), `npm run build`
+  PASS y `npm run e2e:billing-series:ci` 6/6 PASS. Chromium se ejecuto
+  en contenedor temporal; el primer intento unitario fallo por aislamiento
+  de namespaces y paso al repetir con `CHROMIUM_USER_FLAGS=--no-sandbox`
+  solo en ese contenedor, sin modificar codigo ni test config.
+- Imagen `node:22.23.3-alpine3.24` verificada: Node `v22.23.3`, npm
+  `10.9.9`. El primer Docker build no pudo cargar un symlink de
+  `node_modules/.bin` desde el contexto Windows; la repeticion con copia
+  temporal sin dependencias/artefactos paso (`npm ci`, Angular build y
+  runtime Nginx sin Node/npm). No se publico imagen.
+- Audit actualizado sin fix: completo 83 (6 low, 22 moderate, 51 high,
+  4 critical); produccion 8 (4 moderate, 4 high, 0 critical). Respecto de
+  SEC-FE-1B (82, con 3 critical), el nuevo critical es
+  `GHSA-pqg4-j6r4-53mv` sobre `shell-quote@1.10.0`, via
+  `@angular-devkit/build-angular -> webpack-dev-server -> launch-editor`.
+  El advisory se incorporo a GitHub el 2026-10-06; es tooling dev-only,
+  no un cambio de dependencias causado por esta fase. Requiere triage
+  separado; no se altero el riesgo aceptado de `tar@6.2.1` (vence con
+  NG-UP-20 o 2026-10-19, lo primero).
+- No-write autenticado no se repitio sin credenciales QA verificadas; su
+  ausencia no se presenta como PASS. No se modificaron Angular, backend,
+  Storefront, tests, migraciones, `.env` ni secretos. NG-UP-19/20/CF/21,
+  QA-FE-2 y 4D-2C siguen sin iniciar.
+
+### SEC-FE-1C — GHSA-pqg4-j6r4-53mv shell-quote remediation (2026-10-06)
+
+- Estado: `PASS LOCAL`; gate de seguridad resuelto antes del cierre de
+  NG-UP-NODE. NG-UP-NODE sigue abierta, pendiente de revision Git/CI, y
+  NG-UP-19 no se inicio.
+- Advisory `GHSA-pqg4-j6r4-53mv / CVE-2026-102422`, origen
+  `PREEXISTING_DEPENDENCY_NEW_ADVISORY`, reachability
+  `VULNERABLE_CODE_NOT_REACHED`, decision `REMEDIATE_BEFORE_NG_UP_NODE_CLOSE`.
+- La operacion npm acotada bajo Node `22.23.3`/npm `10.9.9` resolvio
+  naturalmente `shell-quote@1.10.0 -> 1.12.0` dentro de `^1.8.3`; solo
+  cambiaron version, resolved e integrity de su nodo en
+  `frontend/package-lock.json`. Sin dependencia directa, override, resolution
+  ni cambio SEC-FE-1C en `frontend/package.json`.
+- QA: `npm ci` PASS; `npm ls --all` PASS; unit 13/13 PASS; Angular build
+  PASS; E2E focal 6/6 PASS; bundle sin tooling afectado; Docker build PASS
+  y runtime Nginx sin Node/npm. La adaptacion `--no-sandbox` de Chromium
+  fue exclusivamente para el contenedor temporal de tests.
+- Audit completo: 83 (6 low, 22 moderate, 51 high, 4 critical) antes y
+  82 (6 low, 22 moderate, 51 high, 3 critical) despues; GHSA y finding
+  `shell-quote` ausentes. Audit produccion: 8 (4 moderate, 4 high,
+  0 critical), sin cambio. `tar@6.2.1` intacto; su aceptacion temporal
+  no se renueva y vence con NG-UP-20 o 2026-10-19, lo primero.
+- Evidencia detallada: `docs/qa/SEC_FE_1_FRONTEND_DEPENDENCY_TRIAGE.md`.
+  Los ocho cambios NG-UP-NODE se conservaron. Sin commit, push ni tag.

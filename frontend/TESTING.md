@@ -1,5 +1,22 @@
 # Frontend testing
 
+## Node/npm toolchain
+
+Use Node `22.23.3` and npm `10.9.9` for frontend commands. The canonical
+Node version is `frontend/.nvmrc`; `devEngines` in `package.json` rejects
+other Node/npm versions. On Windows or WSL, select an existing installation
+or your already available toolchain mechanism before installing dependencies;
+no particular version manager is required. Check the active terminal first:
+
+```powershell
+node --version
+npm --version
+npm ci
+```
+
+Run these commands from `frontend`. `npm ci` installs reproducibly from the
+committed lockfile; do not use `npm install` for this baseline.
+
 ## Unit baseline
 
 The Angular 18 baseline uses Karma 6 and Jasmine 5 temporarily. Run the
@@ -35,7 +52,7 @@ evidence of PASS.
 
 ## CI order
 
-The frontend CI job performs:
+The frontend CI job reads Node from `frontend/.nvmrc`, then performs:
 
 1. `npm ci`;
 2. `npm test`;
