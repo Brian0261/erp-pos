@@ -2546,3 +2546,107 @@ Solo crear tag cuando se cumpla todo:
 - No se crearon migraciones ni se modificaron entidades, repositorios, seguridad, CORS, Auth/JWT, guards, proveedor fiscal o infraestructura.
 - No se verificaron clientes externos fuera del repositorio; deben inventariarse y actualizarse antes del rollout productivo.
 - Sin commit, push ni tag. QA-FE-1 y 4D-2C permanecen fuera de alcance.
+
+### QA-FE-1A Angular unit-test safety baseline
+
+- Alcance autorizado: runner unitario frontend y pruebas P0/P1 de concurrencia
+  de series, sin cambios funcionales.
+- Se agregaron dependencias exactas Karma/Jasmine compatibles con Angular
+  18.2.x y Node 20/22.
+- `angular.json` incorpora exclusivamente el target estable
+  `@angular-devkit/build-angular:karma`; build y serve permanecen intactos.
+- `tsconfig.spec.json` limita tipos Jasmine al contexto de test.
+- Se agregaron 5 tests de servicio y 8 de componente.
+- El E2E focal existente falla ante `pageerror` o `console.error` inesperado y
+  tolera únicamente el status HTTP que cada escenario simula expresamente.
+- El workflow frontend usa lockfile + `npm ci`, ejecuta unit tests, build,
+  instala Chromium y corre los seis escenarios simulados de series.
+- Evidencia local: unit 13/13 PASS; build PASS; focal E2E 6/6 PASS.
+- No-write general: 1 PASS y 2 skipped por credenciales QA ausentes; no se
+  declara PASS para esos casos.
+- Documento: `docs/qa/QA_FE_1A_ANGULAR_UNIT_BASELINE_QA.md`.
+- No se actualizó Angular, CLI, build-angular, TypeScript, Node, npm, RxJS,
+  Zone.js, tslib ni Playwright.
+- No backend, migraciones, Auth/JWT, guards, RBAC, Docker, infraestructura,
+  Storefront, MiFact, `.env` o secretos.
+- El baseline local quedó implementado y validado; el cierre remoto requiere
+  sincronizar su commit de publicación con `origin/master` y que el workflow
+  CI asociado a ese SHA concluya en `success`. Este registro define el
+  criterio y no afirma su cumplimiento.
+- La puerta de despliegue permanece bloqueada para Angular 18 hasta completar
+  NG-UP-NODE, NG-UP-19 y NG-UP-20 y repetir los audits.
+- NG-UP-NODE es la siguiente fase habilitable tras cumplir ese criterio;
+  majors Angular, QA-FE-2 y 4D-2C siguen diferidas.
+
+### SEC-FE-1A Compatible transitive critical remediation
+
+- Fecha de evaluación: 2026-07-23.
+- Alcance: corrección previa dentro del cierre de QA-FE-1A.
+- Comparación audit con la misma base pública de advisories:
+  - HEAD base: 65 totales (7 low, 19 moderate, 36 high, 3 critical).
+  - QA-FE-1A antes de corrección: 64 totales
+    (7 low, 19 moderate, 35 high, 3 critical).
+  - Después de SEC-FE-1A: 62 totales
+    (7 low, 19 moderate, 35 high, 1 critical).
+  - Producción antes/después: 8 high, 0 critical.
+- Delta QA-FE-1A:
+  - no introdujo vulnerabilidades nuevas;
+  - `ws 8.20.0 -> 8.21.1` eliminó un high preexistente.
+- Corrección lockfile-only:
+  - `shell-quote 1.8.3 -> 1.10.0`;
+  - `websocket-driver 0.7.4 -> 0.7.5`;
+  - `package.json` byte-for-byte intacto;
+  - sin direct dependencies, overrides, force o cambios de toolchain.
+- Advisories eliminados:
+  - `GHSA-w7jw-789q-3m8p`;
+  - `GHSA-395f-4hp3-45gv`;
+  - `GHSA-mp7j-qc5w-4988`;
+  - `GHSA-xv26-6w52-cph6`.
+- Este registro de aceptación de 2026-07-23 es histórico: `tar@6.2.1` fue
+  aceptado temporalmente hasta NG-UP-20 o 2026-08-22, lo que ocurriera primero.
+- Los ocho high productivos son Angular 18 preexistente; un nuevo despliegue
+  productivo sigue bloqueado hasta NG-UP-NODE, NG-UP-19 y NG-UP-20.
+- Validaciones:
+  - `npm ci`: PASS, 951 paquetes.
+  - `npm ls --all`: PASS.
+  - Unit: PASS, 13/13 y 0 skipped.
+  - Build: PASS.
+  - E2E focal: PASS, 6/6 y sin errores inesperados.
+  - No-write: 1 PASS y 2 skipped autenticados; no se presentan como PASS.
+  - Equivalente local del job CI frontend: PASS.
+  - Bundle estático sin tooling vulnerable ni `node_modules`: PASS.
+- Documento:
+  `docs/qa/SEC_FE_1_FRONTEND_DEPENDENCY_TRIAGE.md`.
+- El cierre remoto del baseline requiere commit de publicación sincronizado con
+  `origin/master` y workflow CI asociado al SHA en `success`; este registro no
+  afirma que la condición esté cumplida.
+- La puerta de despliegue Angular 18 permanece activa; NG-UP-NODE, majors
+  Angular y 4D-2C no se iniciaron.
+
+### SEC-FE-1B Expired tar risk acceptance revalidation
+
+- Revalidación: 2026-10-05.
+- Resultado: `RENEW_SHORT_RISK_ACCEPTANCE`.
+- Comparación temporal: `CAMBIO_MATERIAL`.
+- Audit total actual: 82 findings (6 low, 22 moderate, 51 high,
+  3 critical).
+- Audit productivo actual: 8 findings (4 moderate, 4 high, 0 critical).
+- Nuevo advisory desde 2026-07-23: `GHSA-r292-9mhp-454m / CVE-2026-73566`,
+  afecta `tar <=7.5.20` y la primera versión corregida es `7.5.21`; `tar@6.2.1`
+  permanece afectado.
+- `tar@6.2.1` sigue dev-only, fuera del audit productivo y del runtime, y no
+  se ejecuta en los caminos actuales de test/build/E2E/CI. QA-FE-1A no lo
+  introdujo ni introdujo sus vulnerabilidades.
+- No existe fix compatible dentro de Angular CLI 18 bajo las restricciones
+  actuales. La remediación permanece asignada a NG-UP-20.
+- La aceptación vence al cerrar NG-UP-20 o el 2026-10-19, lo que ocurra
+  primero; no existe renovación automática.
+- Restricciones: reauditar ante cualquier cambio de lockfile; no ejecutar
+  `ng add` ni `ng update` con paquetes o fuentes no confiables; no procesar
+  TAR arbitrarios; no usar overrides ni resolutions; no añadir `tar` como
+  dependencia directa artificial.
+- Iniciar NG-UP-NODE inmediatamente después del cierre remoto de QA-FE-1A y
+  continuar sin pausas innecesarias hasta NG-UP-19 y NG-UP-20.
+- QA-FE-1A queda implementada y validada localmente, pero no se declara
+  cerrada remotamente hasta publicar su commit, mantener `HEAD == origin/master`
+  y obtener `success` en el workflow de ese SHA. El roadmap no cambia.

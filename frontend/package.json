@@ -11,6 +11,7 @@
     "e2e:no-write": "playwright test --grep @no-write",
     "e2e:no-write:headed": "playwright test --grep @no-write --headed --workers=1",
     "e2e:no-write:ci": "playwright test --grep @no-write --workers=1",
+    "e2e:billing-series:ci": "playwright test e2e/specs/billing-series-concurrency.spec.ts --workers=1",
     "e2e:report": "playwright show-report e2e/playwright-report"
   },
   "dependencies": {
@@ -31,6 +32,13 @@
     "@angular/cli": "18.2.12",
     "@angular/compiler-cli": "18.2.13",
     "@playwright/test": "^1.61.1",
+    "@types/jasmine": "5.1.15",
+    "jasmine-core": "5.2.0",
+    "karma": "6.4.4",
+    "karma-chrome-launcher": "3.2.0",
+    "karma-coverage": "2.2.1",
+    "karma-jasmine": "5.1.0",
+    "karma-jasmine-html-reporter": "2.1.0",
     "typescript": "5.5.4"
   }
 }

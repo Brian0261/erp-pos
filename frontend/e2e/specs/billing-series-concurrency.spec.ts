@@ -21,6 +21,20 @@ async function openSeriesPage(
 ) {
   let listRequests = 0;
   const mutations: { method: string; ifMatch: string | undefined }[] = [];
+  const browserErrors: string[] = [];
+
+  page.on("console", (message) => {
+    const text = message.text();
+    const expectedHttpFailure =
+      text.includes("Failed to load resource") &&
+      text.includes(`status of ${responseStatus}`);
+    if (message.type() === "error" && !expectedHttpFailure) {
+      browserErrors.push(`console.error: ${text}`);
+    }
+  });
+  page.on("pageerror", (error) => {
+    browserErrors.push(`pageerror: ${error.message}`);
+  });
 
   await page.addInitScript(() => localStorage.setItem("erp_pos_token", "e2e-token"));
   await page.route("**/api/v1/auth/me", (route) =>
@@ -63,7 +77,7 @@ async function openSeriesPage(
   await page.goto("/facturacion/series");
   await expect(page.getByRole("heading", { name: "Series registradas" })).toBeVisible();
 
-  return { mutations, getListRequests: () => listRequests };
+  return { browserErrors, mutations, getListRequests: () => listRequests };
 }
 
 test("stale update sends one If-Match request, reloads once and never retries", async ({ page }) => {
@@ -77,6 +91,7 @@ test("stale update sends one If-Match request, reloads once and never retries", 
   await expect(page.getByText(/La serie fue modificada por otro usuario/)).toBeVisible();
   expect(state.mutations).toHaveLength(1);
   expect(state.getListRequests()).toBe(2);
+  expect(state.browserErrors).toEqual([]);
 });
 
 test("stale deactivate sends one If-Match request and reloads without optimistic success", async ({ page }) => {
@@ -89,6 +104,7 @@ test("stale deactivate sends one If-Match request and reloads without optimistic
   expect(state.mutations).toHaveLength(1);
   expect(state.getListRequests()).toBe(2);
   await expect(page.getByText("Serie B001 desactivada.")).not.toBeVisible();
+  expect(state.browserErrors).toEqual([]);
 });
 
 test("stale reactivate sends one If-Match request and reloads without optimistic success", async ({ page }) => {
@@ -102,6 +118,7 @@ test("stale reactivate sends one If-Match request and reloads without optimistic
   expect(state.mutations).toHaveLength(1);
   expect(state.getListRequests()).toBe(2);
   await expect(page.getByText("Serie B001 activada.")).not.toBeVisible();
+  expect(state.browserErrors).toEqual([]);
 });
 
 test("missing precondition reloads once, invalidates the edit and never retries", async ({ page }) => {
@@ -125,6 +142,7 @@ test("missing precondition reloads once, invalidates the edit and never retries"
   expect(state.getListRequests()).toBe(2);
   await expect(page.getByText("Serie actualizada correctamente.")).not.toBeVisible();
   await expect(page.getByRole("button", { name: "Actualizar serie", exact: true })).not.toBeVisible();
+  expect(state.browserErrors).toEqual([]);
 });
 
 for (const scenario of [
@@ -149,5 +167,6 @@ for (const scenario of [
     await expect(page.getByText(/No se pudo verificar la versión vigente/)).not.toBeVisible();
     expect(state.mutations).toHaveLength(1);
     expect(state.getListRequests()).toBe(1);
+    expect(state.browserErrors).toEqual([]);
   });
 }
