@@ -132,10 +132,15 @@ dependencies:
 - `@angular/router`.
 
 QA-FE-1A did not introduce or increase them. Angular 18 has no sufficient
-supported patch. NG-UP-19 must verify that an aligned 19.2.27 dependency set
-clears the reported advisory ranges. The roadmap must then continue through
-NG-UP-20 so the application and CLI return to a supported major and the
-remaining `tar@6` path is eliminated.
+supported patch. NG-UP-19 must verify that the target dependency set clears
+the reported advisory ranges. Framework target `19.2.25`:
+`@angular/animations`, `@angular/common`, `@angular/compiler`,
+`@angular/core`, `@angular/forms`, `@angular/platform-browser`,
+`@angular/platform-browser-dynamic`, `@angular/router`, and
+`@angular/compiler-cli`. CLI/tooling target `19.2.27`:
+`@angular/cli` and `@angular-devkit/build-angular`. The roadmap must then
+continue through NG-UP-20 so the application and CLI return to a supported
+major and the remaining `tar@6` path is eliminated.
 
 A new production deployment from Angular 18 remains blocked. NG-UP-NODE,
 NG-UP-19 and NG-UP-20 have not been started by SEC-FE-1A.
@@ -194,8 +199,10 @@ in `success`. No commit, push or tag was created by this correction.
 
 ## SEC-FE-1C — GHSA-pqg4-j6r4-53mv shell-quote remediation (2026-10-06)
 
-Status: **PASS LOCAL**. This is a security gate before the separate Git/CI
-closeout of NG-UP-NODE; NG-UP-NODE is not closed and NG-UP-19 has not started.
+Status at the 2026-10-06 local validation snapshot: **PASS LOCAL**. At that
+point, this was a security gate before the separate Git/CI closeout of
+NG-UP-NODE, and NG-UP-19 had not started. The subsequent published closeout
+is recorded in `docs/ai/CURRENT_STATUS.md`.
 
 - Advisory: `GHSA-pqg4-j6r4-53mv / CVE-2026-102422` (fixed from
   `shell-quote@1.11.0`). Initial dependency: `shell-quote@1.10.0`.
@@ -238,6 +245,6 @@ closeout of NG-UP-NODE; NG-UP-NODE is not closed and NG-UP-19 has not started.
   An initial attempt failed before compilation because a reused temporary
   context lacked `nginx.conf`; the complete-context retry passed. The
   temporary image tag was removed; no image was published.
-- The eight pending NG-UP-NODE files were preserved. No commit, push or tag
-  was made. NG-UP-NODE is implemented and locally validated, ready to return
-  to its own Git/CI closeout gate; it is not declared closed here.
+- At this pre-closeout snapshot, the eight pending NG-UP-NODE files were
+  preserved; no commit, push or tag had yet been made. NG-UP-NODE was
+  implemented and locally validated, pending its separate Git/CI closeout.

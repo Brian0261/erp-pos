@@ -1545,13 +1545,14 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
   arbitrarios, overrides, resolutions ni dependencia directa artificial de
   `tar`.
 - Los ocho high productivos son Angular 18 preexistente. Un nuevo despliegue
-  productivo permanece bloqueado hasta completar NG-UP-NODE, NG-UP-19 y
-  NG-UP-20 y repetir los audits.
+  productivo permanece bloqueado hasta completar NG-UP-19 y NG-UP-20 y
+  repetir los audits. NG-UP-NODE ya está cerrada.
 - Evidencia: `docs/qa/SEC_FE_1_FRONTEND_DEPENDENCY_TRIAGE.md`.
-- NG-UP-NODE esta IMPLEMENTADA con QA funcional local PASS. El aumento
-  temporal de critical en el audit fue atendido por SEC-FE-1C, con resultado
-  `PASS LOCAL`; NG-UP-NODE queda lista para volver a su gate de cierre Git/CI,
-  pero no se declara cerrada. Baseline exacta:
+- SEC-FE-1C y NG-UP-NODE están CERRADAS. El cierre conjunto se publicó en
+  `5c78597c09f2d9fe5a94792adb241b48646c937d` y su workflow `ci`
+  (`37544946703`) terminó `success`; frontend y backend: PASS. Al cierre,
+  `HEAD == origin/master`, el working tree estaba limpio y no había tag.
+  NG-UP-19 está DESBLOQUEADA PERO NO INICIADA. Baseline exacta:
   Node `22.23.3` y npm
   `10.9.9`, `frontend/.nvmrc` canonica, `devEngines` de enforcement,
   GitHub Actions leyendo `.nvmrc` y build Docker fijado en
@@ -1567,8 +1568,9 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
   `shell-quote`. Produccion permanece en 8 (4 moderate, 4 high, 0 critical).
   `shell-quote@1.12.0` es la unica copia, dev-only; `tar@6.2.1` conserva
   la aceptacion temporal hasta NG-UP-20 o 2026-10-19, lo que ocurra primero.
-- SEC-FE-1C: `npm ci`, arbol completo, unit 13/13, build, E2E focal 6/6,
-  Docker build/runtime y `git diff --check` pasaron localmente. Siguiente
-  accion de NG-UP-NODE: revision final, commit autorizado y CI remoto.
-  No se hizo commit, push ni tag en SEC-FE-1C.
+- SEC-FE-1C: `npm ci`, árbol completo, unit 13/13, build, E2E focal 6/6,
+  Docker build/runtime y `git diff --check` pasaron localmente. Esa validación
+  no creó un commit separado; el cierre conjunto posterior de SEC-FE-1C y
+  NG-UP-NODE quedó publicado en el commit y workflow indicados arriba. No se
+  creó tag.
 - NG-UP-19/20/CF/21, QA-FE-2 y 4D-2C permanecen sin iniciar.
