@@ -1511,18 +1511,18 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
 - QA local posterior: Ecommerce 21/21, ProductCleanup 22/22, fiscal 16/16,
   ambos ordenes cruzados 38/38 cada uno, conjunto afectado 59/59 y backend
   `clean verify` 642/642 (`BUILD SUCCESS`, 0 failures/errors/skipped).
-- Estado remoto: QA-FE-1A sigue abierta. El cierre exige publicar esta
-  correccion en un SHA posterior a `5cff881` y que el workflow completo de ese
-  SHA termine en `success`; no existe aun evidencia de ese nuevo workflow.
-- Working tree en esta preparacion de cierre: los dos tests backend indicados
-  mas los documentos de esta actualizacion. No se ha hecho commit, push ni tag.
+- Estado remoto final: QA-FE-1A esta CERRADA. La correccion se publico en
+  `adab03b7ed034cf66ec4d7b895acd6734500725c` con push normal a `master`.
+- El workflow GitHub Actions `37500375922` del SHA final termino en `success`:
+  frontend PASS, unit tests 13/13, E2E focal 6/6 y backend PASS con 642/642
+  tests, 0 failures, 0 errors y 0 skipped.
+- Al cierre: `HEAD == origin/master`, 0 ahead/behind, working tree limpio y
+  sin tag.
 - Durante la implementación original del baseline no se modificó código
   funcional/backend, Node, Angular, TypeScript, Docker, infraestructura ni
   `.env`; la corrección test-only backend quedó registrada arriba.
-- Estado técnico: implementación y validación local completadas. El cierre
-  remoto requiere que el commit de publicación esté sincronizado con
-  `origin/master` y que el workflow CI asociado a ese SHA concluya en
-  `success`; esa condición no se afirma como cumplida aquí.
+- Estado técnico: implementación y validación local y remota completadas. El
+  cierre remoto descrito arriba es la evidencia vigente de QA-FE-1A.
 - SEC-FE-1A completó la corrección transitiva compatible previa al cierre:
   `shell-quote 1.8.3 -> 1.10.0` y
   `websocket-driver 0.7.4 -> 0.7.5`, sin modificar `package.json`.
@@ -1548,8 +1548,7 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
   productivo permanece bloqueado hasta completar NG-UP-NODE, NG-UP-19 y
   NG-UP-20 y repetir los audits.
 - Evidencia: `docs/qa/SEC_FE_1_FRONTEND_DEPENDENCY_TRIAGE.md`.
-- NG-UP-NODE permanece bloqueada hasta satisfacer el criterio de cierre
-  remoto de QA-FE-1A y verificar la puerta de despliegue Angular 18; despues
-  debe continuar hasta NG-UP-19 y NG-UP-20 sin pausas innecesarias.
-- Siguiente fase planificada, aun bloqueada: NG-UP-NODE.
-- NG-UP-19/20/CF/21, QA-FE-2 y 4D-2C permanecen diferidas.
+- NG-UP-NODE esta DESBLOQUEADA pero no iniciada ni implementada; su Plan Mode
+  definio una baseline tecnica pendiente de implementacion.
+- Siguiente fase planificada: NG-UP-NODE.
+- NG-UP-19/20/CF/21, QA-FE-2 y 4D-2C permanecen sin iniciar.

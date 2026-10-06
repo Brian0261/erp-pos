@@ -2571,10 +2571,11 @@ Solo crear tag cuando se cumpla todo:
   migraciones, Auth/JWT, guards, RBAC, Docker, infraestructura, Storefront,
   MiFact, `.env` o secretos. La correccion backend test-only posterior queda
   registrada en el evento del 2026-10-06.
-- El baseline local quedó implementado y validado; el cierre remoto requiere
-  sincronizar su commit de publicación con `origin/master` y que el workflow
-  CI asociado a ese SHA concluya en `success`. Este registro define el
-  criterio y no afirma su cumplimiento.
+- En el estado histórico de cierre local, el baseline quedó implementado y
+  validado; el registro indicaba que el cierre remoto requería sincronizar el
+  commit de publicación con `origin/master` y obtener `success` en CI. Esa era
+  la condición pendiente de entonces y no representa el estado actual después
+  del evento de cierre definitivo registrado más adelante.
 - La puerta de despliegue permanece bloqueada para Angular 18 hasta completar
   NG-UP-NODE, NG-UP-19 y NG-UP-20 y repetir los audits.
 - NG-UP-NODE es la siguiente fase habilitable tras cumplir ese criterio;
@@ -2677,8 +2678,23 @@ Solo crear tag cuando se cumpla todo:
   completo 642/642, `BUILD SUCCESS`, 0 failures/errors/skipped.
 - Cambios backend exclusivamente test-only. No se modificaron frontend,
   codigo productivo, Flyway/migraciones, CI, Docker, Auth/JWT ni la constraint.
-- QA-FE-1A sigue abierta remotamente. El siguiente gate es revision final,
-  nuevo commit posterior a `5cff881`, push y workflow completo asociado en
-  `success`. No se afirma SHA ni resultado remoto futuro.
-- NG-UP-NODE permanece bloqueada hasta cumplir ese gate.
-- Esta actualizacion es documental; no ejecuta commit, push, tag ni workflow.
+- En ese momento, QA-FE-1A permanecia abierta a la espera de su cierre remoto;
+  esa afirmacion es historica y queda reemplazada por el evento de cierre
+  definitivo registrado a continuacion.
+- Esta actualizacion historica no ejecutaba commit, push, tag ni workflow.
+
+### QA-FE-1A — remote closure (2026-10-06)
+
+- Commit final publicado: `adab03b7ed034cf66ec4d7b895acd6734500725c`.
+- Mensaje: `test(backend): isolate integration tests for ci`.
+- Push normal fast-forward a `master`; no hubo amend, force push, merge,
+  rebase ni tag.
+- Workflow GitHub Actions: run `37500375922`, resultado completo `success`.
+- Frontend: PASS; unit tests 13/13; E2E focal 6/6.
+- Backend: PASS; 642 tests, 0 failures, 0 errors y 0 skipped.
+- Al cierre: `HEAD == origin/master`, 0 ahead/behind, working tree limpio y
+  sin tag.
+- QA-FE-1A queda CERRADA.
+- NG-UP-NODE queda DESBLOQUEADA pero no iniciada ni implementada. Su Plan Mode
+  definio una baseline tecnica pendiente de implementacion.
+- NG-UP-19, NG-UP-20, NG-UP-CF, NG-UP-21, QA-FE-2 y 4D-2C siguen sin iniciar.
