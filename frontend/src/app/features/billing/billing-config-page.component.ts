@@ -25,10 +25,9 @@ interface BillingProfileExtras {
 }
 
 @Component({
-  selector: "app-billing-config-page",
-  standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink],
-  template: `
+    selector: "app-billing-config-page",
+    imports: [CommonModule, ReactiveFormsModule, RouterLink],
+    template: `
     <ng-container *ngIf="!initialLoading || showInitialLoader">
       <section class="ui-card billing-config-page">
         <ng-container *ngIf="initialLoading && showInitialLoader">
@@ -312,8 +311,8 @@ interface BillingProfileExtras {
       </section>
     </ng-container>
   `,
-  styles: [
-    `
+    styles: [
+        `
       .billing-config-page {
         padding: var(--space-5);
         display: grid;
@@ -488,7 +487,7 @@ interface BillingProfileExtras {
         }
       }
     `,
-  ],
+    ]
 })
 export class BillingConfigPageComponent implements OnInit, OnDestroy {
   readonly environments = BILLING_ENVIRONMENTS;

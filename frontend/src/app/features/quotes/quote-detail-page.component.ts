@@ -15,10 +15,9 @@ import {
 } from "./data/quotes.models";
 
 @Component({
-  selector: "app-quote-detail-page",
-  standalone: true,
-  imports: [CommonModule, RouterLink],
-  template: `
+    selector: "app-quote-detail-page",
+    imports: [CommonModule, RouterLink],
+    template: `
     <section class="ui-card quote-detail-page" *ngIf="quote">
       <header class="ui-page-head">
         <div>
@@ -243,8 +242,8 @@ import {
       </section>
     </section>
   `,
-  styles: [
-    `
+    styles: [
+        `
       .quote-detail-page {
         padding: var(--space-5);
         display: grid;
@@ -475,7 +474,7 @@ import {
         }
       }
     `,
-  ],
+    ]
 })
 export class QuoteDetailPageComponent implements OnInit {
   quoteId = 0;

@@ -22,10 +22,9 @@ type ProductDisplayInfo = {
 };
 
 @Component({
-  selector: "app-purchase-order-detail-page",
-  standalone: true,
-  imports: [CommonModule, RouterLink],
-  template: `
+    selector: "app-purchase-order-detail-page",
+    imports: [CommonModule, RouterLink],
+    template: `
     <section class="ui-card order-detail-page" *ngIf="order">
       <header class="ui-page-head">
         <div>
@@ -203,8 +202,8 @@ type ProductDisplayInfo = {
       </a>
     </section>
   `,
-  styles: [
-    `
+    styles: [
+        `
       .order-detail-page {
         padding: var(--space-5);
         display: grid;
@@ -393,7 +392,7 @@ type ProductDisplayInfo = {
         word-break: break-word;
       }
     `,
-  ],
+    ]
 })
 export class PurchaseOrderDetailPageComponent implements OnInit {
   order: PurchaseOrderResponse | null = null;

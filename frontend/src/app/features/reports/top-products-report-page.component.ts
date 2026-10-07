@@ -8,10 +8,9 @@ import { TopProductReportItemResponse } from "./data/reports.models";
 import { ReportsService } from "./data/reports.service";
 
 @Component({
-  selector: "app-top-products-report-page",
-  standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
-  template: `
+    selector: "app-top-products-report-page",
+    imports: [CommonModule, ReactiveFormsModule],
+    template: `
     <section class="ui-card ui-module-page top-products-report-page">
       <header class="ui-page-head">
         <div>
@@ -125,8 +124,8 @@ import { ReportsService } from "./data/reports.service";
       </section>
     </section>
   `,
-  styles: [
-    `
+    styles: [
+        `
       .top-products-filters {
         grid-template-columns: 1fr 1fr minmax(120px, 180px) auto;
       }
@@ -145,7 +144,7 @@ import { ReportsService } from "./data/reports.service";
         }
       }
     `,
-  ],
+    ]
 })
 export class TopProductsReportPageComponent implements OnInit {
   readonly filtersForm = this.formBuilder.group({

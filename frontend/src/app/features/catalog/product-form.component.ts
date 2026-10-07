@@ -16,10 +16,9 @@ import { UnitService } from "./data/unit.service";
 import { toHttpErrorMessage } from "./data/http-error-message";
 
 @Component({
-  selector: "app-product-form",
-  standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink],
-  template: `
+    selector: "app-product-form",
+    imports: [CommonModule, ReactiveFormsModule, RouterLink],
+    template: `
     <section class="ui-card product-form-page">
       <header class="ui-page-head">
         <div>
@@ -197,8 +196,8 @@ import { toHttpErrorMessage } from "./data/http-error-message";
       </form>
     </section>
   `,
-  styles: [
-    `
+    styles: [
+        `
       .product-form-page {
         padding: var(--space-5);
         display: grid;
@@ -342,7 +341,7 @@ import { toHttpErrorMessage } from "./data/http-error-message";
         }
       }
     `,
-  ],
+    ]
 })
 export class ProductFormComponent implements OnInit {
   readonly form = this.formBuilder.group({

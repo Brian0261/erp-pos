@@ -8,10 +8,9 @@ import { LowStockItemResponse } from "./data/reports.models";
 import { ReportsService } from "./data/reports.service";
 
 @Component({
-  selector: "app-low-stock-report-page",
-  standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
-  template: `
+    selector: "app-low-stock-report-page",
+    imports: [CommonModule, ReactiveFormsModule],
+    template: `
     <section class="ui-card ui-module-page low-stock-report-page">
       <header class="ui-page-head">
         <div>
@@ -131,8 +130,8 @@ import { ReportsService } from "./data/reports.service";
       </section>
     </section>
   `,
-  styles: [
-    `
+    styles: [
+        `
       .low-stock-filters {
         grid-template-columns: minmax(220px, 340px) auto;
       }
@@ -155,7 +154,7 @@ import { ReportsService } from "./data/reports.service";
         }
       }
     `,
-  ],
+    ]
 })
 export class LowStockReportPageComponent implements OnInit {
   readonly filtersForm = this.formBuilder.group({

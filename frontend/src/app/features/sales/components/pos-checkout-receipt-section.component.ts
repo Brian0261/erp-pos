@@ -12,10 +12,9 @@ import { BillingSeriesResponse } from "../../billing/data/billing.models";
 import { PosReceiptType } from "../data/pos-ui.models";
 
 @Component({
-  selector: "app-pos-checkout-receipt-section",
-  standalone: true,
-  imports: [CommonModule],
-  template: `
+    selector: "app-pos-checkout-receipt-section",
+    imports: [CommonModule],
+    template: `
     <section class="receipt-panel" aria-label="Comprobante de la venta">
       <header class="receipt-panel__header">
         <div>
@@ -165,8 +164,8 @@ import { PosReceiptType } from "../data/pos-ui.models";
       </div>
     </section>
   `,
-  styles: [
-    `
+    styles: [
+        `
       .receipt-panel {
         display: grid;
         gap: var(--space-2);
@@ -285,7 +284,7 @@ import { PosReceiptType } from "../data/pos-ui.models";
         }
       }
     `,
-  ],
+    ]
 })
 export class PosCheckoutReceiptSectionComponent implements OnChanges {
   @Input({ required: true }) receiptType: PosReceiptType = "TICKET";

@@ -22,15 +22,14 @@ const QUANTITY_PATTERN = /^(?:0\.[1-9]|[1-9]\d*(?:\.[0-9])?)$/;
 const DISCOUNT_PATTERN = /^(?:0(?:\.\d{1,2})?|[1-9]\d*(?:\.\d{1,2})?)$/;
 
 @Component({
-  selector: "app-quote-new-page",
-  standalone: true,
-  imports: [
-    CommonModule,
-    ReactiveFormsModule,
-    RouterLink,
-    ProductAutocompleteComponent,
-  ],
-  template: `
+    selector: "app-quote-new-page",
+    imports: [
+        CommonModule,
+        ReactiveFormsModule,
+        RouterLink,
+        ProductAutocompleteComponent,
+    ],
+    template: `
     <section class="ui-card quote-form-page">
       <header class="ui-page-head">
         <div>
@@ -288,8 +287,8 @@ const DISCOUNT_PATTERN = /^(?:0(?:\.\d{1,2})?|[1-9]\d*(?:\.\d{1,2})?)$/;
       </form>
     </section>
   `,
-  styles: [
-    `
+    styles: [
+        `
       .quote-form-page {
         padding: var(--space-5);
         display: grid;
@@ -541,7 +540,7 @@ const DISCOUNT_PATTERN = /^(?:0(?:\.\d{1,2})?|[1-9]\d*(?:\.\d{1,2})?)$/;
         }
       }
     `,
-  ],
+    ]
 })
 export class QuoteNewPageComponent implements OnInit {
   readonly form = this.formBuilder.group({

@@ -11,10 +11,9 @@ import { toHttpErrorMessage } from "./data/http-error-message";
 import { ProductImportService } from "./data/product-import.service";
 
 @Component({
-  selector: "app-product-import-page",
-  standalone: true,
-  imports: [CommonModule, RouterLink],
-  template: `
+    selector: "app-product-import-page",
+    imports: [CommonModule, RouterLink],
+    template: `
     <section class="ui-card import-page">
       <header class="ui-page-head">
         <div>
@@ -280,8 +279,8 @@ import { ProductImportService } from "./data/product-import.service";
       </ng-template>
     </section>
   `,
-  styles: [
-    `
+    styles: [
+        `
       .import-page {
         padding: var(--space-5);
         display: grid;
@@ -550,7 +549,7 @@ import { ProductImportService } from "./data/product-import.service";
         }
       }
     `,
-  ],
+    ]
 })
 export class ProductImportPageComponent {
   readonly previewPageSize = 50;

@@ -12,10 +12,9 @@ import {
 import { ReportsService } from "./data/reports.service";
 
 @Component({
-  selector: "app-electronic-documents-report-page",
-  standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
-  template: `
+    selector: "app-electronic-documents-report-page",
+    imports: [CommonModule, ReactiveFormsModule],
+    template: `
     <section class="ui-card ui-module-page electronic-documents-report-page">
       <header class="ui-page-head">
         <div>
@@ -154,8 +153,8 @@ import { ReportsService } from "./data/reports.service";
       </section>
     </section>
   `,
-  styles: [
-    `
+    styles: [
+        `
       .documents-filters {
         grid-template-columns: 1fr 1fr minmax(180px, 240px) auto;
       }
@@ -178,7 +177,7 @@ import { ReportsService } from "./data/reports.service";
         }
       }
     `,
-  ],
+    ]
 })
 export class ElectronicDocumentsReportPageComponent implements OnInit {
   readonly statuses = REPORT_ELECTRONIC_DOCUMENT_STATUSES;

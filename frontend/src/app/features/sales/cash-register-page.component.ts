@@ -8,10 +8,9 @@ import { CashRegisterService } from "./data/cash-register.service";
 import { CashRegisterResponse } from "./data/sales.models";
 
 @Component({
-  selector: "app-cash-register-page",
-  standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
-  template: `
+    selector: "app-cash-register-page",
+    imports: [CommonModule, ReactiveFormsModule],
+    template: `
     <section class="ui-card cash-page">
       <header class="ui-page-head">
         <div>
@@ -294,8 +293,8 @@ import { CashRegisterResponse } from "./data/sales.models";
       </details>
     </section>
   `,
-  styles: [
-    `
+    styles: [
+        `
       .cash-page {
         padding: var(--space-5);
         display: grid;
@@ -631,7 +630,7 @@ import { CashRegisterResponse } from "./data/sales.models";
         }
       }
     `,
-  ],
+    ]
 })
 export class CashRegisterPageComponent implements OnInit {
   private readonly currencyFormatter = new Intl.NumberFormat("es-PE", {

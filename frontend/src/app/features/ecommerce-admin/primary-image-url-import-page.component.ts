@@ -14,10 +14,9 @@ import { toHttpErrorMessage } from "./data/http-error-message";
 type PreviewFilter = "all" | "valid" | "error" | "warning";
 
 @Component({
-  selector: "app-primary-image-url-import-page",
-  standalone: true,
-  imports: [CommonModule, RouterLink],
-  template: `
+    selector: "app-primary-image-url-import-page",
+    imports: [CommonModule, RouterLink],
+    template: `
     <section class="ui-card import-page">
       <header class="ui-page-head">
         <div>
@@ -352,8 +351,8 @@ type PreviewFilter = "all" | "valid" | "error" | "warning";
       </ng-template>
     </section>
   `,
-  styles: [
-    `
+    styles: [
+        `
       .import-page {
         padding: var(--space-5);
         display: grid;
@@ -796,7 +795,7 @@ type PreviewFilter = "all" | "valid" | "error" | "warning";
         }
       }
     `,
-  ],
+    ]
 })
 export class PrimaryImageUrlImportPageComponent {
   @ViewChild("fileInput") fileInput?: ElementRef<HTMLInputElement>;

@@ -9,10 +9,9 @@ import { QuoteService } from "./data/quote.service";
 import { QuoteResponse, QuoteStatus } from "./data/quotes.models";
 
 @Component({
-  selector: "app-quotes-page",
-  standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink],
-  template: `
+    selector: "app-quotes-page",
+    imports: [CommonModule, ReactiveFormsModule, RouterLink],
+    template: `
     <section class="ui-card quotes-page">
       <header class="ui-page-head">
         <div>
@@ -198,8 +197,8 @@ import { QuoteResponse, QuoteStatus } from "./data/quotes.models";
       </div>
     </section>
   `,
-  styles: [
-    `
+    styles: [
+        `
       .quotes-page {
         padding: var(--space-5);
         display: grid;
@@ -405,7 +404,7 @@ import { QuoteResponse, QuoteStatus } from "./data/quotes.models";
         }
       }
     `,
-  ],
+    ]
 })
 export class QuotesPageComponent implements OnInit {
   readonly filtersForm = this.formBuilder.group({

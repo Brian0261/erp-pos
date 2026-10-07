@@ -56,10 +56,9 @@ interface DashboardActivity {
 }
 
 @Component({
-  selector: "app-dashboard",
-  standalone: true,
-  imports: [CommonModule, RouterLink],
-  template: `
+    selector: "app-dashboard",
+    imports: [CommonModule, RouterLink],
+    template: `
     <section class="dashboard-shell">
       <ng-container *ngIf="!profileErrorMessage; else profileErrorBlock">
         <section class="ui-card dashboard-hero">
@@ -229,8 +228,8 @@ interface DashboardActivity {
       </ng-template>
     </section>
   `,
-  styles: [
-    `
+    styles: [
+        `
       .dashboard-shell {
         display: grid;
         gap: var(--space-4);
@@ -554,7 +553,7 @@ interface DashboardActivity {
         }
       }
     `,
-  ],
+    ]
 })
 export class DashboardComponent implements OnInit {
   user: UserProfile | null = null;

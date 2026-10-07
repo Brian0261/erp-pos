@@ -4,10 +4,9 @@ import { Component, ElementRef, HostListener, ViewChild, inject } from "@angular
 import { ConfirmDialogService } from "./confirm-dialog.service";
 
 @Component({
-  selector: "app-confirm-dialog",
-  standalone: true,
-  imports: [CommonModule],
-  template: `
+    selector: "app-confirm-dialog",
+    imports: [CommonModule],
+    template: `
     <ng-container *ngIf="dialogService.state$ | async as state">
       <section
         class="confirm-dialog-backdrop"
@@ -66,8 +65,8 @@ import { ConfirmDialogService } from "./confirm-dialog.service";
       </section>
     </ng-container>
   `,
-  styles: [
-    `
+    styles: [
+        `
       .confirm-dialog-backdrop {
         position: fixed;
         inset: 0;
@@ -154,7 +153,7 @@ import { ConfirmDialogService } from "./confirm-dialog.service";
         }
       }
     `,
-  ],
+    ]
 })
 export class ConfirmDialogComponent {
   @ViewChild("cancelButton")

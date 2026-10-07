@@ -2,10 +2,9 @@ import { CommonModule } from "@angular/common";
 import { Component, Input } from "@angular/core";
 
 @Component({
-  selector: "app-pos-totals-summary",
-  standalone: true,
-  imports: [CommonModule],
-  template: `
+    selector: "app-pos-totals-summary",
+    imports: [CommonModule],
+    template: `
     <section class="total-board" aria-label="Totales de venta">
       <article class="total-main">
         <span>Total a cobrar</span>
@@ -32,8 +31,8 @@ import { Component, Input } from "@angular/core";
       </div>
     </section>
   `,
-  styles: [
-    `
+    styles: [
+        `
       .total-board {
         border: 1px solid rgba(18, 23, 184, 0.18);
         border-radius: var(--radius-lg);
@@ -106,7 +105,7 @@ import { Component, Input } from "@angular/core";
         }
       }
     `,
-  ],
+    ]
 })
 export class PosTotalsSummaryComponent {
   @Input({ required: true }) total = 0;

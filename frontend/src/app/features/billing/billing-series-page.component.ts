@@ -17,10 +17,9 @@ import { BillingSeriesService } from "./data/billing-series.service";
 import { toHttpErrorMessage } from "./data/http-error-message";
 
 @Component({
-  selector: "app-billing-series-page",
-  standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
-  template: `
+    selector: "app-billing-series-page",
+    imports: [CommonModule, ReactiveFormsModule],
+    template: `
     <section class="ui-card billing-series-page">
       <header class="ui-page-head">
         <div class="page-copy">
@@ -354,8 +353,8 @@ import { toHttpErrorMessage } from "./data/http-error-message";
       </section>
     </section>
   `,
-  styles: [
-    `
+    styles: [
+        `
       .billing-series-page {
         padding: var(--space-5);
         display: grid;
@@ -616,7 +615,7 @@ import { toHttpErrorMessage } from "./data/http-error-message";
         }
       }
     `,
-  ],
+    ]
 })
 export class BillingSeriesPageComponent implements OnInit {
   readonly environments = BILLING_ENVIRONMENTS;

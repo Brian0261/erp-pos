@@ -46,19 +46,18 @@ import {
 } from "./utils/pos-calculations";
 
 @Component({
-  selector: "app-pos-page",
-  standalone: true,
-  imports: [
-    CommonModule,
-    RouterLink,
-    PosTotalsSummaryComponent,
-    PosCartPanelComponent,
-    PosCheckoutModalComponent,
-    PosFullCartModalComponent,
-    PosSearchPanelComponent,
-    PosSearchResultsComponent,
-  ],
-  template: `
+    selector: "app-pos-page",
+    imports: [
+        CommonModule,
+        RouterLink,
+        PosTotalsSummaryComponent,
+        PosCartPanelComponent,
+        PosCheckoutModalComponent,
+        PosFullCartModalComponent,
+        PosSearchPanelComponent,
+        PosSearchResultsComponent,
+    ],
+    template: `
     <section class="ui-card pos-page">
       <div class="pos-utility-header">
         <div class="pos-hero__actions">
@@ -233,8 +232,8 @@ import {
       ></app-pos-full-cart-modal>
     </section>
   `,
-  styles: [
-    `
+    styles: [
+        `
       :host {
         display: block;
         height: 100%;
@@ -494,7 +493,7 @@ import {
         }
       }
     `,
-  ],
+    ]
 })
 export class PosPageComponent implements OnInit, OnDestroy {
   readonly quickSearchTerms = [

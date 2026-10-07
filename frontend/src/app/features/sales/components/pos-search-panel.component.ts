@@ -5,10 +5,9 @@ import { FormGroup, ReactiveFormsModule } from "@angular/forms";
 import { WarehouseResponse } from "../../inventory/data/inventory.models";
 
 @Component({
-  selector: "app-pos-search-panel",
-  standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
-  template: `
+    selector: "app-pos-search-panel",
+    imports: [CommonModule, ReactiveFormsModule],
+    template: `
     <form [formGroup]="saleForm" class="pos-command" (ngSubmit)="search.emit()">
       <label class="field field--warehouse">
         <span>Almacén de salida</span>
@@ -89,8 +88,8 @@ import { WarehouseResponse } from "../../inventory/data/inventory.models";
       </section>
     </form>
   `,
-  styles: [
-    `
+    styles: [
+        `
       :host {
         display: block;
         min-width: 0;
@@ -355,7 +354,7 @@ import { WarehouseResponse } from "../../inventory/data/inventory.models";
         }
       }
     `,
-  ],
+    ]
 })
 export class PosSearchPanelComponent {
   @Input({ required: true }) saleForm!: FormGroup;

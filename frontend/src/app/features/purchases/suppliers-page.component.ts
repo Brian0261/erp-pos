@@ -20,10 +20,9 @@ import { SupplierService } from "./data/supplier.service";
 type SupplierFormMode = "create" | "edit";
 
 @Component({
-  selector: "app-suppliers-page",
-  standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule],
-  template: `
+    selector: "app-suppliers-page",
+    imports: [CommonModule, FormsModule, ReactiveFormsModule],
+    template: `
     <section class="ui-card suppliers-page">
       <header class="ui-page-head">
         <div>
@@ -250,8 +249,8 @@ type SupplierFormMode = "create" | "edit";
       </section>
     </section>
   `,
-  styles: [
-    `
+    styles: [
+        `
       .suppliers-page {
         padding: var(--space-5);
         display: grid;
@@ -463,7 +462,7 @@ type SupplierFormMode = "create" | "edit";
         }
       }
     `,
-  ],
+    ]
 })
 export class SuppliersPageComponent implements OnInit {
   readonly form = this.formBuilder.group({

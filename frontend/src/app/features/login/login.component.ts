@@ -6,10 +6,9 @@ import { Router } from "@angular/router";
 import { AuthService } from "../../core/auth/auth.service";
 
 @Component({
-  selector: "app-login",
-  standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
-  template: `
+    selector: "app-login",
+    imports: [CommonModule, ReactiveFormsModule],
+    template: `
     <section class="login-shell">
       <div class="login-grid">
         <aside class="brand-panel" aria-label="InkToy branding">
@@ -64,8 +63,8 @@ import { AuthService } from "../../core/auth/auth.service";
       </div>
     </section>
   `,
-  styles: [
-    `
+    styles: [
+        `
       .login-shell {
         min-height: 100vh;
         display: grid;
@@ -247,7 +246,7 @@ import { AuthService } from "../../core/auth/auth.service";
         }
       }
     `,
-  ],
+    ]
 })
 export class LoginComponent {
   loading = false;

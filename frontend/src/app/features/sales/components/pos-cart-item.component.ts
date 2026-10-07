@@ -13,10 +13,9 @@ export interface PosCartItemQuantityChange extends PosCartItemValueChange {
 }
 
 @Component({
-  selector: "app-pos-cart-item",
-  standalone: true,
-  imports: [CommonModule],
-  template: `
+    selector: "app-pos-cart-item",
+    imports: [CommonModule],
+    template: `
     <article class="cart-item">
       <div class="cart-item__main">
         <h3>{{ item.name }}</h3>
@@ -94,8 +93,8 @@ export interface PosCartItemQuantityChange extends PosCartItemValueChange {
       </div>
     </article>
   `,
-  styles: [
-    `
+    styles: [
+        `
       .cart-item {
         border: 1px solid color-mix(in srgb, var(--color-border-default) 78%, transparent);
         border-radius: var(--radius-lg);
@@ -295,7 +294,7 @@ export interface PosCartItemQuantityChange extends PosCartItemValueChange {
         }
       }
     `,
-  ],
+    ]
 })
 export class PosCartItemComponent {
   @Input({ required: true }) item!: PosCartItem;

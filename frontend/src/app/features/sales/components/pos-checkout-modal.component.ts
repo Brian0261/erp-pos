@@ -15,15 +15,14 @@ import { PosCheckoutReceiptSectionComponent } from "./pos-checkout-receipt-secti
 import { PosTotalsSummaryComponent } from "./pos-totals-summary.component";
 
 @Component({
-  selector: "app-pos-checkout-modal",
-  standalone: true,
-  imports: [
-    CommonModule,
-    PosCheckoutPaymentSectionComponent,
-    PosCheckoutReceiptSectionComponent,
-    PosTotalsSummaryComponent,
-  ],
-  template: `
+    selector: "app-pos-checkout-modal",
+    imports: [
+        CommonModule,
+        PosCheckoutPaymentSectionComponent,
+        PosCheckoutReceiptSectionComponent,
+        PosTotalsSummaryComponent,
+    ],
+    template: `
     <section
       class="checkout-modal-backdrop"
       *ngIf="isOpen"
@@ -124,8 +123,8 @@ import { PosTotalsSummaryComponent } from "./pos-totals-summary.component";
       </article>
     </section>
   `,
-  styles: [
-    `
+    styles: [
+        `
       .checkout-modal-backdrop {
         position: fixed;
         inset: 0;
@@ -284,7 +283,7 @@ import { PosTotalsSummaryComponent } from "./pos-totals-summary.component";
         }
       }
     `,
-  ],
+    ]
 })
 export class PosCheckoutModalComponent implements OnChanges {
   @Input({ required: true }) isOpen = false;

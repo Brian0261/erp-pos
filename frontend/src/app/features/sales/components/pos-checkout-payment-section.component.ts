@@ -4,10 +4,9 @@ import { Component, EventEmitter, Input, Output } from "@angular/core";
 import { PaymentLine } from "../data/pos-ui.models";
 
 @Component({
-  selector: "app-pos-checkout-payment-section",
-  standalone: true,
-  imports: [CommonModule],
-  template: `
+    selector: "app-pos-checkout-payment-section",
+    imports: [CommonModule],
+    template: `
     <section class="payment-panel" aria-label="Pagos de la venta">
       <header class="payment-panel__header">
         <div>
@@ -90,8 +89,8 @@ import { PaymentLine } from "../data/pos-ui.models";
       </div>
     </section>
   `,
-  styles: [
-    `
+    styles: [
+        `
       .payment-panel {
         display: grid;
         gap: var(--space-2);
@@ -212,7 +211,7 @@ import { PaymentLine } from "../data/pos-ui.models";
         }
       }
     `,
-  ],
+    ]
 })
 export class PosCheckoutPaymentSectionComponent {
   @Input({ required: true }) payments: PaymentLine[] = [];

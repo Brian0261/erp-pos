@@ -17,10 +17,9 @@ import { toHttpErrorMessage } from "./data/http-error-message";
 import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.service";
 
 @Component({
-  selector: "app-billing-document-detail-page",
-  standalone: true,
-  imports: [CommonModule, RouterLink],
-  template: `
+    selector: "app-billing-document-detail-page",
+    imports: [CommonModule, RouterLink],
+    template: `
     <section class="ui-card billing-document-detail-page" *ngIf="document">
       <header class="ui-page-head">
         <div>
@@ -253,8 +252,8 @@ import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.servic
       </section>
     </section>
   `,
-  styles: [
-    `
+    styles: [
+        `
       .billing-document-detail-page {
         padding: var(--space-5);
         display: grid;
@@ -497,7 +496,7 @@ import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.servic
         }
       }
     `,
-  ],
+    ]
 })
 export class BillingDocumentDetailPageComponent implements OnInit {
   document: ElectronicDocumentResponse | null = null;

@@ -8,10 +8,9 @@ import { QuotesReportResponse } from "./data/reports.models";
 import { ReportsService } from "./data/reports.service";
 
 @Component({
-  selector: "app-quotes-report-page",
-  standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
-  template: `
+    selector: "app-quotes-report-page",
+    imports: [CommonModule, ReactiveFormsModule],
+    template: `
     <section class="ui-card ui-module-page quotes-report-page">
       <header class="ui-page-head">
         <div>
@@ -107,8 +106,8 @@ import { ReportsService } from "./data/reports.service";
       </section>
     </section>
   `,
-  styles: [
-    `
+    styles: [
+        `
       .quotes-filters {
         grid-template-columns: 1fr 1fr auto;
       }
@@ -127,7 +126,7 @@ import { ReportsService } from "./data/reports.service";
         }
       }
     `,
-  ],
+    ]
 })
 export class QuotesReportPageComponent implements OnInit {
   readonly filtersForm = this.formBuilder.group({

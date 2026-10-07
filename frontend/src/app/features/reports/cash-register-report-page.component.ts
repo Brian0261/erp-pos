@@ -8,10 +8,9 @@ import { CashRegisterReportResponse } from "./data/reports.models";
 import { ReportsService } from "./data/reports.service";
 
 @Component({
-  selector: "app-cash-register-report-page",
-  standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
-  template: `
+    selector: "app-cash-register-report-page",
+    imports: [CommonModule, ReactiveFormsModule],
+    template: `
     <section class="ui-card ui-module-page cash-report-page">
       <header class="ui-page-head">
         <div>
@@ -138,8 +137,8 @@ import { ReportsService } from "./data/reports.service";
       </section>
     </section>
   `,
-  styles: [
-    `
+    styles: [
+        `
       .cash-filters {
         grid-template-columns: minmax(260px, 420px) auto;
       }
@@ -174,7 +173,7 @@ import { ReportsService } from "./data/reports.service";
         }
       }
     `,
-  ],
+    ]
 })
 export class CashRegisterReportPageComponent implements OnInit {
   readonly filtersForm = this.formBuilder.group({

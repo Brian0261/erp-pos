@@ -12,10 +12,9 @@ interface ReportShortcut {
 }
 
 @Component({
-  selector: "app-reports-dashboard-page",
-  standalone: true,
-  imports: [CommonModule, RouterLink],
-  template: `
+    selector: "app-reports-dashboard-page",
+    imports: [CommonModule, RouterLink],
+    template: `
     <section class="ui-card ui-module-page reports-dashboard-page">
       <header class="ui-page-head">
         <div>
@@ -74,8 +73,8 @@ interface ReportShortcut {
       </section>
     </section>
   `,
-  styles: [
-    `
+    styles: [
+        `
       .cards-grid {
         display: grid;
         grid-template-columns: repeat(3, minmax(220px, 1fr));
@@ -165,7 +164,7 @@ interface ReportShortcut {
         }
       }
     `,
-  ],
+    ]
 })
 export class ReportsDashboardPageComponent implements OnInit {
   private readonly allShortcuts: ReportShortcut[] = [

@@ -23,10 +23,9 @@ import { WarehouseService } from "./data/warehouse.service";
 const QUANTITY_PATTERN = /^(?:0\.[1-9]|[1-9]\d*(?:\.[0-9])?)$/;
 
 @Component({
-  selector: "app-transfers-page",
-  standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, ProductAutocompleteComponent],
-  template: `
+    selector: "app-transfers-page",
+    imports: [CommonModule, ReactiveFormsModule, ProductAutocompleteComponent],
+    template: `
     <section class="ui-card inventory-page">
       <header class="ui-page-head">
         <div>
@@ -237,8 +236,8 @@ const QUANTITY_PATTERN = /^(?:0\.[1-9]|[1-9]\d*(?:\.[0-9])?)$/;
       </form>
     </section>
   `,
-  styles: [
-    `
+    styles: [
+        `
       .inventory-page {
         padding: var(--space-5);
         display: grid;
@@ -494,7 +493,7 @@ const QUANTITY_PATTERN = /^(?:0\.[1-9]|[1-9]\d*(?:\.[0-9])?)$/;
         }
       }
     `,
-  ],
+    ]
 })
 export class TransfersPageComponent implements OnInit, OnDestroy {
   readonly form = this.formBuilder.group(

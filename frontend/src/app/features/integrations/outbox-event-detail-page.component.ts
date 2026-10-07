@@ -8,10 +8,9 @@ import { OutboxEventResponse } from "./data/outbox.models";
 import { OutboxService } from "./data/outbox.service";
 
 @Component({
-  selector: "app-outbox-event-detail-page",
-  standalone: true,
-  imports: [CommonModule, RouterLink],
-  template: `
+    selector: "app-outbox-event-detail-page",
+    imports: [CommonModule, RouterLink],
+    template: `
     <section class="ui-card ui-module-page outbox-event-detail-page">
       <header class="ui-page-head">
         <div>
@@ -139,8 +138,8 @@ import { OutboxService } from "./data/outbox.service";
       </section>
     </section>
   `,
-  styles: [
-    `
+    styles: [
+        `
       .detail-grid {
         display: flex;
         gap: var(--space-3);
@@ -206,7 +205,7 @@ import { OutboxService } from "./data/outbox.service";
         }
       }
     `,
-  ],
+    ]
 })
 export class OutboxEventDetailPageComponent implements OnInit {
   event: OutboxEventResponse | null = null;

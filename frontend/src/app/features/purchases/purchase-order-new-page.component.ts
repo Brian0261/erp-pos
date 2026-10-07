@@ -29,15 +29,14 @@ const QUANTITY_PATTERN = /^(?:0\.[1-9]|[1-9]\d*(?:\.[0-9])?)$/;
 const UNIT_COST_PATTERN = /^(?:0\.(?:0[1-9]|[1-9]\d?)|[1-9]\d*(?:\.\d{1,2})?)$/;
 
 @Component({
-  selector: "app-purchase-order-new-page",
-  standalone: true,
-  imports: [
-    CommonModule,
-    ReactiveFormsModule,
-    RouterLink,
-    ProductAutocompleteComponent,
-  ],
-  template: `
+    selector: "app-purchase-order-new-page",
+    imports: [
+        CommonModule,
+        ReactiveFormsModule,
+        RouterLink,
+        ProductAutocompleteComponent,
+    ],
+    template: `
     <section class="ui-card order-form-page">
       <header class="ui-page-head">
         <div>
@@ -265,8 +264,8 @@ const UNIT_COST_PATTERN = /^(?:0\.(?:0[1-9]|[1-9]\d?)|[1-9]\d*(?:\.\d{1,2})?)$/;
       </form>
     </section>
   `,
-  styles: [
-    `
+    styles: [
+        `
       .order-form-page {
         padding: var(--space-5);
         display: grid;
@@ -514,7 +513,7 @@ const UNIT_COST_PATTERN = /^(?:0\.(?:0[1-9]|[1-9]\d?)|[1-9]\d*(?:\.\d{1,2})?)$/;
         }
       }
     `,
-  ],
+    ]
 })
 export class PurchaseOrderNewPageComponent implements OnInit {
   readonly form = this.formBuilder.group({

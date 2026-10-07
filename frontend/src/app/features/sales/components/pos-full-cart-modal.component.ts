@@ -8,10 +8,9 @@ import {
 import { PosCartItem } from "../data/pos-ui.models";
 
 @Component({
-  selector: "app-pos-full-cart-modal",
-  standalone: true,
-  imports: [CommonModule],
-  template: `
+    selector: "app-pos-full-cart-modal",
+    imports: [CommonModule],
+    template: `
     <section
       class="full-cart-backdrop"
       *ngIf="isOpen"
@@ -142,8 +141,8 @@ import { PosCartItem } from "../data/pos-ui.models";
       </article>
     </section>
   `,
-  styles: [
-    `
+    styles: [
+        `
       .full-cart-backdrop {
         position: fixed;
         inset: 0;
@@ -478,7 +477,7 @@ import { PosCartItem } from "../data/pos-ui.models";
         }
       }
     `,
-  ],
+    ]
 })
 export class PosFullCartModalComponent {
   @Input({ required: true }) isOpen = false;

@@ -8,10 +8,9 @@ import { InventoryMovementReportItemResponse } from "./data/reports.models";
 import { ReportsService } from "./data/reports.service";
 
 @Component({
-  selector: "app-inventory-movements-report-page",
-  standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
-  template: `
+    selector: "app-inventory-movements-report-page",
+    imports: [CommonModule, ReactiveFormsModule],
+    template: `
     <section class="ui-card ui-module-page inventory-movements-report-page">
       <header class="ui-page-head">
         <div>
@@ -137,8 +136,8 @@ import { ReportsService } from "./data/reports.service";
       </section>
     </section>
   `,
-  styles: [
-    `
+    styles: [
+        `
       .movements-actions {
         grid-column: 1 / -1;
       }
@@ -147,7 +146,7 @@ import { ReportsService } from "./data/reports.service";
         min-width: 1120px;
       }
     `,
-  ],
+    ]
 })
 export class InventoryMovementsReportPageComponent implements OnInit {
   readonly filtersForm = this.formBuilder.group({

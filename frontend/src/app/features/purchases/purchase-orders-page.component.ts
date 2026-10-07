@@ -17,10 +17,9 @@ import { PurchaseOrderService } from "./data/purchase-order.service";
 import { SupplierService } from "./data/supplier.service";
 
 @Component({
-  selector: "app-purchase-orders-page",
-  standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink],
-  template: `
+    selector: "app-purchase-orders-page",
+    imports: [CommonModule, ReactiveFormsModule, RouterLink],
+    template: `
     <section class="ui-card purchase-orders-page">
       <header class="ui-page-head">
         <div>
@@ -178,8 +177,8 @@ import { SupplierService } from "./data/supplier.service";
       </div>
     </section>
   `,
-  styles: [
-    `
+    styles: [
+        `
       .purchase-orders-page {
         padding: var(--space-5);
         display: grid;
@@ -308,7 +307,7 @@ import { SupplierService } from "./data/supplier.service";
         }
       }
     `,
-  ],
+    ]
 })
 export class PurchaseOrdersPageComponent implements OnInit {
   readonly filterForm = this.formBuilder.group({

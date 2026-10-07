@@ -15,10 +15,9 @@ import {
 import { OutboxService } from "./data/outbox.service";
 
 @Component({
-  selector: "app-outbox-events-page",
-  standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink],
-  template: `
+    selector: "app-outbox-events-page",
+    imports: [CommonModule, ReactiveFormsModule, RouterLink],
+    template: `
     <section class="ui-card ui-module-page outbox-events-page">
       <header class="ui-page-head">
         <div>
@@ -196,8 +195,8 @@ import { OutboxService } from "./data/outbox.service";
       </section>
     </section>
   `,
-  styles: [
-    `
+    styles: [
+        `
       .outbox-filters {
         grid-template-columns: minmax(180px, 220px) minmax(220px, 1fr) auto;
       }
@@ -226,7 +225,7 @@ import { OutboxService } from "./data/outbox.service";
         }
       }
     `,
-  ],
+    ]
 })
 export class OutboxEventsPageComponent implements OnInit {
   readonly statuses = OUTBOX_EVENT_STATUSES;

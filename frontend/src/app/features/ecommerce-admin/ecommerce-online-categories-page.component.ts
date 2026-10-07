@@ -12,10 +12,9 @@ import { EcommerceAdminService } from "./data/ecommerce-admin.service";
 import { toHttpErrorMessage } from "./data/http-error-message";
 
 @Component({
-  selector: "app-ecommerce-online-categories-page",
-  standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
-  template: `
+    selector: "app-ecommerce-online-categories-page",
+    imports: [CommonModule, ReactiveFormsModule],
+    template: `
     <section class="ui-card ecommerce-page">
       <header class="ui-page-head">
         <div>
@@ -191,8 +190,8 @@ import { toHttpErrorMessage } from "./data/http-error-message";
       </div>
     </section>
   `,
-  styles: [
-    `
+    styles: [
+        `
       .ecommerce-page {
         padding: var(--space-5);
         display: grid;
@@ -307,7 +306,7 @@ import { toHttpErrorMessage } from "./data/http-error-message";
         }
       }
     `,
-  ],
+    ]
 })
 export class EcommerceOnlineCategoriesPageComponent implements OnInit {
   readonly form = this.formBuilder.group({

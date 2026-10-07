@@ -66,10 +66,9 @@ const ROLES_CONSULTA_CAJERO: AppRole[] = ["CAJERO"];
 const ROLES_ECOMMERCE_ADMIN: AppRole[] = ["ADMIN", "SUPERVISOR"];
 
 @Component({
-  selector: "app-layout",
-  standalone: true,
-  imports: [CommonModule, RouterOutlet, RouterLink, RouterLinkActive, ConfirmDialogComponent],
-  template: `
+    selector: "app-layout",
+    imports: [CommonModule, RouterOutlet, RouterLink, RouterLinkActive, ConfirmDialogComponent],
+    template: `
     <div class="layout-shell" [class.is-sidebar-compact]="isSidebarCompact">
       <aside class="sidebar" [class.is-compact]="isSidebarCompact">
         <ng-template #sidebarIconTemplate let-icon>
@@ -500,8 +499,8 @@ const ROLES_ECOMMERCE_ADMIN: AppRole[] = ["ADMIN", "SUPERVISOR"];
       <app-confirm-dialog></app-confirm-dialog>
     </div>
   `,
-  styles: [
-    `
+    styles: [
+        `
       .layout-shell {
         display: grid;
         grid-template-columns: var(--layout-sidebar-width, 250px) 1fr;
@@ -1331,7 +1330,7 @@ const ROLES_ECOMMERCE_ADMIN: AppRole[] = ["ADMIN", "SUPERVISOR"];
         }
       }
     `,
-  ],
+    ]
 })
 export class LayoutComponent implements OnInit, OnDestroy {
   currentUser: UserProfile | null = null;

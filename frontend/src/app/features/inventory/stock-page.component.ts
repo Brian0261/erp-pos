@@ -18,10 +18,9 @@ type ProductCacheItem = Pick<
 >;
 
 @Component({
-  selector: "app-stock-page",
-  standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, ProductAutocompleteComponent],
-  template: `
+    selector: "app-stock-page",
+    imports: [CommonModule, ReactiveFormsModule, ProductAutocompleteComponent],
+    template: `
     <section class="ui-card inventory-page">
       <header class="ui-page-head">
         <div>
@@ -183,8 +182,8 @@ type ProductCacheItem = Pick<
       </footer>
     </section>
   `,
-  styles: [
-    `
+    styles: [
+        `
       .inventory-page {
         padding: var(--space-5);
         display: grid;
@@ -502,7 +501,7 @@ type ProductCacheItem = Pick<
         }
       }
     `,
-  ],
+    ]
 })
   export class StockPageComponent implements OnInit, OnDestroy {
   readonly filtersForm = this.formBuilder.group({

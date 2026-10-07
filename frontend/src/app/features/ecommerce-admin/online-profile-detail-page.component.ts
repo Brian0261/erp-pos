@@ -37,10 +37,9 @@ interface DetailTab {
 }
 
 @Component({
-  selector: "app-online-profile-detail-page",
-  standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink],
-  template: `
+    selector: "app-online-profile-detail-page",
+    imports: [CommonModule, ReactiveFormsModule, RouterLink],
+    template: `
     <section class="ecommerce-detail-page">
       <header class="detail-hero">
         <div class="hero-copy">
@@ -677,8 +676,8 @@ interface DetailTab {
       </div>
     </section>
   `,
-  styles: [
-    `
+    styles: [
+        `
       .ecommerce-detail-page {
         display: grid;
         gap: var(--space-4);
@@ -1556,7 +1555,7 @@ interface DetailTab {
         }
       }
     `,
-  ],
+    ]
 })
 export class OnlineProfileDetailPageComponent implements OnInit {
   readonly robotsPolicies: RobotsPolicy[] = [

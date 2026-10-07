@@ -18,10 +18,9 @@ import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.servic
 const QUANTITY_PATTERN = /^(?:0\.[1-9]|[1-9]\d*(?:\.[0-9])?)$/;
 
 @Component({
-  selector: "app-adjustments-page",
-  standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, ProductAutocompleteComponent],
-  template: `
+    selector: "app-adjustments-page",
+    imports: [CommonModule, ReactiveFormsModule, ProductAutocompleteComponent],
+    template: `
     <section class="ui-card inventory-page">
       <header class="ui-page-head">
         <div>
@@ -151,8 +150,8 @@ const QUANTITY_PATTERN = /^(?:0\.[1-9]|[1-9]\d*(?:\.[0-9])?)$/;
 
     </section>
   `,
-  styles: [
-    `
+    styles: [
+        `
       .inventory-page {
         padding: var(--space-5);
         display: grid;
@@ -374,7 +373,7 @@ const QUANTITY_PATTERN = /^(?:0\.[1-9]|[1-9]\d*(?:\.[0-9])?)$/;
         }
       }
     `,
-  ],
+    ]
 })
   export class AdjustmentsPageComponent implements OnInit, OnDestroy {
   readonly form = this.formBuilder.group({

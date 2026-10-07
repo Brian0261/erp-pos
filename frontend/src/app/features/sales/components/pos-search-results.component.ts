@@ -4,10 +4,9 @@ import { Component, EventEmitter, Input, Output } from "@angular/core";
 import { PosProductResponse } from "../data/sales.models";
 
 @Component({
-  selector: "app-pos-search-results",
-  standalone: true,
-  imports: [CommonModule],
-  template: `
+    selector: "app-pos-search-results",
+    imports: [CommonModule],
+    template: `
     <section class="results-panel">
       <header class="panel-head">
         <div>
@@ -68,8 +67,8 @@ import { PosProductResponse } from "../data/sales.models";
       </div>
     </section>
   `,
-  styles: [
-    `
+    styles: [
+        `
       :host {
         display: grid;
         min-height: 0;
@@ -353,7 +352,7 @@ import { PosProductResponse } from "../data/sales.models";
         }
       }
     `,
-  ],
+    ]
 })
 export class PosSearchResultsComponent {
   @Input({ required: true }) searchResults: PosProductResponse[] = [];

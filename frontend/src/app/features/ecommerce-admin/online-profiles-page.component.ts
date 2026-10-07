@@ -22,10 +22,9 @@ type ReadinessFilter = "ALL" | ReadinessStatus;
 const NONE_VALUE = "__NONE__";
 
 @Component({
-  selector: "app-online-profiles-page",
-  standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink],
-  template: `
+    selector: "app-online-profiles-page",
+    imports: [CommonModule, ReactiveFormsModule, RouterLink],
+    template: `
     <section class="ui-card ecommerce-page">
       <header class="ui-page-head">
         <div>
@@ -251,8 +250,8 @@ const NONE_VALUE = "__NONE__";
       </footer>
     </section>
   `,
-  styles: [
-    `
+    styles: [
+        `
       .ecommerce-page {
         padding: var(--space-5);
         display: grid;
@@ -437,7 +436,7 @@ const NONE_VALUE = "__NONE__";
         }
       }
     `,
-  ],
+    ]
 })
 export class OnlineProfilesPageComponent implements OnInit, OnDestroy {
   readonly noneValue = NONE_VALUE;

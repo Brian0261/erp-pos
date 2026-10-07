@@ -12,10 +12,9 @@ import {
 import { ReportsService } from "./data/reports.service";
 
 @Component({
-  selector: "app-sales-report-page",
-  standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
-  template: `
+    selector: "app-sales-report-page",
+    imports: [CommonModule, ReactiveFormsModule],
+    template: `
     <section class="ui-card ui-module-page sales-report-page">
       <header class="ui-page-head">
         <div>
@@ -160,8 +159,8 @@ import { ReportsService } from "./data/reports.service";
       </section>
     </section>
   `,
-  styles: [
-    `
+    styles: [
+        `
       .sales-filters {
         grid-template-columns: 1fr 1fr auto;
       }
@@ -180,7 +179,7 @@ import { ReportsService } from "./data/reports.service";
         }
       }
     `,
-  ],
+    ]
 })
 export class SalesReportPageComponent implements OnInit {
   readonly filtersForm = this.formBuilder.group({

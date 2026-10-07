@@ -30,10 +30,9 @@ type MovementKind =
   | "SALE_VOID_IN";
 
 @Component({
-  selector: "app-kardex-page",
-  standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, ProductAutocompleteComponent],
-  template: `
+    selector: "app-kardex-page",
+    imports: [CommonModule, ReactiveFormsModule, ProductAutocompleteComponent],
+    template: `
     <section class="ui-card ui-module-page kardex-page">
       <header class="ui-page-head">
         <div>
@@ -268,8 +267,8 @@ type MovementKind =
       </section>
     </section>
   `,
-  styles: [
-    `
+    styles: [
+        `
       .kardex-filters {
         display: grid;
         gap: var(--space-3);
@@ -471,7 +470,7 @@ type MovementKind =
         }
       }
     `,
-  ],
+    ]
 })
 export class KardexPageComponent implements OnInit, OnDestroy {
   readonly filtersForm = this.formBuilder.group(

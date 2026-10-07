@@ -18,10 +18,9 @@ import { WarehouseResponse } from "./data/inventory.models";
 import { WarehouseService } from "./data/warehouse.service";
 
 @Component({
-  selector: "app-initial-stock-page",
-  standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, ProductAutocompleteComponent],
-  template: `
+    selector: "app-initial-stock-page",
+    imports: [CommonModule, ReactiveFormsModule, ProductAutocompleteComponent],
+    template: `
     <section class="ui-card inventory-page">
       <header class="ui-page-head">
         <div>
@@ -142,8 +141,8 @@ import { WarehouseService } from "./data/warehouse.service";
       </p>
     </section>
   `,
-  styles: [
-    `
+    styles: [
+        `
       .inventory-page {
         padding: var(--space-5);
         display: grid;
@@ -355,7 +354,7 @@ import { WarehouseService } from "./data/warehouse.service";
         }
       }
     `,
-  ],
+    ]
 })
   export class InitialStockPageComponent implements OnInit, OnDestroy {
   readonly integerPositiveValidator: ValidatorFn = (

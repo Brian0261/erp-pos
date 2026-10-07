@@ -17,10 +17,9 @@ import { toHttpErrorMessage } from "./data/http-error-message";
 import { SalesService } from "../sales/data/sales.service";
 
 @Component({
-  selector: "app-billing-documents-page",
-  standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink],
-  template: `
+    selector: "app-billing-documents-page",
+    imports: [CommonModule, ReactiveFormsModule, RouterLink],
+    template: `
     <section class="ui-card billing-documents-page">
       <header class="ui-page-head">
         <div>
@@ -271,8 +270,8 @@ import { SalesService } from "../sales/data/sales.service";
       </section>
     </section>
   `,
-  styles: [
-    `
+    styles: [
+        `
       .billing-documents-page {
         padding: var(--space-5);
         display: grid;
@@ -513,7 +512,7 @@ import { SalesService } from "../sales/data/sales.service";
         }
       }
     `,
-  ],
+    ]
 })
 export class BillingDocumentsPageComponent implements OnInit {
   readonly documentTypes = ELECTRONIC_DOCUMENT_TYPES;

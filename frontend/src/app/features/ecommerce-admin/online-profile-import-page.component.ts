@@ -12,10 +12,9 @@ import { EcommerceAdminService } from "./data/ecommerce-admin.service";
 import { toHttpErrorMessage } from "./data/http-error-message";
 
 @Component({
-  selector: "app-online-profile-import-page",
-  standalone: true,
-  imports: [CommonModule, RouterLink],
-  template: `
+    selector: "app-online-profile-import-page",
+    imports: [CommonModule, RouterLink],
+    template: `
     <section class="ui-card import-page">
       <header class="ui-page-head">
         <div>
@@ -244,8 +243,8 @@ import { toHttpErrorMessage } from "./data/http-error-message";
       </ng-template>
     </section>
   `,
-  styles: [
-    `
+    styles: [
+        `
       .import-page {
         padding: var(--space-5);
         display: grid;
@@ -478,7 +477,7 @@ import { toHttpErrorMessage } from "./data/http-error-message";
         }
       }
     `,
-  ],
+    ]
 })
 export class OnlineProfileImportPageComponent {
   @ViewChild("fileInput") private fileInput?: ElementRef<HTMLInputElement>;

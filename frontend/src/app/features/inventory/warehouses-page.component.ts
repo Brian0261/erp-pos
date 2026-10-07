@@ -14,10 +14,9 @@ import {
 import { WarehouseService } from "./data/warehouse.service";
 
 @Component({
-  selector: "app-warehouses-page",
-  standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
-  template: `
+    selector: "app-warehouses-page",
+    imports: [CommonModule, ReactiveFormsModule],
+    template: `
     <section class="ui-card inventory-page">
       <header class="ui-page-head">
         <div>
@@ -158,8 +157,8 @@ import { WarehouseService } from "./data/warehouse.service";
       </div>
     </section>
   `,
-  styles: [
-    `
+    styles: [
+        `
       .inventory-page {
         padding: var(--space-5);
         display: grid;
@@ -274,7 +273,7 @@ import { WarehouseService } from "./data/warehouse.service";
         }
       }
     `,
-  ],
+    ]
 })
 export class WarehousesPageComponent implements OnInit {
   readonly form = this.formBuilder.group({

@@ -36,10 +36,9 @@ type ProductDisplayInfo = {
 };
 
 @Component({
-  selector: "app-purchase-order-receive-page",
-  standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink],
-  template: `
+    selector: "app-purchase-order-receive-page",
+    imports: [CommonModule, ReactiveFormsModule, RouterLink],
+    template: `
     <section class="ui-card receive-page" *ngIf="order">
       <header class="ui-page-head">
         <div>
@@ -247,8 +246,8 @@ type ProductDisplayInfo = {
       </a>
     </section>
   `,
-  styles: [
-    `
+    styles: [
+        `
       .receive-page {
         padding: var(--space-5);
         display: grid;
@@ -526,7 +525,7 @@ type ProductDisplayInfo = {
         }
       }
     `,
-  ],
+    ]
 })
 export class PurchaseOrderReceivePageComponent implements OnInit {
   readonly form = this.formBuilder.group({

@@ -16,10 +16,9 @@ import { SalesService } from "./data/sales.service";
 import { SaleResponse } from "./data/sales.models";
 
 @Component({
-  selector: "app-sale-detail-page",
-  standalone: true,
-  imports: [CommonModule, RouterLink],
-  template: `
+    selector: "app-sale-detail-page",
+    imports: [CommonModule, RouterLink],
+    template: `
     <section class="ui-card sale-detail-page" *ngIf="sale || errorMessage">
       <header class="ui-page-head">
           <div>
@@ -300,8 +299,8 @@ import { SaleResponse } from "./data/sales.models";
       </ng-container>
     </section>
   `,
-  styles: [
-    `
+    styles: [
+        `
       .sale-detail-page {
         padding: var(--space-5);
         display: grid;
@@ -669,7 +668,7 @@ import { SaleResponse } from "./data/sales.models";
         }
       }
     `,
-  ],
+    ]
 })
 export class SaleDetailPageComponent implements OnInit {
   private readonly blockingBillingStatuses = new Set([

@@ -27,10 +27,9 @@ interface PaymentLine {
 }
 
 @Component({
-  selector: "app-quote-convert-page",
-  standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink],
-  template: `
+    selector: "app-quote-convert-page",
+    imports: [CommonModule, ReactiveFormsModule, RouterLink],
+    template: `
     <section class="ui-card quote-convert-page" *ngIf="quote">
       <header class="ui-page-head">
         <div>
@@ -345,8 +344,8 @@ interface PaymentLine {
       </footer>
     </section>
   `,
-  styles: [
-    `
+    styles: [
+        `
       .quote-convert-page {
         padding: var(--space-5);
         display: grid;
@@ -637,7 +636,7 @@ interface PaymentLine {
         }
       }
     `,
-  ],
+    ]
 })
 export class QuoteConvertPageComponent implements OnInit {
   readonly form = this.formBuilder.group({

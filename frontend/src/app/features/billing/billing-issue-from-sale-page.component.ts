@@ -20,10 +20,9 @@ import { toHttpErrorMessage } from "./data/http-error-message";
 import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.service";
 
 @Component({
-  selector: "app-billing-issue-from-sale-page",
-  standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink],
-  template: `
+    selector: "app-billing-issue-from-sale-page",
+    imports: [CommonModule, ReactiveFormsModule, RouterLink],
+    template: `
     <section class="ui-card billing-issue-page" *ngIf="sale">
       <header class="ui-page-head">
         <div>
@@ -238,8 +237,8 @@ import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.servic
       </section>
     </section>
   `,
-  styles: [
-    `
+    styles: [
+        `
       .billing-issue-page {
         padding: var(--space-5);
         display: grid;
@@ -415,7 +414,7 @@ import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.servic
         }
       }
     `,
-  ],
+    ]
 })
 export class BillingIssueFromSalePageComponent implements OnInit {
   readonly documentTypes = ELECTRONIC_DOCUMENT_TYPES;

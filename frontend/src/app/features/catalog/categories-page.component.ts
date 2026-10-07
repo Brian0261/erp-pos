@@ -8,10 +8,9 @@ import { toHttpErrorMessage } from "./data/http-error-message";
 import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.service";
 
 @Component({
-  selector: "app-categories-page",
-  standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
-  template: `
+    selector: "app-categories-page",
+    imports: [CommonModule, ReactiveFormsModule],
+    template: `
     <section class="ui-card catalog-page">
       <header class="ui-page-head">
         <div>
@@ -156,8 +155,8 @@ import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.servic
       </div>
     </section>
   `,
-  styles: [
-    `
+    styles: [
+        `
       .catalog-page {
         padding: var(--space-5);
         display: grid;
@@ -271,7 +270,7 @@ import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.servic
         }
       }
     `,
-  ],
+    ]
 })
 export class CategoriesPageComponent implements OnInit {
   readonly form = this.formBuilder.group({

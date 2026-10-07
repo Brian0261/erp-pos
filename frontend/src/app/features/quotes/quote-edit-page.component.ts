@@ -28,15 +28,14 @@ const QUANTITY_PATTERN = /^(?:0\.[1-9]|[1-9]\d*(?:\.[0-9])?)$/;
 const DISCOUNT_PATTERN = /^(?:0(?:\.\d{1,2})?|[1-9]\d*(?:\.\d{1,2})?)$/;
 
 @Component({
-  selector: "app-quote-edit-page",
-  standalone: true,
-  imports: [
-    CommonModule,
-    ReactiveFormsModule,
-    RouterLink,
-    ProductAutocompleteComponent,
-  ],
-  template: `
+    selector: "app-quote-edit-page",
+    imports: [
+        CommonModule,
+        ReactiveFormsModule,
+        RouterLink,
+        ProductAutocompleteComponent,
+    ],
+    template: `
     <section class="ui-card quote-edit-page">
       <header class="ui-page-head">
         <div>
@@ -337,8 +336,8 @@ const DISCOUNT_PATTERN = /^(?:0(?:\.\d{1,2})?|[1-9]\d*(?:\.\d{1,2})?)$/;
       </section>
     </section>
   `,
-  styles: [
-    `
+    styles: [
+        `
       .quote-edit-page {
         padding: var(--space-5);
         display: grid;
@@ -626,7 +625,7 @@ const DISCOUNT_PATTERN = /^(?:0(?:\.\d{1,2})?|[1-9]\d*(?:\.\d{1,2})?)$/;
         }
       }
     `,
-  ],
+    ]
 })
 export class QuoteEditPageComponent implements OnInit {
   readonly nonEditableMessage =

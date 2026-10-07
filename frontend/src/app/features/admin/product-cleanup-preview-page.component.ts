@@ -27,10 +27,9 @@ type DetailTabId =
   | "inventory";
 
 @Component({
-  selector: "app-product-cleanup-preview-page",
-  standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink],
-  template: `
+    selector: "app-product-cleanup-preview-page",
+    imports: [CommonModule, ReactiveFormsModule, RouterLink],
+    template: `
     <section class="ui-card cleanup-page">
       <header class="ui-page-head">
         <div>
@@ -512,8 +511,8 @@ type DetailTabId =
       </section>
     </section>
   `,
-  styles: [
-    `
+    styles: [
+        `
       .cleanup-page {
         padding: var(--space-5);
         display: grid;
@@ -973,7 +972,7 @@ type DetailTabId =
         }
       }
     `,
-  ],
+    ]
 })
 export class ProductCleanupPreviewPageComponent {
   private static readonly REQUIRED_CONFIRMATION_TEXT = "ELIMINAR PRUEBAS";

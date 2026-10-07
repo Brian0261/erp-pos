@@ -15,10 +15,9 @@ import {
 } from "./data/sales.models";
 
 @Component({
-  selector: "app-sales-page",
-  standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink],
-  template: `
+    selector: "app-sales-page",
+    imports: [CommonModule, ReactiveFormsModule, RouterLink],
+    template: `
     <section class="ui-card sales-page">
       <header class="ui-page-head">
         <div>
@@ -170,8 +169,8 @@ import {
       </div>
     </section>
   `,
-  styles: [
-    `
+    styles: [
+        `
       .sales-page {
         padding: var(--space-5);
         display: grid;
@@ -352,7 +351,7 @@ import {
         }
       }
     `,
-  ],
+    ]
 })
 export class SalesPageComponent implements OnInit {
   private readonly destroyRef = inject(DestroyRef);

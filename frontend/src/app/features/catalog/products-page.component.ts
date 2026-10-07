@@ -19,10 +19,9 @@ import { toHttpErrorMessage } from "./data/http-error-message";
 import { UnitService } from "./data/unit.service";
 
 @Component({
-  selector: "app-products-page",
-  standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink],
-  template: `
+    selector: "app-products-page",
+    imports: [CommonModule, ReactiveFormsModule, RouterLink],
+    template: `
     <section class="ui-card catalog-page">
       <header class="ui-page-head">
         <div class="page-copy">
@@ -264,8 +263,8 @@ import { UnitService } from "./data/unit.service";
       </footer>
     </section>
   `,
-  styles: [
-    `
+    styles: [
+        `
       .catalog-page {
         padding: var(--space-5) var(--space-5) 0.55rem;
         display: grid;
@@ -631,7 +630,7 @@ import { UnitService } from "./data/unit.service";
         }
       }
     `,
-  ],
+    ]
 })
 export class ProductsPageComponent implements OnInit {
   readonly searchForm = this.formBuilder.nonNullable.group({

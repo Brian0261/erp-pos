@@ -29,10 +29,9 @@ import { ProductService } from "../../../features/catalog/data/product.service";
 let productAutocompleteUid = 0;
 
 @Component({
-  selector: "app-product-autocomplete",
-  standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
-  template: `
+    selector: "app-product-autocomplete",
+    imports: [CommonModule, ReactiveFormsModule],
+    template: `
     <div class="product-autocomplete" [class.product-autocomplete--compact]="compact">
       <label class="product-autocomplete__field">
         <span class="product-autocomplete__label">Producto</span>
@@ -124,8 +123,8 @@ let productAutocompleteUid = 0;
       </div>
     </div>
   `,
-  styles: [
-    `
+    styles: [
+        `
       .product-autocomplete {
         position: relative;
         display: grid;
@@ -275,7 +274,7 @@ let productAutocompleteUid = 0;
         }
       }
     `,
-  ],
+    ]
 })
 export class ProductAutocompleteComponent implements OnChanges, OnInit, OnDestroy {
   private readonly destroy$ = new Subject<void>();

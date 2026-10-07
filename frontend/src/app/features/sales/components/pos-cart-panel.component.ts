@@ -9,10 +9,9 @@ import {
 import { PosCartItem } from "../data/pos-ui.models";
 
 @Component({
-  selector: "app-pos-cart-panel",
-  standalone: true,
-  imports: [CommonModule, PosCartItemComponent],
-  template: `
+    selector: "app-pos-cart-panel",
+    imports: [CommonModule, PosCartItemComponent],
+    template: `
     <section class="cart-panel">
       <header class="panel-head panel-head--compact">
         <div>
@@ -61,8 +60,8 @@ import { PosCartItem } from "../data/pos-ui.models";
       </ng-template>
     </section>
   `,
-  styles: [
-    `
+    styles: [
+        `
       :host {
         display: block;
         height: 100%;
@@ -218,7 +217,7 @@ import { PosCartItem } from "../data/pos-ui.models";
         }
       }
     `,
-  ],
+    ]
 })
 export class PosCartPanelComponent {
   @Input({ required: true }) cart: PosCartItem[] = [];
