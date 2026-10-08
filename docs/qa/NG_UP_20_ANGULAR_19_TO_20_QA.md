@@ -1,6 +1,6 @@
 # NG-UP-20 — Angular 19 → Angular 20: Build y QA local
 
-Fecha: 2026-10-07. Estado: **IMPLEMENTADA Y VALIDADA LOCALMENTE, PENDIENTE DE CIERRE GIT/CI**. No hay commit, push, tag ni workflow remoto de esta fase.
+Fecha de QA local: 2026-10-07. Estado actual: **NG-UP-20 CERRADA**. Las evidencias locales que siguen describen las pruebas antes del cierre Git/CI; su estado remoto final se registra en «Cierre remoto Git/CI».
 
 ## Preflight y baseline
 
@@ -108,7 +108,18 @@ GHSA-w9m9-85wc-3x92 GHSA-x5fp-wj9c-mxmx
 | `tar@6.2.1` | `npm ls/explain`: única copia `tar@7.5.22` por `pacote@21.5.1` y `node-gyp@12.4.0`; no hay tar 6, finding tar ni ruta transitiva vulnerable detectada. | `TAR_ACCEPTANCE_RESOLVED` localmente |
 | `GHSA-pqg4-j6r4-53mv` | Única copia `shell-quote@1.12.0` en tooling webpack-dev-server → launch-editor; el GHSA no figura en el audit. | Sin regresión |
 
-La aceptación temporal anterior de `tar@6.2.1` **no se renueva**. Su condición técnica de riesgo quedó resuelta localmente; la actualización formal de estado depende del cierre Git/CI de NG-UP-20. No se introdujo una dependencia directa de tar ni override.
+La aceptación temporal anterior de `tar@6.2.1` **no se renovó**. Su condición técnica de riesgo quedó resuelta localmente y el cierre formal se registra abajo. No se introdujo una dependencia directa de tar ni override.
+
+## Cierre remoto Git/CI
+
+- Commit funcional publicado: `e2ea2204d6982039d7523d90e6b967a0f1cfcb59`, mensaje `feat(frontend): upgrade Angular to 20`, parent `5ee416dbb6c430fec28a89555e739daaa07e5f58`.
+- GitHub Actions [`ci #37700778791`](https://github.com/Brian0261/erp-pos/actions/runs/37700778791): repositorio `Brian0261/erp-pos`, rama `master`, evento `push`, SHA `e2ea2204d6982039d7523d90e6b967a0f1cfcb59`; estado `completed`, conclusión `success`.
+- Frontend CI: Node `22.23.3`, npm `10.9.9`; instalación reproducible, unit 13/13 PASS, build PASS y E2E focal 6/6 PASS. Backend CI: `BUILD SUCCESS`, 642 tests, 0 failures, 0 errors y 0 skipped. Ambos jobs finalizaron `success`.
+- Verificación tras el cierre funcional y antes de esta reconciliación documental: `HEAD == origin/master == e2ea2204d6982039d7523d90e6b967a0f1cfcb59`, 0 ahead/behind, working tree limpio y sin tag.
+- Resultado formal: **NG-UP-20 CERRADA**. `TAR_ACCEPTANCE_RESOLVED — CERRADA`; `tar@6.2.1` no está instalado y no se identificó sustituto vulnerable. No se extendió la aceptación con vencimiento 2026-10-19.
+- La auditoría completa conserva 23 findings de desarrollo (5 moderate, 18 high) documentados arriba; no se declara que el audit completo esté libre de vulnerabilidades. Audit productivo: 0 findings según `npm audit --omit=dev` local.
+- En la instantánea previa al cierre Git/CI, aún no existían commit ni push NG-UP-20; las menciones de ese estado en la evidencia de QA local corresponden solo a ese momento. El cierre funcional posterior usa el único commit indicado arriba.
+- NG-UP-CF queda **DESBLOQUEADA, NO INICIADA**. NG-UP-21, QA-FE-2 y 4D-2C siguen sin iniciarse.
 
 ## Bundle y Docker
 
@@ -121,5 +132,5 @@ La aceptación temporal anterior de `tar@6.2.1` **no se renueva**. Su condición
 - Modificados por implementación: `frontend/package.json`, `frontend/package-lock.json`, `frontend/angular.json`.
 - Documentación permitida: `docs/ai/CURRENT_STATUS.md`, `docs/ai/CHANGE_CONTROL.md` y este documento nuevo.
 - Backend, PostgreSQL/Flyway, Auth/JWT, Storefront, CI, Dockerfile, `.nvmrc`, `devEngines`, `.env` y secretos no cambiaron. NG-UP-CF, NG-UP-21, QA-FE-2 y 4D-2C no se iniciaron.
-- No se hizo commit, push ni tag. Ningún SHA ni workflow remoto NG-UP-20 se atribuye antes del cierre.
+- En la instantánea de QA local previa a Git/CI todavía no se habían hecho commit ni push. El cierre posterior queda documentado en la sección «Cierre remoto Git/CI»; no se creó tag.
 - Limitación principal: los dos E2E autenticados no se ejecutaron sin credenciales QA autorizadas. La seguridad productiva y los tests disponibles sí fueron comprobados; el audit completo mantiene findings dev-only que requieren seguimiento independiente, no un `npm audit fix` en esta fase.
