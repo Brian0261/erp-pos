@@ -180,8 +180,9 @@ export class ConfirmDialogComponent {
   }
 
   @HostListener("document:keydown.tab", ["$event"])
-  onTabKey(event: KeyboardEvent): void {
-    if (!this.dialogService.currentState) {
+  @HostListener("document:keydown.shift.tab", ["$event"])
+  onTabKey(event: Event): void {
+    if (!(event instanceof KeyboardEvent) || !this.dialogService.currentState) {
       return;
     }
 
