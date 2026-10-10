@@ -2811,3 +2811,34 @@ Solo crear tag cuando se cumpla todo:
 - Audit completo 13 entradas dev-only (11 High, 2 Moderate), dos advisories de origen preexistentes; productivo 0. Exposición y límites documentados, sin afirmar ausencia general de riesgo ni aplicar audit fix/overrides/resolutions. Gates HPM/esbuild/shell-quote sin regresión; aceptación tar continúa cerrada.
 - Al redactar: técnicamente cerrada por CI funcional; cierre formal condicionado al único commit documental autorizado y su CI, sin predecir SHA/resultado. Documentos: CURRENT_STATUS.md, CHANGE_CONTROL.md y nuevo QA NG-UP-21. Sin cambios funcionales en este cierre.
 - Estado vigente: NG-UP-20 CERRADA; NG-UP-CF POSPUESTA; QA-FE-2 DESBLOQUEADA, NO INICIADA; 4D-2C NO INICIADA. Entradas previas históricas. Sin fases posteriores iniciadas.
+
+## QA-FE-RISK-1A — cierre funcional Git/CI (2026-10-10)
+
+- Alcance funcional: `frontend/src/app/features/sales/pos-page.component.ts`,
+  `frontend/src/app/features/sales/components/pos-full-cart-modal.component.ts`
+  y `frontend/src/app/features/sales/pos-page.component.spec.ts`.
+- Preflight: rama `master`; base local/remota
+  `0a7f7262668738619d82fa62ae8d08d60c146871`; ahead/behind 0/0; exactamente
+  esos tres archivos pendientes; sin tag. Revisión final y whitespace PASS.
+- Commit funcional publicado por push normal:
+  `6fff339c9afb5f1355c8050a61725337d294b8ef`
+  (`fix(pos): reconcile discounts after quantity changes`). Sin amend, squash,
+  rebase, force push ni tag.
+- CI funcional [`38071154879`](https://github.com/Brian0261/erp-pos/actions/runs/38071154879):
+  `ci`, `push` a `master`, SHA exacto, `completed / success`. Frontend:
+  instalación PASS, unitarios 22/22 PASS, build PASS, E2E focal 6/6 PASS.
+  Backend: `./mvnw -B clean verify`, 642 tests, 0 failures/errors/skipped,
+  `BUILD SUCCESS`.
+- QA local anterior: reproducción más siete casos 8/8, unitarios 22/22, build,
+  E2E focal 6/6 PASS; no-write 1 PASS y 2 SKIPPED por falta de credenciales QA.
+  Se reutilizó la evidencia sin volver a ejecutar pruebas locales. No hubo
+  operaciones comerciales reales.
+- La reconciliación limita el descuento al subtotal efectivo de su propia
+  línea; cantidad/stock y descuento se guardan coherentemente, se reparan
+  borradores inválidos y el checkout revalida importes. Los riesgos de vuelto,
+  pagos mixtos, decimales/redondeo, cantidades fraccionarias, revaloración y
+  reglas fiscales siguen explícitamente fuera de alcance.
+- La corrección tiene CI funcional satisfactorio. El cierre formal continúa
+  condicionado al commit documental autorizado y al `ci` exitoso de su SHA; no
+  se predice su resultado. Evidencia: `docs/qa/QA_FE_RISK_1A_POS_MONETARY_QA.md`.
+- No iniciar QA-FE-2, 4D-2C ni fases/correcciones adicionales en este cierre.

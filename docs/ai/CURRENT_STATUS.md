@@ -1607,3 +1607,41 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
 - CI funcional [37891729204](https://github.com/Brian0261/erp-pos/actions/runs/37891729204): ci/master/push, SHA funcional exacto, completed/success. Frontend Node/npm aprobados, instalación reproducible, unit 14/14, build y E2E 6/6 PASS. Backend 642 tests, 0 failures/errors/skipped, PASS.
 - Seguridad: 13 entradas dev-only, 11 High y 2 Moderate, dos advisories de origen preexistentes (braces GHSA-vfj7-8cjw-p6xm, uuid GHSA-w5hq-g745-h8pq). Audit productivo 0, sin regresión material identificada; no implica tooling sin riesgos. Exposición y límites en `docs/qa/NG_UP_21_ANGULAR_20_TO_21_QA.md`; sin remediaciones artificiales.
 - **NG-UP-20 CERRADA; NG-UP-CF POSPUESTA; QA-FE-2 DESBLOQUEADA, NO INICIADA; 4D-2C NO INICIADA.** control-flow-migration excluida; *ngIf, *ngFor, trackBy, CommonModule intactos. Backend, DB/Flyway, Storefront, CI, Dockerfile, .env y secretos no modificados.
+
+### QA-FE-RISK-1A — conciliación monetaria POS (2026-10-10)
+
+- Estado: corrección funcional publicada y CI funcional `success`; cierre formal
+  pendiente del commit documental y su workflow CI. No se anticipa su resultado.
+- Reproducción original: con el producto A a S/ 10, cantidad 2 y descuento
+  S/ 15, más producto B a S/ 5, al reducir A a cantidad 1 el carrito mostraba
+  una diferencia de S/ 5 entre la suma de netos por línea y el total. Tras la
+  corrección, el descuento A queda en S/ 10, los netos son S/ 0 y S/ 5, el
+  total es S/ 5 y la diferencia S/ 0. La discrepancia provenía de aplicar el
+  descuento de forma inconsistente entre el estado de la línea y los totales
+  agregados tras cambiar cantidad.
+- Corrección: limitar el descuento desde cero hasta el subtotal efectivo de su
+  propia línea; aplicar primero el límite de stock y persistir cantidad y descuento
+  reconciliados; reparar borradores restaurados; conservar la fila y bloquear
+  checkout si el stock disponible es cero; presentar aviso accesible sin
+  sustituir errores o advertencias críticos; validar importes antes y después
+  de la confirmación asíncrona. El payload existente de venta y contratos HTTP
+  se mantienen; no hubo cambios backend.
+- QA local previamente aprobada y reutilizada (sin repetir): reproducción
+  original y siete escenarios adicionales 8/8; unitarios Angular 22/22; build
+  PASS; E2E focal de series 6/6; E2E no-write 1 PASS y 2 SKIPPED por falta de
+  credenciales QA; `git diff --check` PASS. Sin operaciones comerciales reales
+  ni requests HTTP inesperados.
+- Commit funcional `6fff339c9afb5f1355c8050a61725337d294b8ef`
+  (`fix(pos): reconcile discounts after quantity changes`), publicado mediante
+  push normal a `master`. Incluye únicamente los dos componentes POS y el spec
+  de reproducción/regresión.
+- CI funcional [`38071154879`](https://github.com/Brian0261/erp-pos/actions/runs/38071154879):
+  `ci`, evento `push`, rama `master`, SHA exacto, `completed / success`.
+  Frontend: instalación, unitarios 22/22, build y E2E focal 6/6 PASS. Backend:
+  `./mvnw -B clean verify`, 642 tests, 0 failures/errors/skipped, PASS.
+- Riesgos no resueltos por esta fase: consistencia del vuelto y pagos mixtos,
+  precisión decimal/redondeo, cantidades fraccionarias, revaloración de precios
+  y reglas fiscales/comprobantes. No se consideran resueltos ni validados.
+- Evidencia detallada: `docs/qa/QA_FE_RISK_1A_POS_MONETARY_QA.md`. El cierre
+  formal depende también del CI del commit documental. No iniciar QA-FE-2,
+  4D-2C ni otra corrección monetaria como parte de este cierre.
