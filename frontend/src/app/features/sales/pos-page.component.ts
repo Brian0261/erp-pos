@@ -106,13 +106,21 @@ import {
 
           <div
             class="message-stack"
-            *ngIf="activeErrorMessage || warningMessage || successMessage"
+            *ngIf="activeErrorMessage || warningMessage || successMessage || (discountAdjustmentMessage && !isFullCartOpen)"
           >
             <p class="ui-alert ui-alert--error" *ngIf="activeErrorMessage">
               {{ activeErrorMessage }}
             </p>
             <p class="ui-alert ui-alert--info" *ngIf="warningMessage">
               {{ warningMessage }}
+            </p>
+            <p
+              class="ui-alert ui-alert--info"
+              *ngIf="discountAdjustmentMessage && !isFullCartOpen"
+              role="status"
+              aria-live="polite"
+            >
+              {{ discountAdjustmentMessage }}
             </p>
             <p class="ui-alert ui-alert--success" *ngIf="successMessage">
               {{ successMessage }}
@@ -222,6 +230,7 @@ import {
         [cartCountLabel]="cartCountLabel"
         [total]="total"
         [lineTotals]="cartLineTotals"
+        [discountAdjustmentMessage]="discountAdjustmentMessage"
         (close)="closeFullCart()"
         (decrease)="decreaseQuantity($event)"
         (increase)="increaseQuantity($event)"
@@ -539,6 +548,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
   searchErrorMessage = "";
   stockMessage = "";
   warningMessage = "";
+  discountAdjustmentMessage = "";
   successMessage = "";
   lastSaleId: number | null = null;
   showGoToBillingAction = false;
@@ -691,6 +701,10 @@ export class PosPageComponent implements OnInit, OnDestroy {
     );
     this.searchResults = [...draft.searchResults];
     this.cart = draft.cart.map((item) => ({ ...item }));
+    this.discountAdjustmentMessage = this.cart
+      .map((item) => this.clampLineDiscount(item, "la restauración del borrador"))
+      .filter((message) => message !== null)
+      .join(" ");
     this.payments =
       draft.payments.length > 0
         ? draft.payments.map((payment) => ({ ...payment }))
@@ -731,6 +745,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
     );
     this.searchResults = [];
     this.cart = [];
+    this.discountAdjustmentMessage = "";
     this.payments = [{ paymentMethod: "CASH", amount: 0, reference: "" }];
     this.lastSaleId = null;
     this.receiptType = "TICKET";
@@ -824,6 +839,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
     this.searchErrorMessage = "";
     this.stockMessage = "";
     this.warningMessage = "";
+    this.discountAdjustmentMessage = "";
     if (!preserveLastSaleId) {
       this.successMessage = "";
       this.showGoToBillingAction = false;
@@ -1198,11 +1214,13 @@ export class PosPageComponent implements OnInit, OnDestroy {
 
   removeFromCart(index: number): void {
     this.cart.splice(index, 1);
+    this.discountAdjustmentMessage = "";
     this.persistDraftState();
   }
 
   clearCart(clearLastSaleReference = true): void {
     this.cart = [];
+    this.discountAdjustmentMessage = "";
     this.payments = [{ paymentMethod: "CASH", amount: 0, reference: "" }];
     if (clearLastSaleReference) {
       this.lastSaleId = null;
@@ -1225,14 +1243,18 @@ export class PosPageComponent implements OnInit, OnDestroy {
 
     if (parsed > maxStock) {
       this.errorMessage = `Cantidad excede stock disponible (${item.stockAvailable}) para ${item.sku}.`;
-      item.quantity = Math.max(maxStock, 1);
-      if (input) {
-        input.value = String(item.quantity);
+      if (maxStock < 1) {
+        // There is no valid positive quantity: retain the row and block checkout.
+        if (input) {
+          input.value = String(item.quantity);
+        }
+        return;
       }
-      return;
     }
 
-    item.quantity = parsed;
+    item.quantity = Math.min(parsed, maxStock);
+    this.discountAdjustmentMessage =
+      this.clampLineDiscount(item, "el cambio de cantidad") ?? "";
     if (input) {
       input.value = String(item.quantity);
     }
@@ -1268,6 +1290,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
       return;
     }
 
+    this.discountAdjustmentMessage = "";
     const parsed = Math.max(normalizePosNumber(rawValue), 0);
     const maxDiscount = this.lineSubtotal(item);
 
@@ -1279,6 +1302,23 @@ export class PosPageComponent implements OnInit, OnDestroy {
 
     item.discountAmount = parsed;
     this.persistDraftState();
+  }
+
+  private clampLineDiscount(item: PosCartItem, reason: string): string | null {
+    const previous = item.discountAmount;
+    const adjusted = Math.min(
+      Math.max(normalizePosNumber(previous), 0),
+      Math.max(this.lineSubtotal(item), 0),
+    );
+    if (adjusted === previous) {
+      return null;
+    }
+
+    item.discountAmount = adjusted;
+    const previousLabel = Number.isFinite(previous)
+      ? `S/ ${previous.toFixed(2)}`
+      : "un importe no válido";
+    return `Se ajustó el descuento de ${item.name} de ${previousLabel} a S/ ${adjusted.toFixed(2)} por ${reason}.`;
   }
 
   lineSubtotal(item: PosCartItem): number {
@@ -1505,6 +1545,13 @@ export class PosPageComponent implements OnInit, OnDestroy {
         return;
       }
 
+      // Recheck the current cart after the asynchronous confirmation.
+      const currentValidationError = this.validateSaleBeforeSubmit();
+      if (currentValidationError) {
+        this.errorMessage = currentValidationError;
+        return;
+      }
+
       const warehouseId = this.saleForm.value.warehouseId as number;
 
       const payload: CreateSaleRequest = {
@@ -1651,12 +1698,28 @@ export class PosPageComponent implements OnInit, OnDestroy {
     }
 
     for (const item of this.cart) {
+      if (
+        !Number.isFinite(item.quantity) ||
+        !Number.isFinite(item.salePrice) ||
+        !Number.isFinite(this.lineSubtotal(item))
+      ) {
+        return `La cantidad o el importe de ${item.sku} no es válido.`;
+      }
+
       if (normalizePosQuantity(item.quantity) <= 0) {
         return `La cantidad de ${item.sku} debe ser mayor que 0.`;
       }
 
-      if (normalizePosNumber(item.discountAmount) < 0) {
+      if (!Number.isFinite(item.discountAmount)) {
+        return `El descuento de ${item.sku} no es un importe válido.`;
+      }
+
+      if (item.discountAmount < 0) {
         return `El descuento de ${item.sku} debe ser >= 0.`;
+      }
+
+      if (item.discountAmount > this.lineSubtotal(item)) {
+        return `El descuento de ${item.sku} no puede superar el subtotal del producto.`;
       }
 
       if (
@@ -1664,6 +1727,14 @@ export class PosPageComponent implements OnInit, OnDestroy {
       ) {
         return `Stock insuficiente para ${item.sku}.`;
       }
+    }
+
+    if (
+      !Number.isFinite(this.total) ||
+      !Number.isFinite(this.paidTotal) ||
+      this.payments.some((payment) => !Number.isFinite(payment.amount))
+    ) {
+      return "Los importes de la venta y los pagos deben ser finitos.";
     }
 
     const validPayments = this.payments.filter(

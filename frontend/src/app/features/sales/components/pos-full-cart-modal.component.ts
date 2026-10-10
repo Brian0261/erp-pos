@@ -35,6 +35,14 @@ import { PosCartItem } from "../data/pos-ui.models";
           >
             Cerrar
           </button>
+          <p
+            class="ui-alert ui-alert--info full-cart-adjustment"
+            *ngIf="discountAdjustmentMessage"
+            role="status"
+            aria-live="polite"
+          >
+            {{ discountAdjustmentMessage }}
+          </p>
         </header>
 
         <div class="full-cart-empty" *ngIf="cart.length === 0">
@@ -166,6 +174,11 @@ import { PosCartItem } from "../data/pos-ui.models";
         box-shadow: 0 20px 60px rgba(16, 17, 20, 0.24);
         padding: var(--space-4);
         overflow: hidden;
+      }
+
+      .full-cart-adjustment {
+        grid-column: 1 / -1;
+        margin: 0;
       }
 
       .full-cart-header {
@@ -485,6 +498,7 @@ export class PosFullCartModalComponent {
   @Input({ required: true }) cartCountLabel = "0 ítems";
   @Input({ required: true }) total = 0;
   @Input({ required: true }) lineTotals: number[] = [];
+  @Input() discountAdjustmentMessage = "";
 
   @Output() readonly close = new EventEmitter<void>();
   @Output() readonly decrease = new EventEmitter<number>();
