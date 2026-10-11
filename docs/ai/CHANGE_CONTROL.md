@@ -2842,3 +2842,32 @@ Solo crear tag cuando se cumpla todo:
   condicionado al commit documental autorizado y al `ci` exitoso de su SHA; no
   se predice su resultado. Evidencia: `docs/qa/QA_FE_RISK_1A_POS_MONETARY_QA.md`.
 - No iniciar QA-FE-2, 4D-2C ni fases/correcciones adicionales en este cierre.
+
+### QA-POS-MONEY-2 — cierre funcional remoto (2026-10-10)
+
+- Autorización limitada al cierre formal Git/CI de pagos mixtos, vuelto y
+  conciliación de caja; no autorizó operaciones comerciales reales ni fases
+  posteriores.
+- Preflight: `master`, base local/remota
+  `e69bae8ffc822af47055f3702c0a22007d1e3bfc`, 0 ahead/behind; working tree
+  contenía exclusivamente los diez archivos funcionales autorizados, sin tag.
+  Revisión de diff y whitespace sin hallazgos fuera de alcance.
+- Commit funcional único: `b2e4f2fc27f21ce39dd926886057cc3a7405603e`
+  (`fix(pos): reconcile mixed payments, change and cash closing`), push normal
+  a `master`; sin reescritura de historial ni tag.
+- CI [`38102775218`](https://github.com/Brian0261/erp-pos/actions/runs/38102775218),
+  evento `push`, `master`, SHA exacto, `completed / success`. Backend:
+  `./mvnw -B clean verify`, 664 tests, 0 failures/errors/skipped, `BUILD
+  SUCCESS`; `PosMoneyIntegrationTest` 11/11 PASS. Frontend: unitarios 32/32,
+  build y E2E focal 6/6 PASS.
+- QA local previa reutilizada, sin repetir. No-write autenticado: 1 PASS y 2
+  SKIPPED por falta de credenciales verificadas. Tests de integración con
+  PostgreSQL 16 aislado por Testcontainers y fixtures sintéticos; verificaron
+  persistencia, conciliación y rollback. No hubo operaciones comerciales reales.
+- El siguiente y único paso autorizado es el commit documental y CI de
+  `CURRENT_STATUS.md`, este documento y
+  `docs/qa/QA_POS_MONEY_2_PAYMENTS_CASH_QA.md`. No declarar el cierre formal
+  hasta comprobar ese segundo workflow.
+- Riesgos fuera de alcance: política monetaria general de redondeo, cantidades
+  fraccionarias, revaloración de precios y reglas fiscales/comprobantes. No
+  iniciar QA-FE-2, 4D-2C ni otras fases como parte de este cierre.

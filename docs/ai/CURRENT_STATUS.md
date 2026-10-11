@@ -1645,3 +1645,26 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
 - Evidencia detallada: `docs/qa/QA_FE_RISK_1A_POS_MONETARY_QA.md`. El cierre
   formal depende también del CI del commit documental. No iniciar QA-FE-2,
   4D-2C ni otra corrección monetaria como parte de este cierre.
+
+### QA-POS-MONEY-2 — pagos mixtos, vuelto y conciliación de caja (2026-10-10)
+
+- Corrección funcional publicada: `b2e4f2fc27f21ce39dd926886057cc3a7405603e`
+  (`fix(pos): reconcile mixed payments, change and cash closing`), push normal
+  a `master`; CI funcional [`38102775218`](https://github.com/Brian0261/erp-pos/actions/runs/38102775218)
+  completó `success` para ese SHA.
+- CI remoto: backend `./mvnw -B clean verify`, 664 tests, 0 failures, 0 errors,
+  0 skipped, `BUILD SUCCESS`; `PosMoneyIntegrationTest` ejecutó 11/11 PASS
+  contra PostgreSQL/Testcontainers. Frontend: unitarios 32/32, build PASS y
+  E2E focal de series 6/6 PASS.
+- La política distingue pagos no efectivo y efectivo: el backend valida que
+  el efectivo recibido cubra el saldo pendiente, limita el vuelto al efectivo
+  recibido y concilia el efectivo neto esperado de caja.
+- QA local previamente aprobada fue reutilizada, sin repetirla durante el
+  cierre. No-write autenticado: 1 PASS y 2 SKIPPED por falta de credenciales
+  QA verificadas; los omitidos no se cuentan como PASS. Todas las pruebas
+  usaron datos sintéticos; no hubo ventas, cobros ni movimientos de caja reales.
+- Riesgos abiertos: política general de redondeo decimal, cantidades
+  fraccionarias, revaloración de precios, reglas fiscales y comprobantes.
+  Evidencia: `docs/qa/QA_POS_MONEY_2_PAYMENTS_CASH_QA.md`.
+- El cierre formal sigue pendiente del commit documental y de verificar su CI.
+  QA-FE-2, 4D-2C y otras fases posteriores no se iniciaron.
