@@ -6,7 +6,7 @@ import {
 import { provideZoneChangeDetection } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 import { provideRouter } from "@angular/router";
-import { of } from "rxjs";
+import { of, throwError } from "rxjs";
 
 import { AuthService } from "../../core/auth/auth.service";
 import { UserProfile } from "../../core/auth/auth.models";
@@ -21,6 +21,131 @@ import { PosDraftState, PosStateService } from "./data/pos-state.service";
 import { CashRegisterResponse, PosProductResponse } from "./data/sales.models";
 import { SalesService } from "./data/sales.service";
 import { PosPageComponent } from "./pos-page.component";
+import { PaymentLine } from "./data/pos-ui.models";
+
+describe("PosPageComponent cash and electronic payment policy", () => {
+  let fixture: ReturnType<typeof TestBed.createComponent<PosPageComponent>>;
+  let component: PosPageComponent;
+  let sales: jasmine.SpyObj<SalesService>;
+  let confirm: jasmine.SpyObj<ConfirmDialogService>;
+  let documents: jasmine.SpyObj<ElectronicDocumentService>;
+  let http: HttpTestingController;
+  const line = (paymentMethod: PaymentLine["paymentMethod"], amount: number): PaymentLine =>
+    ({ paymentMethod, amount, reference: `QA-${paymentMethod}` });
+
+  beforeEach(async () => {
+    sales = jasmine.createSpyObj<SalesService>("SalesService", ["create"]);
+    sales.create.and.returnValue(of());
+    confirm = jasmine.createSpyObj<ConfirmDialogService>("ConfirmDialogService", ["confirm"]);
+    confirm.confirm.and.returnValue(Promise.resolve(false));
+    documents = jasmine.createSpyObj<ElectronicDocumentService>(
+      "ElectronicDocumentService", ["createFromSale", "generateXml", "sign", "send"],
+    );
+    await TestBed.configureTestingModule({
+      imports: [PosPageComponent],
+      providers: [
+        provideZoneChangeDetection(), provideRouter([]), provideHttpClient(), provideHttpClientTesting(),
+        { provide: AuthService, useValue: { me: () => of({ id: "qa-money", roles: ["CAJERO"] }) } },
+        { provide: WarehouseService, useValue: { list: () => of([
+          { id: 1, code: "QA", name: "Synthetic warehouse", type: "STORE", active: true },
+        ]) } },
+        { provide: CashRegisterService, useValue: { current: () => of({ id: 7, status: "OPEN" }) } },
+        { provide: PosService, useValue: { search: () => of([]), lookup: () => of([]) } },
+        { provide: PosStateService, useValue: { load: () => null, save: () => {}, clearAll: () => {} } },
+        { provide: ConfirmDialogService, useValue: confirm },
+        { provide: SalesService, useValue: sales },
+        { provide: BillingSeriesService, useValue: { list: () => of([]) } },
+        { provide: ElectronicDocumentService, useValue: documents },
+      ],
+    }).compileComponents();
+    http = TestBed.inject(HttpTestingController);
+    fixture = TestBed.createComponent(PosPageComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    component.cart = [{ productId: 101, sku: "QA-MONEY", barcode: null, name: "Synthetic product",
+      salePrice: 100, stockAvailable: 10, quantity: 1, discountAmount: 0 }];
+  });
+
+  afterEach(() => {
+    expect(documents.createFromSale).not.toHaveBeenCalled();
+    expect(documents.generateXml).not.toHaveBeenCalled();
+    expect(documents.sign).not.toHaveBeenCalled();
+    expect(documents.send).not.toHaveBeenCalled();
+    http.expectNone(() => true, "Payment QA must never call a backend");
+    http.verify();
+    fixture.destroy();
+  });
+
+  const scenarios: { name: string; payments: PaymentLine[]; accepted: boolean; change: number }[] = [
+    { name: "A", payments: [line("CASH", 100)], accepted: true, change: 0 },
+    { name: "B", payments: [line("CASH", 120)], accepted: true, change: 20 },
+    { name: "C", payments: [line("CARD", 100)], accepted: true, change: 0 },
+    { name: "D", payments: [line("CARD", 120)], accepted: false, change: 0 },
+    { name: "E", payments: [line("CARD", 80), line("CASH", 30)], accepted: true, change: 10 },
+    { name: "F", payments: [line("CARD", 110), line("CASH", 10)], accepted: false, change: 0 },
+    { name: "G", payments: [line("CASH", 90)], accepted: false, change: 0 },
+    { name: "H", payments: [line("TRANSFER", 120)], accepted: false, change: 0 },
+  ];
+  for (const scenario of scenarios) {
+    it(`enforces scenario ${scenario.name} and renders only cash-funded change`, async () => {
+      component.payments = structuredClone(scenario.payments);
+      component.openCheckoutModal();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(component.change).toBe(scenario.change);
+      expect(component.change).toBeLessThanOrEqual(scenario.payments
+        .filter(p => p.paymentMethod === "CASH").reduce((sum, p) => sum + p.amount, 0));
+      const metrics = fixture.nativeElement.querySelector('[aria-label="Resumen de pagos"]');
+      expect(metrics.textContent).toContain(`Vuelto: S/ ${scenario.change.toFixed(2)}`);
+      component.finalizeSale();
+      await fixture.whenStable();
+      if (scenario.accepted) {
+        expect(confirm.confirm).toHaveBeenCalledTimes(1);
+        expect(component.errorMessage).toBe("");
+      } else {
+        expect(confirm.confirm).not.toHaveBeenCalled();
+        expect(component.errorMessage).not.toBe("");
+        if (scenario.name !== "G") expect(component.errorMessage).toContain("electrónicos");
+      }
+      expect(sales.create).not.toHaveBeenCalled();
+      expect(component.payments).toEqual(scenario.payments);
+      expect(component.cart.length).toBe(1);
+    });
+  }
+
+  it("preserves valid mixed payments and cart when the simulated backend rejects confirmation", async () => {
+    component.payments = [line("TRANSFER", 40), line("CARD", 40), line("CASH", 30)];
+    const originalCart = structuredClone(component.cart);
+    const originalPayments = structuredClone(component.payments);
+    confirm.confirm.and.returnValue(Promise.resolve(true));
+    sales.create.and.returnValue(throwError(() => ({ status: 422, error: { message: "Synthetic rejection" } })));
+    component.finalizeSale();
+    await fixture.whenStable();
+    expect(sales.create).toHaveBeenCalledOnceWith({ warehouseId: 1,
+      items: [{ productId: 101, quantity: 1, discountAmount: 0 }],
+      payments: originalPayments });
+    expect(component.cart).toEqual(originalCart);
+    expect(component.payments).toEqual(originalPayments);
+    expect(component.submitting).toBeFalse();
+    expect(component.errorMessage).not.toBe("");
+  });
+
+  it("rechecks electronic overpayment after asynchronous confirmation before sending", async () => {
+    component.payments = [line("CARD", 80), line("CASH", 30)];
+    let resolve!: (confirmed: boolean) => void;
+    confirm.confirm.and.returnValue(new Promise<boolean>(r => { resolve = r; }));
+    component.finalizeSale();
+    component.payments[0].amount = 110;
+    resolve(true);
+    await fixture.whenStable();
+    expect(component.errorMessage).toContain("electrónicos");
+    expect(sales.create).not.toHaveBeenCalled();
+    expect(component.payments[0].amount).toBe(110);
+    expect(component.cart.length).toBe(1);
+  });
+});
 
 describe("PosPageComponent monetary reconciliation", () => {
   it("keeps the cart total equal to net line amounts after reducing a discounted quantity", async () => {

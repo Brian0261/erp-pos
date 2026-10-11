@@ -66,5 +66,10 @@ public class CashRegisterPersistenceAdapter implements CashRegisterRepositoryPor
     public BigDecimal sumSalesCashPaid(Long cashRegisterSessionId) {
         return repository.sumSalesCashPaid(cashRegisterSessionId);
     }
+
+    @Override
+    public BigDecimal sumSalesCashChange(Long cashRegisterSessionId) {
+        return repository.sumSalesCashChange(cashRegisterSessionId);
+    }
 }
 

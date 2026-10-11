@@ -92,7 +92,8 @@ public class CashRegisterApplicationService implements CashRegisterUseCase {
 
         BigDecimal salesTotal = defaultZero(cashRegisterRepositoryPort.sumSalesTotal(current.id()));
         BigDecimal cashSales = defaultZero(cashRegisterRepositoryPort.sumSalesCashPaid(current.id()));
-        BigDecimal expectedCash = defaultZero(current.openingAmount()).add(cashSales);
+        BigDecimal cashChange = defaultZero(cashRegisterRepositoryPort.sumSalesCashChange(current.id()));
+        BigDecimal expectedCash = defaultZero(current.openingAmount()).add(cashSales).subtract(cashChange);
         BigDecimal difference = counted.subtract(expectedCash);
 
         CashRegisterSession closed = new CashRegisterSession(

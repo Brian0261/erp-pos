@@ -15,5 +15,6 @@ public interface CashRegisterRepositoryPort {
     Instant findLastSaleAt(Long cashRegisterSessionId);
     java.math.BigDecimal sumSalesTotal(Long cashRegisterSessionId);
     java.math.BigDecimal sumSalesCashPaid(Long cashRegisterSessionId);
+    java.math.BigDecimal sumSalesCashChange(Long cashRegisterSessionId);
 }
 

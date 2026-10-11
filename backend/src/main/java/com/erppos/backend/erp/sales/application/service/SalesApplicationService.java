@@ -157,6 +157,7 @@ public class SalesApplicationService implements SalesUseCase {
         List<SalePayment> payments = new ArrayList<>();
         BigDecimal paid = ZERO;
         BigDecimal cashPaid = ZERO;
+        BigDecimal electronicPaid = ZERO;
         for (CreateSalePaymentCommand paymentCommand : command.payments()) {
             if (paymentCommand.paymentMethod() == null) {
                 throw new SalesBusinessRuleException("paymentMethod is required");
@@ -169,18 +170,20 @@ public class SalesApplicationService implements SalesUseCase {
             paid = paid.add(amount);
             if (paymentCommand.paymentMethod() == PaymentMethod.CASH) {
                 cashPaid = cashPaid.add(amount);
+            } else {
+                electronicPaid = electronicPaid.add(amount);
             }
             payments.add(new SalePayment(null, null, paymentCommand.paymentMethod(), amount, trimToNull(paymentCommand.reference()), null));
         }
 
+        if (electronicPaid.compareTo(total) > 0) {
+            throw new SalesBusinessRuleException("Los pagos electrónicos no pueden superar el total de la venta.");
+        }
         if (paid.compareTo(total) < 0) {
             throw new SalesBusinessRuleException("Paid amount does not cover sale total");
         }
 
-        BigDecimal change = ZERO;
-        if (paid.compareTo(total) > 0 && cashPaid.compareTo(ZERO) > 0) {
-            change = paid.subtract(total);
-        }
+        BigDecimal change = cashPaid.subtract(total.subtract(electronicPaid)).max(ZERO);
 
         String saleNumber = generateSaleNumber();
         Sale sale = new Sale(

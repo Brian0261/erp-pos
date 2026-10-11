@@ -47,7 +47,19 @@ export function calculatePosPaidTotal(payments: PaymentLine[]): number {
 }
 
 export function calculatePosChange(cart: PosCartItem[], payments: PaymentLine[]): number {
-  const paidTotal = calculatePosPaidTotal(payments);
   const total = calculatePosTotal(cart);
-  return paidTotal > total ? paidTotal - total : 0;
+  const electronicPaid = calculatePosElectronicPaidTotal(payments);
+  if (electronicPaid > total) {
+    return 0;
+  }
+  const cashPaid = payments
+    .filter(payment => payment.paymentMethod === "CASH")
+    .reduce((sum, payment) => sum + Math.max(normalizePosNumber(payment.amount), 0), 0);
+  return Math.min(cashPaid, Math.max(cashPaid - (total - electronicPaid), 0));
+}
+
+export function calculatePosElectronicPaidTotal(payments: PaymentLine[]): number {
+  return payments
+    .filter(payment => payment.paymentMethod === "CARD" || payment.paymentMethod === "TRANSFER")
+    .reduce((sum, payment) => sum + Math.max(normalizePosNumber(payment.amount), 0), 0);
 }

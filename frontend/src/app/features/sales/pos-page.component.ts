@@ -36,6 +36,7 @@ import {
 import {
   calculatePosChange,
   calculatePosDiscountTotal,
+  calculatePosElectronicPaidTotal,
   calculatePosLineSubtotal,
   calculatePosLineTotal,
   calculatePosPaidTotal,
@@ -1743,6 +1744,10 @@ export class PosPageComponent implements OnInit, OnDestroy {
 
     if (validPayments.length === 0) {
       return "Debes registrar al menos un pago valido.";
+    }
+
+    if (calculatePosElectronicPaidTotal(this.payments) > this.total) {
+      return "Los pagos electrónicos no pueden superar el total de la venta. Reduce tarjeta o transferencia; el vuelto solo corresponde al efectivo.";
     }
 
     if (this.paidTotal < this.total) {

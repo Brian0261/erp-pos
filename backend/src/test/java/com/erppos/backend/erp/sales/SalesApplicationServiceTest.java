@@ -30,6 +30,9 @@ import com.erppos.backend.erp.sales.domain.port.SalesBillingSummaryReadPort;
 import com.erppos.backend.erp.sales.domain.port.WarehouseReadPort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.Arguments;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.access.prepost.PreAuthorize;
 
@@ -45,6 +48,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -63,8 +67,9 @@ class SalesApplicationServiceTest {
 
     @BeforeEach
     void setUp() {
-        cashRepo = new InMemoryCashRegisterRepository();
         saleRepo = new InMemorySaleRepository();
+        cashRepo = new InMemoryCashRegisterRepository();
+        cashRepo.sales = saleRepo;
         catalogReadPort = new InMemoryCatalogReadPort();
         warehouseReadPort = new InMemoryWarehouseReadPort();
         inventoryPort = new InMemoryInventorySalesPort();
@@ -207,6 +212,70 @@ class SalesApplicationServiceTest {
                 List.of(new CreateSalePaymentCommand(PaymentMethod.CASH, BigDecimal.valueOf(5), null))
         );
         assertThrows(SalesBusinessRuleException.class, () -> salesService.create(command));
+    }
+
+    static Stream<Arguments> paymentScenarios() {
+        return Stream.of(
+                Arguments.of("A", List.of(payment(PaymentMethod.CASH, 100)), true, 0),
+                Arguments.of("B", List.of(payment(PaymentMethod.CASH, 120)), true, 20),
+                Arguments.of("C", List.of(payment(PaymentMethod.CARD, 100)), true, 0),
+                Arguments.of("D", List.of(payment(PaymentMethod.CARD, 120)), false, 0),
+                Arguments.of("E", List.of(payment(PaymentMethod.CARD, 80), payment(PaymentMethod.CASH, 30)), true, 10),
+                Arguments.of("F", List.of(payment(PaymentMethod.CARD, 110), payment(PaymentMethod.CASH, 10)), false, 0),
+                Arguments.of("G", List.of(payment(PaymentMethod.CASH, 90)), false, 0),
+                Arguments.of("H", List.of(payment(PaymentMethod.TRANSFER, 120)), false, 0));
+    }
+
+    private static CreateSalePaymentCommand payment(PaymentMethod method, int amount) {
+        return new CreateSalePaymentCommand(method, BigDecimal.valueOf(amount), "QA-" + method);
+    }
+
+    @ParameterizedTest(name = "payment policy {0}")
+    @MethodSource("paymentScenarios")
+    void shouldEnforcePaymentPolicyBeforeAnyWrite(String scenario, List<CreateSalePaymentCommand> payments,
+                                                 boolean accepted, int expectedChange) {
+        cashService.open(new OpenCashRegisterCommand(BigDecimal.ZERO, null));
+        catalogReadPort.products.put(1L, new PosProductSnapshot(1L, "QA-MONEY", null, "Synthetic", BigDecimal.valueOf(100), true));
+        CreateSaleCommand command = new CreateSaleCommand(1L,
+                List.of(new CreateSaleItemCommand(1L, BigDecimal.ONE, BigDecimal.ZERO)), payments);
+        if (!accepted) {
+            assertThrows(SalesBusinessRuleException.class, () -> salesService.create(command));
+            assertEquals(0, saleRepo.saveCalls, "Invalid payments must not invoke sale/payment persistence");
+            assertTrue(saleRepo.storage.isEmpty());
+            assertEquals(0, inventoryPort.saleOutMovements);
+            assertEquals(0, BigDecimal.valueOf(20).compareTo(inventoryPort.stockAvailable(1L, 1L)));
+            return;
+        }
+        Sale sale = salesService.create(command);
+        assertEquals(0, BigDecimal.valueOf(expectedChange).compareTo(sale.changeAmount()));
+        BigDecimal cash = payments.stream().filter(p -> p.paymentMethod() == PaymentMethod.CASH)
+                .map(CreateSalePaymentCommand::amount).reduce(BigDecimal.ZERO, BigDecimal::add);
+        assertTrue(sale.changeAmount().signum() >= 0 && sale.changeAmount().compareTo(cash) <= 0);
+        assertEquals(payments.size(), sale.payments().size());
+        for (int i = 0; i < payments.size(); i++) {
+            assertEquals(payments.get(i).paymentMethod(), sale.payments().get(i).paymentMethod());
+            assertEquals(0, payments.get(i).amount().compareTo(sale.payments().get(i).amount()));
+            assertEquals(payments.get(i).reference(), sale.payments().get(i).reference());
+        }
+    }
+
+    static Stream<Arguments> cashCloseScenarios() {
+        return Stream.of(
+                Arguments.of(0, List.of(payment(PaymentMethod.CASH, 120)), 100),
+                Arguments.of(0, List.of(payment(PaymentMethod.CARD, 80), payment(PaymentMethod.CASH, 30)), 20),
+                Arguments.of(50, List.of(payment(PaymentMethod.CASH, 120)), 150));
+    }
+
+    @ParameterizedTest
+    @MethodSource("cashCloseScenarios")
+    void shouldCloseCashUsingReceivedCashMinusChange(int opening, List<CreateSalePaymentCommand> payments, int expected) {
+        CashRegisterSession session = cashService.open(new OpenCashRegisterCommand(BigDecimal.valueOf(opening), null));
+        catalogReadPort.products.put(1L, new PosProductSnapshot(1L, "QA-MONEY", null, "Synthetic", BigDecimal.valueOf(100), true));
+        salesService.create(new CreateSaleCommand(1L,
+                List.of(new CreateSaleItemCommand(1L, BigDecimal.ONE, BigDecimal.ZERO)), payments));
+        CashRegisterSession closed = cashService.close(session.id(), new CloseCashRegisterCommand(BigDecimal.valueOf(expected), null));
+        assertEquals(0, BigDecimal.valueOf(expected).compareTo(closed.expectedCashAmount()));
+        assertEquals(0, closed.differenceAmount().compareTo(BigDecimal.ZERO));
     }
 
     @Test
@@ -431,6 +500,7 @@ class SalesApplicationServiceTest {
     }
 
     static class InMemoryCashRegisterRepository implements CashRegisterRepositoryPort {
+        private InMemorySaleRepository sales;
         private final AtomicLong seq = new AtomicLong(1);
         private final Map<Long, CashRegisterSession> storage = new HashMap<>();
         private final UUID fixedUser = UUID.fromString("00000000-0000-0000-0000-000000000000");
@@ -494,11 +564,22 @@ class SalesApplicationServiceTest {
 
         @Override
         public BigDecimal sumSalesCashPaid(Long cashRegisterSessionId) {
-            return BigDecimal.ZERO;
+            return sales.storage.values().stream()
+                    .filter(s -> s.status() == SaleStatus.COMPLETED && Objects.equals(s.cashRegisterSessionId(), cashRegisterSessionId))
+                    .flatMap(s -> s.payments().stream()).filter(p -> p.paymentMethod() == PaymentMethod.CASH)
+                    .map(SalePayment::amount).reduce(BigDecimal.ZERO, BigDecimal::add);
+        }
+
+        @Override
+        public BigDecimal sumSalesCashChange(Long cashRegisterSessionId) {
+            return sales.storage.values().stream()
+                    .filter(s -> s.status() == SaleStatus.COMPLETED && Objects.equals(s.cashRegisterSessionId(), cashRegisterSessionId))
+                    .map(Sale::changeAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
         }
     }
 
     static class InMemorySaleRepository implements SaleRepositoryPort {
+        private int saveCalls;
         private final AtomicLong saleSeq = new AtomicLong(1);
         private final AtomicLong itemSeq = new AtomicLong(1);
         private final AtomicLong paySeq = new AtomicLong(1);
@@ -506,6 +587,7 @@ class SalesApplicationServiceTest {
 
         @Override
         public Sale save(Sale sale) {
+            saveCalls++;
             Long id = sale.id() == null ? saleSeq.getAndIncrement() : sale.id();
             List<SaleItem> items = sale.items().stream()
                     .map(i -> new SaleItem(i.id() == null ? itemSeq.getAndIncrement() : i.id(), id, i.productId(), i.quantity(), i.unitPrice(), i.discountAmount(), i.lineTotal()))

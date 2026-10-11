@@ -30,6 +30,15 @@ public interface CashRegisterSessionJpaRepository extends JpaRepository<CashRegi
             """)
     BigDecimal sumSalesCashPaid(@Param("sessionId") Long sessionId);
 
+    // Sum once per sale, not per CASH payment: a join would multiply change.
+    @Query("""
+            SELECT COALESCE(SUM(s.changeAmount), 0)
+            FROM SaleEntity s
+            WHERE s.cashRegisterSession.id = :sessionId
+              AND s.status = com.erppos.backend.erp.sales.domain.model.SaleStatus.COMPLETED
+            """)
+    BigDecimal sumSalesCashChange(@Param("sessionId") Long sessionId);
+
     @Query("""
             SELECT MIN(s.soldAt)
             FROM SaleEntity s
