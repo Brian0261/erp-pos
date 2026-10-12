@@ -1,16 +1,5 @@
 import { expect, Locator, Page } from "@playwright/test";
 
-const QUICK_SEARCH_TERMS = [
-  "Cartulina",
-  "Papelógrafo",
-  "Copia",
-  "Impresión",
-  "Goma eva",
-  "Cinta",
-  "Elástico",
-  "Cordón",
-];
-
 export async function goToPos(page: Page): Promise<void> {
   await page.goto("/pos");
   await expect(page.getByRole("heading", { name: "Punto de venta" })).toBeVisible();
@@ -32,24 +21,16 @@ export async function clearVisibleCart(page: Page): Promise<void> {
   }
 
 export async function searchForFirstVisibleProduct(page: Page): Promise<boolean> {
+  const runId = process.env["QA_RUN_ID"];
+  if (!runId) throw new Error("QA_RUN_REQUIRED");
   const searchInput = page.getByLabel("Buscar o escanear producto");
-
-  for (const term of QUICK_SEARCH_TERMS) {
-    const quickSearch = page.getByRole("button", { name: term });
-    if (await quickSearch.isVisible()) {
-      await quickSearch.click();
-    } else {
-      await searchInput.fill(term);
-      await page.getByRole("button", { name: "Buscar", exact: true }).click();
-    }
-
-    const foundProduct = await waitForSearchAttempt(page);
-    if (foundProduct) {
-      return true;
-    }
-  }
-
-  return false;
+  await searchInput.fill("Cartulina QA " + runId);
+  const response = page.waitForResponse(r => new URL(r.url()).pathname === "/api/v1/pos/products/search");
+  await page.getByRole("button", { name: "Buscar", exact: true }).click();
+  if ((await response).status() !== 200) throw new Error("QA_PRODUCT_SEARCH_FAILED");
+  await expect(page.getByText("Cartulina QA " + runId, { exact: true }).first(), "QA_PRODUCT_MISSING").toBeVisible();
+  await expect(page.getByRole("button", { name: "Agregar", exact: true })).toHaveCount(1);
+  return true;
 }
 
 export async function addFirstSearchResultToCart(page: Page): Promise<void> {
@@ -120,16 +101,4 @@ function firstCartQuantityDecrease(page: Page): Locator {
 
 function firstCartQuantityIncrease(page: Page): Locator {
   return firstCartItem(page).locator(".quantity-stepper").nth(1);
-}
-
-async function waitForSearchAttempt(page: Page): Promise<boolean> {
-  const addButton = page.getByRole("button", { name: "Agregar", exact: true }).first();
-  const emptyResults = page.getByText("No se encontraron productos para la busqueda.");
-
-  const result = await Promise.race([
-    addButton.waitFor({ state: "visible", timeout: 5_000 }).then(() => true),
-    emptyResults.waitFor({ state: "visible", timeout: 5_000 }).then(() => false),
-  ]).catch(() => false);
-
-  return result;
 }

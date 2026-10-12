@@ -1,4 +1,5 @@
-export const QA_STORAGE_STATE_PATH = "e2e/.auth/qa-user.json";
+// Private container tmpfs, outside checkout, host filesystem and synced folders.
+export const QA_STORAGE_STATE_PATH = "/qa-run/qa-user.json";
 
 export interface QaCredentials {
   usernameOrEmail: string;
