@@ -23,14 +23,87 @@ Este documento no autoriza commits, cambios funcionales, cambios de infraestruct
 9. No mezclar backend y frontend si la tarea no lo exige.
 10. No cambiar contratos API sin documentar impacto, compatibilidad y plan de validacion.
 
+## Flujo GitHub Flow — fuente normativa
+
+Esta sección es la fuente normativa del flujo de ramas, PR, CI, revisión y cierre. `AGENTS.md` y `docs/ai/AI_AGENT_INSTRUCTIONS.md` resumen guardrails y enlazan aquí; no mantienen protocolos paralelos.
+
+### Política de ramas y alcance
+
+- `master` es la rama estable y debe partir del último estado remoto actualizado.
+- Para cada tarea autorizada, usar una rama temporal creada desde `master` actualizado. Convención: `feat/<id>-<resumen>`, `fix/<id>-<resumen>`, `docs/<id>-<resumen>`, `test/<id>-<resumen>` o `hotfix/<id>-<resumen>`.
+- No crear ramas permanentes `develop` o `release`; no mezclar tareas o fases independientes.
+- Crear o cambiar ramas requiere autorización para esa operación. Si el trabajo no autoriza Git writes, limitarse a inspección o cambios locales dentro del alcance expresamente permitido.
+
+### Secuencia por tarea
+
+1. **Preflight:** verificar rama, HEAD, sincronización con remoto, working tree, tags relevantes, instrucciones aplicables y CI. Si hay cambios ajenos, divergencia material o estado inesperado, detenerse y reportar `BLOCKED`; no ocultar ni reubicar cambios.
+2. **Plan:** ante incertidumbre, riesgos de seguridad/datos, arquitectura, migraciones, contratos o producción, inspeccionar y presentar plan/criterios antes de Build.
+3. **Alcance:** definir archivos, comportamiento, exclusiones, criterios de aceptación y QA proporcional. Una fase no autoriza iniciar otra.
+4. **Build:** implementar solo el alcance aprobado en la rama temporal autorizada. Mantener cambios pequeños y revisar el diff.
+5. **QA y documentación:** ejecutar checks pertinentes; no repetir suites costosas si existe evidencia válida para el mismo SHA y entorno. Actualizar documentación de la tarea en la misma rama/PR cuando corresponda, sin anticipar resultados que todavía no ocurrieron.
+6. **Commit/push/PR:** son tres autorizaciones distintas. Solo realizar cada operación cuando el usuario la autorice expresamente. Publicar únicamente la rama temporal autorizada; no hacer push directo a `master` como flujo habitual.
+7. **CI y revisión:** confirmar que CI corresponde al SHA/PR exacto, revisar los cambios y atender conversaciones requeridas. CI verde es requisito de calidad, nunca aprobación ni permiso de merge.
+8. **Merge:** requiere autorización humana explícita e independiente. Preferir squash merge para mantener un commit coherente por tarea en `master`; no auto-merge.
+9. **Post-merge:** verificar el SHA de `master`, CI posterior al merge y sincronización local/remota. Cerrar con evidencia en el PR y/o registro de fase. Eliminar la rama temporal solo con autorización explícita.
+
+Secuencia de referencia para una tarea documental; sustituir `<id>`/`<resumen>` y ejecutar cada escritura solo con su autorización:
+
+```powershell
+git status --short
+git fetch origin
+git switch master
+git pull --ff-only origin master
+git switch -c docs/<id>-<resumen>
+# editar, validar y revisar el diff
+git add <archivos-autorizados>
+git commit -m "docs(<area>): <resumen>"
+git push -u origin docs/<id>-<resumen>
+gh pr create --base master --head docs/<id>-<resumen>
+```
+
+No ejecutar el bloque completo mecánicamente: cada cambio Git requiere autorización separada. En particular, no añadir un comando de merge al flujo automático.
+
+### Commits, PR y trazabilidad
+
+- Mantener commits pequeños y coherentes en la rama temporal; varios commits de desarrollo son aceptables cuando están autorizados. El squash del PR conserva una historia principal compacta.
+- Código, QA y documentación que pertenecen a una tarea deben viajar en la misma rama y PR. No crear como rutina un segundo commit documental después del merge para anotar SHA o CI; registrar la evidencia final en el PR o registro de fase. Una actualización versionada posterior requiere justificación y autorización propias.
+- No registrar como hecho un resultado de CI aún no ocurrido. No editar documentación histórica para simular evidencia.
+- La política documenta el flujo recomendado; no constituye por sí misma autorización para operaciones Git ni configuración administrativa.
+
+### Gate y autorización por operación
+
+- Implementar ≠ commit; commit ≠ push; push ≠ crear PR; crear/actualizar PR ≠ merge; CI verde ≠ aprobación humana.
+- No ejecutar automáticamente commit, push, PR, merge, force push, rebase, amend, tag, eliminación de rama, cambios de protección/ruleset ni despliegue.
+- Si una autorización no especifica con claridad la operación y su alcance, detenerse antes de esa escritura y pedir autorización.
+
+### Configuración recomendada de `master` — pendiente de autorización administrativa
+
+No asumir que estas reglas están activas ni cambiarlas durante una tarea normal. Cuando se autorice una fase administrativa separada, evaluar:
+
+- requerir PR para actualizar `master`;
+- requerir los checks observados `backend`, `frontend` y `e2e-auth`;
+- requerir rama actualizada antes de merge, conversaciones resueltas e historial lineal;
+- impedir force-push y eliminación de `master`; evitar bypass administrativo si la plataforma permite conservar una recuperación segura.
+
+No exigir aprobación de reviewer mientras no exista una segunda persona revisora disponible. No habilitar por defecto merge queue, auto-merge, despliegue productivo requerido, restricciones por equipos/organización ni commits firmados obligatorios sin necesidad y configuración verificadas. Antes de guardar required checks, confirmar en un PR real sus contextos exactos y que sean inequívocos/no omitibles; los nombres de jobs observados son `backend`, `frontend`, `e2e-auth`. La configuración efectiva solo se confirma leyéndola después de la fase administrativa autorizada.
+
+### Transición de adopción
+
+1. **A — documentación local:** registrar la política en este playbook, enlazarla desde las instrucciones generales y `AGENTS.md`, y dejar constancia en `DECISIONS_LOG.md`. No crear PR/commit/push como parte de esa fase si no se autorizan.
+2. **B — PR de transición:** requiere autorización independiente; rama documental temporal, PR hacia `master`, los tres checks verdes, revisión de diff y autorización humana de squash merge. Verificar CI y sincronización tras el merge. No activar protecciones desde esta fase.
+3. **C — configuración administrativa:** requiere autorización separada; verificar disponibilidad de checks y capacidad operativa, aplicar únicamente la protección aprobada y luego leer/verificar las reglas efectivas y bypasses.
+4. **D — adopción continua:** aplicar el flujo normal a cada tarea con alcance y autorizaciones explícitas.
+
+El estado real de cada etapa debe reportarse con evidencia; documentar la transición no habilita ni afirma la configuración de GitHub.
+
 ## Checklist docs-only
 
 ### Que leer antes
 
 - `docs/ai/AI_AGENT_INSTRUCTIONS.md`.
-- `docs/ai/CHANGE_CONTROL.md`.
-- `docs/ai/CURRENT_STATUS.md`.
-- Documentos relacionados al tema que se va a actualizar.
+- Este playbook y `docs/ai/DECISIONS_LOG.md` cuando la tarea afecte procedimientos o decisiones.
+- `docs/ai/CHANGE_CONTROL.md` o `docs/ai/CURRENT_STATUS.md` solo si el cambio registra o depende de una fase/estado actual.
+- El documento objetivo y las fuentes directamente relacionadas; no recorrer toda la documentación por defecto.
 
 ### Que NO tocar
 
