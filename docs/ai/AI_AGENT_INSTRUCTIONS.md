@@ -14,15 +14,22 @@ Esta guia define como debe trabajar cualquier AI Coding Agent (Copilot, ChatGPT,
 6. No crear ni usar datos reales sin autorizacion explicita.
 7. No hacer commits ni tags automaticamente.
 
-## Lectura obligatoria antes de modificar codigo
+## Lectura previa segun alcance
 
-1. README del proyecto: estado funcional, stack, rutas y reglas vigentes.
-2. Documentacion AI en docs/ai (todos los archivos de esta carpeta).
-3. ADR activos en docs/adr.
-4. Hallazgos y checklist QA en docs/qa (especialmente REGRESSION_CHECKLIST y MVP_STABILIZATION_REPORT).
-5. Estado git local:
-   - git status
-   - git diff --stat
+1. Revisar `AGENTS.md` y las instrucciones aplicables en la ruta afectada.
+2. Confirmar `git status --short`, rama y HEAD.
+3. Leer `README.md` y solo los documentos vigentes directamente relacionados con la tarea: instrucciones de agente, playbook, decisiones, ADR y QA pertinente. No es necesario recorrer indiscriminadamente todos los documentos de `docs/ai` o `docs/qa`.
+4. Si se modifica código, inspeccionar sus pruebas, contratos y dependencias relevantes antes de editar.
+
+Para trabajo Git, seguir el flujo normativo de `docs/ai/TASK_EXECUTION_PLAYBOOK.md`; `docs/ai/DECISIONS_LOG.md` registra su adopcion documental y el estado pendiente de configuración administrativa.
+
+## Estado git local
+
+Antes de modificar, confirmar como minimo:
+
+- `git status --short`
+- `git branch --show-current`
+- `git log -1 --oneline`
 
 ## Restricciones estrictas
 
@@ -64,10 +71,10 @@ Esta guia define como debe trabajar cualquier AI Coding Agent (Copilot, ChatGPT,
 
 ## Regla de commits y automatizacion
 
-1. Prohibido hacer commit automatico.
-2. Prohibido push automatico.
-3. Prohibido crear tags automaticamente.
-4. Si se requiere commit/tag, esperar confirmacion humana.
+1. Commit, push, creación de PR, merge, eliminación de rama, reescritura de historial y tags son operaciones separadas; cada una requiere autorización humana explícita para esa operación.
+2. La autorización para implementar no autoriza commit o push; crear/actualizar un PR no autoriza merge.
+3. CI verde no equivale a autorización humana de merge.
+4. Seguir GitHub Flow y las revisiones del [`TASK_EXECUTION_PLAYBOOK.md`](TASK_EXECUTION_PLAYBOOK.md). No asumir que las protecciones administrativas ya están activas.
 
 ## Regla de hallazgos fuera de alcance
 
