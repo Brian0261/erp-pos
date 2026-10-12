@@ -1668,3 +1668,44 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
   Evidencia: `docs/qa/QA_POS_MONEY_2_PAYMENTS_CASH_QA.md`.
 - El cierre formal sigue pendiente del commit documental y de verificar su CI.
   QA-FE-2, 4D-2C y otras fases posteriores no se iniciaron.
+
+### QA-E2E-AUTH-1A — gate no-write autenticado efímero (2026-10-12)
+
+- **QA-E2E-AUTH-1A: CI funcional validado; cierre documental remoto pendiente**.
+  QA local PASS_LOCAL. Base local/remota verificada: `master`,
+  `98280045d0b5223034f03b708ab4c206085cf637`, 0 ahead/behind, sin tag;
+  working tree inicial limpio. Commit funcional publicado:
+  `ce869d0b1751d2f88474b2c2f06cdf9f6e6afc92`
+  (`test(e2e): add isolated authenticated no-write CI gate`).
+- Orquestador único `frontend/e2e/qa/run-qa.mjs`: preparación separada del
+  runtime; namespace Docker `network:none` compartido solo por recursos propios.
+  Sin puertos publicados, salida a red, Compose comercial ni servicios reutilizados.
+  Pruebas TCP independientes confirman aislamiento frente a señuelos controlados
+  en host y otra red; atestación DB antes de Flyway y backend/proxy en runtime.
+- Launcher/filtro/fixtures exclusivamente `backend/src/test`. Login real CAJERO,
+  credenciales aleatorias, estado autenticado privado en tmpfs; sin bypass Auth.
+  Guard Playwright de contexto y filtro backend obligatorio bloquean escrituras;
+  cero operaciones comerciales y stock sintético inalterado al finalizar.
+- QA: backend focal 8/8 y suite completa 672/672 (0 failures/errors/skipped);
+  gate 3/3 (un público y dos autenticados), setup 1/1, seguridad 12/12,
+  Angular unitarios 32/32, build PASS y E2E de series 6/6. Sin omisiones.
+  Ejecución final headed/regresión `95920f9227aa566e488bd635`: exit 0,
+  limpieza PASS. Evidencia headless del gate también satisfactoria.
+- Job independiente `e2e-auth` con `contents: read` y mismo orquestador;
+  jobs existentes preservados. CI funcional
+  [38289820058](https://github.com/Brian0261/erp-pos/actions/runs/38289820058),
+  push/master/SHA exacto, **completed/success**: backend 672/672 (focal 8/8),
+  frontend npm ci/unitarios 32/32/build/series 6/6 y e2e-auth success.
+  Gate remoto: 3/3 sin fallos/omisiones, setup 1/1, negativos 12/12;
+  runId `9a6469a8680ba9508f16dc6e`, identidad/red/no-write/cleanup PASS,
+  cero artefactos publicados. Sin operaciones comerciales reales.
+  Artefacto productivo comprobado sin clases QA. Sin cambios funcionales,
+  Auth/JWT/RBAC, migraciones, dependencias/lockfiles, Karma/Jasmine o `.env`.
+- Evidencia e inventario: `docs/qa/QA_E2E_AUTH_1_QA.md`. Riesgos residuales:
+  confianza en host/daemon/imágenes, cleanup no garantizable tras caída abrupta
+  del daemon/host. Push funcional normal, sin tag ni reescritura. `master`
+  reportó `protected=false`; automatización no equivale a check obligatorio.
+  Protección/rulesets/required checks no se modificaron y requieren otra autorización.
+- Siguiente acción autorizada: commit/push documental y verificar su CI exacto;
+  no declarar cierre definitivo antes de comprobar backend/frontend/e2e-auth.
+  NG-UP-CF sigue pospuesta; QA-FE-2 y 4D-2C no iniciadas.

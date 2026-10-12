@@ -2871,3 +2871,58 @@ Solo crear tag cuando se cumpla todo:
 - Riesgos fuera de alcance: política monetaria general de redondeo, cantidades
   fraccionarias, revaloración de precios y reglas fiscales/comprobantes. No
   iniciar QA-FE-2, 4D-2C ni otras fases como parte de este cierre.
+
+### QA-E2E-AUTH-1A — implementación y QA local (2026-10-12)
+
+- Autorización: implementar exclusivamente gate autenticado no-write efímero,
+  validarlo localmente y documentarlo; sin publicación ni infraestructura comercial.
+  Base `master` / `origin/master` `98280045d0b5223034f03b708ab4c206085cf637`,
+  0/0, working tree limpio y sin tag antes de comenzar.
+- Se añadió launcher Spring test-only, atestación JDBC previa a Flyway,
+  fixtures sintéticos CAJERO/ALMACENERO y filtro mandatory no-write antes de
+  negocio. Auth/JWT/RBAC productivos no se modificaron. Jar productivo sin QA.
+- Orquestador Node aprobado: red namespace `none`, sin rutas/puertos expuestos,
+  capacidades eliminadas, raíz read-only, datos/sesiones en tmpfs. Se verifican
+  container ID/etiquetas, marcador PostgreSQL/system ID, datasource efectivo,
+  PID/perfil y proxy Angular. Señuelos propios demuestran aislamiento sin depender
+  de rutas Playwright ni sondear destinos reales.
+- E2E deja de depender de credenciales manuales/skip: login real, storageState
+  privado reutilizable, guard de contexto, bloqueo de service workers/WebSockets,
+  negativos y conteo exacto. No se exportan sesiones, tokens ni reportes sensibles.
+- CI añade únicamente `e2e-auth`, mínimo privilegio y mismo orquestador.
+  Scripts npm actualizados sin dependencias/lockfile.
+  Extras test-only indispensables: Dockerfile de herramientas separadas y
+  `safety-policy.cjs` compatible con loader Playwright; inventario en QA.
+- Evidencia: focal backend 8/8; suite completa 672/672, 0 failures/errors/skipped;
+  seguridad 12/12, gate 3/3 sin omisiones (1 público + 2 autenticados), setup
+  1/1 separado; Angular 32/32, build PASS y series 6/6. Corrida final
+  `node e2e/qa/run-qa.mjs --headed --regression`, runId
+  `95920f9227aa566e488bd635`, exit 0 y cleanup PASS. Gate headless también PASS.
+  Fallos de entorno intermedios no se contaron como ejecuciones completas exitosas.
+- QA local **PASS_LOCAL**. `git diff --check` sin errores. Solo cambios autorizados
+  test-only/E2E/scripts/CI/docs; sin fuentes funcionales, `.env`, migraciones,
+  Compose comercial, cambios a Karma/Jasmine ni transacciones comerciales reales.
+- Cierre formal autorizado por separado: revisión de seguridad sin cambios de
+  código; commit funcional único
+  `ce869d0b1751d2f88474b2c2f06cdf9f6e6afc92`
+  (`test(e2e): add isolated authenticated no-write CI gate`), 21 archivos del
+  grupo A. Los tres documentos del grupo B permanecieron pendientes. Fetch
+  confirmó remoto base intacto y 1 ahead/0 behind; push normal a master.
+- CI funcional [38289820058](https://github.com/Brian0261/erp-pos/actions/runs/38289820058),
+  `ci`, push/master/SHA exacto, **completed/success**. Backend: clean verify,
+  672 tests, 0 failures/errors/skipped, E2eQaSafetyTest 8/8; frontend: npm ci,
+  Angular 32/32, build y series 6/6 PASS. e2e-auth: 3 PASS/0 FAIL/0 SKIPPED,
+  setup 1 PASS, seguridad 12 PASS; runId `9a6469a8680ba9508f16dc6e`.
+- Logs remotos verifican ausencia de QA en jar productivo, atestación DB previa
+  a Flyway, rechazos de marcador/datasource, red sin rutas y señuelos inaccesibles,
+  identidad backend/proxy/datasource/filtro, doble no-write y cleanup propio PASS.
+  Sin operaciones comerciales ni exportación de sesiones; 0 artefactos publicados.
+  QA local reutilizada sin repetir suites.
+- Estado al preparar el commit documental: **QA-E2E-AUTH-1A: CI funcional
+  validado; cierre documental remoto pendiente**. Publicar solo estos tres docs
+  y verificar después el segundo CI exacto; no anticipar su resultado.
+- Sin tags, amend, rebase ni force push. `master` reportó `protected=false`;
+  e2e-auth automático no se presenta como requisito administrativo. Protección,
+  rulesets y required checks no modificados; requieren autorización separada.
+- No iniciar QA-FE-2, 4D-2C ni NG-UP-CF. Riesgos y límites, requisitos del runner,
+  inventario y evidencias en `docs/qa/QA_E2E_AUTH_1_QA.md`.
