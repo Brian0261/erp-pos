@@ -37,6 +37,10 @@ public class UnitPersistenceAdapter implements UnitRepositoryPort {
         return unitJpaRepository.findAllByOrderByCodeAsc().stream().map(UnitMapper::toDomain).toList();
     }
     @Override
+    public Optional<Unit> findByIdForUpdate(Long id) {
+        return unitJpaRepository.findByIdForUpdate(id).map(UnitMapper::toDomain);
+    }
+    @Override
     public Optional<Unit> findById(Long id) {
         return unitJpaRepository.findById(id).map(UnitMapper::toDomain);
     }

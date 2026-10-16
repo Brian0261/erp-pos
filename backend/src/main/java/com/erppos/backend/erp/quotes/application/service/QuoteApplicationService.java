@@ -18,6 +18,7 @@ import com.erppos.backend.erp.quotes.domain.port.QuoteHistoryRepositoryPort;
 import com.erppos.backend.erp.quotes.domain.port.QuoteRepositoryPort;
 import com.erppos.backend.erp.quotes.domain.port.QuoteSalesPort;
 import com.erppos.backend.erp.security.domain.RoleName;
+import com.erppos.backend.erp.shared.domain.policy.CommercialMoneyPolicy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -224,6 +225,7 @@ public class QuoteApplicationService implements QuoteUseCase {
             throw new QuoteBusinessRuleException("At least one payment is required");
         }
 
+        validateConvertibleAmounts(current);
         Long saleId = quoteSalesPort.createSaleFromQuote(current, command.warehouseId(), command.payments());
 
         Quote converted = new Quote(
@@ -275,6 +277,23 @@ public class QuoteApplicationService implements QuoteUseCase {
         }
     }
 
+    private void validateConvertibleAmounts(Quote quote) {
+        // Validate historical internal consistency without repricing or rewriting the quote.
+        for (QuoteItem item : quote.items()) {
+            CommercialMoneyPolicy.Line line = CommercialMoneyPolicy.line(item.unitPrice(), item.quantity(),
+                    item.discountAmount(), QuoteBusinessRuleException::new);
+            if (line.net().compareTo(CommercialMoneyPolicy.nonNegative(item.lineTotal(), "lineTotal", QuoteBusinessRuleException::new)) != 0) {
+                throw new QuoteBusinessRuleException("Historical quote line does not reconcile; edit before conversion");
+            }
+        }
+        Totals totals = calculateTotals(quote.items());
+        if (totals.subtotal().compareTo(CommercialMoneyPolicy.nonNegative(quote.subtotalAmount(), "subtotalAmount", QuoteBusinessRuleException::new)) != 0
+                || totals.discount().compareTo(CommercialMoneyPolicy.nonNegative(quote.discountAmount(), "discountAmount", QuoteBusinessRuleException::new)) != 0
+                || totals.total().compareTo(CommercialMoneyPolicy.nonNegative(quote.totalAmount(), "totalAmount", QuoteBusinessRuleException::new)) != 0) {
+            throw new QuoteBusinessRuleException("Historical quote totals do not reconcile; edit before conversion");
+        }
+    }
+
     private Quote asExpiredIfNeeded(Quote quote) {
         if ((quote.status() == QuoteStatus.DRAFT || quote.status() == QuoteStatus.SENT)
                 && quote.expiresAt().isBefore(LocalDate.now())) {
@@ -321,22 +340,12 @@ public class QuoteApplicationService implements QuoteUseCase {
                 throw new QuoteBusinessRuleException("Product is inactive");
             }
 
-            BigDecimal qty = normalize(item.quantity());
-            if (qty.compareTo(ZERO) <= 0) {
-                throw new QuoteBusinessRuleException("quantity must be > 0");
-            }
+            if (product.quantityPolicy() == null) throw new QuoteBusinessRuleException("Product quantity policy is missing");
+            BigDecimal qty = product.quantityPolicy().validateNew(item.quantity(), QuoteBusinessRuleException::new);
 
-            BigDecimal unitPrice = normalize(product.salePrice());
-            BigDecimal subtotal = unitPrice.multiply(qty);
-            BigDecimal discount = normalize(defaultZero(item.discountAmount()));
-            if (discount.compareTo(ZERO) < 0) {
-                throw new QuoteBusinessRuleException("discountAmount must be >= 0");
-            }
-            if (discount.compareTo(subtotal) > 0) {
-                throw new QuoteBusinessRuleException("discountAmount cannot exceed item subtotal");
-            }
-
-            return new QuoteItem(null, quoteId, item.productId(), qty, unitPrice, discount, subtotal.subtract(discount));
+            CommercialMoneyPolicy.Line line = CommercialMoneyPolicy.line(product.salePrice(), qty,
+                    item.discountAmount(), QuoteBusinessRuleException::new);
+            return new QuoteItem(null, quoteId, item.productId(), qty, line.unitPrice(), line.discount(), line.net());
         }).toList();
     }
 
@@ -344,10 +353,14 @@ public class QuoteApplicationService implements QuoteUseCase {
         BigDecimal subtotal = ZERO;
         BigDecimal discount = ZERO;
         for (QuoteItem item : items) {
-            subtotal = subtotal.add(item.unitPrice().multiply(item.quantity()));
+            subtotal = subtotal.add(item.lineTotal().add(item.discountAmount()));
             discount = discount.add(item.discountAmount());
         }
-        BigDecimal total = subtotal.subtract(discount);
+        subtotal = CommercialMoneyPolicy.nonNegative(subtotal, "subtotalAmount", QuoteBusinessRuleException::new);
+        discount = CommercialMoneyPolicy.nonNegative(discount, "discountAmount", QuoteBusinessRuleException::new);
+        BigDecimal total = CommercialMoneyPolicy.nonNegative(items.stream().map(QuoteItem::lineTotal)
+                .reduce(CommercialMoneyPolicy.ZERO, BigDecimal::add), "totalAmount", QuoteBusinessRuleException::new);
+        if (total.compareTo(subtotal.subtract(discount)) != 0) throw new QuoteBusinessRuleException("Quote lines do not reconcile");
         if (total.compareTo(ZERO) < 0) {
             throw new QuoteBusinessRuleException("Quote total cannot be negative");
         }

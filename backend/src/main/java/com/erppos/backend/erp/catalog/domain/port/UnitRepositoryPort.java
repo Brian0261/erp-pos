@@ -8,4 +8,5 @@ public interface UnitRepositoryPort {
     boolean existsByCodeIgnoreCaseAndIdNot(String code, Long id);
     List<Unit> findAll();
     Optional<Unit> findById(Long id);
+    Optional<Unit> findByIdForUpdate(Long id);
 }

@@ -1,3 +1,6 @@
+export type ClassifiedQuantityPolicy = "WHOLE" | "DECIMAL_2";
+export type QuantityPolicy = ClassifiedQuantityPolicy | "LEGACY_UNCLASSIFIED";
+
 export interface Category {
   id: number;
   name: string;
@@ -8,6 +11,7 @@ export interface Category {
 }
 
 export interface Unit {
+  quantityPolicy: QuantityPolicy;
   id: number;
   code: string;
   name: string;
@@ -67,11 +71,13 @@ export interface CategoryStatusRequest {
 }
 
 export interface UnitCreateRequest {
+  quantityPolicy: ClassifiedQuantityPolicy;
   code: string;
   name: string;
 }
 
 export interface UnitUpdateRequest {
+  quantityPolicy?: ClassifiedQuantityPolicy | null;
   code: string;
   name: string;
 }

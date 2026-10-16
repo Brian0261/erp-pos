@@ -43,6 +43,7 @@ public class PosController {
                 view.barcode(),
                 view.name(),
                 view.salePrice(),
+                view.quantityPolicy(),
                 view.stockAvailable()
         );
     }

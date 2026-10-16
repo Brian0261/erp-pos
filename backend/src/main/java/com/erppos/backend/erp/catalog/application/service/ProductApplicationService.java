@@ -12,6 +12,7 @@ import com.erppos.backend.erp.catalog.domain.model.Unit;
 import com.erppos.backend.erp.catalog.domain.port.CategoryRepositoryPort;
 import com.erppos.backend.erp.catalog.domain.port.ProductRepositoryPort;
 import com.erppos.backend.erp.catalog.domain.port.UnitRepositoryPort;
+import com.erppos.backend.erp.shared.domain.policy.CommercialMoneyPolicy;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -37,6 +38,7 @@ public class ProductApplicationService implements ProductUseCase {
     }
     @Override
     public Product create(CreateProductCommand command) {
+        var salePrice = CommercialMoneyPolicy.nonNegative(command.salePrice(), "salePrice", CatalogBusinessRuleException::new);
         validateCreateConstraints(command.sku(), command.barcode());
         ensureCategoryAndUnitActive(command.categoryId(), command.unitId());
         String actor = auditUserProvider.currentUsername();
@@ -48,7 +50,7 @@ public class ProductApplicationService implements ProductUseCase {
                 trimToNull(command.description()),
                 command.categoryId(),
                 command.unitId(),
-                command.salePrice(),
+                salePrice,
                 true,
                 null,
                 null,
@@ -92,6 +94,7 @@ public class ProductApplicationService implements ProductUseCase {
     }
     @Override
     public Product update(Long id, UpdateProductCommand command) {
+        var salePrice = CommercialMoneyPolicy.nonNegative(command.salePrice(), "salePrice", CatalogBusinessRuleException::new);
         Product current = getById(id);
         String sku = command.sku().trim();
         String barcode = normalizeBarcode(command.barcode());
@@ -110,7 +113,7 @@ public class ProductApplicationService implements ProductUseCase {
                 trimToNull(command.description()),
                 command.categoryId(),
                 command.unitId(),
-                command.salePrice(),
+                salePrice,
                 command.active() == null ? current.active() : command.active(),
                 current.createdAt(),
                 current.updatedAt(),

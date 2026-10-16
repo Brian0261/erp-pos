@@ -52,6 +52,7 @@ public class PosApplicationService implements PosUseCase {
                 product.barcode(),
                 product.name(),
                 product.salePrice(),
+                product.quantityPolicy(),
                 stock
         );
     }

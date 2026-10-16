@@ -41,7 +41,7 @@ class BillingSeriesOptimisticConcurrencyMigrationIntegrationTest {
                     """);
         }
 
-        Flyway latest = flyway("public", null);
+        Flyway latest = flyway("public", MigrationVersion.fromVersion("25"));
         latest.migrate();
         latest.validate();
 
@@ -111,7 +111,7 @@ class BillingSeriesOptimisticConcurrencyMigrationIntegrationTest {
             statement.execute("CREATE SCHEMA fresh_4d2b1");
         }
 
-        Flyway fresh = flyway("fresh_4d2b1", null);
+        Flyway fresh = flyway("fresh_4d2b1", MigrationVersion.fromVersion("25"));
         fresh.migrate();
         fresh.validate();
 

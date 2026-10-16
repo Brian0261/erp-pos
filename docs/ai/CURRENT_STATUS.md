@@ -1709,3 +1709,23 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
 - Siguiente acción autorizada: commit/push documental y verificar su CI exacto;
   no declarar cierre definitivo antes de comprobar backend/frontend/e2e-auth.
   NG-UP-CF sigue pospuesta; QA-FE-2 y 4D-2C no iniciadas.
+
+### MONEY-CORE-P0 — implementada y validada localmente; publicacion pendiente (2026-10-15)
+
+- **PASS_LOCAL — MONEY-CORE-P0 VALIDADA LOCALMENTE**, no CLOSED. Rama
+  `fix/money-core-p0`, base `d24ce4fb10c60dc29f7f662e258f755a8edcc136`;
+  `master` intacta, staging vacio y sin commits nuevos.
+- Politica monetaria exacta a dos decimales y HALF_UP por linea; clasificacion
+  de cantidades WHOLE/DECIMAL_2 con compatibilidad legacy y migracion aditiva
+  V26. A/B/C, conciliacion de pagos/caja, inventario/anulaciones historicas,
+  rollback PostgreSQL y cotizaciones/conversiones validados.
+- QA definitiva: backend `clean verify` **708 PASS**, 0 FAIL/ERROR/SKIPPED;
+  Angular **37 PASS** y build PASS; gate E2E autenticado aislado **16 PASS**
+  (3 no-write + 1 setup + 12 negativos), 0 FAIL/ERROR/SKIPPED y cleanup PASS.
+  Evidencia reutilizada sin repetir pruebas durante esta preparacion documental.
+- Documentacion e inventario exacto de 48 candidatos en
+  `docs/qa/MONEY_CORE_P0_QA.md`. Originales y respaldos MONEY-QA-0 intactos;
+  Angular D permanece fuera del worktree/cierre.
+- Commit local, publicacion, PR/revision y Git/CI remoto pendientes de
+  autorizaciones independientes; no se anticipan SHA, CI ni cierre remoto.
+  MONEY-CHECKOUT-P1 no iniciada; MONEY-FISCAL-P1 y 4D-2C fuera de alcance.

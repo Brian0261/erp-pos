@@ -1,4 +1,6 @@
 package com.erppos.backend.erp.catalog;
+
+import com.erppos.backend.erp.shared.domain.policy.QuantityPolicy;
 import com.erppos.backend.erp.catalog.application.service.AuditUserProvider;
 import com.erppos.backend.erp.catalog.application.service.CategoryApplicationService;
 import com.erppos.backend.erp.catalog.application.service.ProductApplicationService;
@@ -54,6 +56,21 @@ class CatalogApplicationServiceTest {
         assertEquals("Cuadernos", category.name());
         assertTrue(category.active());
     }
+
+    @Test
+    void moneyCoreValidatesProductPricesBeforeCreateAndUpdate() {
+        Long[] ids = seedActiveCategoryAndUnit();
+        assertThrows(CatalogBusinessRuleException.class, () -> productService.create(new CreateProductCommand(
+                "QA-EXCESS", null, "Synthetic", null, ids[0], ids[1], new BigDecimal("1.005"))));
+        assertFalse(productRepository.existsBySkuIgnoreCase("QA-EXCESS"));
+        Product product = productService.create(new CreateProductCommand("QA-EXACT", null, "Synthetic", null,
+                ids[0], ids[1], new BigDecimal("1.230")));
+        assertEquals(new BigDecimal("1.23"), product.salePrice());
+        assertThrows(CatalogBusinessRuleException.class, () -> productService.update(product.id(),
+                new com.erppos.backend.erp.catalog.application.usecase.UpdateProductCommand("QA-EXACT", null,
+                        "Synthetic", null, ids[0], ids[1], new BigDecimal("1.005"), true)));
+        assertEquals(new BigDecimal("1.23"), productService.getById(product.id()).salePrice());
+    }
     @Test
     void shouldRejectDuplicatedCategoryName() {
         categoryService.create(new CreateCategoryCommand("Papeles", null));
@@ -102,16 +119,16 @@ class CatalogApplicationServiceTest {
     }
     @Test
     void shouldCreateUnitSuccessfully() {
-        Unit unit = unitService.create(new CreateUnitCommand("UND", "Unidad"));
+        Unit unit = unitService.create(new CreateUnitCommand("UND", "Unidad", QuantityPolicy.WHOLE));
         assertNotNull(unit.id());
         assertEquals("UND", unit.code());
     }
 
     @Test
     void shouldUpdateUnitSuccessfully() {
-        Unit unit = unitService.create(new CreateUnitCommand("UND", "Unidad"));
+        Unit unit = unitService.create(new CreateUnitCommand("UND", "Unidad", QuantityPolicy.WHOLE));
 
-        Unit updated = unitService.update(unit.id(), new UpdateUnitCommand("UND2", "Unidad secundaria"));
+        Unit updated = unitService.update(unit.id(), new UpdateUnitCommand("UND2", "Unidad secundaria", null));
 
         assertEquals(unit.id(), updated.id());
         assertEquals("UND2", updated.code());
@@ -121,16 +138,16 @@ class CatalogApplicationServiceTest {
 
     @Test
     void shouldRejectDuplicatedUnitCodeOnUpdate() {
-        Unit first = unitService.create(new CreateUnitCommand("UND", "Unidad"));
-        Unit second = unitService.create(new CreateUnitCommand("PQT", "Paquete"));
+        Unit first = unitService.create(new CreateUnitCommand("UND", "Unidad", QuantityPolicy.WHOLE));
+        Unit second = unitService.create(new CreateUnitCommand("PQT", "Paquete", QuantityPolicy.WHOLE));
 
         assertThrows(CatalogConflictException.class,
-                () -> unitService.update(second.id(), new UpdateUnitCommand(first.code().toLowerCase(), "Paquete")));
+                () -> unitService.update(second.id(), new UpdateUnitCommand(first.code().toLowerCase(), "Paquete", null)));
     }
 
     @Test
     void shouldChangeUnitStatusSuccessfully() {
-        Unit unit = unitService.create(new CreateUnitCommand("UND", "Unidad"));
+        Unit unit = unitService.create(new CreateUnitCommand("UND", "Unidad", QuantityPolicy.WHOLE));
 
         Unit updated = unitService.changeStatus(unit.id(), new ChangeUnitStatusCommand(false));
 
@@ -140,15 +157,15 @@ class CatalogApplicationServiceTest {
     @Test
     void shouldRejectBlankUnitCodeOrName() {
         assertThrows(CatalogBusinessRuleException.class,
-                () -> unitService.create(new CreateUnitCommand("   ", "Unidad")));
+                () -> unitService.create(new CreateUnitCommand("   ", "Unidad", QuantityPolicy.WHOLE)));
         assertThrows(CatalogBusinessRuleException.class,
-                () -> unitService.create(new CreateUnitCommand("UND", "   ")));
+                () -> unitService.create(new CreateUnitCommand("UND", "   ", QuantityPolicy.WHOLE)));
     }
     @Test
     void shouldRejectDuplicatedUnitCode() {
-        unitService.create(new CreateUnitCommand("CJA", "Caja"));
+        unitService.create(new CreateUnitCommand("CJA", "Caja", QuantityPolicy.WHOLE));
         assertThrows(CatalogConflictException.class,
-                () -> unitService.create(new CreateUnitCommand("cja", "Caja duplicada")));
+                () -> unitService.create(new CreateUnitCommand("cja", "Caja duplicada", QuantityPolicy.WHOLE)));
     }
     @Test
     void shouldCreateProductWithRequiredSku() {
@@ -278,7 +295,7 @@ class CatalogApplicationServiceTest {
     void shouldFilterProductsByQueryCategoryAndActive() {
         Category categoryA = categoryRepository.save(new Category(null, "Utiles A", null, true, null, null, "system", "system"));
         Category categoryB = categoryRepository.save(new Category(null, "Utiles B", null, true, null, null, "system", "system"));
-        Unit unit = unitRepository.save(new Unit(null, "UND", "Unidad", true, null, null, "system", "system"));
+        Unit unit = unitRepository.save(new Unit(null, "UND", "Unidad", QuantityPolicy.WHOLE, true, null, null, "system", "system"));
 
         productService.create(new CreateProductCommand("SKU-016", "BC-016", "Mochila Azul", null, categoryA.id(), unit.id(), BigDecimal.ONE));
         productService.create(new CreateProductCommand("SKU-017", "BC-017", "Mochila Roja", null, categoryB.id(), unit.id(), BigDecimal.ONE));
@@ -330,7 +347,7 @@ class CatalogApplicationServiceTest {
                 null, "Inactiva", null, false, null, null, "system", "system"
         ));
         Unit activeUnit = unitRepository.save(new Unit(
-                null, "UND", "Unidad", true, null, null, "system", "system"
+                null, "UND", "Unidad", QuantityPolicy.WHOLE, true, null, null, "system", "system"
         ));
         assertThrows(CatalogBusinessRuleException.class, () ->
                 productService.create(new CreateProductCommand(
@@ -344,7 +361,7 @@ class CatalogApplicationServiceTest {
                 null, "Activa", null, true, null, null, "system", "system"
         ));
         Unit inactiveUnit = unitRepository.save(new Unit(
-                null, "PKT", "Paquete", false, null, null, "system", "system"
+                null, "PKT", "Paquete", QuantityPolicy.WHOLE, false, null, null, "system", "system"
         ));
         assertThrows(CatalogBusinessRuleException.class, () ->
                 productService.create(new CreateProductCommand(
@@ -357,7 +374,7 @@ class CatalogApplicationServiceTest {
                 null, "Utiles", null, true, null, null, "system", "system"
         ));
         Unit unit = unitRepository.save(new Unit(
-                null, "UND", "Unidad", true, null, null, "system", "system"
+                null, "UND", "Unidad", QuantityPolicy.WHOLE, true, null, null, "system", "system"
         ));
         return new Long[]{category.id(), unit.id()};
     }
@@ -406,7 +423,7 @@ class CatalogApplicationServiceTest {
             Long id = unit.id() == null ? sequence.getAndIncrement() : unit.id();
             Instant now = Instant.now();
             Unit stored = new Unit(
-                    id, unit.code(), unit.name(), unit.active(),
+                    id, unit.code(), unit.name(), unit.quantityPolicy(), unit.active(),
                     unit.createdAt() == null ? now : unit.createdAt(),
                     now, unit.createdBy(), unit.updatedBy()
             );
@@ -426,6 +443,9 @@ class CatalogApplicationServiceTest {
         public List<Unit> findAll() {
             return storage.values().stream().toList();
         }
+        @Override
+        public Optional<Unit> findByIdForUpdate(Long id) { return findById(id); }
+
         @Override
         public Optional<Unit> findById(Long id) {
             return Optional.ofNullable(storage.get(id));

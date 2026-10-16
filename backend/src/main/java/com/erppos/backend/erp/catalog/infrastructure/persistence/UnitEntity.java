@@ -11,6 +11,8 @@ public class UnitEntity {
     private String code;
     @Column(name = "name", nullable = false, length = 120)
     private String name;
+    @Column(name = "quantity_policy", length = 16)
+    private String quantityPolicy;
     @Column(name = "active", nullable = false)
     private boolean active;
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -36,6 +38,8 @@ public class UnitEntity {
     public void setCode(String code) { this.code = code; }
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
+    public String getQuantityPolicy() { return quantityPolicy; }
+    public void setQuantityPolicy(String quantityPolicy) { this.quantityPolicy = quantityPolicy; }
     public boolean isActive() { return active; }
     public void setActive(boolean active) { this.active = active; }
     public Instant getCreatedAt() { return createdAt; }

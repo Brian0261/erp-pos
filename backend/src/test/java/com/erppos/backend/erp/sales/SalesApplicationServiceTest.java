@@ -1,5 +1,7 @@
 package com.erppos.backend.erp.sales;
 
+import com.erppos.backend.erp.shared.domain.policy.QuantityPolicy;
+
 import com.erppos.backend.erp.sales.adapter.rest.SalesController;
 import com.erppos.backend.erp.sales.application.service.AuditUserProvider;
 import com.erppos.backend.erp.sales.application.service.CashRegisterApplicationService;
@@ -80,7 +82,7 @@ class SalesApplicationServiceTest {
         salesService = new SalesApplicationService(saleRepo, cashRepo, catalogReadPort, warehouseReadPort, inventoryPort, salesBillingSummaryReadPort, auditUserProvider);
 
         warehouseReadPort.activeWarehouses.put(1L, true);
-        catalogReadPort.products.put(1L, new PosProductSnapshot(1L, "SKU-1", "EAN-1", "Producto 1", BigDecimal.valueOf(5), true));
+        catalogReadPort.products.put(1L, new PosProductSnapshot(1L, "SKU-1", "EAN-1", "Producto 1", BigDecimal.valueOf(5), QuantityPolicy.WHOLE, true));
         inventoryPort.stockByProductWarehouse.put(key(1L, 1L), BigDecimal.valueOf(20));
     }
 
@@ -235,7 +237,7 @@ class SalesApplicationServiceTest {
     void shouldEnforcePaymentPolicyBeforeAnyWrite(String scenario, List<CreateSalePaymentCommand> payments,
                                                  boolean accepted, int expectedChange) {
         cashService.open(new OpenCashRegisterCommand(BigDecimal.ZERO, null));
-        catalogReadPort.products.put(1L, new PosProductSnapshot(1L, "QA-MONEY", null, "Synthetic", BigDecimal.valueOf(100), true));
+        catalogReadPort.products.put(1L, new PosProductSnapshot(1L, "QA-MONEY", null, "Synthetic", BigDecimal.valueOf(100), QuantityPolicy.WHOLE, true));
         CreateSaleCommand command = new CreateSaleCommand(1L,
                 List.of(new CreateSaleItemCommand(1L, BigDecimal.ONE, BigDecimal.ZERO)), payments);
         if (!accepted) {
@@ -270,7 +272,7 @@ class SalesApplicationServiceTest {
     @MethodSource("cashCloseScenarios")
     void shouldCloseCashUsingReceivedCashMinusChange(int opening, List<CreateSalePaymentCommand> payments, int expected) {
         CashRegisterSession session = cashService.open(new OpenCashRegisterCommand(BigDecimal.valueOf(opening), null));
-        catalogReadPort.products.put(1L, new PosProductSnapshot(1L, "QA-MONEY", null, "Synthetic", BigDecimal.valueOf(100), true));
+        catalogReadPort.products.put(1L, new PosProductSnapshot(1L, "QA-MONEY", null, "Synthetic", BigDecimal.valueOf(100), QuantityPolicy.WHOLE, true));
         salesService.create(new CreateSaleCommand(1L,
                 List.of(new CreateSaleItemCommand(1L, BigDecimal.ONE, BigDecimal.ZERO)), payments));
         CashRegisterSession closed = cashService.close(session.id(), new CloseCashRegisterCommand(BigDecimal.valueOf(expected), null));

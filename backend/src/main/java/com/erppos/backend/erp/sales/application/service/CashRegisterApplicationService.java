@@ -10,6 +10,7 @@ import com.erppos.backend.erp.sales.domain.exception.SalesNotFoundException;
 import com.erppos.backend.erp.sales.domain.model.CashRegisterSession;
 import com.erppos.backend.erp.sales.domain.model.CashRegisterStatus;
 import com.erppos.backend.erp.sales.domain.port.CashRegisterRepositoryPort;
+import com.erppos.backend.erp.shared.domain.policy.CommercialMoneyPolicy;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,7 +35,7 @@ public class CashRegisterApplicationService implements CashRegisterUseCase {
     @Override
     @Transactional
     public CashRegisterSession open(OpenCashRegisterCommand command) {
-        BigDecimal openingAmount = command.openingAmount();
+        BigDecimal openingAmount = CommercialMoneyPolicy.nonNegative(command.openingAmount(), "openingAmount", SalesBusinessRuleException::new);
         if (openingAmount == null || openingAmount.compareTo(BigDecimal.ZERO) < 0) {
             throw new SalesBusinessRuleException("openingAmount must be >= 0");
         }
@@ -76,7 +77,7 @@ public class CashRegisterApplicationService implements CashRegisterUseCase {
     @Override
     @Transactional
     public CashRegisterSession close(Long id, CloseCashRegisterCommand command) {
-        BigDecimal counted = command.countedAmount();
+        BigDecimal counted = CommercialMoneyPolicy.nonNegative(command.countedAmount(), "countedAmount", SalesBusinessRuleException::new);
         if (counted == null || counted.compareTo(BigDecimal.ZERO) < 0) {
             throw new SalesBusinessRuleException("countedAmount must be >= 0");
         }
@@ -93,8 +94,9 @@ public class CashRegisterApplicationService implements CashRegisterUseCase {
         BigDecimal salesTotal = defaultZero(cashRegisterRepositoryPort.sumSalesTotal(current.id()));
         BigDecimal cashSales = defaultZero(cashRegisterRepositoryPort.sumSalesCashPaid(current.id()));
         BigDecimal cashChange = defaultZero(cashRegisterRepositoryPort.sumSalesCashChange(current.id()));
-        BigDecimal expectedCash = defaultZero(current.openingAmount()).add(cashSales).subtract(cashChange);
-        BigDecimal difference = counted.subtract(expectedCash);
+        BigDecimal expectedCash = CommercialMoneyPolicy.nonNegative(defaultZero(current.openingAmount()).add(cashSales).subtract(cashChange),
+                "expectedCashAmount", SalesBusinessRuleException::new);
+        BigDecimal difference = CommercialMoneyPolicy.exact(counted.subtract(expectedCash), "differenceAmount", SalesBusinessRuleException::new);
 
         CashRegisterSession closed = new CashRegisterSession(
                 current.id(),

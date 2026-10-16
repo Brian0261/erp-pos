@@ -1,5 +1,7 @@
 package com.erppos.backend.erp.quotes;
 
+import com.erppos.backend.erp.shared.domain.policy.QuantityPolicy;
+
 import com.erppos.backend.erp.quotes.adapter.rest.QuoteController;
 import com.erppos.backend.erp.quotes.application.service.AuditUserProvider;
 import com.erppos.backend.erp.quotes.application.service.QuoteApplicationService;
@@ -62,9 +64,9 @@ class QuoteApplicationServiceTest {
                 auditUserProvider
         );
 
-        quoteCatalogReadPort.products.put(1L, new QuoteProductSnapshot(1L, "SKU-1", "EAN-1", "Producto 1", BigDecimal.valueOf(10), true));
-        quoteCatalogReadPort.products.put(2L, new QuoteProductSnapshot(2L, "SKU-2", "EAN-2", "Producto 2", BigDecimal.valueOf(5), true));
-        quoteCatalogReadPort.products.put(99L, new QuoteProductSnapshot(99L, "SKU-I", null, "Inactivo", BigDecimal.ONE, false));
+        quoteCatalogReadPort.products.put(1L, new QuoteProductSnapshot(1L, "SKU-1", "EAN-1", "Producto 1", BigDecimal.valueOf(10), QuantityPolicy.WHOLE, true));
+        quoteCatalogReadPort.products.put(2L, new QuoteProductSnapshot(2L, "SKU-2", "EAN-2", "Producto 2", BigDecimal.valueOf(5), QuantityPolicy.WHOLE, true));
+        quoteCatalogReadPort.products.put(99L, new QuoteProductSnapshot(99L, "SKU-I", null, "Inactivo", BigDecimal.ONE, QuantityPolicy.WHOLE, false));
     }
 
     @Test
