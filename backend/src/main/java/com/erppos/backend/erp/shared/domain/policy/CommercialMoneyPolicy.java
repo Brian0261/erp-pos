@@ -8,13 +8,18 @@ import java.util.function.Function;
 public final class CommercialMoneyPolicy {
     public static final BigDecimal ZERO = new BigDecimal("0.00");
     private static final BigDecimal MAX = new BigDecimal("999999999999.99");
+    private static final int MAX_ABSOLUTE_SCALE = 1_000;
 
     private CommercialMoneyPolicy() { }
 
     public static BigDecimal exact(BigDecimal value, String field,
                                    Function<String, ? extends RuntimeException> error) {
         if (value == null) throw error.apply(field + " is required");
-        // Bound before rescaling also avoids expanding an unbounded exponent.
+        // Bound the representation before arithmetic can expand an extreme exponent.
+        int scale = value.scale();
+        if (scale < -MAX_ABSOLUTE_SCALE || scale > MAX_ABSOLUTE_SCALE) {
+            throw error.apply(field + " must be exactly representable with two decimals");
+        }
         if (value.abs().compareTo(MAX) > 0) throw error.apply(field + " exceeds NUMERIC(14,2) capacity");
         try {
             return value.setScale(2, RoundingMode.UNNECESSARY);

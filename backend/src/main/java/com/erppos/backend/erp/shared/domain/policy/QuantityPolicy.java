@@ -9,9 +9,15 @@ public enum QuantityPolicy {
     WHOLE, DECIMAL_2, LEGACY_UNCLASSIFIED;
 
     private static final BigDecimal MAX = new BigDecimal("9999999999999.999");
+    private static final int MAX_ABSOLUTE_SCALE = 1_000;
 
     public BigDecimal validateNew(BigDecimal value, Function<String, ? extends RuntimeException> error) {
         if (value == null || value.signum() <= 0) throw error.apply("quantity must be > 0");
+        int scale = value.scale();
+        if (scale < -MAX_ABSOLUTE_SCALE || scale > MAX_ABSOLUTE_SCALE) {
+            throw error.apply(this == DECIMAL_2 ? "quantity must have at most two decimals"
+                    : "quantity must be an integer for " + name());
+        }
         if (value.compareTo(MAX) > 0) throw error.apply("quantity exceeds NUMERIC(16,3) capacity");
         try {
             return value.setScale(this == DECIMAL_2 ? 2 : 0, RoundingMode.UNNECESSARY);
