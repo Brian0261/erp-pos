@@ -2,7 +2,7 @@ import { CommonModule } from "@angular/common";
 import { Component, OnInit } from "@angular/core";
 import { FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
 
-import { Unit } from "./data/catalog.models";
+import { ClassifiedQuantityPolicy, Unit } from "./data/catalog.models";
 import { toHttpErrorMessage } from "./data/http-error-message";
 import { UnitService } from "./data/unit.service";
 import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.service";
@@ -26,10 +26,16 @@ import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.servic
       <form [formGroup]="form" (ngSubmit)="submit()" class="form-grid">
         <span class="field-label">Código *</span>
         <span class="field-label">Nombre *</span>
+        <label class="field-label" for="unit-quantity-policy">Cantidades{{ isEditing ? "" : " *" }}</label>
         <span class="field-label field-label--placeholder" aria-hidden="true">&nbsp;</span>
 
         <input type="text" formControlName="code" placeholder="Ej. UND" />
         <input type="text" formControlName="name" placeholder="Ej. Unidad" />
+        <select id="unit-quantity-policy" formControlName="quantityPolicy">
+          <option [ngValue]="null">{{ isEditing ? "Conservar clasificación actual" : "Selecciona una clasificación" }}</option>
+          <option value="WHOLE">Enteras</option>
+          <option value="DECIMAL_2">Hasta 2 decimales</option>
+        </select>
         <div class="form-action">
           <button
             type="submit"
@@ -55,6 +61,9 @@ import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.servic
         <div class="field-feedback" aria-live="polite">
           <small class="field-error" [class.field-error--hidden]="!isInvalid('name')">Nombre es obligatorio.</small>
         </div>
+        <div class="field-feedback" aria-live="polite">
+          <small class="field-error" [class.field-error--hidden]="!isInvalid('quantityPolicy')">Selecciona la política de cantidades.</small>
+        </div>
         <div class="field-feedback field-feedback--placeholder" aria-hidden="true">
           <small class="field-placeholder">&nbsp;</small>
         </div>
@@ -73,6 +82,7 @@ import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.servic
             <tr>
               <th>Código</th>
               <th>Nombre</th>
+              <th>Cantidades</th>
               <th>Estado</th>
               <th>Acciones</th>
             </tr>
@@ -81,6 +91,7 @@ import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.servic
             <tr *ngFor="let unit of units">
               <td class="cell-code">{{ unit.code }}</td>
               <td>{{ unit.name }}</td>
+              <td>{{ unit.quantityPolicy === 'WHOLE' ? 'Enteras' : unit.quantityPolicy === 'DECIMAL_2' ? 'Hasta 2 decimales' : 'Sin clasificar · solo enteras' }}</td>
               <td>
                 <span
                   class="ui-badge"
@@ -122,7 +133,7 @@ import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.servic
               </td>
             </tr>
             <tr *ngIf="units.length === 0">
-              <td colspan="4" class="ui-table__empty">
+              <td colspan="5" class="ui-table__empty">
                 <div class="ui-empty-state">No hay unidades registradas.</div>
               </td>
             </tr>
@@ -141,7 +152,7 @@ import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.servic
 
       .form-grid {
         display: grid;
-        grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr) auto;
+        grid-template-columns: minmax(160px, 1fr) minmax(160px, 1fr) minmax(180px, 1fr) auto;
         grid-template-rows: auto auto auto;
         gap: var(--space-3);
         align-items: start;
@@ -165,7 +176,7 @@ import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.servic
         visibility: hidden;
       }
 
-      input {
+      input, select {
         padding: 0.6rem 0.7rem;
         border: 1px solid var(--color-border-strong);
         border-radius: var(--radius-sm);
@@ -252,6 +263,7 @@ export class UnitsPageComponent implements OnInit {
   readonly form = this.formBuilder.group({
     code: ["", [Validators.required, Validators.maxLength(20)]],
     name: ["", [Validators.required, Validators.maxLength(120)]],
+    quantityPolicy: this.formBuilder.control<ClassifiedQuantityPolicy | null>(null, Validators.required),
   });
 
   units: Unit[] = [];
@@ -285,9 +297,14 @@ export class UnitsPageComponent implements OnInit {
       code: (value.code ?? "").trim(),
       name: (value.name ?? "").trim(),
     };
+    const policy = value.quantityPolicy;
+    if (this.editingUnitId === null && policy == null) {
+      this.saving = false;
+      return;
+    }
     const request$ = this.editingUnitId === null
-      ? this.unitService.create(payload)
-      : this.unitService.update(this.editingUnitId, payload);
+      ? this.unitService.create({ ...payload, quantityPolicy: policy! })
+      : this.unitService.update(this.editingUnitId, { ...payload, quantityPolicy: policy });
 
     request$
       .subscribe({
@@ -315,12 +332,17 @@ export class UnitsPageComponent implements OnInit {
     this.editingUnitId = unit.id;
     this.errorMessage = "";
     this.successMessage = "";
-    this.form.setValue({ code: unit.code, name: unit.name });
+    this.form.controls.quantityPolicy.clearValidators();
+    this.form.controls.quantityPolicy.updateValueAndValidity();
+    this.form.setValue({ code: unit.code, name: unit.name,
+      quantityPolicy: unit.quantityPolicy === 'WHOLE' || unit.quantityPolicy === 'DECIMAL_2' ? unit.quantityPolicy : null });
   }
 
   cancelEdit(): void {
     this.editingUnitId = null;
     this.form.reset();
+    this.form.controls.quantityPolicy.setValidators(Validators.required);
+    this.form.controls.quantityPolicy.updateValueAndValidity();
   }
 
   async changeStatus(unit: Unit, active: boolean): Promise<void> {

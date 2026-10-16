@@ -25,6 +25,7 @@ import com.erppos.backend.erp.sales.domain.port.InventorySalesPort;
 import com.erppos.backend.erp.sales.domain.port.SaleRepositoryPort;
 import com.erppos.backend.erp.sales.domain.port.SalesBillingSummaryReadPort;
 import com.erppos.backend.erp.sales.domain.port.WarehouseReadPort;
+import com.erppos.backend.erp.shared.domain.policy.CommercialMoneyPolicy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -122,34 +123,34 @@ public class SalesApplicationService implements SalesUseCase {
                 throw new SalesBusinessRuleException("Product is inactive");
             }
 
-            BigDecimal quantity = normalize(itemCommand.quantity());
-            if (quantity.compareTo(ZERO) <= 0) {
-                throw new SalesBusinessRuleException("Item quantity must be > 0");
-            }
+            if (product.quantityPolicy() == null) throw new SalesBusinessRuleException("Product quantity policy is missing");
+            BigDecimal quantity = product.quantityPolicy().validateNew(itemCommand.quantity(), SalesBusinessRuleException::new);
 
-            BigDecimal unitPrice = normalize(product.salePrice());
-            BigDecimal itemSubtotal = unitPrice.multiply(quantity);
-            BigDecimal itemDiscount = normalize(defaultZero(itemCommand.discountAmount()));
-            if (itemDiscount.compareTo(ZERO) < 0) {
-                throw new SalesBusinessRuleException("discountAmount must be >= 0");
-            }
-            if (itemDiscount.compareTo(itemSubtotal) > 0) {
-                throw new SalesBusinessRuleException("discountAmount cannot exceed item subtotal");
-            }
+            CommercialMoneyPolicy.Line line = CommercialMoneyPolicy.line(product.salePrice(), quantity,
+                    itemCommand.discountAmount(), SalesBusinessRuleException::new);
+            BigDecimal unitPrice = line.unitPrice();
+            BigDecimal itemSubtotal = line.gross();
+            BigDecimal itemDiscount = line.discount();
 
             BigDecimal stock = inventorySalesPort.stockAvailable(product.id(), command.warehouseId());
             if (stock.compareTo(quantity) < 0) {
                 throw new SalesConflictException("Insufficient stock for product " + product.sku());
             }
 
-            BigDecimal lineTotal = itemSubtotal.subtract(itemDiscount);
+            BigDecimal lineTotal = line.net();
             items.add(new SaleItem(null, null, product.id(), quantity, unitPrice, itemDiscount, lineTotal));
 
             subtotal = subtotal.add(itemSubtotal);
             discountTotal = discountTotal.add(itemDiscount);
         }
 
-        BigDecimal total = subtotal.subtract(discountTotal);
+        subtotal = CommercialMoneyPolicy.nonNegative(subtotal, "subtotalAmount", SalesBusinessRuleException::new);
+        discountTotal = CommercialMoneyPolicy.nonNegative(discountTotal, "discountAmount", SalesBusinessRuleException::new);
+        BigDecimal total = CommercialMoneyPolicy.nonNegative(items.stream().map(SaleItem::lineTotal)
+                .reduce(CommercialMoneyPolicy.ZERO, BigDecimal::add), "totalAmount", SalesBusinessRuleException::new);
+        if (total.compareTo(subtotal.subtract(discountTotal)) != 0) {
+            throw new SalesBusinessRuleException("Sale lines do not reconcile");
+        }
         if (total.compareTo(ZERO) < 0) {
             throw new SalesBusinessRuleException("Total cannot be negative");
         }
@@ -162,7 +163,7 @@ public class SalesApplicationService implements SalesUseCase {
             if (paymentCommand.paymentMethod() == null) {
                 throw new SalesBusinessRuleException("paymentMethod is required");
             }
-            BigDecimal amount = normalize(paymentCommand.amount());
+            BigDecimal amount = CommercialMoneyPolicy.positive(paymentCommand.amount(), "payment amount", SalesBusinessRuleException::new);
             if (amount.compareTo(ZERO) <= 0) {
                 throw new SalesBusinessRuleException("Payment amount must be > 0");
             }
@@ -176,6 +177,7 @@ public class SalesApplicationService implements SalesUseCase {
             payments.add(new SalePayment(null, null, paymentCommand.paymentMethod(), amount, trimToNull(paymentCommand.reference()), null));
         }
 
+        paid = CommercialMoneyPolicy.nonNegative(paid, "paidAmount", SalesBusinessRuleException::new);
         if (electronicPaid.compareTo(total) > 0) {
             throw new SalesBusinessRuleException("Los pagos electrónicos no pueden superar el total de la venta.");
         }
@@ -183,7 +185,9 @@ public class SalesApplicationService implements SalesUseCase {
             throw new SalesBusinessRuleException("Paid amount does not cover sale total");
         }
 
-        BigDecimal change = cashPaid.subtract(total.subtract(electronicPaid)).max(ZERO);
+        BigDecimal change = CommercialMoneyPolicy.nonNegative(cashPaid.subtract(total.subtract(electronicPaid)),
+                "changeAmount", SalesBusinessRuleException::new);
+        if (paid.subtract(change).compareTo(total) != 0) throw new SalesBusinessRuleException("Payments do not reconcile");
 
         String saleNumber = generateSaleNumber();
         Sale sale = new Sale(

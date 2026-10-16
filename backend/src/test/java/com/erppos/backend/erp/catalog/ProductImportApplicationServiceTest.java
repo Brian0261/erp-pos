@@ -1,5 +1,7 @@
 package com.erppos.backend.erp.catalog;
 
+import com.erppos.backend.erp.shared.domain.policy.QuantityPolicy;
+
 import com.erppos.backend.erp.catalog.application.port.ProductImportWorkbookPort;
 import com.erppos.backend.erp.catalog.application.service.AuditUserProvider;
 import com.erppos.backend.erp.catalog.application.service.ProductApplicationService;
@@ -79,6 +81,20 @@ class ProductImportApplicationServiceTest {
     }
 
     @Test
+    void moneyCoreRejectsInvalidPricesPerRowAndAcceptsRedundantZeros() {
+        seedActiveCategoryAndUnit();
+        var result = importService.confirm(new ProductImportUseCase.ConfirmCommand(List.of(
+                new ProductImportUseCase.ImportRowCommand(2, "QA-BAD", null, "Synthetic", null, "Utiles", "UND", "0.505", "true"),
+                new ProductImportUseCase.ImportRowCommand(3, "QA-EXACT", null, "Synthetic", null, "Utiles", "UND", "1.230", "true")
+        )));
+        assertEquals(1, result.createdRows());
+        assertFalse(result.rows().get(0).created());
+        assertTrue(result.rows().get(0).errors().contains("salePrice is invalid"));
+        assertFalse(productRepository.existsBySkuIgnoreCase("QA-BAD"));
+        assertEquals(new BigDecimal("1.23"), productRepository.findById(result.rows().get(1).productId()).orElseThrow().salePrice());
+    }
+
+    @Test
     void shouldCreateValidRowsOnConfirmFile() {
         seedActiveCategoryAndUnit();
 
@@ -91,7 +107,7 @@ class ProductImportApplicationServiceTest {
     @Test
     void shouldRejectExistingSkuOnConfirmRevalidation() {
         Category category = categoryRepository.save(new Category(null, "Utiles", null, true, null, null, "system", "system"));
-        Unit unit = unitRepository.save(new Unit(null, "UND", "Unidad", true, null, null, "system", "system"));
+        Unit unit = unitRepository.save(new Unit(null, "UND", "Unidad", QuantityPolicy.WHOLE, true, null, null, "system", "system"));
         productRepository.save(new Product(null, "SKU-IMPORT-1", null, "Previo", null, category.id(), unit.id(), BigDecimal.ONE, true, null, null, "system", "system"));
 
         ProductImportUseCase.ConfirmResult confirm = importService.confirm(new ProductImportUseCase.ConfirmCommand(List.of(
@@ -114,12 +130,12 @@ class ProductImportApplicationServiceTest {
 
     private void seedActiveCategoryAndUnit() {
         categoryRepository.save(new Category(null, "Utiles", null, true, null, null, "system", "system"));
-        unitRepository.save(new Unit(null, "UND", "Unidad", true, null, null, "system", "system"));
+        unitRepository.save(new Unit(null, "UND", "Unidad", QuantityPolicy.WHOLE, true, null, null, "system", "system"));
     }
 
     private void seedInactiveCategoryAndUnit() {
         categoryRepository.save(new Category(null, "Utiles", null, false, null, null, "system", "system"));
-        unitRepository.save(new Unit(null, "UND", "Unidad", false, null, null, "system", "system"));
+        unitRepository.save(new Unit(null, "UND", "Unidad", QuantityPolicy.WHOLE, false, null, null, "system", "system"));
     }
 
     private static class FakeWorkbookPort implements ProductImportWorkbookPort {

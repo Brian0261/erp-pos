@@ -8,7 +8,9 @@ import com.erppos.backend.erp.catalog.domain.exception.CatalogConflictException;
 import com.erppos.backend.erp.catalog.domain.exception.CatalogNotFoundException;
 import com.erppos.backend.erp.catalog.domain.model.Unit;
 import com.erppos.backend.erp.catalog.domain.port.UnitRepositoryPort;
+import com.erppos.backend.erp.shared.domain.policy.QuantityPolicy;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 @Service
 public class UnitApplicationService implements UnitUseCase {
@@ -19,7 +21,9 @@ public class UnitApplicationService implements UnitUseCase {
         this.auditUserProvider = auditUserProvider;
     }
     @Override
+    @Transactional
     public Unit create(CreateUnitCommand command) {
+        requireClassification(command.quantityPolicy());
         String code = trimToNull(command.code());
         String name = trimToNull(command.name());
         if (code == null) {
@@ -36,6 +40,7 @@ public class UnitApplicationService implements UnitUseCase {
                 null,
                 code,
                 name,
+                command.quantityPolicy(),
                 true,
                 null,
                 null,
@@ -46,8 +51,11 @@ public class UnitApplicationService implements UnitUseCase {
     }
 
     @Override
+    @Transactional
     public Unit update(Long id, UpdateUnitCommand command) {
-        Unit current = getById(id);
+        Unit current = getByIdForUpdate(id);
+        QuantityPolicy policy = command.quantityPolicy() == null ? current.quantityPolicy() : command.quantityPolicy();
+        if (command.quantityPolicy() != null) requireClassification(policy);
         String code = trimToNull(command.code());
         String name = trimToNull(command.name());
         if (code == null) {
@@ -65,6 +73,7 @@ public class UnitApplicationService implements UnitUseCase {
                 current.id(),
                 code,
                 name,
+                policy,
                 current.active(),
                 current.createdAt(),
                 current.updatedAt(),
@@ -75,13 +84,15 @@ public class UnitApplicationService implements UnitUseCase {
     }
 
     @Override
+    @Transactional
     public Unit changeStatus(Long id, ChangeUnitStatusCommand command) {
-        Unit current = getById(id);
+        Unit current = getByIdForUpdate(id);
         String actor = auditUserProvider.currentUsername();
         Unit updated = new Unit(
                 current.id(),
                 current.code(),
                 current.name(),
+                current.quantityPolicy(),
                 command.active(),
                 current.createdAt(),
                 current.updatedAt(),
@@ -95,9 +106,21 @@ public class UnitApplicationService implements UnitUseCase {
         return unitRepositoryPort.findAll();
     }
 
-    private Unit getById(Long id) {
+    @Override
+    public Unit getById(Long id) {
         return unitRepositoryPort.findById(id)
                 .orElseThrow(() -> new CatalogNotFoundException("Unit not found"));
+    }
+
+    private Unit getByIdForUpdate(Long id) {
+        return unitRepositoryPort.findByIdForUpdate(id)
+                .orElseThrow(() -> new CatalogNotFoundException("Unit not found"));
+    }
+
+    private void requireClassification(QuantityPolicy policy) {
+        if (policy == null || policy == QuantityPolicy.LEGACY_UNCLASSIFIED) {
+            throw new CatalogBusinessRuleException("quantityPolicy must be WHOLE or DECIMAL_2");
+        }
     }
 
     private String trimToNull(String value) {

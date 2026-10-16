@@ -1,3 +1,5 @@
+import { QuantityPolicy } from "../../catalog/data/catalog.models";
+
 export type CashRegisterStatus = "OPEN" | "CLOSED";
 
 export interface CashRegisterResponse {
@@ -24,6 +26,8 @@ export interface CloseCashRegisterRequest {
 }
 
 export interface PosProductResponse {
+  // Optional only for compatibility with pre-P0 cached responses; backend is authoritative.
+  quantityPolicy?: QuantityPolicy;
   productId: number;
   sku: string;
   barcode: string | null;

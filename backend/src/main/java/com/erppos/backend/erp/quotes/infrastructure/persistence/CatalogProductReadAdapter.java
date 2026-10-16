@@ -1,6 +1,7 @@
 package com.erppos.backend.erp.quotes.infrastructure.persistence;
 
 import com.erppos.backend.erp.catalog.application.usecase.ProductUseCase;
+import com.erppos.backend.erp.catalog.application.usecase.UnitUseCase;
 import com.erppos.backend.erp.catalog.domain.exception.CatalogNotFoundException;
 import com.erppos.backend.erp.catalog.domain.model.Product;
 import com.erppos.backend.erp.quotes.domain.model.QuoteProductSnapshot;
@@ -13,9 +14,11 @@ import java.util.Optional;
 public class CatalogProductReadAdapter implements QuoteCatalogReadPort {
 
     private final ProductUseCase productUseCase;
+    private final UnitUseCase unitUseCase;
 
-    public CatalogProductReadAdapter(ProductUseCase productUseCase) {
+    public CatalogProductReadAdapter(ProductUseCase productUseCase, UnitUseCase unitUseCase) {
         this.productUseCase = productUseCase;
+        this.unitUseCase = unitUseCase;
     }
 
     @Override
@@ -28,6 +31,7 @@ public class CatalogProductReadAdapter implements QuoteCatalogReadPort {
                     product.barcode(),
                     product.name(),
                     product.salePrice(),
+                    unitUseCase.getById(product.unitId()).quantityPolicy(),
                     product.active()
             ));
         } catch (CatalogNotFoundException ex) {

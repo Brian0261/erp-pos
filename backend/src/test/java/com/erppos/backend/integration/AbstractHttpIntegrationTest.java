@@ -113,6 +113,7 @@ abstract class AbstractHttpIntegrationTest {
         ObjectNode payload = objectMapper.createObjectNode();
         payload.put("code", "UIT" + suffix);
         payload.put("name", "Unidad IT " + suffix);
+        payload.put("quantityPolicy", "WHOLE");
 
         MvcResult result = mockMvc.perform(post("/api/v1/units")
                         .header(HttpHeaders.AUTHORIZATION, bearer(token))

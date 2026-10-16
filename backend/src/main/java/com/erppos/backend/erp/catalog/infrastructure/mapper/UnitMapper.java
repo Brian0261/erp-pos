@@ -1,4 +1,5 @@
 package com.erppos.backend.erp.catalog.infrastructure.mapper;
+import com.erppos.backend.erp.shared.domain.policy.QuantityPolicy;
 import com.erppos.backend.erp.catalog.domain.model.Unit;
 import com.erppos.backend.erp.catalog.infrastructure.persistence.UnitEntity;
 public final class UnitMapper {
@@ -9,6 +10,7 @@ public final class UnitMapper {
                 entity.getId(),
                 entity.getCode(),
                 entity.getName(),
+                QuantityPolicy.fromStorage(entity.getQuantityPolicy()),
                 entity.isActive(),
                 entity.getCreatedAt(),
                 entity.getUpdatedAt(),
@@ -24,6 +26,7 @@ public final class UnitMapper {
     public static void merge(UnitEntity entity, Unit unit) {
         entity.setCode(unit.code());
         entity.setName(unit.name());
+        entity.setQuantityPolicy(unit.quantityPolicy().storageValue());
         entity.setActive(unit.active());
         entity.setCreatedBy(unit.createdBy());
         entity.setUpdatedBy(unit.updatedBy());

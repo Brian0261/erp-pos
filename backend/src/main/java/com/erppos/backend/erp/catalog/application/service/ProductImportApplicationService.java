@@ -17,6 +17,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.erppos.backend.erp.shared.domain.policy.CommercialMoneyPolicy;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -250,11 +251,11 @@ public class ProductImportApplicationService implements ProductImportUseCase {
             errors.add("salePrice is required");
         } else {
             try {
-                salePrice = new BigDecimal(salePriceText);
+                salePrice = CommercialMoneyPolicy.nonNegative(new BigDecimal(salePriceText), "salePrice", IllegalArgumentException::new);
                 if (salePrice.compareTo(BigDecimal.ZERO) < 0) {
                     errors.add("salePrice must be >= 0");
                 }
-            } catch (NumberFormatException ex) {
+            } catch (IllegalArgumentException ex) {
                 errors.add("salePrice is invalid");
             }
         }

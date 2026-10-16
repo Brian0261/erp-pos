@@ -2926,3 +2926,36 @@ Solo crear tag cuando se cumpla todo:
   rulesets y required checks no modificados; requieren autorización separada.
 - No iniciar QA-FE-2, 4D-2C ni NG-UP-CF. Riesgos y límites, requisitos del runner,
   inventario y evidencias en `docs/qa/QA_E2E_AUTH_1_QA.md`.
+
+### MONEY-CORE-P0 — validacion local y preparacion pre-commit (2026-10-15)
+
+- Alcance autorizado: nucleo monetario P0 de catalogo, ventas/caja y
+  cotizaciones; politica compartida de dinero/cantidades, compatibilidad
+  historica y Angular minimo de administracion de unidades. Esta intervencion
+  de cierre solo consolida `docs/qa/MONEY_CORE_P0_QA.md`, `CURRENT_STATUS.md`
+  y este registro; no modifica codigo ni repite pruebas.
+- Worktree `C:/Users/USUARIO/InkToyWorktrees/money-core-p0`, rama
+  `fix/money-core-p0`, base `d24ce4fb10c60dc29f7f662e258f755a8edcc136`.
+  Dinero exacto a dos decimales, HALF_UP por linea, sumas/pagos/vuelto
+  conciliados y cantidades WHOLE/DECIMAL_2; NULL legacy sin clasificacion
+  automatica. V26 agrega quantity_policy nullable con CHECK, sin backfill ni
+  cambios de columnas monetarias/inventario o migraciones historicas.
+- A/B/C y rollback real de venta/pagos/inventario/cotizaciones PASS. Los
+  ajustes test-only preservan la intencion: fixture V26 comprueba SQLSTATE
+  23514 y las instancias del test fiscal V25 limitan su target a 25.
+- **PASS_LOCAL**, no CLOSED: backend integral `clean verify` 708 PASS;
+  Angular 37 PASS y build PASS; E2E aislado 16 PASS (3 + 1 setup + 12 negativos).
+  Cero FAIL/ERROR/SKIPPED obligatorios; identidad/red/no-write/cleanup PASS.
+  Bloqueos de entorno y su resolucion segura se conservan como historial en QA,
+  no como estado vigente. No se suman focales al conteo de la suite integral.
+- MONEY-QA-0: originales y respaldos externos preservados; copia backend
+  adaptada incluida, Angular D excluida. Inventario futuro exacto en QA:
+  38 tracked modificados + 10 nuevos = 48 archivos, cero eliminados y staging
+  vacio; sin caches, logs, temporales, respaldos, .env o artefactos generados.
+- Sin git add, commit, push, PR, merge, tags, reescritura, cambios de rama,
+  worktree o protecciones. master permanece intacta. El siguiente paso requiere
+  autorizacion expresa del commit local; publicacion, PR/revision, CI exacto y
+  eventual merge siguen pendientes con sus gates separados del playbook.
+- MONEY-CHECKOUT-P1 no iniciada; MONEY-FISCAL-P1 y 4D-2C fuera de alcance.
+  Sin cambios a dependencias/lockfiles, workflows, Auth/JWT/RBAC productivos,
+  Storefront, infraestructura, secretos o configuracion persistente.
