@@ -6,6 +6,8 @@ import {
   PosCartItemValueChange,
 } from "./pos-cart-item.component";
 import { PosCartItem } from "../data/pos-ui.models";
+import { quantityStep } from "../utils/pos-decimal";
+import { canPosStep, posUnitPriceText } from "../utils/pos-calculations";
 
 @Component({
     selector: "app-pos-full-cart-modal",
@@ -26,7 +28,7 @@ import { PosCartItem } from "../data/pos-ui.models";
           </div>
           <div class="full-cart-summary">
             <span>Total actual</span>
-            <strong>S/ {{ total | number: "1.2-2" }}</strong>
+            <strong>S/ {{ (total | number: "1.2-2") ?? '—' }}</strong>
           </div>
           <button
             type="button"
@@ -44,6 +46,7 @@ import { PosCartItem } from "../data/pos-ui.models";
             {{ discountAdjustmentMessage }}
           </p>
         </header>
+        <p class="ui-alert ui-alert--error" *ngIf="validationMessage" role="alert">{{ validationMessage }}</p>
 
         <div class="full-cart-empty" *ngIf="cart.length === 0">
           <strong>Carrito vacío</strong>
@@ -61,7 +64,7 @@ import { PosCartItem } from "../data/pos-ui.models";
                 <p class="full-cart-sku">{{ item.sku }}</p>
                 <span class="full-cart-meta-separator" aria-hidden="true">·</span>
                 <span class="full-cart-product-price">
-                  P.U. S/ {{ item.salePrice | number: "1.2-2" }}
+                  P.U. S/ {{ unitPriceText(item) }}
                 </span>
                 <span *ngIf="item.barcode" class="full-cart-barcode-note">
                   {{ item.barcode }}
@@ -81,18 +84,17 @@ import { PosCartItem } from "../data/pos-ui.models";
                     class="ui-button quantity-stepper"
                     aria-label="Disminuir cantidad"
                     (click)="decrease.emit(index)"
-                    [disabled]="item.quantity <= 1"
+                    [disabled]="!canStep(item, -1)"
                   >
                     -
                   </button>
                   <input
                     type="number"
-                    min="1"
-                    step="1"
-                    inputmode="numeric"
-                    pattern="[0-9]*"
+                    [min]="quantityStep(item.quantityPolicy)"
+                    [step]="quantityStep(item.quantityPolicy)"
+                    [attr.inputmode]="item.quantityPolicy === 'DECIMAL_2' ? 'decimal' : 'numeric'"
                     aria-label="Cantidad del producto"
-                    [value]="item.quantity"
+                    [value]="item.quantityInput ?? item.quantity"
                     (focus)="quantityFocus.emit($any($event.target))"
                     (click)="quantityFocus.emit($any($event.target))"
                     (input)="
@@ -108,6 +110,7 @@ import { PosCartItem } from "../data/pos-ui.models";
                     class="ui-button quantity-stepper"
                     aria-label="Aumentar cantidad"
                     (click)="increase.emit(index)"
+                    [disabled]="!canStep(item, 1)"
                   >
                     +
                   </button>
@@ -121,7 +124,7 @@ import { PosCartItem } from "../data/pos-ui.models";
                   min="0"
                   step="0.01"
                   aria-label="Descuento del producto"
-                  [value]="item.discountAmount"
+                  [value]="item.discountInput ?? item.discountAmount"
                   (input)="
                     setDiscount.emit({
                       index: index,
@@ -133,7 +136,7 @@ import { PosCartItem } from "../data/pos-ui.models";
 
               <div class="full-cart-line">
                 <span>Subtotal</span>
-                <strong>S/ {{ (lineTotals[index] || 0) | number: "1.2-2" }}</strong>
+                <strong>S/ {{ (lineTotals[index] | number: "1.2-2") ?? '—' }}</strong>
               </div>
 
               <button
@@ -493,6 +496,10 @@ import { PosCartItem } from "../data/pos-ui.models";
     ]
 })
 export class PosFullCartModalComponent {
+  readonly quantityStep = quantityStep;
+  readonly canStep = canPosStep;
+  readonly unitPriceText = posUnitPriceText;
+  @Input() validationMessage = "";
   @Input({ required: true }) isOpen = false;
   @Input({ required: true }) cart: PosCartItem[] = [];
   @Input({ required: true }) cartCountLabel = "0 ítems";

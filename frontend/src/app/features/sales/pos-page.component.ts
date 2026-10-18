@@ -1,8 +1,10 @@
 import { CommonModule } from "@angular/common";
-import { Component, HostListener, OnDestroy, OnInit } from "@angular/core";
+import { Component, ElementRef, HostListener, OnDestroy, OnInit, ViewChild } from "@angular/core";
 import { FormBuilder, Validators } from "@angular/forms";
 import { RouterLink } from "@angular/router";
 import { Subscription } from "rxjs";
+import { HttpErrorResponse } from "@angular/common/http";
+import { immutableRequest } from "./utils/checkout-confirmation";
 
 import { AuthService } from "../../core/auth/auth.service";
 import { WarehouseService } from "../inventory/data/warehouse.service";
@@ -16,7 +18,7 @@ import { PosTotalsSummaryComponent } from "./components/pos-totals-summary.compo
 import { CashRegisterService } from "./data/cash-register.service";
 import { toHttpErrorMessage } from "./data/http-error-message";
 import { PosService } from "./data/pos.service";
-import { PosDraftState, PosStateService } from "./data/pos-state.service";
+import { POS_DRAFT_FORMAT_VERSION, PosDraftState, PosStateService } from "./data/pos-state.service";
 import { PaymentLine, PosCartItem, PosReceiptType } from "./data/pos-ui.models";
 import { SalesService } from "./data/sales.service";
 import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.service";
@@ -44,7 +46,12 @@ import {
   calculatePosTotal,
   normalizePosNumber,
   normalizePosQuantity,
+  posLineCents,
+  posTotalCents,
+  posPaidCents,
 } from "./utils/pos-calculations";
+import { availableQuantity, decimalText, isQuantityPolicy, moneyCents, quantityHundredths,
+  quantityStep, scaledNumber, stockMillis } from "./utils/pos-decimal";
 
 @Component({
     selector: "app-pos-page",
@@ -107,7 +114,7 @@ import {
 
           <div
             class="message-stack"
-            *ngIf="activeErrorMessage || warningMessage || successMessage || (discountAdjustmentMessage && !isFullCartOpen)"
+            *ngIf="activeErrorMessage || warningMessage || successMessage || draftReviewMessage || pendingSaleRequest || (discountAdjustmentMessage && !isFullCartOpen)"
           >
             <p class="ui-alert ui-alert--error" *ngIf="activeErrorMessage">
               {{ activeErrorMessage }}
@@ -115,6 +122,17 @@ import {
             <p class="ui-alert ui-alert--info" *ngIf="warningMessage">
               {{ warningMessage }}
             </p>
+            <div class="ui-alert ui-alert--warning" *ngIf="priceReviewRequired && needsRevalidation" role="alert">
+              <strong>Los precios de esta venta cambiaron</strong>
+              <p id="price-review-instruction">Si mantienes el carrito, no podrás cobrar hasta revisar los precios actualizados</p>
+            </div>
+            <p class="ui-alert ui-alert--info" *ngIf="draftReviewMessage">{{ draftReviewMessage }}</p>
+            <button #priceReviewButton class="ui-button ui-button--secondary" type="button" *ngIf="needsRevalidation && !pendingSaleRequest"
+              [attr.aria-describedby]="priceReviewRequired ? 'price-review-instruction' : null"
+              [disabled]="revalidating" (click)="revalidateCart()">{{ revalidating ? 'Revalidando…' : priceReviewRequired ? 'Revisar precios' : 'Revalidar borrador y revisar precios' }}</button>
+            <p class="ui-alert ui-alert--warning" *ngIf="pendingSaleRequest">Resultado de cobro pendiente. No inicies otra venta: reintenta la misma operación para recuperar su resultado.</p>
+            <button class="ui-button ui-button--secondary" type="button" *ngIf="pendingSaleRequest"
+              [disabled]="submitting" (click)="finalizeSale()">Recuperar resultado del cobro</button>
             <p
               class="ui-alert ui-alert--info"
               *ngIf="discountAdjustmentMessage && !isFullCartOpen"
@@ -159,6 +177,7 @@ import {
 
           <footer class="checkout-actions">
             <button
+              #checkoutLauncher
               type="button"
               class="ui-button ui-button--primary checkout-button"
               (click)="openCheckoutModal()"
@@ -232,6 +251,7 @@ import {
         [total]="total"
         [lineTotals]="cartLineTotals"
         [discountAdjustmentMessage]="discountAdjustmentMessage"
+        [validationMessage]="activeErrorMessage || draftReviewMessage"
         (close)="closeFullCart()"
         (decrease)="decreaseQuantity($event)"
         (increase)="increaseQuantity($event)"
@@ -542,6 +562,10 @@ export class PosPageComponent implements OnInit, OnDestroy {
   loadingLookup = false;
   loadingSearch = false;
   submitting = false;
+  revalidating = false;
+  pendingSaleRequest: CreateSaleRequest | null = null;
+  private confirmingSale = false;
+  private pendingOwnerBlocked = false;
   isFullCartOpen = false;
   isCheckoutModalOpen = false;
 
@@ -553,6 +577,24 @@ export class PosPageComponent implements OnInit, OnDestroy {
   successMessage = "";
   lastSaleId: number | null = null;
   showGoToBillingAction = false;
+  draftReviewMessage = "";
+  priceReviewRequired = false;
+  @ViewChild("checkoutLauncher") private checkoutLauncher?: ElementRef<HTMLButtonElement>;
+  private priceReviewButtonRef?: ElementRef<HTMLButtonElement>;
+  @ViewChild("priceReviewButton")
+  set priceReviewButton(button: ElementRef<HTMLButtonElement> | undefined) {
+    this.priceReviewButtonRef = button;
+    if (button && this.priceReviewRequired) {
+      queueMicrotask(() => {
+        if (button.nativeElement.isConnected && !this.isCheckoutModalOpen && !this.revalidating) {
+          button.nativeElement.focus();
+        }
+      });
+    }
+  }
+  private restoredDraftTotal: string | null = null;
+  private draftSourceFormatVersion = POS_DRAFT_FORMAT_VERSION;
+  private draftValidationIssues: string[] = [];
 
   private readonly subscriptions = new Subscription();
   private warehousesLoaded = false;
@@ -615,6 +657,13 @@ export class PosPageComponent implements OnInit, OnDestroy {
     this.subscriptions.add(
       warehouseControl.valueChanges.subscribe(() => {
         if (!this.isHydratingDraft) {
+          if (this.pendingSaleRequest) {
+            warehouseControl.setValue(this.pendingSaleRequest.warehouseId, { emitEvent: false });
+            this.preventPendingEdit();
+            return;
+          }
+          this.cart = this.cart.map(item => ({ ...item, requiresRevalidation: true }));
+          if (this.cart.length) this.draftReviewMessage = "El almacén cambió: revalida disponibilidad antes de cobrar.";
           this.clearStockMessage();
           this.persistDraftState();
         }
@@ -650,6 +699,16 @@ export class PosPageComponent implements OnInit, OnDestroy {
     this.draftInitialized = true;
 
     const draft = this.posStateService.load();
+
+    if (draft?.pendingSaleRequest) {
+      if (!this.currentUserId || draft.userId !== this.currentUserId) {
+        this.pendingOwnerBlocked = true;
+        this.errorMessage = "Existe un cobro pendiente cuyo usuario no pudo verificarse. Recarga con el usuario original para recuperar el resultado; no se borró la operación.";
+        return;
+      }
+      this.restoreDraft(draft);
+      return;
+    }
 
     if (!this.currentCashSession) {
       this.posStateService.clearAll();
@@ -701,11 +760,16 @@ export class PosPageComponent implements OnInit, OnDestroy {
       { emitEvent: false },
     );
     this.searchResults = [...draft.searchResults];
-    this.cart = draft.cart.map((item) => ({ ...item }));
-    this.discountAdjustmentMessage = this.cart
-      .map((item) => this.clampLineDiscount(item, "la restauración del borrador"))
-      .filter((message) => message !== null)
-      .join(" ");
+    this.cart = draft.cart.map((item) => ({ ...item, requiresRevalidation: true }));
+    this.pendingSaleRequest = draft.pendingSaleRequest ? immutableRequest(draft.pendingSaleRequest) : null;
+    this.discountAdjustmentMessage = "";
+    this.restoredDraftTotal = draft.preliminaryTotal ?? null;
+    this.draftSourceFormatVersion = draft.sourceFormatVersion ?? draft.formatVersion ?? 0;
+    this.draftValidationIssues = draft.validationIssues ?? [];
+    this.draftReviewMessage = this.cart.length
+      ? "Borrador restaurado: precios, políticas y stock pendientes de revalidación. Los importes originales se conservarán hasta tu aceptación."
+      : "";
+    if (draft.validationIssues?.length) this.draftReviewMessage += ` ${draft.validationIssues.join(" ")}`;
     this.payments =
       draft.payments.length > 0
         ? draft.payments.map((payment) => ({ ...payment }))
@@ -746,6 +810,9 @@ export class PosPageComponent implements OnInit, OnDestroy {
     );
     this.searchResults = [];
     this.cart = [];
+    this.draftReviewMessage = "";
+    this.priceReviewRequired = false;
+    this.restoredDraftTotal = null;
     this.discountAdjustmentMessage = "";
     this.payments = [{ paymentMethod: "CASH", amount: 0, reference: "" }];
     this.lastSaleId = null;
@@ -785,17 +852,25 @@ export class PosPageComponent implements OnInit, OnDestroy {
     return null;
   }
 
-  private persistDraftState(): void {
-    if (this.isHydratingDraft || !this.currentUserId || !this.currentCashSession) {
-      return;
+  private persistDraftState(): boolean {
+    if (this.pendingOwnerBlocked || this.isHydratingDraft || !this.currentUserId || (!this.currentCashSession && !this.pendingSaleRequest)) {
+      return false;
     }
 
     const currentWarehouseId = this.saleForm.value.warehouseId ?? null;
     const existingDraft = this.posStateService.load();
 
-    this.posStateService.save({
+    return this.posStateService.save({
+      pendingSaleRequest: this.pendingSaleRequest,
+      formatVersion: POS_DRAFT_FORMAT_VERSION,
+      sourceFormatVersion: this.cart.some(item => item.requiresRevalidation)
+        ? this.draftSourceFormatVersion : POS_DRAFT_FORMAT_VERSION,
+      validationIssues: this.cart.some(item => item.requiresRevalidation) ? this.draftValidationIssues : [],
+      requiresRevalidation: this.cart.some(item => item.requiresRevalidation),
+      preliminaryTotal: this.cart.some(item => item.requiresRevalidation)
+        ? this.restoredDraftTotal : (Number.isFinite(this.total) ? decimalText(moneyCents(this.total)) : null),
       userId: this.currentUserId,
-      cashRegisterSessionId: this.currentCashSession.id,
+      cashRegisterSessionId: this.currentCashSession?.id ?? existingDraft?.cashRegisterSessionId ?? null,
       warehouseId: currentWarehouseId,
       lastWarehouseId: currentWarehouseId ?? existingDraft?.lastWarehouseId ?? null,
       code: this.saleForm.value.code ?? "",
@@ -804,7 +879,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
       cart: this.cart.map((item) => ({ ...item })),
       payments: this.payments.map((payment) => ({ ...payment })),
       lastSaleId: this.lastSaleId,
-    });
+    }) !== false;
   }
 
   private resetDraftAfterCheckout(preserveLastSaleId: boolean): void {
@@ -822,6 +897,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
     this.searchResults = [];
     this.cart = [];
     this.payments = [{ paymentMethod: "CASH", amount: 0, reference: "" }];
+    this.priceReviewRequired = false;
     if (!preserveLastSaleId) {
       this.lastSaleId = null;
     }
@@ -855,6 +931,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
   }
 
   cancelSale(): void {
+    if (this.preventPendingEdit()) return;
     this.resetDraftAfterCheckout(false);
   }
 
@@ -1150,6 +1227,10 @@ export class PosPageComponent implements OnInit, OnDestroy {
   }
 
   openCheckoutModal(): void {
+    if (this.priceReviewRequired && this.needsRevalidation) {
+      this.revalidateCart();
+      return;
+    }
     this.isCheckoutModalOpen = true;
   }
 
@@ -1158,6 +1239,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
   }
 
   addToCart(product: PosProductResponse): void {
+    if (this.preventPendingEdit()) return;
     this.errorMessage = "";
     this.stockMessage = "";
     this.successMessage = "";
@@ -1177,23 +1259,31 @@ export class PosPageComponent implements OnInit, OnDestroy {
       (item) => item.productId === product.productId,
     );
 
-    if (existing) {
-      const nextQty = existing.quantity + 1;
-      if (nextQty > this.availableIntegerStock(existing)) {
+    let price: number;
+    let initialQuantity: number;
+    try {
+      if (!isQuantityPolicy(product.quantityPolicy)) throw new Error("No se recibió la política de cantidad. Vuelve a buscar el producto.");
+      price = scaledNumber(moneyCents(product.salePrice, "Precio del producto"));
+      const available = availableQuantity(product.stockAvailable, product.quantityPolicy);
+      if (available <= 0) {
         this.stockMessage = this.buildStockUnavailableMessage(product);
         return;
       }
-      existing.quantity = nextQty;
-      this.clearStockMessage();
-      this.persistDraftState();
+      initialQuantity = available >= 1 ? 1 : quantityStep(product.quantityPolicy);
+    } catch (error) {
+      this.errorMessage = error instanceof Error ? error.message : "Producto no válido.";
       return;
     }
-
-    const availableStock = Math.floor(
-      normalizePosNumber(product.stockAvailable),
-    );
-
-    if (availableStock <= 0) {
+    if (existing) {
+      // A new read must not silently replace a restored price or policy.
+      if (existing.requiresRevalidation || existing.salePrice !== price || existing.quantityPolicy !== product.quantityPolicy) {
+        this.errorMessage = "El producto guardado requiere revisión. Retíralo y agrégalo desde la búsqueda actual.";
+        return;
+      }
+      this.increaseQuantity(this.cart.indexOf(existing));
+      return;
+    }
+    if (initialQuantity <= 0) {
       this.stockMessage = this.buildStockUnavailableMessage(product);
       return;
     }
@@ -1203,10 +1293,11 @@ export class PosPageComponent implements OnInit, OnDestroy {
       sku: product.sku,
       barcode: product.barcode,
       name: product.name,
-      salePrice: normalizePosNumber(product.salePrice),
+      salePrice: price,
       stockAvailable: normalizePosNumber(product.stockAvailable),
-      quantity: 1,
+      quantity: initialQuantity,
       discountAmount: 0,
+      quantityPolicy: product.quantityPolicy,
     });
 
     this.clearStockMessage();
@@ -1214,13 +1305,18 @@ export class PosPageComponent implements OnInit, OnDestroy {
   }
 
   removeFromCart(index: number): void {
+    if (this.preventPendingEdit()) return;
     this.cart.splice(index, 1);
+    if (!this.cart.some(item => item.requiresRevalidation)) this.draftReviewMessage = "";
     this.discountAdjustmentMessage = "";
     this.persistDraftState();
   }
 
   clearCart(clearLastSaleReference = true): void {
+    if (this.preventPendingEdit()) return;
     this.cart = [];
+    this.draftReviewMessage = "";
+    this.restoredDraftTotal = null;
     this.discountAdjustmentMessage = "";
     this.payments = [{ paymentMethod: "CASH", amount: 0, reference: "" }];
     if (clearLastSaleReference) {
@@ -1234,26 +1330,25 @@ export class PosPageComponent implements OnInit, OnDestroy {
   }
 
   setQuantity(index: number, rawValue: string, input?: HTMLInputElement): void {
+    if (this.preventPendingEdit()) return;
     const item = this.cart[index];
     if (!item) {
       return;
     }
 
-    const parsed = normalizePosQuantity(rawValue);
-    const maxStock = this.availableIntegerStock(item);
-
-    if (parsed > maxStock) {
-      this.errorMessage = `Cantidad excede stock disponible (${item.stockAvailable}) para ${item.sku}.`;
-      if (maxStock < 1) {
-        // There is no valid positive quantity: retain the row and block checkout.
-        if (input) {
-          input.value = String(item.quantity);
-        }
-        return;
+    try {
+      const quantity = quantityHundredths(rawValue, item.quantityPolicy);
+      if (quantity * 10n > stockMillis(item.stockInput ?? item.stockAvailable)) {
+        throw new Error(`Cantidad excede stock disponible (${item.stockAvailable}) para ${item.sku}. Corrige la cantidad; no se ha ajustado automáticamente.`);
       }
+      item.quantity = scaledNumber(quantity);
+      delete item.quantityInput;
+    } catch (error) {
+      item.quantityInput = rawValue;
+      this.errorMessage = error instanceof Error ? error.message : "Cantidad no válida.";
+      this.persistDraftState();
+      return;
     }
-
-    item.quantity = Math.min(parsed, maxStock);
     this.discountAdjustmentMessage =
       this.clampLineDiscount(item, "el cambio de cantidad") ?? "";
     if (input) {
@@ -1269,7 +1364,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
       return;
     }
 
-    this.setQuantity(index, String(item.quantity + 1));
+    this.stepQuantity(index, 1);
   }
 
   decreaseQuantity(index: number): void {
@@ -1278,44 +1373,58 @@ export class PosPageComponent implements OnInit, OnDestroy {
       return;
     }
 
-    this.setQuantity(index, String(item.quantity - 1));
+    this.stepQuantity(index, -1);
   }
 
-  availableIntegerStock(item: Pick<PosCartItem, "stockAvailable">): number {
-    return Math.floor(normalizePosNumber(item.stockAvailable));
+  private stepQuantity(index: number, direction: 1 | -1): void {
+    const item = this.cart[index];
+    try {
+      const quantity = quantityHundredths(item.quantityInput ?? item.quantity, item.quantityPolicy);
+      const step = item.quantityPolicy === "DECIMAL_2" ? 1n : 100n;
+      this.setQuantity(index, decimalText(quantity + BigInt(direction) * step));
+    } catch (error) { this.errorMessage = error instanceof Error ? error.message : "Cantidad no válida."; }
+  }
+
+  availableIntegerStock(item: PosCartItem): number {
+    try { return availableQuantity(item.stockInput ?? item.stockAvailable, item.quantityPolicy); }
+    catch { return NaN; }
   }
 
   setDiscount(index: number, rawValue: string): void {
+    if (this.preventPendingEdit()) return;
     const item = this.cart[index];
     if (!item) {
       return;
     }
 
     this.discountAdjustmentMessage = "";
-    const parsed = Math.max(normalizePosNumber(rawValue), 0);
-    const maxDiscount = this.lineSubtotal(item);
-
-    if (parsed > maxDiscount) {
-      item.discountAmount = maxDiscount;
-      this.persistDraftState();
-      return;
+    try {
+      const cents = moneyCents(rawValue, "El descuento");
+      const maxDiscount = moneyCents(this.lineSubtotal(item), "Subtotal");
+      if (cents > maxDiscount) throw new Error("El descuento no puede superar el subtotal del producto.");
+      item.discountAmount = scaledNumber(cents);
+      delete item.discountInput;
+    } catch (error) {
+      item.discountInput = rawValue;
+      this.errorMessage = error instanceof Error ? error.message : "Descuento no válido.";
     }
-
-    item.discountAmount = parsed;
     this.persistDraftState();
   }
 
   private clampLineDiscount(item: PosCartItem, reason: string): string | null {
     const previous = item.discountAmount;
-    const adjusted = Math.min(
-      Math.max(normalizePosNumber(previous), 0),
-      Math.max(this.lineSubtotal(item), 0),
-    );
+    let adjusted: number;
+    try {
+      const cents = moneyCents(item.discountInput ?? previous, "El descuento");
+      const gross = moneyCents(this.lineSubtotal(item), "Subtotal");
+      adjusted = scaledNumber(cents > gross ? gross : cents);
+    } catch { return null; }
     if (adjusted === previous) {
       return null;
     }
 
     item.discountAmount = adjusted;
+    delete item.discountInput;
     const previousLabel = Number.isFinite(previous)
       ? `S/ ${previous.toFixed(2)}`
       : "un importe no válido";
@@ -1331,11 +1440,13 @@ export class PosPageComponent implements OnInit, OnDestroy {
   }
 
   addPaymentLine(): void {
+    if (this.preventPendingEdit()) return;
     this.payments.push({ paymentMethod: "CASH", amount: 0, reference: "" });
     this.persistDraftState();
   }
 
   removePaymentLine(index: number): void {
+    if (this.preventPendingEdit()) return;
     if (this.payments.length === 1) {
       return;
     }
@@ -1344,6 +1455,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
   }
 
   setPaymentMethod(index: number, value: string): void {
+    if (this.preventPendingEdit()) return;
     const payment = this.payments[index];
     if (!payment) {
       return;
@@ -1356,16 +1468,24 @@ export class PosPageComponent implements OnInit, OnDestroy {
   }
 
   setPaymentAmount(index: number, rawValue: string): void {
+    if (this.preventPendingEdit()) return;
     const payment = this.payments[index];
     if (!payment) {
       return;
     }
 
-    payment.amount = Math.max(normalizePosNumber(rawValue), 0);
+    try {
+      payment.amount = scaledNumber(moneyCents(rawValue, "El pago"));
+      delete payment.amountInput;
+    } catch (error) {
+      payment.amountInput = rawValue;
+      this.errorMessage = error instanceof Error ? error.message : "Pago no válido.";
+    }
     this.persistDraftState();
   }
 
   setPaymentReference(index: number, rawValue: string): void {
+    if (this.preventPendingEdit()) return;
     const payment = this.payments[index];
     if (!payment) {
       return;
@@ -1376,6 +1496,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
   }
 
   setReceiptType(type: PosReceiptType): void {
+    if (this.preventPendingEdit()) return;
     this.receiptType = type;
     this.receiptSeriesId = "";
     this.receiptCustomerDocument = "";
@@ -1390,6 +1511,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
   }
 
   setReceiptSeriesId(rawValue: string): void {
+    if (this.preventPendingEdit()) return;
     this.receiptSeriesId = String(rawValue || "");
   }
 
@@ -1398,15 +1520,18 @@ export class PosPageComponent implements OnInit, OnDestroy {
   }
 
   setReceiptCustomerDocument(rawValue: string): void {
+    if (this.preventPendingEdit()) return;
     const maxLength = this.receiptType === "INVOICE" ? 11 : 8;
     this.receiptCustomerDocument = rawValue.replace(/\D/g, "").slice(0, maxLength);
   }
 
   setReceiptCustomerName(rawValue: string): void {
+    if (this.preventPendingEdit()) return;
     this.receiptCustomerName = rawValue;
   }
 
   setReceiptCustomerAddress(rawValue: string): void {
+    if (this.preventPendingEdit()) return;
     this.receiptCustomerAddress = rawValue;
   }
 
@@ -1522,6 +1647,17 @@ export class PosPageComponent implements OnInit, OnDestroy {
   }
 
   finalizeSale(): void {
+    if (this.pendingOwnerBlocked) { this.preventPendingEdit(); return; }
+    if (this.submitting || this.confirmingSale || this.revalidating) return;
+    if (this.pendingSaleRequest) {
+      const pending = this.pendingSaleRequest;
+      this.confirmingSale = true;
+      void this.confirmDialog.confirm({ title: "Recuperar cobro pendiente",
+        description: `Se consultará la misma operación ${pending.operationId}, sin crear otra identidad de venta. Total confirmado: S/ ${decimalText(moneyCents(pending.confirmedTotal))}.`,
+        confirmText: "Reintentar misma operación", cancelText: "Cancelar", variant: "warning" })
+        .then(ok => { if (ok) this.submitConfirmedSale(pending); }).finally(() => this.confirmingSale = false);
+      return;
+    }
     this.errorMessage = "";
     this.warningMessage = "";
     this.successMessage = "";
@@ -1534,6 +1670,9 @@ export class PosPageComponent implements OnInit, OnDestroy {
       return;
     }
 
+    const payload = immutableRequest(this.buildSaleRequest(crypto.randomUUID()));
+    const fingerprint = this.checkoutFingerprint();
+    this.confirmingSale = true;
     void this.confirmDialog.confirm({
       title: "Confirmar venta",
       description: this.buildFinalizeConfirmationMessage(),
@@ -1546,35 +1685,48 @@ export class PosPageComponent implements OnInit, OnDestroy {
         return;
       }
 
-      // Recheck the current cart after the asynchronous confirmation.
       const currentValidationError = this.validateSaleBeforeSubmit();
       if (currentValidationError) {
         this.errorMessage = currentValidationError;
         return;
       }
+      if (fingerprint !== this.checkoutFingerprint()) {
+        this.errorMessage = "El carrito o los pagos cambiaron durante la confirmación. Revisa y confirma nuevamente.";
+        return;
+      }
 
-      const warehouseId = this.saleForm.value.warehouseId as number;
+      this.submitConfirmedSale(payload);
+    }).finally(() => this.confirmingSale = false);
+  }
 
-      const payload: CreateSaleRequest = {
-        warehouseId,
-        items: this.cart.map((item) => ({
-          productId: item.productId,
-          quantity: normalizePosQuantity(item.quantity),
-          discountAmount: normalizePosNumber(item.discountAmount),
-        })),
-        payments: this.payments
-          .map((payment) => ({
-            paymentMethod: payment.paymentMethod,
-            amount: normalizePosNumber(payment.amount),
-            reference: payment.reference.trim() ? payment.reference.trim() : null,
-          }))
-          .filter((payment) => payment.amount > 0),
-      };
+  private buildSaleRequest(operationId: string): CreateSaleRequest {
+    return { operationId, warehouseId: this.saleForm.value.warehouseId as number,
+      confirmedTotal: scaledNumber(posTotalCents(this.cart)),
+      items: this.cart.map(item => ({ productId: item.productId,
+        quantity: normalizePosQuantity(item.quantityInput ?? item.quantity, item.quantityPolicy),
+        discountAmount: scaledNumber(moneyCents(item.discountInput ?? item.discountAmount)),
+        confirmedUnitPrice: scaledNumber(moneyCents(item.salePriceInput ?? item.salePrice)) })),
+      payments: this.payments.map(p => ({ paymentMethod: p.paymentMethod,
+        amount: scaledNumber(moneyCents(p.amountInput ?? p.amount)), reference: p.reference.trim() || null }))
+        .filter(p => p.amount > 0) };
+  }
 
+  private checkoutFingerprint(): string {
+    return JSON.stringify([this.saleForm.value.warehouseId, this.cart, this.payments, this.receiptType,
+      this.receiptSeriesId, this.receiptCustomerDocument, this.receiptCustomerName, this.receiptCustomerAddress]);
+  }
+
+  private submitConfirmedSale(payload: CreateSaleRequest): void {
+      this.pendingSaleRequest = payload;
+      if (!this.persistDraftState()) {
+        this.pendingSaleRequest = null;
+        this.errorMessage = "No se pudo conservar la identidad del cobro. No se envió la venta.";
+        return;
+      }
       this.submitting = true;
-
       this.salesService.create(payload).subscribe({
         next: (sale) => {
+          this.pendingSaleRequest = null;
           if (this.receiptType === "TICKET") {
             this.submitting = false;
             this.successMessage = `Venta ${sale.saleNumber} registrada correctamente.`;
@@ -1588,13 +1740,27 @@ export class PosPageComponent implements OnInit, OnDestroy {
         },
         error: (error: unknown) => {
           this.submitting = false;
+          const response = error as HttpErrorResponse;
+          if (response.status >= 400 && response.status < 500 && response.status !== 408
+              && !["OPERATION_CONTENT_MISMATCH", "OPERATION_RESULT_UNAVAILABLE"].includes(response.error?.code)) {
+            this.pendingSaleRequest = null;
+          }
+          if (response.status === 409 && response.error?.code === "PRICE_CONFIRMATION_REQUIRED") {
+            this.isCheckoutModalOpen = false;
+            this.isFullCartOpen = false;
+            this.priceReviewRequired = true;
+            this.cart = this.cart.map(item => ({ ...item, requiresRevalidation: true }));
+            this.draftReviewMessage = `Total confirmado S/ ${decimalText(moneyCents(response.error.confirmedTotal))}; total vigente ${response.error.proposedTotal === null ? 'requiere revisar descuentos' : 'S/ ' + decimalText(moneyCents(response.error.proposedTotal))}. ` +
+              response.error.changes.map((c: { productId: number; confirmedUnitPrice: number; currentUnitPrice: number }) =>
+                `Producto #${c.productId}: S/ ${decimalText(moneyCents(c.confirmedUnitPrice))} → S/ ${decimalText(moneyCents(c.currentUnitPrice))}.`).join(" ");
+          }
           this.errorMessage = toHttpErrorMessage(
             error,
             "No se pudo registrar la venta.",
           );
+          this.persistDraftState();
         },
       });
-    });
   }
 
   private loadWarehouses(): void {
@@ -1612,6 +1778,74 @@ export class PosPageComponent implements OnInit, OnDestroy {
         this.warehousesLoaded = true;
         this.maybeRestoreDraft();
       },
+    });
+  }
+
+  get needsRevalidation(): boolean { return this.cart.some(item => item.requiresRevalidation); }
+
+  private preventPendingEdit(): boolean {
+    if (this.pendingOwnerBlocked) {
+      this.errorMessage = "Recupera el cobro pendiente con el usuario original antes de iniciar otra venta.";
+      return true;
+    }
+    if (!this.pendingSaleRequest) return false;
+    this.errorMessage = "Hay un cobro con resultado pendiente. Recupera su resultado antes de modificar o cancelar la venta.";
+    return true;
+  }
+
+  revalidateCart(): void {
+    if (this.revalidating || this.preventPendingEdit() || !this.cart.length) return;
+    const warehouseId = this.saleForm.value.warehouseId;
+    if (!warehouseId) { this.errorMessage = "Selecciona un almacén para revalidar."; return; }
+    const fingerprint = this.checkoutFingerprint();
+    const original = structuredClone(this.cart);
+    this.revalidating = true;
+    this.posService.snapshot(original.map(item => item.productId), warehouseId).subscribe({
+      next: products => {
+        if (fingerprint !== this.checkoutFingerprint()) { this.errorMessage = "El borrador cambió. Revalídalo nuevamente."; this.revalidating = false; return; }
+        try {
+          const proposed = original.map(item => {
+            const product = products.find(p => p.productId === item.productId);
+            if (!product || !isQuantityPolicy(product.quantityPolicy)) throw new Error(`${item.name}: no está disponible o no tiene política válida.`);
+            const updated: PosCartItem = { ...item, salePrice: product.salePrice, salePriceInput: undefined,
+              quantityPolicy: product.quantityPolicy, stockAvailable: product.stockAvailable, stockInput: undefined, requiresRevalidation: false };
+            posLineCents(updated);
+            if (quantityHundredths(updated.quantityInput ?? updated.quantity, updated.quantityPolicy) * 10n > stockMillis(product.stockAvailable))
+              throw new Error(`${item.name}: stock insuficiente. Conservamos tu cantidad y descuento; revísalos antes de continuar.`);
+            return updated;
+          });
+          const proposedTotal = decimalText(posTotalCents(proposed));
+          const differences = proposed.map((item, i) => `${item.name}: precio ${original[i].salePriceInput ?? original[i].salePrice} → ${item.salePrice}; política ${original[i].quantityPolicy ?? 'sin clasificar'} → ${item.quantityPolicy}; stock ${original[i].stockInput ?? original[i].stockAvailable} → ${item.stockAvailable}`).join("\n");
+          const priceReview = this.priceReviewRequired;
+          void this.confirmDialog.confirm({ title: priceReview ? "Los precios de esta venta cambiaron" : "Revisar borrador y precios vigentes",
+            description: `${differences}\nTotal guardado: ${this.restoredDraftTotal ?? this.total}. Total propuesto: S/ ${proposedTotal}.\nCantidades, descuentos y pagos no se modificarán.${priceReview ? '\nSi mantienes el carrito, no podrás cobrar hasta revisar los precios actualizados' : ''}`,
+            confirmText: priceReview ? "Aceptar nuevos precios" : "Aceptar propuesta", cancelText: priceReview ? "Mantener carrito" : "Conservar original", variant: "warning" }).then(accepted => {
+              if (!accepted) return;
+              if (fingerprint !== this.checkoutFingerprint()) { this.errorMessage = "El borrador cambió. Revalídalo nuevamente."; return; }
+              this.cart = proposed;
+              this.priceReviewRequired = false;
+              this.draftReviewMessage = "";
+              this.restoredDraftTotal = null;
+              this.draftValidationIssues = [];
+              this.errorMessage = "";
+              this.persistDraftState();
+              if (priceReview) queueMicrotask(() => this.checkoutLauncher?.nativeElement.focus());
+            }).finally(() => {
+              this.revalidating = false;
+              if (priceReview && this.needsRevalidation) {
+                // The review launcher is disabled until Angular renders this state change.
+                setTimeout(() => {
+                  const button = this.priceReviewButtonRef?.nativeElement;
+                  if (button?.isConnected && !this.revalidating && !this.isCheckoutModalOpen) button.focus();
+                });
+              }
+            });
+        } catch (error) {
+          this.errorMessage = error instanceof Error ? error.message : "No se pudo validar el borrador.";
+          this.revalidating = false;
+        }
+      },
+      error: error => { this.errorMessage = toHttpErrorMessage(error, "No se pudo revalidar el borrador."); this.revalidating = false; },
     });
   }
 
@@ -1698,61 +1932,20 @@ export class PosPageComponent implements OnInit, OnDestroy {
       return "Debes agregar al menos un item al carrito.";
     }
 
-    for (const item of this.cart) {
-      if (
-        !Number.isFinite(item.quantity) ||
-        !Number.isFinite(item.salePrice) ||
-        !Number.isFinite(this.lineSubtotal(item))
-      ) {
-        return `La cantidad o el importe de ${item.sku} no es válido.`;
+    try {
+      for (const item of this.cart) {
+        posLineCents(item);
+        const quantity = quantityHundredths(item.quantityInput ?? item.quantity, item.quantityPolicy);
+        if (quantity * 10n > stockMillis(item.stockInput ?? item.stockAvailable)) return `Stock insuficiente para ${item.sku}.`;
       }
-
-      if (normalizePosQuantity(item.quantity) <= 0) {
-        return `La cantidad de ${item.sku} debe ser mayor que 0.`;
-      }
-
-      if (!Number.isFinite(item.discountAmount)) {
-        return `El descuento de ${item.sku} no es un importe válido.`;
-      }
-
-      if (item.discountAmount < 0) {
-        return `El descuento de ${item.sku} debe ser >= 0.`;
-      }
-
-      if (item.discountAmount > this.lineSubtotal(item)) {
-        return `El descuento de ${item.sku} no puede superar el subtotal del producto.`;
-      }
-
-      if (
-        normalizePosQuantity(item.quantity) > this.availableIntegerStock(item)
-      ) {
-        return `Stock insuficiente para ${item.sku}.`;
-      }
-    }
-
-    if (
-      !Number.isFinite(this.total) ||
-      !Number.isFinite(this.paidTotal) ||
-      this.payments.some((payment) => !Number.isFinite(payment.amount))
-    ) {
-      return "Los importes de la venta y los pagos deben ser finitos.";
-    }
-
-    const validPayments = this.payments.filter(
-      (payment) => normalizePosNumber(payment.amount) > 0,
-    );
-
-    if (validPayments.length === 0) {
-      return "Debes registrar al menos un pago valido.";
-    }
-
-    if (calculatePosElectronicPaidTotal(this.payments) > this.total) {
-      return "Los pagos electrónicos no pueden superar el total de la venta. Reduce tarjeta o transferencia; el vuelto solo corresponde al efectivo.";
-    }
-
-    if (this.paidTotal < this.total) {
-      return "El total pagado debe ser mayor o igual al total de la venta.";
-    }
+      const total = posTotalCents(this.cart);
+      const paid = posPaidCents(this.payments);
+      const electronic = posPaidCents(this.payments, true);
+      if (!this.payments.some(payment => moneyCents(payment.amountInput ?? payment.amount) > 0n)) return "Debes registrar al menos un pago válido.";
+      if (electronic > total) return "Los pagos electrónicos no pueden superar el total de la venta. Reduce tarjeta o transferencia; el vuelto solo corresponde al efectivo.";
+      if (paid < total) return "El total pagado debe ser mayor o igual al total de la venta.";
+    } catch (error) { return error instanceof Error ? error.message : "Los importes no son válidos."; }
+    if (this.cart.some(item => item.requiresRevalidation)) return this.draftReviewMessage || "El borrador requiere revalidación de precios y stock.";
 
     if (this.receiptValidationError) {
       return this.receiptValidationError;

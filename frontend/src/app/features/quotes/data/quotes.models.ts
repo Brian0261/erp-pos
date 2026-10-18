@@ -87,6 +87,9 @@ export interface QuotePaymentRequest {
 }
 
 export interface ConvertQuoteToSaleRequest {
+  operationId: string;
+  confirmedTotal: number;
+  items: { quoteItemId: number; quantity: number; discountAmount: number; confirmedUnitPrice: number }[];
   warehouseId: number;
   comment?: string | null;
   payments: QuotePaymentRequest[];

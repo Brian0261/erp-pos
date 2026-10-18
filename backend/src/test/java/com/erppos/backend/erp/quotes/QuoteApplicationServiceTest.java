@@ -319,7 +319,8 @@ class QuoteApplicationServiceTest {
         return new ConvertQuoteToSaleCommand(
                 1L,
                 "convertir",
-                List.of(new QuotePaymentCommand(PaymentMethod.CASH, BigDecimal.valueOf(30), null))
+                List.of(new QuotePaymentCommand(PaymentMethod.CASH, BigDecimal.valueOf(30), null)),
+                java.util.UUID.randomUUID(), BigDecimal.valueOf(30), List.of()
         );
     }
 
@@ -432,13 +433,14 @@ class QuoteApplicationServiceTest {
     }
 
     static class InMemoryQuoteSalesPort implements QuoteSalesPort {
+        @Override public Optional<Long> replay(Quote quote, ConvertQuoteToSaleCommand command) { return Optional.empty(); }
         private long saleIdSeq = 1;
         private long callCount;
         private boolean failNoOpenCash;
         private boolean failStock;
 
         @Override
-        public Long createSaleFromQuote(Quote quote, Long warehouseId, List<QuotePaymentCommand> payments) {
+        public Long createSaleFromQuote(Quote quote, ConvertQuoteToSaleCommand command) {
             callCount++;
             if (failNoOpenCash) {
                 throw new QuoteBusinessRuleException("No open cash register");

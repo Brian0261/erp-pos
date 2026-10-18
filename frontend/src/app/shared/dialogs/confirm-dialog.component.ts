@@ -24,7 +24,7 @@ import { ConfirmDialogService } from "./confirm-dialog.service";
           [attr.role]="state.variant === 'warning' || state.variant === 'danger' ? 'alertdialog' : 'dialog'"
           aria-modal="true"
           aria-labelledby="confirmDialogTitle"
-          aria-describedby="confirmDialogDescription"
+          [attr.aria-describedby]="isExtendedDescription(state.description) ? null : 'confirmDialogDescription'"
           (click)="$event.stopPropagation()"
         >
           <header class="confirm-dialog__header">
@@ -33,12 +33,21 @@ import { ConfirmDialogService } from "./confirm-dialog.service";
               [class.ui-chip--danger]="state.variant === 'danger'"
               [class.ui-chip--info]="state.variant === 'info'"
             >{{ chipLabel(state.variant) }}</span>
-            <h2 id="confirmDialogTitle" class="confirm-dialog__title">{{ state.title }}</h2>
+            <h2 #dialogTitle id="confirmDialogTitle" class="confirm-dialog__title" tabindex="-1">{{ state.title }}</h2>
           </header>
 
-          <strong class="confirm-dialog__highlight" *ngIf="state.highlightText">{{ state.highlightText }}</strong>
-
-          <p id="confirmDialogDescription" class="confirm-dialog__description">{{ state.description }}</p>
+          <div class="confirm-dialog__body"
+            [attr.tabindex]="isExtendedDescription(state.description) ? 0 : null"
+            [attr.role]="isExtendedDescription(state.description) ? 'region' : null"
+            [attr.aria-label]="isExtendedDescription(state.description) ? 'Detalles de la confirmación' : null">
+            <strong class="confirm-dialog__highlight" *ngIf="state.highlightText">{{ state.highlightText }}</strong>
+            <ng-container *ngIf="isExtendedDescription(state.description); else simpleDescription">
+              <p class="confirm-dialog__description" *ngFor="let line of descriptionLines(state.description)">{{ line }}</p>
+            </ng-container>
+            <ng-template #simpleDescription>
+              <p id="confirmDialogDescription" class="confirm-dialog__description">{{ state.description }}</p>
+            </ng-template>
+          </div>
 
           <footer class="confirm-dialog__actions">
             <button
@@ -74,18 +83,45 @@ import { ConfirmDialogService } from "./confirm-dialog.service";
         display: grid;
         place-items: center;
         padding: var(--space-4);
+        overflow: hidden;
         background: rgba(16, 17, 20, 0.68);
         backdrop-filter: blur(4px);
       }
 
       .confirm-dialog {
         width: min(32rem, calc(100vw - 2rem));
-        display: grid;
+        max-width: 100%;
+        max-height: calc(100vh - 2 * var(--space-4));
+        max-height: calc(100dvh - 2 * var(--space-4));
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
         gap: var(--space-4);
         padding: var(--space-5);
         border-radius: calc(var(--radius-lg) + 0.15rem);
         border-color: var(--color-border-default);
         box-shadow: 0 24px 80px rgba(16, 17, 20, 0.34);
+        overflow: hidden;
+        overflow-wrap: anywhere;
+      }
+
+      .confirm-dialog__body {
+        min-height: 0;
+        min-width: 0;
+        overflow-y: auto;
+        overflow-x: hidden;
+        overscroll-behavior: contain;
+        padding: 0.2rem;
+        margin: -0.2rem;
+      }
+
+      .confirm-dialog__body > * + * {
+        margin-top: var(--space-2);
+      }
+
+      .confirm-dialog__header,
+      .confirm-dialog__actions {
+        flex-shrink: 0;
       }
 
       .confirm-dialog--warning {
@@ -165,6 +201,7 @@ export class ConfirmDialogComponent {
   }
 
   @ViewChild("dialogPanel") private dialogPanel?: ElementRef<HTMLElement>;
+  @ViewChild("dialogTitle") private dialogTitle?: ElementRef<HTMLElement>;
 
   readonly dialogService = inject(ConfirmDialogService);
   private cancelButtonRef?: ElementRef<HTMLButtonElement>;
@@ -195,6 +232,12 @@ export class ConfirmDialogComponent {
     const first = focusableElements[0];
     const last = focusableElements[focusableElements.length - 1];
     const activeElement = document.activeElement;
+
+    if (!focusableElements.includes(activeElement as HTMLElement)) {
+      event.preventDefault();
+      (event.shiftKey ? last : first).focus();
+      return;
+    }
 
     if (event.shiftKey && activeElement === first) {
       event.preventDefault();
@@ -230,8 +273,21 @@ export class ConfirmDialogComponent {
 
   private focusCancelButton(): void {
     queueMicrotask(() => {
-      this.cancelButtonRef?.nativeElement.focus();
+      const state = this.dialogService.currentState;
+      if (state && this.isExtendedDescription(state.description)) {
+        this.dialogTitle?.nativeElement.focus({ preventScroll: true });
+      } else {
+        this.cancelButtonRef?.nativeElement.focus();
+      }
     });
+  }
+
+  isExtendedDescription(description: string): boolean {
+    return description.length > 500 || this.descriptionLines(description).length > 8;
+  }
+
+  descriptionLines(description: string): string[] {
+    return description.split("\n").filter(line => line.trim().length > 0);
   }
 
   private getFocusableElements(): HTMLElement[] {

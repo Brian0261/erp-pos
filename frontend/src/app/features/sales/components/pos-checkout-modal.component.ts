@@ -36,7 +36,7 @@ import { PosTotalsSummaryComponent } from "./pos-totals-summary.component";
           <div class="checkout-modal__header-copy">
             <h2 id="checkout-modal-title">Cobrar venta</h2>
             <p class="checkout-modal__summary">
-              {{ cartItemsCountLabel }} · Total S/ {{ total | number: "1.2-2" }}
+              {{ cartItemsCountLabel }} · Total S/ {{ (total | number: "1.2-2") ?? '—' }}
             </p>
           </div>
           <button
@@ -80,6 +80,7 @@ import { PosTotalsSummaryComponent } from "./pos-totals-summary.component";
             <div class="checkout-modal__payment-column">
               <app-pos-checkout-payment-section
                 [payments]="payments"
+                [total]="total"
                 [paidTotal]="paidTotal"
                 [change]="change"
                 (addPayment)="addPayment.emit()"

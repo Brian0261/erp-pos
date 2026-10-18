@@ -10,6 +10,10 @@ import com.erppos.backend.erp.sales.application.usecase.VoidSaleCommand;
 import com.erppos.backend.erp.sales.domain.exception.SalesBusinessRuleException;
 import com.erppos.backend.erp.sales.domain.exception.SalesConflictException;
 import com.erppos.backend.erp.sales.domain.exception.SalesNotFoundException;
+import com.erppos.backend.erp.sales.domain.exception.PriceConfirmationRequiredException;
+import com.erppos.backend.erp.sales.domain.exception.SaleOperationConflictException;
+import com.erppos.backend.erp.sales.domain.port.CheckoutReadPort;
+import com.erppos.backend.erp.sales.domain.port.SaleOperationPort;
 import com.erppos.backend.erp.sales.domain.model.CashRegisterSession;
 import com.erppos.backend.erp.sales.domain.model.CashRegisterStatus;
 import com.erppos.backend.erp.sales.domain.model.PaymentMethod;
@@ -66,6 +70,8 @@ public class SalesApplicationService implements SalesUseCase {
     private final InventorySalesPort inventorySalesPort;
     private final SalesBillingSummaryReadPort salesBillingSummaryReadPort;
     private final AuditUserProvider auditUserProvider;
+    private final CheckoutReadPort checkoutReadPort;
+    private final SaleOperationPort saleOperationPort;
 
     public SalesApplicationService(
             SaleRepositoryPort saleRepositoryPort,
@@ -74,7 +80,9 @@ public class SalesApplicationService implements SalesUseCase {
             WarehouseReadPort warehouseReadPort,
             InventorySalesPort inventorySalesPort,
             SalesBillingSummaryReadPort salesBillingSummaryReadPort,
-            AuditUserProvider auditUserProvider
+            AuditUserProvider auditUserProvider,
+            CheckoutReadPort checkoutReadPort,
+            SaleOperationPort saleOperationPort
     ) {
         this.saleRepositoryPort = saleRepositoryPort;
         this.cashRegisterRepositoryPort = cashRegisterRepositoryPort;
@@ -83,11 +91,18 @@ public class SalesApplicationService implements SalesUseCase {
         this.inventorySalesPort = inventorySalesPort;
         this.salesBillingSummaryReadPort = salesBillingSummaryReadPort;
         this.auditUserProvider = auditUserProvider;
+        this.checkoutReadPort = checkoutReadPort;
+        this.saleOperationPort = saleOperationPort;
     }
 
     @Override
     @Transactional
     public Sale create(CreateSaleCommand command) {
+        String requestHash = SaleRequestIdentity.hash(command);
+        UUID actorId = auditUserProvider.currentUserId();
+        saleOperationPort.lock(actorId, command.operationId());
+        java.util.Optional<Sale> replay = completedOperation(actorId, command, requestHash);
+        if (replay.isPresent()) return replay.get();
         CashRegisterSession cashSession = cashRegisterRepositoryPort.findOpenByUserId(auditUserProvider.currentUserId())
                 .orElseThrow(() -> new SalesConflictException("Current user does not have an OPEN cash register"));
 
@@ -112,13 +127,18 @@ public class SalesApplicationService implements SalesUseCase {
         BigDecimal discountTotal = ZERO;
 
         Map<Long, Boolean> seenProducts = new HashMap<>();
-        for (CreateSaleItemCommand itemCommand : command.items()) {
+        List<Long> productIds = command.items().stream().map(CreateSaleItemCommand::productId).distinct().sorted().toList();
+        Map<Long, PosProductSnapshot> products = checkoutReadPort.lockCatalog(productIds).stream()
+                .collect(java.util.stream.Collectors.toMap(PosProductSnapshot::id, p -> p));
+        checkoutReadPort.lockStock(productIds, command.warehouseId());
+        List<PriceConfirmationRequiredException.PriceChange> priceChanges = new ArrayList<>();
+        for (CreateSaleItemCommand itemCommand : command.items().stream().sorted(java.util.Comparator.comparing(CreateSaleItemCommand::productId)).toList()) {
             if (seenProducts.put(itemCommand.productId(), Boolean.TRUE) != null) {
                 throw new SalesBusinessRuleException("Duplicated product in sale items");
             }
 
-            PosProductSnapshot product = catalogReadPort.findById(itemCommand.productId())
-                    .orElseThrow(() -> new SalesNotFoundException("Product not found"));
+            PosProductSnapshot product = products.get(itemCommand.productId());
+            if (product == null) throw new SalesNotFoundException("Product not found");
             if (!product.active()) {
                 throw new SalesBusinessRuleException("Product is inactive");
             }
@@ -126,9 +146,17 @@ public class SalesApplicationService implements SalesUseCase {
             if (product.quantityPolicy() == null) throw new SalesBusinessRuleException("Product quantity policy is missing");
             BigDecimal quantity = product.quantityPolicy().validateNew(itemCommand.quantity(), SalesBusinessRuleException::new);
 
-            CommercialMoneyPolicy.Line line = CommercialMoneyPolicy.line(product.salePrice(), quantity,
-                    itemCommand.discountAmount(), SalesBusinessRuleException::new);
-            BigDecimal unitPrice = line.unitPrice();
+            BigDecimal confirmedPrice = CommercialMoneyPolicy.nonNegative(itemCommand.confirmedUnitPrice(), "confirmedUnitPrice", SalesBusinessRuleException::new);
+            BigDecimal unitPrice = CommercialMoneyPolicy.nonNegative(product.salePrice(), "unitPrice", SalesBusinessRuleException::new);
+            if (confirmedPrice.compareTo(unitPrice) != 0) priceChanges.add(new PriceConfirmationRequiredException.PriceChange(product.id(), confirmedPrice, unitPrice));
+            CommercialMoneyPolicy.Line line;
+            try {
+                line = CommercialMoneyPolicy.line(unitPrice, quantity, itemCommand.discountAmount(), SalesBusinessRuleException::new);
+            } catch (SalesBusinessRuleException ex) {
+                if (confirmedPrice.compareTo(unitPrice) != 0)
+                    throw new PriceConfirmationRequiredException(command.confirmedTotal(), null, priceChanges);
+                throw ex;
+            }
             BigDecimal itemSubtotal = line.gross();
             BigDecimal itemDiscount = line.discount();
 
@@ -154,6 +182,9 @@ public class SalesApplicationService implements SalesUseCase {
         if (total.compareTo(ZERO) < 0) {
             throw new SalesBusinessRuleException("Total cannot be negative");
         }
+        BigDecimal confirmedTotal = CommercialMoneyPolicy.nonNegative(command.confirmedTotal(), "confirmedTotal", SalesBusinessRuleException::new);
+        if (!priceChanges.isEmpty() || confirmedTotal.compareTo(total) != 0)
+            throw new PriceConfirmationRequiredException(confirmedTotal, total, priceChanges);
 
         List<SalePayment> payments = new ArrayList<>();
         BigDecimal paid = ZERO;
@@ -225,7 +256,25 @@ public class SalesApplicationService implements SalesUseCase {
             );
         }
 
+        saleOperationPort.complete(actorId, command.operationId(), requestHash, saved.id());
         return saved;
+    }
+
+    @Override
+    @Transactional
+    public java.util.Optional<Sale> replay(CreateSaleCommand command) {
+        String hash = SaleRequestIdentity.hash(command);
+        UUID actor = auditUserProvider.currentUserId();
+        saleOperationPort.lock(actor, command.operationId());
+        return completedOperation(actor, command, hash);
+    }
+
+    private java.util.Optional<Sale> completedOperation(UUID actor, CreateSaleCommand command, String hash) {
+        return saleOperationPort.find(actor, command.operationId()).map(operation -> {
+            if (!operation.requestHash().equals(hash)) throw new SaleOperationConflictException("OPERATION_CONTENT_MISMATCH", "operationId was already used with different content");
+            if (operation.saleId() == null) throw new SaleOperationConflictException("OPERATION_RESULT_UNAVAILABLE", "Operation result was removed; this operationId cannot be reused");
+            return saleRepositoryPort.findById(operation.saleId()).orElseThrow(() -> new SaleOperationConflictException("OPERATION_RESULT_UNAVAILABLE", "Operation result unavailable"));
+        });
     }
 
     @Override
@@ -378,7 +427,7 @@ public class SalesApplicationService implements SalesUseCase {
     }
 
     private String generateSaleNumber() {
-        return "S-" + Instant.now().toEpochMilli();
+        return "S-" + UUID.randomUUID();
     }
 
     private String trimToNull(String value) {

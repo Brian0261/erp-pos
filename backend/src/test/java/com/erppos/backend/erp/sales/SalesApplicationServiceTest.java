@@ -79,7 +79,7 @@ class SalesApplicationServiceTest {
 
         auditUserProvider = new TestAuditUserProvider();
         cashService = new CashRegisterApplicationService(cashRepo, auditUserProvider);
-        salesService = new SalesApplicationService(saleRepo, cashRepo, catalogReadPort, warehouseReadPort, inventoryPort, salesBillingSummaryReadPort, auditUserProvider);
+        salesService = new SalesApplicationService(saleRepo, cashRepo, catalogReadPort, warehouseReadPort, inventoryPort, salesBillingSummaryReadPort, auditUserProvider, catalogReadPort, new InMemoryOperations());
 
         warehouseReadPort.activeWarehouses.put(1L, true);
         catalogReadPort.products.put(1L, new PosProductSnapshot(1L, "SKU-1", "EAN-1", "Producto 1", BigDecimal.valueOf(5), QuantityPolicy.WHOLE, true));
@@ -164,7 +164,7 @@ class SalesApplicationServiceTest {
     @Test
     void shouldRejectSaleWithoutItems() {
         cashService.open(new OpenCashRegisterCommand(BigDecimal.ZERO, null));
-        CreateSaleCommand command = new CreateSaleCommand(1L, List.of(), validPayments());
+        CreateSaleCommand command = confirmedSale(1L, List.of(), validPayments());
         assertThrows(SalesBusinessRuleException.class, () -> salesService.create(command));
     }
 
@@ -172,9 +172,9 @@ class SalesApplicationServiceTest {
     void shouldRejectSaleWithInsufficientStock() {
         cashService.open(new OpenCashRegisterCommand(BigDecimal.ZERO, null));
         inventoryPort.stockByProductWarehouse.put(key(1L, 1L), BigDecimal.ONE);
-        CreateSaleCommand command = new CreateSaleCommand(
+        CreateSaleCommand command = confirmedSale(
                 1L,
-                List.of(new CreateSaleItemCommand(1L, BigDecimal.TEN, BigDecimal.ZERO)),
+                List.of(confirmedItem(1L, BigDecimal.TEN, BigDecimal.ZERO)),
                 validPayments()
         );
         assertThrows(SalesConflictException.class, () -> salesService.create(command));
@@ -197,9 +197,9 @@ class SalesApplicationServiceTest {
     @Test
     void shouldCalculateChangeForCashPayment() {
         cashService.open(new OpenCashRegisterCommand(BigDecimal.ZERO, null));
-        Sale sale = salesService.create(new CreateSaleCommand(
+        Sale sale = salesService.create(confirmedSale(
                 1L,
-                List.of(new CreateSaleItemCommand(1L, BigDecimal.valueOf(2), BigDecimal.ZERO)),
+                List.of(confirmedItem(1L, BigDecimal.valueOf(2), BigDecimal.ZERO)),
                 List.of(new CreateSalePaymentCommand(PaymentMethod.CASH, BigDecimal.valueOf(15), null))
         ));
         assertEquals(0, sale.changeAmount().compareTo(BigDecimal.valueOf(5)));
@@ -208,9 +208,9 @@ class SalesApplicationServiceTest {
     @Test
     void shouldFailWhenPaymentIsIncomplete() {
         cashService.open(new OpenCashRegisterCommand(BigDecimal.ZERO, null));
-        CreateSaleCommand command = new CreateSaleCommand(
+        CreateSaleCommand command = confirmedSale(
                 1L,
-                List.of(new CreateSaleItemCommand(1L, BigDecimal.valueOf(2), BigDecimal.ZERO)),
+                List.of(confirmedItem(1L, BigDecimal.valueOf(2), BigDecimal.ZERO)),
                 List.of(new CreateSalePaymentCommand(PaymentMethod.CASH, BigDecimal.valueOf(5), null))
         );
         assertThrows(SalesBusinessRuleException.class, () -> salesService.create(command));
@@ -238,8 +238,8 @@ class SalesApplicationServiceTest {
                                                  boolean accepted, int expectedChange) {
         cashService.open(new OpenCashRegisterCommand(BigDecimal.ZERO, null));
         catalogReadPort.products.put(1L, new PosProductSnapshot(1L, "QA-MONEY", null, "Synthetic", BigDecimal.valueOf(100), QuantityPolicy.WHOLE, true));
-        CreateSaleCommand command = new CreateSaleCommand(1L,
-                List.of(new CreateSaleItemCommand(1L, BigDecimal.ONE, BigDecimal.ZERO)), payments);
+        CreateSaleCommand command = confirmedSale(1L,
+                List.of(confirmedItem(1L, BigDecimal.ONE, BigDecimal.ZERO)), payments);
         if (!accepted) {
             assertThrows(SalesBusinessRuleException.class, () -> salesService.create(command));
             assertEquals(0, saleRepo.saveCalls, "Invalid payments must not invoke sale/payment persistence");
@@ -273,8 +273,8 @@ class SalesApplicationServiceTest {
     void shouldCloseCashUsingReceivedCashMinusChange(int opening, List<CreateSalePaymentCommand> payments, int expected) {
         CashRegisterSession session = cashService.open(new OpenCashRegisterCommand(BigDecimal.valueOf(opening), null));
         catalogReadPort.products.put(1L, new PosProductSnapshot(1L, "QA-MONEY", null, "Synthetic", BigDecimal.valueOf(100), QuantityPolicy.WHOLE, true));
-        salesService.create(new CreateSaleCommand(1L,
-                List.of(new CreateSaleItemCommand(1L, BigDecimal.ONE, BigDecimal.ZERO)), payments));
+        salesService.create(confirmedSale(1L,
+                List.of(confirmedItem(1L, BigDecimal.ONE, BigDecimal.ZERO)), payments));
         CashRegisterSession closed = cashService.close(session.id(), new CloseCashRegisterCommand(BigDecimal.valueOf(expected), null));
         assertEquals(0, BigDecimal.valueOf(expected).compareTo(closed.expectedCashAmount()));
         assertEquals(0, closed.differenceAmount().compareTo(BigDecimal.ZERO));
@@ -436,10 +436,26 @@ class SalesApplicationServiceTest {
         assertFalse(preAuthorize.value().contains("ALMACENERO"));
     }
 
+
+    private CreateSaleItemCommand confirmedItem(Long id, BigDecimal quantity, BigDecimal discount) {
+        return new CreateSaleItemCommand(id, quantity, discount, catalogReadPort.products.get(id).salePrice());
+    }
+    private CreateSaleCommand confirmedSale(Long warehouse, List<CreateSaleItemCommand> items, List<CreateSalePaymentCommand> payments) {
+        BigDecimal total = items.stream().map(i -> i.confirmedUnitPrice().multiply(i.quantity()).setScale(2, java.math.RoundingMode.HALF_UP)
+                .subtract(i.discountAmount())).reduce(BigDecimal.ZERO, BigDecimal::add);
+        return new CreateSaleCommand(warehouse, items, payments, UUID.randomUUID(), total, "POS");
+    }
+    static class InMemoryOperations implements com.erppos.backend.erp.sales.domain.port.SaleOperationPort {
+        private final Map<String, CompletedOperation> values = new HashMap<>();
+        @Override public void lock(UUID actor, UUID operation) {}
+        @Override public Optional<CompletedOperation> find(UUID actor, UUID operation) { return Optional.ofNullable(values.get(actor + ":" + operation)); }
+        @Override public void complete(UUID actor, UUID operation, String hash, Long sale) { values.put(actor + ":" + operation, new CompletedOperation(hash, sale)); }
+    }
+
     private CreateSaleCommand validSaleCommand() {
-        return new CreateSaleCommand(
+        return confirmedSale(
                 1L,
-                List.of(new CreateSaleItemCommand(1L, BigDecimal.valueOf(2), BigDecimal.ZERO)),
+                List.of(confirmedItem(1L, BigDecimal.valueOf(2), BigDecimal.ZERO)),
                 validPayments()
         );
     }
@@ -638,7 +654,10 @@ class SalesApplicationServiceTest {
         }
     }
 
-    static class InMemoryCatalogReadPort implements CatalogReadPort {
+    static class InMemoryCatalogReadPort implements CatalogReadPort, com.erppos.backend.erp.sales.domain.port.CheckoutReadPort {
+        @Override public List<PosProductSnapshot> lockCatalog(List<Long> ids) { return ids.stream().map(products::get).filter(Objects::nonNull).toList(); }
+        @Override public List<com.erppos.backend.erp.sales.domain.model.PosProductView> snapshot(List<Long> ids, Long warehouse) { return List.of(); }
+        @Override public void lockStock(List<Long> ids, Long warehouseId) {}
         private final Map<Long, PosProductSnapshot> products = new HashMap<>();
 
         @Override

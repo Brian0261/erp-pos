@@ -104,7 +104,7 @@ public class QuoteApplicationService implements QuoteUseCase {
     @Override
     @Transactional
     public Quote update(Long id, UpdateQuoteCommand command) {
-        Quote current = getById(id);
+        Quote current = lockedQuote(id);
         if (current.status() != QuoteStatus.DRAFT && current.status() != QuoteStatus.SENT) {
             throw new QuoteConflictException("Only DRAFT or SENT quotes can be edited");
         }
@@ -141,7 +141,7 @@ public class QuoteApplicationService implements QuoteUseCase {
     @Override
     @Transactional
     public Quote send(Long id, String comment) {
-        Quote current = getById(id);
+        Quote current = lockedQuote(id);
         if (current.status() != QuoteStatus.DRAFT) {
             throw new QuoteConflictException("Only DRAFT quotes can be sent");
         }
@@ -176,7 +176,7 @@ public class QuoteApplicationService implements QuoteUseCase {
     @Override
     @Transactional
     public Quote cancel(Long id, String comment) {
-        Quote current = getById(id);
+        Quote current = lockedQuote(id);
         if (current.status() != QuoteStatus.DRAFT && current.status() != QuoteStatus.SENT) {
             throw new QuoteConflictException("Only DRAFT or SENT quotes can be cancelled");
         }
@@ -217,7 +217,6 @@ public class QuoteApplicationService implements QuoteUseCase {
         Quote current = quoteRepositoryPort.findByIdForUpdate(id)
                 .orElseThrow(() -> new QuoteNotFoundException("Quote not found"));
 
-        assertQuoteCanBeConverted(current);
         if (command.warehouseId() == null) {
             throw new QuoteBusinessRuleException("warehouseId is required");
         }
@@ -225,8 +224,16 @@ public class QuoteApplicationService implements QuoteUseCase {
             throw new QuoteBusinessRuleException("At least one payment is required");
         }
 
+        java.util.Optional<Long> replay = quoteSalesPort.replay(current, command);
+        if (replay.isPresent()) {
+            if (current.status() != QuoteStatus.CONVERTED || !replay.get().equals(current.convertedSaleId()))
+                throw new QuoteConflictException("Conversion operation result does not match this quote");
+            return current;
+        }
+        assertQuoteCanBeConverted(current);
+
         validateConvertibleAmounts(current);
-        Long saleId = quoteSalesPort.createSaleFromQuote(current, command.warehouseId(), command.payments());
+        Long saleId = quoteSalesPort.createSaleFromQuote(current, command);
 
         Quote converted = new Quote(
                 current.id(),
@@ -275,6 +282,11 @@ public class QuoteApplicationService implements QuoteUseCase {
         if (quote.status() != QuoteStatus.DRAFT && quote.status() != QuoteStatus.SENT) {
             throw new QuoteConflictException("Only DRAFT or SENT quotes can be converted");
         }
+    }
+
+    private Quote lockedQuote(Long id) {
+        return asExpiredIfNeeded(quoteRepositoryPort.findByIdForUpdate(id)
+                .orElseThrow(() -> new QuoteNotFoundException("Quote not found")));
     }
 
     private void validateConvertibleAmounts(Quote quote) {

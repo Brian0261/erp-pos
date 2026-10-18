@@ -36,6 +36,12 @@ public class PosController {
         return ResponseEntity.ok(posUseCase.search(query, warehouseId).stream().map(this::toResponse).toList());
     }
 
+    @GetMapping("/snapshot")
+    @PreAuthorize("hasAnyRole('CAJERO','ADMIN','SUPERVISOR')")
+    public ResponseEntity<List<PosProductResponse>> snapshot(@RequestParam List<Long> productIds, @RequestParam Long warehouseId) {
+        return ResponseEntity.ok(posUseCase.snapshot(productIds, warehouseId).stream().map(this::toResponse).toList());
+    }
+
     private PosProductResponse toResponse(PosProductView view) {
         return new PosProductResponse(
                 view.productId(),

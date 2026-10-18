@@ -611,6 +611,8 @@ class ProductCleanupPreviewIntegrationTest extends AbstractHttpIntegrationTest {
         payment.put("amount", paymentAmount);
         payment.put("reference", "PREVIEW-QA");
 
+        confirmSalePayload(payload);
+
         MvcResult result = mockMvc.perform(post("/api/v1/sales")
                         .header(HttpHeaders.AUTHORIZATION, bearer(token))
                         .contentType(MediaType.APPLICATION_JSON)

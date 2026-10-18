@@ -66,6 +66,16 @@ public class GlobalExceptionHandler {
         this.errorResponseFactory = errorResponseFactory;
     }
 
+    @ExceptionHandler(com.erppos.backend.erp.sales.domain.exception.PriceConfirmationRequiredException.class)
+    public ResponseEntity<com.erppos.backend.erp.sales.adapter.dto.PriceConfirmationErrorResponse> handlePriceConfirmation(
+            com.erppos.backend.erp.sales.domain.exception.PriceConfirmationRequiredException ex, HttpServletRequest request) {
+        ApiError base = errorResponseFactory.build(request, HttpStatus.CONFLICT, ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT).header(HttpHeaders.CACHE_CONTROL, "no-store")
+                .body(new com.erppos.backend.erp.sales.adapter.dto.PriceConfirmationErrorResponse(base.timestamp(), base.status(),
+                        base.error(), base.message(), base.path(), base.traceId(), "PRICE_CONFIRMATION_REQUIRED",
+                        ex.confirmedTotal(), ex.proposedTotal(), ex.changes()));
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiError> handleValidation(MethodArgumentNotValidException ex, HttpServletRequest request) {
         String message = ex.getBindingResult()
@@ -74,6 +84,25 @@ public class GlobalExceptionHandler {
                 .map(this::formatFieldError)
                 .collect(Collectors.joining("; "));
         return ResponseEntity.badRequest().body(errorResponseFactory.build(request, HttpStatus.BAD_REQUEST, message));
+    }
+
+    @ExceptionHandler(com.erppos.backend.erp.sales.domain.exception.SaleOperationConflictException.class)
+    public ResponseEntity<java.util.Map<String, Object>> handleSaleOperationConflict(
+            com.erppos.backend.erp.sales.domain.exception.SaleOperationConflictException ex, HttpServletRequest request) {
+        ApiError base = errorResponseFactory.build(request, HttpStatus.CONFLICT, ex.getMessage());
+        java.util.Map<String, Object> body = new java.util.LinkedHashMap<>();
+        body.put("timestamp", base.timestamp()); body.put("status", base.status()); body.put("error", base.error());
+        body.put("message", base.message()); body.put("path", base.path()); body.put("traceId", base.traceId()); body.put("code", ex.code());
+        return ResponseEntity.status(HttpStatus.CONFLICT).header(HttpHeaders.CACHE_CONTROL, "no-store").body(body);
+    }
+
+    @ExceptionHandler(org.springframework.http.converter.HttpMessageNotReadableException.class)
+    public ResponseEntity<?> handleCheckoutPayload(org.springframework.http.converter.HttpMessageNotReadableException ex, HttpServletRequest request) {
+        String path = request.getRequestURI();
+        if (path.equals("/api/v1/sales") || path.matches("/api/v1/quotes/[^/]+/convert-to-sale")) {
+            return ResponseEntity.badRequest().body(errorResponseFactory.build(request, HttpStatus.BAD_REQUEST, "Invalid checkout request format"));
+        }
+        return handleGeneric(ex, request);
     }
 
     @ExceptionHandler(ConstraintViolationException.class)

@@ -1,4 +1,10 @@
 import { CommonModule } from "@angular/common";
+import { HttpErrorResponse } from "@angular/common/http";
+import { PosService } from "../sales/data/pos.service";
+import { PosProductResponse } from "../sales/data/sales.models";
+import { immutableRequest } from "../sales/utils/checkout-confirmation";
+import { posLineCents, posPaidCents, posTotalCents } from "../sales/utils/pos-calculations";
+import { decimalText, moneyCents, quantityHundredths, scaledNumber, stockMillis } from "../sales/utils/pos-decimal";
 import { Component, OnInit } from "@angular/core";
 import { FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
 import { ActivatedRoute, RouterLink } from "@angular/router";
@@ -127,6 +133,7 @@ interface PaymentLine {
             <span class="label">Total pagado</span>
             <strong>{{ formatCurrency(paidTotal) }}</strong>
           </p>
+          <p class="summary-row"><span class="label">Total propuesto de venta</span><strong>{{ proposalTotal === null ? 'Revalidación pendiente' : formatCurrency(proposalTotal) }}</strong></p>
           <p class="summary-row">
             <span class="label">Pendiente</span>
             <strong [class.amount-pending]="pendingAmount > 0">{{ formatCurrency(pendingAmount) }}</strong>
@@ -181,7 +188,7 @@ interface PaymentLine {
                   </div>
                 </td>
                 <td class="cell--numeric">{{ item.quantity }}</td>
-                <td class="cell--numeric">{{ formatCurrency(item.unitPrice) }}</td>
+                <td class="cell--numeric">{{ formatCurrency(item.unitPrice) }}<small *ngIf="proposalPrice(item.productId) !== null"> · Vigente {{ formatCurrency(proposalPrice(item.productId)) }}</small></td>
                 <td class="cell--numeric">{{ formatCurrency(item.discountAmount) }}</td>
                 <td class="cell--numeric">{{ formatCurrency(item.lineTotal) }}</td>
               </tr>
@@ -199,6 +206,9 @@ interface PaymentLine {
         <header class="section-head">
           <h2>Datos de conversion</h2>
         </header>
+        <p class="ui-alert ui-alert--info">Los importes históricos no cambian. Revisa los precios vigentes y confirma el total de la venta resultante.</p>
+        <button type="button" class="ui-button ui-button--secondary" [disabled]="submitting || revalidating || !!pendingRequest" (click)="refreshProposal()">Revalidar precios y disponibilidad</button>
+        <p *ngIf="pendingRequest" class="ui-alert ui-alert--warning">Resultado pendiente: solo se permite recuperar la misma operación.</p>
 
         <form [formGroup]="form" class="form-grid form-grid--two">
           <label class="field">
@@ -655,6 +665,11 @@ export class QuoteConvertPageComponent implements OnInit {
   ];
 
   submitting = false;
+  revalidating = false;
+  proposalTotal: number | null = null;
+  pendingRequest: ConvertQuoteToSaleRequest | null = null;
+  private proposalProducts: PosProductResponse[] = [];
+  private confirming = false;
   errorMessage = "";
   successMessage = "";
 
@@ -666,6 +681,7 @@ export class QuoteConvertPageComponent implements OnInit {
     private readonly warehouseService: WarehouseService,
     private readonly cashRegisterService: CashRegisterService,
     private readonly confirmDialogService: ConfirmDialogService,
+    private readonly posService: PosService,
   ) {}
 
   ngOnInit(): void {
@@ -676,28 +692,41 @@ export class QuoteConvertPageComponent implements OnInit {
     }
 
     this.quoteId = id;
+    try {
+      const saved = sessionStorage.getItem(this.pendingKey);
+      if (saved) {
+        this.pendingRequest = immutableRequest(JSON.parse(saved));
+        this.form.patchValue({ warehouseId: this.pendingRequest!.warehouseId, comment: this.pendingRequest!.comment ?? "" }, { emitEvent: false });
+        this.payments = this.pendingRequest!.payments.map(p => ({ paymentMethod: p.paymentMethod, amount: decimalText(moneyCents(p.amount)), reference: p.reference ?? "" }));
+        this.form.disable({ emitEvent: false });
+      }
+    }
+    catch { this.errorMessage = "No se pudo recuperar la operación pendiente."; }
+    this.form.controls.warehouseId.valueChanges.subscribe(() => { this.proposalTotal = null; this.proposalProducts = []; });
     this.loadData();
   }
 
   get paidTotal(): number {
-    return this.payments.reduce(
-      (sum, payment) => sum + this.normalizeNumber(payment.amount),
-      0,
-    );
+    try { return scaledNumber(posPaidCents(this.payments.map(p => ({ ...p, amount: Number(p.amount), amountInput: p.amount })))); }
+    catch { return NaN; }
   }
 
   get pendingAmount(): number {
     if (!this.quote) {
       return 0;
     }
-    return Math.max(this.normalizeNumber(this.quote.totalAmount) - this.paidTotal, 0);
+    if (this.proposalTotal === null || !Number.isFinite(this.paidTotal)) return NaN;
+    const delta = moneyCents(this.proposalTotal) - moneyCents(this.paidTotal);
+    return scaledNumber(delta > 0n ? delta : 0n);
   }
 
   addPaymentLine(): void {
+    if (this.pendingRequest) return;
     this.payments.push({ paymentMethod: "CASH", amount: "", reference: "" });
   }
 
   removePaymentLine(index: number): void {
+    if (this.pendingRequest) return;
     if (this.payments.length === 1) {
       return;
     }
@@ -705,6 +734,7 @@ export class QuoteConvertPageComponent implements OnInit {
   }
 
   setPaymentMethod(index: number, value: string): void {
+    if (this.pendingRequest) return;
     const payment = this.payments[index];
     if (!payment) {
       return;
@@ -716,33 +746,24 @@ export class QuoteConvertPageComponent implements OnInit {
   }
 
   setPaymentAmount(index: number, value: string): void {
+    if (this.pendingRequest) return;
     const payment = this.payments[index];
     if (!payment) {
       return;
     }
 
-    payment.amount = this.sanitizeDecimalValue(value, 2, true);
+    payment.amount = value;
   }
 
   normalizePaymentAmountOnBlur(index: number): void {
+    if (this.pendingRequest) return;
     const payment = this.payments[index];
     if (!payment) {
       return;
     }
 
-    const normalized = this.sanitizeDecimalValue(String(payment.amount ?? ""), 2, false);
-    if (!normalized) {
-      payment.amount = "";
-      return;
-    }
-
-    const numeric = Number(normalized);
-    if (!Number.isFinite(numeric) || numeric < 0) {
-      payment.amount = "";
-      return;
-    }
-
-    payment.amount = String(numeric);
+    try { payment.amount = decimalText(moneyCents(payment.amount)); }
+    catch { this.errorMessage = "El pago debe tener precisión monetaria exacta; conserva y corrige el valor ingresado."; }
   }
 
   blockInvalidDecimalKeys(event: KeyboardEvent): void {
@@ -753,6 +774,7 @@ export class QuoteConvertPageComponent implements OnInit {
   }
 
   setPaymentReference(index: number, value: string): void {
+    if (this.pendingRequest) return;
     const payment = this.payments[index];
     if (!payment) {
       return;
@@ -773,6 +795,7 @@ export class QuoteConvertPageComponent implements OnInit {
   }
 
   canAttemptConversion(): boolean {
+    if (this.pendingRequest) return true;
     if (!this.quote) {
       return false;
     }
@@ -881,16 +904,27 @@ export class QuoteConvertPageComponent implements OnInit {
   }
 
   formatCurrency(value: unknown): string {
+    if (value === null || value === undefined || !Number.isFinite(Number(value))) return "—";
     const amount = this.normalizeNumber(value);
     return new Intl.NumberFormat("es-PE", {
       style: "currency",
       currency: "PEN",
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
-    }).format(Number.isFinite(amount) ? amount : 0);
+    }).format(amount);
   }
 
   private async convertInternal(): Promise<void> {
+    if (this.submitting || this.confirming || this.revalidating) return;
+    if (this.pendingRequest) {
+      this.confirming = true;
+      try {
+        if (await this.confirmDialogService.confirm({ title: "Recuperar conversión pendiente",
+          description: `Se reintentará la misma operación ${this.pendingRequest.operationId} sin crear otra venta.`,
+          confirmText: "Recuperar resultado", cancelText: "Cancelar", variant: "warning" })) this.submitConversion(this.pendingRequest);
+      } finally { this.confirming = false; }
+      return;
+    }
     if (!this.quote) {
       this.errorMessage = "Cotizacion no disponible.";
       return;
@@ -902,42 +936,57 @@ export class QuoteConvertPageComponent implements OnInit {
       return;
     }
 
+    const payload = immutableRequest(this.buildConversionRequest());
+    const fingerprint = this.conversionFingerprint();
+    this.confirming = true;
     const confirmed = await this.confirmDialogService.confirm({
       title: "Convertir cotizacion",
       description: this.buildConvertConfirmationMessage(this.quote),
       confirmText: "Convertir",
       cancelText: "Cancelar",
       variant: "warning",
-    });
+    }).catch(() => false).finally(() => this.confirming = false);
     if (!confirmed) {
       return;
     }
+    if (fingerprint !== this.conversionFingerprint()) { this.errorMessage = "La cotización, propuesta o pagos cambiaron. Revisa y confirma nuevamente."; return; }
 
     this.errorMessage = "";
     this.successMessage = "";
 
-    const warehouseId = Number(this.form.value.warehouseId);
-    const comment = this.normalizeOptional(this.form.value.comment);
-    const payments = this.payments
-      .map((payment) => this.mapPayment(payment))
-      .filter((payment) => payment !== null) as QuotePaymentRequest[];
+    this.submitConversion(payload);
+  }
 
-    const payload: ConvertQuoteToSaleRequest = {
-      warehouseId,
-      comment,
-      payments,
-    };
-
+  private submitConversion(payload: ConvertQuoteToSaleRequest): void {
+    if (!this.quote) return;
+    this.pendingRequest = payload;
+    try { sessionStorage.setItem(this.pendingKey, JSON.stringify(payload)); }
+    catch { this.errorMessage = "No se pudo conservar la identidad del cobro. No se envió la conversión."; this.pendingRequest = null; return; }
+    this.form.disable({ emitEvent: false });
     this.submitting = true;
 
     this.quoteService.convertToSale(this.quote.id, payload).subscribe({
       next: (convertedQuote) => {
+        this.pendingRequest = null;
+        sessionStorage.removeItem(this.pendingKey);
         this.submitting = false;
         this.quote = convertedQuote;
         this.successMessage = `Cotizacion convertida correctamente a venta #${convertedQuote.convertedSaleId}.`;
       },
       error: (error: unknown) => {
         this.submitting = false;
+        const response = error as HttpErrorResponse;
+        if (response.status >= 400 && response.status < 500 && response.status !== 408
+            && !["OPERATION_CONTENT_MISMATCH", "OPERATION_RESULT_UNAVAILABLE"].includes(response.error?.code)) {
+          this.pendingRequest = null; sessionStorage.removeItem(this.pendingKey); this.form.enable({ emitEvent: false });
+        }
+        if (response.status === 409 && response.error?.code === "PRICE_CONFIRMATION_REQUIRED") {
+          this.proposalTotal = null; this.proposalProducts = [];
+          this.errorMessage = `Total confirmado ${response.error.confirmedTotal}; total vigente ${response.error.proposedTotal ?? 'requiere revisar descuentos'}. Revalida y confirma otra vez. ` +
+            response.error.changes.map((c: { productId: number; confirmedUnitPrice: number; currentUnitPrice: number }) =>
+              `Producto #${c.productId}: ${c.confirmedUnitPrice} → ${c.currentUnitPrice}`).join("; ");
+          return;
+        }
         this.errorMessage = toHttpErrorMessage(
           error,
           "No se pudo convertir la cotizacion.",
@@ -966,7 +1015,7 @@ export class QuoteConvertPageComponent implements OnInit {
         this.warehouses = warehouses.filter((warehouse) => warehouse.active);
         this.currentCashSession = cashSession;
 
-        if (!this.isConvertible(quote)) {
+        if (!this.isConvertible(quote) && !this.pendingRequest) {
           this.errorMessage =
             "La cotizacion no se puede convertir porque esta CONVERTED, CANCELLED o EXPIRED.";
         }
@@ -998,15 +1047,21 @@ export class QuoteConvertPageComponent implements OnInit {
       return "warehouseId es obligatorio.";
     }
 
-    const validPayments = this.payments
+    if (this.proposalTotal === null) return "Revalida los precios y la disponibilidad antes de convertir.";
+    let validPayments: QuotePaymentRequest[];
+    try {
+      validPayments = this.payments
       .map((payment) => this.mapPayment(payment))
       .filter((payment) => payment !== null) as QuotePaymentRequest[];
+      const electronic = validPayments.filter(p => p.paymentMethod !== "CASH").reduce((sum, p) => sum + moneyCents(p.amount), 0n);
+      if (electronic > moneyCents(this.proposalTotal)) return "Los pagos electrónicos no pueden superar el total propuesto.";
+    } catch (error) { return error instanceof Error ? error.message : "Pago no válido."; }
 
     if (validPayments.length === 0) {
       return "Debes registrar al menos un pago valido.";
     }
 
-    if (this.paidTotal < this.normalizeNumber(this.quote.totalAmount)) {
+    if (moneyCents(this.paidTotal) < moneyCents(this.proposalTotal)) {
       return "El total pagado debe cubrir el total de la cotizacion.";
     }
 
@@ -1027,7 +1082,7 @@ export class QuoteConvertPageComponent implements OnInit {
   }
 
   private mapPayment(payment: PaymentLine): QuotePaymentRequest | null {
-    const amount = this.normalizeNumber(payment.amount);
+    const amount = scaledNumber(moneyCents(payment.amount));
     if (amount <= 0) {
       return null;
     }
@@ -1044,6 +1099,7 @@ export class QuoteConvertPageComponent implements OnInit {
       `Vas a convertir la cotizacion ${quote.quoteNumber} a venta.`,
       "",
       `Total cotizacion: ${this.formatCurrency(quote.totalAmount)}`,
+      `Total propuesto de venta: ${this.formatCurrency(this.proposalTotal)}`,
       `Total pagado: ${this.formatCurrency(this.paidTotal)}`,
       "",
       "Se generara una venta real y podria impactar caja/stock segun el flujo actual.",
@@ -1101,10 +1157,51 @@ export class QuoteConvertPageComponent implements OnInit {
     return trimmed.length > 0 ? trimmed : null;
   }
 
+  private get pendingKey(): string { return `erp_quote_conversion_pending_${this.quoteId}`; }
+  private conversionFingerprint(): string { return JSON.stringify([this.quote, this.proposalProducts, this.form.getRawValue(), this.payments]); }
+  proposalPrice(id: number): number | null { return this.proposalProducts.find(p => p.productId === id)?.salePrice ?? null; }
+
+  refreshProposal(): void {
+    if (!this.quote || this.pendingRequest || this.revalidating) return;
+    const warehouse = this.form.value.warehouseId;
+    if (!warehouse) { this.errorMessage = "Selecciona un almacén."; return; }
+    const quote = structuredClone(this.quote);
+    const fingerprint = this.conversionFingerprint();
+    this.revalidating = true;
+    this.posService.snapshot(quote.items.map(i => i.productId), warehouse).subscribe({
+      next: products => {
+        this.revalidating = false;
+        if (fingerprint !== this.conversionFingerprint()) { this.errorMessage = "La propuesta cambió durante la consulta; revalida nuevamente."; return; }
+        try {
+          const lines = quote.items.map(item => {
+            const product = products.find(p => p.productId === item.productId);
+            if (!product) throw new Error(`Producto #${item.productId} no disponible.`);
+            const line = { ...product, quantity: item.quantity, discountAmount: item.discountAmount };
+            posLineCents(line);
+            if (quantityHundredths(item.quantity, product.quantityPolicy) * 10n > stockMillis(product.stockAvailable)) throw new Error(`${product.name}: stock insuficiente.`);
+            return line;
+          });
+          this.proposalTotal = scaledNumber(posTotalCents(lines)); this.proposalProducts = products;
+          this.errorMessage = "";
+        } catch (error) { this.proposalTotal = null; this.proposalProducts = []; this.errorMessage = error instanceof Error ? error.message : "Propuesta inválida."; }
+      },
+      error: error => { this.revalidating = false; this.proposalTotal = null; this.proposalProducts = []; this.errorMessage = toHttpErrorMessage(error, "No se pudo revalidar."); },
+    });
+  }
+
+  private buildConversionRequest(): ConvertQuoteToSaleRequest {
+    if (!this.quote || this.proposalTotal === null) throw new Error("Revalidación pendiente");
+    return { operationId: crypto.randomUUID(), warehouseId: this.form.value.warehouseId as number,
+      confirmedTotal: this.proposalTotal, comment: this.normalizeOptional(this.form.value.comment),
+      items: this.quote.items.map(item => ({ quoteItemId: item.id as number, quantity: item.quantity,
+        discountAmount: item.discountAmount, confirmedUnitPrice: this.proposalPrice(item.productId) as number })),
+      payments: this.payments.map(p => this.mapPayment(p)).filter((p): p is QuotePaymentRequest => p !== null) };
+  }
+
   private normalizeNumber(value: unknown): number {
     const parsed = Number(value);
     if (!Number.isFinite(parsed)) {
-      return 0;
+      return NaN;
     }
     return parsed;
   }

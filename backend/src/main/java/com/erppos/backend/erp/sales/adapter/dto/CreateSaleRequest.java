@@ -12,7 +12,9 @@ public record CreateSaleRequest(
         @NotEmpty(message = "items are required")
         List<@Valid CreateSaleItemRequest> items,
         @NotEmpty(message = "payments are required")
-        List<@Valid CreateSalePaymentRequest> payments
+        List<@Valid CreateSalePaymentRequest> payments,
+        @NotNull(message = "operationId is required") java.util.UUID operationId,
+        @NotNull(message = "confirmedTotal is required") java.math.BigDecimal confirmedTotal
 ) {
 }
 

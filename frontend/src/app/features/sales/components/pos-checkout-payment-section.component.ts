@@ -2,6 +2,7 @@ import { CommonModule } from "@angular/common";
 import { Component, EventEmitter, Input, Output } from "@angular/core";
 
 import { PaymentLine } from "../data/pos-ui.models";
+import { calculatePosRemaining } from "../utils/pos-calculations";
 
 @Component({
     selector: "app-pos-checkout-payment-section",
@@ -48,7 +49,7 @@ import { PaymentLine } from "../data/pos-ui.models";
               type="number"
               min="0"
               step="0.01"
-              [value]="payment.amount"
+              [value]="payment.amountInput ?? payment.amount"
               (input)="
                 updatePaymentAmount.emit({
                   index,
@@ -84,8 +85,9 @@ import { PaymentLine } from "../data/pos-ui.models";
       </div>
 
       <div class="payment-panel__metrics" aria-label="Resumen de pagos">
-        <span>Pagado: <strong>S/ {{ paidTotal | number: "1.2-2" }}</strong></span>
-        <span>Vuelto: <strong>S/ {{ change | number: "1.2-2" }}</strong></span>
+        <span>Pagado: <strong>S/ {{ (paidTotal | number: "1.2-2") ?? '—' }}</strong></span>
+        <span>Vuelto: <strong>S/ {{ (change | number: "1.2-2") ?? '—' }}</strong></span>
+        <span>Pendiente: <strong>S/ {{ (pendingAmount | number: "1.2-2") ?? '—' }}</strong></span>
       </div>
     </section>
   `,
@@ -214,6 +216,8 @@ import { PaymentLine } from "../data/pos-ui.models";
     ]
 })
 export class PosCheckoutPaymentSectionComponent {
+  @Input({ required: true }) total = 0;
+  get pendingAmount(): number { return calculatePosRemaining(this.total, this.paidTotal); }
   @Input({ required: true }) payments: PaymentLine[] = [];
   @Input({ required: true }) paidTotal = 0;
   @Input({ required: true }) change = 0;

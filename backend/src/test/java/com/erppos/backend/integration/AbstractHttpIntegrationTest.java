@@ -54,6 +54,38 @@ abstract class AbstractHttpIntegrationTest {
     @Autowired
     protected ObjectMapper objectMapper;
 
+    @Autowired
+    private org.springframework.jdbc.core.JdbcTemplate checkoutFixtureJdbc;
+
+    /** Input-only adaptation to the mandatory checkout confirmation contract. */
+    protected void confirmSalePayload(ObjectNode payload) {
+        payload.put("operationId", java.util.UUID.randomUUID().toString());
+        BigDecimal total = BigDecimal.ZERO;
+        for (JsonNode node : payload.withArray("items")) {
+            ObjectNode item = (ObjectNode) node;
+            BigDecimal price = checkoutFixtureJdbc.queryForObject("select sale_price from products where id=?", BigDecimal.class, item.path("productId").asLong());
+            item.put("confirmedUnitPrice", price);
+            total = total.add(price.multiply(item.path("quantity").decimalValue()).setScale(2, java.math.RoundingMode.HALF_UP)
+                    .subtract(item.path("discountAmount").decimalValue()));
+        }
+        payload.put("confirmedTotal", total.setScale(2, java.math.RoundingMode.HALF_UP));
+    }
+
+    protected void confirmQuotePayload(long quoteId, ObjectNode payload) {
+        payload.put("operationId", java.util.UUID.randomUUID().toString());
+        var items = payload.putArray("items");
+        BigDecimal total = BigDecimal.ZERO;
+        for (var row : checkoutFixtureJdbc.queryForList("select qi.id, qi.quantity, qi.discount_amount, p.sale_price from quote_items qi join products p on p.id=qi.product_id where qi.quote_id=? order by qi.id", quoteId)) {
+            BigDecimal price = (BigDecimal) row.get("sale_price");
+            BigDecimal quantity = (BigDecimal) row.get("quantity");
+            BigDecimal discount = (BigDecimal) row.get("discount_amount");
+            items.addObject().put("quoteItemId", ((Number)row.get("id")).longValue()).put("quantity", quantity)
+                    .put("discountAmount", discount).put("confirmedUnitPrice", price);
+            total = total.add(price.multiply(quantity).setScale(2, java.math.RoundingMode.HALF_UP).subtract(discount));
+        }
+        payload.put("confirmedTotal", total);
+    }
+
     @DynamicPropertySource
     static void configureDatasource(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
@@ -237,6 +269,8 @@ abstract class AbstractHttpIntegrationTest {
         payload.put("warehouseId", warehouseId);
         payload.put("comment", "Convert IT " + suffix);
         payload.putArray("payments").add(payment);
+
+        confirmQuotePayload(quoteId, payload);
 
         return mockMvc.perform(post("/api/v1/quotes/{id}/convert-to-sale", quoteId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(token))

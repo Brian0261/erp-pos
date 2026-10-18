@@ -12,7 +12,8 @@ public record CreateSaleItemRequest(
         @DecimalMin(value = "0.0001", inclusive = true, message = "quantity must be > 0")
         BigDecimal quantity,
         @DecimalMin(value = "0.0", inclusive = true, message = "discountAmount must be >= 0")
-        BigDecimal discountAmount
+        BigDecimal discountAmount,
+        @NotNull(message = "confirmedUnitPrice is required") BigDecimal confirmedUnitPrice
 ) {
 }
 

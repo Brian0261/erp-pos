@@ -17,10 +17,13 @@ public class PosApplicationService implements PosUseCase {
 
     private final CatalogReadPort catalogReadPort;
     private final InventorySalesPort inventorySalesPort;
+    private final com.erppos.backend.erp.sales.domain.port.CheckoutReadPort checkoutReadPort;
 
-    public PosApplicationService(CatalogReadPort catalogReadPort, InventorySalesPort inventorySalesPort) {
+    public PosApplicationService(CatalogReadPort catalogReadPort, InventorySalesPort inventorySalesPort,
+            com.erppos.backend.erp.sales.domain.port.CheckoutReadPort checkoutReadPort) {
         this.catalogReadPort = catalogReadPort;
         this.inventorySalesPort = inventorySalesPort;
+        this.checkoutReadPort = checkoutReadPort;
     }
 
     @Override
@@ -55,6 +58,14 @@ public class PosApplicationService implements PosUseCase {
                 product.quantityPolicy(),
                 stock
         );
+    }
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public List<PosProductView> snapshot(List<Long> ids, Long warehouseId) {
+        if (warehouseId == null || ids == null || ids.isEmpty() || ids.size() > 200 || ids.stream().anyMatch(id -> id == null || id <= 0))
+            throw new com.erppos.backend.erp.sales.domain.exception.SalesBusinessRuleException("Provide warehouseId and 1..200 productIds");
+        return checkoutReadPort.snapshot(ids.stream().distinct().sorted().toList(), warehouseId);
     }
 }
 

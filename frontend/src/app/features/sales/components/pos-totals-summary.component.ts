@@ -8,25 +8,25 @@ import { Component, Input } from "@angular/core";
     <section class="total-board" aria-label="Totales de venta">
       <article class="total-main">
         <span>Total a cobrar</span>
-        <strong>S/ {{ total | number: "1.2-2" }}</strong>
+        <strong>S/ {{ (total | number: "1.2-2") ?? '—' }}</strong>
       </article>
 
       <div class="total-grid">
         <article>
           <span>Subtotal</span>
-          <strong>S/ {{ subtotal | number: "1.2-2" }}</strong>
+          <strong>S/ {{ (subtotal | number: "1.2-2") ?? '—' }}</strong>
         </article>
         <article>
           <span>Descuento</span>
-          <strong>S/ {{ discountTotal | number: "1.2-2" }}</strong>
+          <strong>S/ {{ (discountTotal | number: "1.2-2") ?? '—' }}</strong>
         </article>
         <article>
           <span>Pagado</span>
-          <strong>S/ {{ paidTotal | number: "1.2-2" }}</strong>
+          <strong>S/ {{ (paidTotal | number: "1.2-2") ?? '—' }}</strong>
         </article>
         <article class="total-change">
           <span>Vuelto</span>
-          <strong>S/ {{ change | number: "1.2-2" }}</strong>
+          <strong>S/ {{ (change | number: "1.2-2") ?? '—' }}</strong>
         </article>
       </div>
     </section>

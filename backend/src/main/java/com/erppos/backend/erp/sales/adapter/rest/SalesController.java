@@ -55,7 +55,8 @@ public class SalesController {
         Sale created = salesUseCase.create(new CreateSaleCommand(
                 request.warehouseId(),
                 request.items().stream().map(this::toItemCommand).toList(),
-                request.payments().stream().map(this::toPaymentCommand).toList()
+                request.payments().stream().map(this::toPaymentCommand).toList(),
+                request.operationId(), request.confirmedTotal(), "POS"
         ));
         return ResponseEntity.created(URI.create("/api/v1/sales/" + created.id())).body(toResponse(created));
     }
@@ -102,7 +103,7 @@ public class SalesController {
     }
 
     private CreateSaleItemCommand toItemCommand(CreateSaleItemRequest request) {
-        return new CreateSaleItemCommand(request.productId(), request.quantity(), request.discountAmount());
+        return new CreateSaleItemCommand(request.productId(), request.quantity(), request.discountAmount(), request.confirmedUnitPrice());
     }
 
     private CreateSalePaymentCommand toPaymentCommand(CreateSalePaymentRequest request) {
