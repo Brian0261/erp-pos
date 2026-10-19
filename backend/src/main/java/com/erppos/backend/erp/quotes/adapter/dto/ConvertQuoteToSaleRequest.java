@@ -13,7 +13,10 @@ public record ConvertQuoteToSaleRequest(
         @Size(max = 400, message = "comment max length is 400")
         String comment,
         @NotEmpty(message = "payments are required")
-        List<@Valid QuotePaymentRequest> payments
+        List<@Valid QuotePaymentRequest> payments,
+        @NotNull java.util.UUID operationId,
+        @NotNull java.math.BigDecimal confirmedTotal,
+        @NotEmpty List<@Valid QuoteConfirmedItemRequest> items
 ) {
 }
 

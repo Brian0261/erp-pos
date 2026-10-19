@@ -1,4 +1,4 @@
-import { provideHttpClient } from "@angular/common/http";
+import { HttpContext, provideHttpClient } from "@angular/common/http";
 import {
   HttpTestingController,
   provideHttpClientTesting,
@@ -10,6 +10,7 @@ import { of, throwError } from "rxjs";
 
 import { AuthService } from "../../core/auth/auth.service";
 import { UserProfile } from "../../core/auth/auth.models";
+import { BOUND_AUTH_CREDENTIALS } from "../../core/auth/bound-auth-context";
 import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.service";
 import { BillingSeriesService } from "../billing/data/billing-series.service";
 import { ElectronicDocumentService } from "../billing/data/electronic-document.service";
@@ -23,6 +24,36 @@ import { SalesService } from "./data/sales.service";
 import { PosPageComponent } from "./pos-page.component";
 import { PaymentLine } from "./data/pos-ui.models";
 
+const SPEC_CREDENTIAL = "synthetic-pos-component-credential";
+
+function createAuthDouble(user: UserProfile): jasmine.SpyObj<AuthService> {
+  const auth = jasmine.createSpyObj<AuthService>("AuthService", ["me", "getToken"]);
+  auth.getToken.and.returnValue(SPEC_CREDENTIAL);
+  auth.me.and.callFake((context?: HttpContext) => {
+    if (context !== undefined && (!(context instanceof HttpContext)
+        || !context.has(BOUND_AUTH_CREDENTIALS)
+        || context.get(BOUND_AUTH_CREDENTIALS)?.token !== SPEC_CREDENTIAL)) {
+      return throwError(() => new Error("Expected the component's bound verification context"));
+    }
+    return of(user);
+  });
+  return auth;
+}
+
+function expectVerifiedContext(auth: jasmine.SpyObj<AuthService>, sales: jasmine.SpyObj<SalesService>): HttpContext {
+  expect(auth.getToken).toHaveBeenCalledTimes(1);
+  expect(auth.me).toHaveBeenCalledTimes(2);
+  expect(auth.me.calls.first().args[0]).toBeUndefined();
+  const context = auth.me.calls.mostRecent().args[0];
+  expect(context instanceof HttpContext).toBeTrue();
+  if (!(context instanceof HttpContext)) throw new Error("Missing bound verification context");
+  expect(context.has(BOUND_AUTH_CREDENTIALS)).toBeTrue();
+  expect(context.get(BOUND_AUTH_CREDENTIALS)).toEqual({ token: SPEC_CREDENTIAL });
+  expect(Object.isFrozen(context.get(BOUND_AUTH_CREDENTIALS))).toBeTrue();
+  expect(sales.create.calls.mostRecent().args[1]).toBe(context);
+  return context;
+}
+
 describe("PosPageComponent cash and electronic payment policy", () => {
   let fixture: ReturnType<typeof TestBed.createComponent<PosPageComponent>>;
   let component: PosPageComponent;
@@ -30,10 +61,12 @@ describe("PosPageComponent cash and electronic payment policy", () => {
   let confirm: jasmine.SpyObj<ConfirmDialogService>;
   let documents: jasmine.SpyObj<ElectronicDocumentService>;
   let http: HttpTestingController;
+  let auth: jasmine.SpyObj<AuthService>;
   const line = (paymentMethod: PaymentLine["paymentMethod"], amount: number): PaymentLine =>
     ({ paymentMethod, amount, reference: `QA-${paymentMethod}` });
 
   beforeEach(async () => {
+    auth = createAuthDouble({ id: "qa-money", username: "qa", email: "qa@example.test", roles: ["CAJERO"] });
     sales = jasmine.createSpyObj<SalesService>("SalesService", ["create"]);
     sales.create.and.returnValue(of());
     confirm = jasmine.createSpyObj<ConfirmDialogService>("ConfirmDialogService", ["confirm"]);
@@ -45,7 +78,7 @@ describe("PosPageComponent cash and electronic payment policy", () => {
       imports: [PosPageComponent],
       providers: [
         provideZoneChangeDetection(), provideRouter([]), provideHttpClient(), provideHttpClientTesting(),
-        { provide: AuthService, useValue: { me: () => of({ id: "qa-money", roles: ["CAJERO"] }) } },
+        { provide: AuthService, useValue: auth },
         { provide: WarehouseService, useValue: { list: () => of([
           { id: 1, code: "QA", name: "Synthetic warehouse", type: "STORE", active: true },
         ]) } },
@@ -64,7 +97,7 @@ describe("PosPageComponent cash and electronic payment policy", () => {
     fixture.detectChanges();
     await fixture.whenStable();
     component.cart = [{ productId: 101, sku: "QA-MONEY", barcode: null, name: "Synthetic product",
-      salePrice: 100, stockAvailable: 10, quantity: 1, discountAmount: 0 }];
+      salePrice: 100, stockAvailable: 10, quantity: 1, discountAmount: 0, quantityPolicy: "WHOLE" }];
   });
 
   afterEach(() => {
@@ -124,8 +157,9 @@ describe("PosPageComponent cash and electronic payment policy", () => {
     component.finalizeSale();
     await fixture.whenStable();
     expect(sales.create).toHaveBeenCalledOnceWith({ warehouseId: 1,
-      items: [{ productId: 101, quantity: 1, discountAmount: 0 }],
-      payments: originalPayments });
+      operationId: jasmine.any(String), confirmedTotal: 100,
+      items: [{ productId: 101, quantity: 1, discountAmount: 0, confirmedUnitPrice: 100 }],
+      payments: originalPayments }, expectVerifiedContext(auth, sales));
     expect(component.cart).toEqual(originalCart);
     expect(component.payments).toEqual(originalPayments);
     expect(component.submitting).toBeFalse();
@@ -162,8 +196,8 @@ describe("PosPageComponent monetary reconciliation", () => {
       expectedCashAmount: null, differenceAmount: null, status: "OPEN", notes: null,
     };
     const products: PosProductResponse[] = [
-      { productId: 101, sku: "QA-A", barcode: null, name: "QA Product A", salePrice: 10, stockAvailable: 10 },
-      { productId: 102, sku: "QA-B", barcode: null, name: "QA Product B", salePrice: 5, stockAvailable: 10 },
+      { productId: 101, sku: "QA-A", barcode: null, name: "QA Product A", salePrice: 10, stockAvailable: 10, quantityPolicy: "WHOLE" },
+      { productId: 102, sku: "QA-B", barcode: null, name: "QA Product B", salePrice: 5, stockAvailable: 10, quantityPolicy: "WHOLE" },
     ];
     let draft: PosDraftState | null = null;
     const draftState = {
@@ -191,7 +225,7 @@ describe("PosPageComponent monetary reconciliation", () => {
         provideRouter([]),
         provideHttpClient(),
         provideHttpClientTesting(),
-        { provide: AuthService, useValue: { me: () => of(user) } },
+        { provide: AuthService, useValue: createAuthDouble(user) },
         { provide: WarehouseService, useValue: { list: () => of([warehouse]) } },
         { provide: CashRegisterService, useValue: cash },
         { provide: PosService, useValue: pos },
@@ -341,12 +375,13 @@ describe("PosPageComponent controlled discount correction", () => {
   let confirm: jasmine.SpyObj<ConfirmDialogService>;
   let allowedMockSalesCalls: number;
   let saveDraft: jasmine.Spy;
+  let auth: jasmine.SpyObj<AuthService>;
 
   const cart = () => [
     { productId: 101, sku: "QA-A", barcode: null, name: "QA Product A", salePrice: 10,
-      stockAvailable: 10, quantity: 2, discountAmount: 15 },
+      stockAvailable: 10, quantity: 2, discountAmount: 15, quantityPolicy: "WHOLE" as const },
     { productId: 102, sku: "QA-B", barcode: null, name: "QA Product B", salePrice: 5.25,
-      stockAvailable: 10, quantity: 1, discountAmount: 1.25 },
+      stockAvailable: 10, quantity: 1, discountAmount: 1.25, quantityPolicy: "WHOLE" as const },
   ];
   const element = <T extends Element>(root: ParentNode, selector: string): T => {
     const found = root.querySelector<T>(selector);
@@ -379,6 +414,7 @@ describe("PosPageComponent controlled discount correction", () => {
   };
 
   beforeEach(async () => {
+    auth = createAuthDouble(user);
     fixture = undefined;
     draft = null;
     allowedMockSalesCalls = 0;
@@ -400,7 +436,7 @@ describe("PosPageComponent controlled discount correction", () => {
       imports: [PosPageComponent],
       providers: [
         provideZoneChangeDetection(), provideRouter([]), provideHttpClient(), provideHttpClientTesting(),
-        { provide: AuthService, useValue: { me: () => of(user) } },
+        { provide: AuthService, useValue: auth },
         { provide: WarehouseService, useValue: { list: () => of([warehouse]) } },
         { provide: CashRegisterService, useValue: cash },
         { provide: PosService, useValue: pos },
@@ -465,7 +501,7 @@ describe("PosPageComponent controlled discount correction", () => {
     expect(confirm.confirm).not.toHaveBeenCalled();
   });
 
-  it("applies the stock limit before clamping and persists both effective values", async () => {
+  it("preserves a quantity above stock as invalid input without changing quantity or discount", async () => {
     await mount();
     component.cart = cart();
     Object.assign(component.cart[0], { quantity: 4, stockAvailable: 2, discountAmount: 35 });
@@ -474,15 +510,18 @@ describe("PosPageComponent controlled discount correction", () => {
     input(quantity, "8");
     await render();
 
-    expect(component.cart[0].quantity).toBe(2);
-    expect(component.cart[0].discountAmount).toBe(20);
-    expect(quantity.value).toBe("2");
-    expect(savedDraft().cart[0].quantity).toBe(2);
-    expect(savedDraft().cart[0].discountAmount).toBe(20);
+    expect(component.cart[0].quantity).toBe(4);
+    expect(component.cart[0].quantityInput).toBe("8");
+    expect(component.cart[0].discountAmount).toBe(35);
+    expect(quantity.value).toBe("8");
+    expect(savedDraft().cart[0].quantityInput).toBe("8");
+    expect(savedDraft().cart[0].discountAmount).toBe(35);
     expect(component.cart[1].discountAmount).toBe(1.25);
     expect(component.errorMessage).toContain("Cantidad excede stock disponible");
-    expect(element(host(), '[role="status"]').textContent).toContain("de S/ 35.00 a S/ 20.00");
-    expect(component.total).toBe(4);
+    expect(host().querySelector('[role="status"]')).toBeNull();
+    component.payments[0].amount = 100;
+    component.finalizeSale();
+    expect(component.errorMessage).toContain("Stock insuficiente");
     expect(confirm.confirm).not.toHaveBeenCalled();
   });
 
@@ -496,18 +535,19 @@ describe("PosPageComponent controlled discount correction", () => {
     const quantity = element<HTMLInputElement>(host(), 'app-pos-cart-item [aria-label="Cantidad del producto"]');
     input(quantity, "3");
     await render();
-    expect(quantity.value).toBe("1");
+    expect(quantity.value).toBe("3");
     expect(component.cart.length).toBe(2);
     expect(component.cart[0].quantity).toBe(1);
     expect(component.cart[0].discountAmount).toBe(0);
-    expect(saveDraft.calls.count()).toBe(savesBefore);
+    expect(saveDraft.calls.count()).toBe(savesBefore + 1);
+    expect(savedDraft().cart[0].quantityInput).toBe("3");
     expect(host().querySelector('[role="status"]')).toBeNull();
     component.finalizeSale();
     expect(component.errorMessage).toContain("Stock insuficiente");
     expect(confirm.confirm).not.toHaveBeenCalled();
   });
 
-  it("repairs and saves an isolated legacy draft once, preserving valid discounts on subsequent restore", async () => {
+  it("preserves incompatible legacy draft amounts and blocks checkout instead of repairing them", async () => {
     const restoredCart = cart();
     restoredCart[0].discountAmount = 25;
     restoredCart.push({ ...restoredCart[1], productId: 103, name: "QA Invalid discount", discountAmount: Infinity });
@@ -517,19 +557,19 @@ describe("PosPageComponent controlled discount correction", () => {
       lastWarehouseId: warehouse.id, code: "", query: "", searchResults: [],
       cart: restoredCart, payments: [{ paymentMethod: "CASH", amount: 0, reference: "" }], lastSaleId: null,
     });
-    expect(component.cart.map((item) => item.discountAmount)).toEqual([20, 1.25, 0, 0]);
-    expect(savedDraft().cart.map((item) => item.discountAmount)).toEqual([20, 1.25, 0, 0]);
-    expect(component.total).toBe(14.50);
-    expect(component.total).toBe(component.cartLineTotals.reduce((sum, net) => sum + net, 0));
-    expect(element(host(), '[role="status"]').textContent).toContain("QA Product A de S/ 25.00 a S/ 20.00");
-    expect(component.discountAdjustmentMessage).toContain("restauración del borrador");
-    expect(component.discountAdjustmentMessage).toContain("QA Invalid discount");
-    expect(component.discountAdjustmentMessage).toContain("QA Negative discount");
+    expect(component.cart.map((item) => item.discountAmount)).toEqual([25, 1.25, Infinity, -2]);
+    expect(savedDraft().cart.map((item) => item.discountAmount)).toEqual([25, 1.25, Infinity, -2]);
+    expect(Number.isNaN(component.total)).toBeTrue();
+    expect(component.draftReviewMessage).toContain("pendientes de revalidación");
+    expect(component.discountAdjustmentMessage).toBe("");
+    component.payments[0].amount = 100;
+    component.finalizeSale();
+    expect(component.errorMessage).toContain("descuento");
 
     const repaired = savedDraft();
     fixture!.destroy();
     await mount(repaired);
-    expect(component.cart.map((item) => item.discountAmount)).toEqual([20, 1.25, 0, 0]);
+    expect(component.cart.map((item) => item.discountAmount)).toEqual([25, 1.25, Infinity, -2]);
     expect(host().querySelector('[role="status"]')).toBeNull();
     expect(confirm.confirm).not.toHaveBeenCalled();
   });
@@ -578,7 +618,7 @@ describe("PosPageComponent controlled discount correction", () => {
     component.cart[0].discountAmount = 10;
     component.payments[0].amount = Infinity;
     component.finalizeSale();
-    expect(component.errorMessage).toContain("finitos");
+    expect(component.errorMessage).toContain("finito");
     expect(confirm.confirm).not.toHaveBeenCalled();
 
     component.payments[0].amount = 100;
@@ -614,11 +654,121 @@ describe("PosPageComponent controlled discount correction", () => {
     expect(confirm.confirm).toHaveBeenCalledTimes(1);
     expect(sales.create).toHaveBeenCalledOnceWith({
       warehouseId: warehouse.id,
+      operationId: jasmine.any(String), confirmedTotal: 4,
       items: [
-        { productId: 101, quantity: 1, discountAmount: 10 },
-        { productId: 102, quantity: 1, discountAmount: 1.25 },
+        { productId: 101, quantity: 1, discountAmount: 10, confirmedUnitPrice: 10 },
+        { productId: 102, quantity: 1, discountAmount: 1.25, confirmedUnitPrice: 5.25 },
       ],
       payments: [{ paymentMethod: "CASH", amount: 10, reference: "QA payment" }],
+    }, expectVerifiedContext(auth, sales));
+  });
+
+  it("steps fractional quantities exactly in both cart views and preserves the P0 discount adjustment", async () => {
+    await mount();
+    component.cart = cart();
+    Object.assign(component.cart[0], { quantityPolicy: "DECIMAL_2", quantity: 0.25,
+      salePrice: 10, stockAvailable: 0.255, discountAmount: 2.50 });
+    await render();
+    const quantity = element<HTMLInputElement>(host(), 'app-pos-cart-item [aria-label="Cantidad del producto"]');
+    expect(quantity.step).toBe("0.01");
+    expect(quantity.min).toBe("0.01");
+    expect(element<HTMLButtonElement>(host(), 'app-pos-cart-item [aria-label="Aumentar cantidad"]').disabled).toBeTrue();
+    component.decreaseQuantity(0);
+    expect(component.cart[0].quantity).toBe(0.24);
+    expect(component.cart[0].discountAmount).toBe(2.40);
+    expect(component.discountAdjustmentMessage).toContain("2.40");
+    component.openFullCart(); await render();
+    const modal = element<HTMLElement>(host(), 'app-pos-full-cart-modal [role="dialog"]');
+    expect(element<HTMLInputElement>(modal, '[aria-label="Cantidad del producto"]').step).toBe("0.01");
+    element<HTMLButtonElement>(modal, '[aria-label="Aumentar cantidad"]').click(); await render();
+    expect(component.cart[0].quantity).toBe(0.25);
+    expect(component.cart[0].discountAmount).toBe(2.40);
+    expect(savedDraft().cart[0].quantityPolicy).toBe("DECIMAL_2");
+  });
+
+  for (const policy of ["WHOLE", "LEGACY_UNCLASSIFIED"] as const) {
+    it(`rejects fractional edits for ${policy} without truncating the requested value`, async () => {
+      await mount(); component.cart = cart(); component.cart[0].quantityPolicy = policy;
+      component.setQuantity(0, "1.25");
+      expect(component.cart[0].quantity).toBe(2);
+      expect(component.cart[0].quantityInput).toBe("1.25");
+      expect(component.errorMessage).toContain("entera");
+      component.payments[0].amount = 100;
+      component.finalizeSale();
+      expect(confirm.confirm).not.toHaveBeenCalled();
+      component.setQuantity(0, "1");
+      expect(component.cart[0].quantity).toBe(1);
+      expect(component.cart[0].quantityInput).toBeUndefined();
+      expect(component.cart[0].discountAmount).toBe(10);
     });
+  }
+
+  it("adds a product with fractional stock, refuses a missing policy and never invents legacy", async () => {
+    await mount();
+    const product: PosProductResponse = { productId: 401, sku: "QA-FRACTION", name: "Synthetic fraction",
+      barcode: null, salePrice: 10, stockAvailable: 0.25, quantityPolicy: "DECIMAL_2" };
+    component.addToCart(product);
+    expect(component.cart[0].quantity).toBe(0.01);
+    component.setQuantity(0, "0.25");
+    expect(component.total).toBe(2.50);
+    component.setQuantity(0, "0.26");
+    expect(component.cart[0].quantity).toBe(0.25);
+    expect(component.cart[0].quantityInput).toBe("0.26");
+    component.addToCart({ ...product, productId: 402, quantityPolicy: undefined });
+    expect(component.cart.length).toBe(1);
+    expect(component.errorMessage).toContain("política");
+  });
+
+  it("rejects monetary precision and empty inputs before confirmation without zeroing stored amounts", async () => {
+    await mount(); component.cart = cart(); component.cart[0].discountAmount = 1;
+    component.setDiscount(0, "0.505");
+    expect(component.cart[0].discountAmount).toBe(1);
+    expect(component.cart[0].discountInput).toBe("0.505");
+    component.payments[0].amount = 100;
+    component.finalizeSale();
+    expect(component.errorMessage).toContain("decimales");
+    expect(confirm.confirm).not.toHaveBeenCalled();
+    component.setDiscount(0, "1.00");
+    component.setPaymentAmount(0, "");
+    expect(component.payments[0].amount).toBe(100);
+    expect(component.payments[0].amountInput).toBe("");
+    component.finalizeSale();
+    expect(confirm.confirm).not.toHaveBeenCalled();
+    component.setPaymentAmount(0, "100.001");
+    expect(component.payments[0].amountInput).toBe("100.001");
+    expect(Number.isNaN(component.paidTotal)).toBeTrue();
+  });
+
+  it("accepts thirty cents, rejects twenty-nine cents and displays an exact pending balance", async () => {
+    await mount(); component.cart = [cart()[0]];
+    Object.assign(component.cart[0], { salePrice: 0.10, quantity: 3, discountAmount: 0 });
+    component.setPaymentAmount(0, "0.29");
+    component.finalizeSale();
+    expect(confirm.confirm).not.toHaveBeenCalled();
+    expect(component.errorMessage).toContain("total pagado");
+    component.openCheckoutModal(); await render();
+    expect(host().querySelector('[aria-label="Resumen de pagos"]')!.textContent).toContain("Pendiente: S/ 0.01");
+    component.setPaymentAmount(0, "0.30"); component.finalizeSale(); await render();
+    expect(component.total).toBe(0.30);
+    expect(component.errorMessage).toBe("");
+    expect(confirm.confirm).toHaveBeenCalledTimes(1);
+  });
+
+  it("restores a valid fractional draft for review without confirming its stale price or stock", async () => {
+    const restored = cart();
+    Object.assign(restored[0], { quantityPolicy: "DECIMAL_2", quantity: 0.25, salePrice: 10, discountAmount: 0.05 });
+    await mount({ formatVersion: 2, userId: user.id, cashRegisterSessionId: cashSession.id,
+      warehouseId: warehouse.id, lastWarehouseId: warehouse.id, code: "", query: "", searchResults: [],
+      cart: restored, payments: [{ paymentMethod: "CASH", amount: 100, reference: "" }],
+      lastSaleId: null, preliminaryTotal: "6.45" });
+    expect(component.cart[0].quantity).toBe(0.25);
+    expect(component.cart[0].salePrice).toBe(10);
+    expect(component.cart[0].discountAmount).toBe(0.05);
+    expect(component.total).toBe(6.45);
+    expect(savedDraft().requiresRevalidation).toBeTrue();
+    expect(savedDraft().preliminaryTotal).toBe("6.45");
+    component.finalizeSale();
+    expect(component.errorMessage).toContain("revalidación");
+    expect(confirm.confirm).not.toHaveBeenCalled();
   });
 });

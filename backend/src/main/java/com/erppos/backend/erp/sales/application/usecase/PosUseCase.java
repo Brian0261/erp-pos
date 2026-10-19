@@ -7,5 +7,6 @@ import java.util.List;
 public interface PosUseCase {
     PosProductView lookupByCode(String code, Long warehouseId);
     List<PosProductView> search(String query, Long warehouseId);
+    List<PosProductView> snapshot(List<Long> productIds, Long warehouseId);
 }
 

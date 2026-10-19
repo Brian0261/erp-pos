@@ -8,6 +8,7 @@ import java.util.List;
 
 public interface SalesUseCase {
     Sale create(CreateSaleCommand command);
+    java.util.Optional<Sale> replay(CreateSaleCommand command);
     List<Sale> list(LocalDate from, LocalDate to, Long cashRegisterSessionId, SaleStatus status, String createdByFilter);
     List<SalesListItemResult> listItems(LocalDate from, LocalDate to, Long cashRegisterSessionId, SaleStatus status, String createdByFilter);
     Sale getById(Long id);

@@ -118,6 +118,7 @@ export interface CreateSaleItemRequest {
   productId: number;
   quantity: number;
   discountAmount?: number;
+  confirmedUnitPrice: number;
 }
 
 export interface CreateSalePaymentRequest {
@@ -127,9 +128,18 @@ export interface CreateSalePaymentRequest {
 }
 
 export interface CreateSaleRequest {
+  operationId: string;
+  confirmedTotal: number;
   warehouseId: number;
   items: CreateSaleItemRequest[];
   payments: CreateSalePaymentRequest[];
+}
+
+export interface PriceConfirmationConflict {
+  code: "PRICE_CONFIRMATION_REQUIRED";
+  confirmedTotal: number;
+  proposedTotal: number | null;
+  changes: { productId: number; confirmedUnitPrice: number; currentUnitPrice: number }[];
 }
 
 export interface VoidSaleRequest {

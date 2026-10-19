@@ -2,6 +2,8 @@ import { CommonModule } from "@angular/common";
 import { Component, EventEmitter, Input, Output } from "@angular/core";
 
 import { PosCartItem } from "../data/pos-ui.models";
+import { quantityStep } from "../utils/pos-decimal";
+import { canPosStep, posUnitPriceText } from "../utils/pos-calculations";
 
 export interface PosCartItemValueChange {
   index: number;
@@ -22,7 +24,7 @@ export interface PosCartItemQuantityChange extends PosCartItemValueChange {
         <div class="cart-item__meta-row">
           <p class="cart-item__sku">{{ item.sku }}</p>
           <span class="cart-item__meta-separator" aria-hidden="true">·</span>
-          <p class="cart-item__stock">P.U. S/ {{ item.salePrice | number: "1.2-2" }}</p>
+          <p class="cart-item__stock">P.U. S/ {{ unitPriceText(item) }}</p>
         </div>
       </div>
 
@@ -35,18 +37,17 @@ export interface PosCartItemQuantityChange extends PosCartItemValueChange {
               class="ui-button quantity-stepper"
               aria-label="Disminuir cantidad"
               (click)="decrease.emit(index)"
-              [disabled]="item.quantity <= 1"
+              [disabled]="!canStep(item, -1)"
             >
               -
             </button>
             <input
               type="number"
-              min="1"
-              step="1"
-              inputmode="numeric"
-              pattern="[0-9]*"
+              [min]="quantityStep(item.quantityPolicy)"
+              [step]="quantityStep(item.quantityPolicy)"
+              [attr.inputmode]="item.quantityPolicy === 'DECIMAL_2' ? 'decimal' : 'numeric'"
               aria-label="Cantidad del producto"
-              [value]="item.quantity"
+              [value]="item.quantityInput ?? item.quantity"
               (focus)="quantityFocus.emit($any($event.target))"
               (click)="quantityFocus.emit($any($event.target))"
               (input)="
@@ -62,6 +63,7 @@ export interface PosCartItemQuantityChange extends PosCartItemValueChange {
               class="ui-button quantity-stepper"
               aria-label="Aumentar cantidad"
               (click)="increase.emit(index)"
+              [disabled]="!canStep(item, 1)"
             >
               +
             </button>
@@ -74,14 +76,14 @@ export interface PosCartItemQuantityChange extends PosCartItemValueChange {
             min="0"
             step="0.01"
             aria-label="Descuento del producto"
-            [value]="item.discountAmount"
+            [value]="item.discountInput ?? item.discountAmount"
             (input)="setDiscount.emit({ index: index, value: $any($event.target).value })"
           />
         </label>
 
         <div class="cart-item__subtotal">
           <span>Subtotal</span>
-          <strong>S/ {{ lineTotal | number: "1.2-2" }}</strong>
+          <strong>S/ {{ (lineTotal | number: "1.2-2") ?? '—' }}</strong>
         </div>
         <button
           type="button"
@@ -297,6 +299,9 @@ export interface PosCartItemQuantityChange extends PosCartItemValueChange {
     ]
 })
 export class PosCartItemComponent {
+  readonly quantityStep = quantityStep;
+  readonly canStep = canPosStep;
+  readonly unitPriceText = posUnitPriceText;
   @Input({ required: true }) item!: PosCartItem;
   @Input({ required: true }) index = 0;
   @Input({ required: true }) lineTotal = 0;

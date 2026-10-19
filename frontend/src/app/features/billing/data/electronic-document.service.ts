@@ -1,4 +1,4 @@
-import { HttpClient, HttpParams } from "@angular/common/http";
+import { HttpClient, HttpContext, HttpParams } from "@angular/common/http";
 import { Injectable } from "@angular/core";
 import { map, Observable } from "rxjs";
 
@@ -20,15 +20,18 @@ export class ElectronicDocumentService {
   createFromSale(
     saleId: number,
     payload: CreateElectronicDocumentFromSaleRequest,
+    context?: HttpContext,
   ): Observable<ElectronicDocumentResponse> {
     return this.http.post<ElectronicDocumentResponse>(
       `${this.endpoint}/from-sale/${saleId}`,
       payload,
+      { context },
     );
   }
 
   list(
     filters?: ElectronicDocumentFilters,
+    context?: HttpContext,
   ): Observable<ElectronicDocumentResponse[]> {
     let params = new HttpParams();
 
@@ -55,12 +58,13 @@ export class ElectronicDocumentService {
     return this.http
       .get<unknown>(this.endpoint, {
         params,
+        context,
       })
       .pipe(map((payload) => this.normalizeListResponse(payload)));
   }
 
-  listBySaleId(saleId: number): Observable<ElectronicDocumentResponse[]> {
-    return this.list({ saleId }).pipe(
+  listBySaleId(saleId: number, context?: HttpContext): Observable<ElectronicDocumentResponse[]> {
+    return this.list({ saleId }, context).pipe(
       map((rows) => this.filterBySaleId(rows, saleId)),
     );
   }

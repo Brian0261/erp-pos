@@ -1710,6 +1710,47 @@ Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones
   no declarar cierre definitivo antes de comprobar backend/frontend/e2e-auth.
   NG-UP-CF sigue pospuesta; QA-FE-2 y 4D-2C no iniciadas.
 
+### MONEY-CHECKOUT-P1 — PASS_LOCAL; cierre Git/CI pendiente (2026-10-17)
+
+- P1-A, P1-B y la corrección UX final de confirmación de precio completadas
+  localmente en `feat/money-checkout-p1`, sobre base
+  `0548931f01239735c6fad58da4ed4710cfca51fb`. Worktree funcional previo
+  preservado; esta consolidación modifica únicamente documentación. El alcance
+  incluye precisión decimal del checkout Angular, contrato de confirmación de
+  precio, checkout backend transaccional, conversión de cotizaciones e
+  idempotencia persistente mediante V27.
+- Contrato de creación: cliente envía `operationId`, `confirmedTotal` y
+  `confirmedUnitPrice`; backend revalida el precio y total vigentes. Campos
+  requeridos ausentes/inválidos se rechazan con HTTP 400; precisión comercial
+  inválida con HTTP 422; discrepancia de precio con HTTP 409 y código
+  `PRICE_CONFIRMATION_REQUIRED`. La validación falla antes de escrituras
+  parciales. La interfaz permite revisar el cambio y confirmar nuevamente.
+- Identidad de operación ligada al usuario autenticado y al hash canónico de la
+  solicitud. Repetición idéntica devuelve la operación ya completada; reutilizar
+  el mismo ID con contenido distinto produce conflicto. V27 conserva tombstones
+  cuando se purga el resultado, impidiendo recrear la venta con esa identidad.
+  Conversión de cotización conserva los datos comerciales confirmados y se
+  procesa dentro de la transacción del checkout.
+- QA local previamente reportada y reutilizada; no se repitió en este cierre
+  documental: P1-A Angular 59 PASS, build PASS y reproducción D PASS; P1-B
+  backend focal 147 PASS, Angular 90 PASS, validación aislada de V27/Flyway
+  sobre PostgreSQL PASS, build PASS y E2E autenticado no-write aislado PASS;
+  corrección UX 57 PASS (12 nuevos), build PASS y `git diff --check` PASS.
+  La UX también pasó las comparaciones 1/5/100 productos y tamaños
+  1366x768, 1024x768, 390x844 y 683x384. Son resultados de ejecuciones
+  distintas; no se suman como conteo único ni implican cobertura de todo el ERP.
+- Sin validación visual manual ni prueba de zoom nativo del navegador; no se
+  probó en producción. Integración coordinada requiere frontend, backend y V27.
+  Clientes REST antiguos que omitan confirmaciones requeridas no son compatibles.
+  La recuperación del mismo intento depende de conservar `operationId` en el
+  navegador; si se pierde la sesión del navegador, no existe recuperación
+  administrativa automática. Una operación tombstone requiere manejo
+  administrativo y no admite reutilizar su identidad.
+- Resultado de esta etapa: `PASS — MONEY_CHECKOUT_P1_DOCS_READY`, preparado para
+  solicitar aprobación del commit local. No es `CLOSED`: no hay commit, push,
+  PR, CI remoto, revisión ni merge. No declarar listo para producción. QA
+  detallada e inventario funcional: `docs/qa/MONEY_CHECKOUT_P1_QA.md`.
+
 ### MONEY-CORE-P0 — implementada y validada localmente; publicacion pendiente (2026-10-15)
 
 - **PASS_LOCAL — MONEY-CORE-P0 VALIDADA LOCALMENTE**, no CLOSED. Rama

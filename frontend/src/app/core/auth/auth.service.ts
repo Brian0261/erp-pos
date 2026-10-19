@@ -1,4 +1,4 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpContext } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable, tap } from 'rxjs';
 
@@ -17,8 +17,8 @@ export class AuthService {
     );
   }
 
-  me(): Observable<UserProfile> {
-    return this.http.get<UserProfile>(`${environment.apiUrl}/auth/me`);
+  me(context?: HttpContext): Observable<UserProfile> {
+    return this.http.get<UserProfile>(`${environment.apiUrl}/auth/me`, { context });
   }
 
   getToken(): string | null {

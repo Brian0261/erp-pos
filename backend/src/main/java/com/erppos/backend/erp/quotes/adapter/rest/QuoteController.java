@@ -114,7 +114,10 @@ public class QuoteController {
         Quote converted = quoteUseCase.convertToSale(id, new ConvertQuoteToSaleCommand(
                 request.warehouseId(),
                 request.comment(),
-                request.payments().stream().map(p -> new QuotePaymentCommand(p.paymentMethod(), p.amount(), p.reference())).toList()
+                request.payments().stream().map(p -> new QuotePaymentCommand(p.paymentMethod(), p.amount(), p.reference())).toList(),
+                request.operationId(), request.confirmedTotal(),
+                request.items().stream().map(i -> new com.erppos.backend.erp.quotes.application.usecase.QuoteConfirmedItemCommand(
+                        i.quoteItemId(), i.quantity(), i.discountAmount(), i.confirmedUnitPrice())).toList()
         ));
         return ResponseEntity.ok(toResponse(converted));
     }

@@ -5,7 +5,8 @@ import java.math.BigDecimal;
 public record CreateSaleItemCommand(
         Long productId,
         BigDecimal quantity,
-        BigDecimal discountAmount
+        BigDecimal discountAmount,
+        BigDecimal confirmedUnitPrice
 ) {
 }
 

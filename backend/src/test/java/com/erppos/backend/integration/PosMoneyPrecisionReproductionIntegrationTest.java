@@ -339,6 +339,7 @@ class PosMoneyPrecisionReproductionIntegrationTest extends AbstractHttpIntegrati
     private MvcResult convert(Fixture f, long id, BigDecimal payment) throws Exception {
         ObjectNode request = objectMapper.createObjectNode().put("warehouseId", f.warehouse());
         request.putArray("payments").addObject().put("paymentMethod", "CASH").put("amount", payment);
+        confirmQuotePayload(id, request);
         return mockMvc.perform(post("/api/v1/quotes/{id}/convert-to-sale", id)
                 .header(HttpHeaders.AUTHORIZATION, bearer(f.token())).contentType(MediaType.APPLICATION_JSON)
                 .content(request.toString())).andReturn();
@@ -378,6 +379,7 @@ class PosMoneyPrecisionReproductionIntegrationTest extends AbstractHttpIntegrati
         for (Payment payment : payments) {
             paymentNodes.addObject().put("paymentMethod", payment.method()).put("amount", payment.amount());
         }
+        confirmSalePayload(payload);
         var violations = validator.validate(objectMapper.treeToValue(payload, CreateSaleRequest.class));
         evidence(scenario + "_INPUT", Map.of("quantities", quantities, "payments", paymentNodes,
                 "validationViolations", violations.stream().map(v -> v.getPropertyPath() + ": " + v.getMessage()).toList()));

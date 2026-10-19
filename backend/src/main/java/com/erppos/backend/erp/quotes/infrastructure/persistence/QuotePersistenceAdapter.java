@@ -17,9 +17,14 @@ import java.util.Optional;
 public class QuotePersistenceAdapter implements QuoteRepositoryPort {
 
     private final QuoteJpaRepository quoteJpaRepository;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
+    private final jakarta.persistence.EntityManager entityManager;
 
-    public QuotePersistenceAdapter(QuoteJpaRepository quoteJpaRepository) {
+    public QuotePersistenceAdapter(QuoteJpaRepository quoteJpaRepository, org.springframework.jdbc.core.JdbcTemplate jdbc,
+            jakarta.persistence.EntityManager entityManager) {
         this.quoteJpaRepository = quoteJpaRepository;
+        this.jdbc = jdbc;
+        this.entityManager = entityManager;
     }
 
     @Override
@@ -42,8 +47,14 @@ public class QuotePersistenceAdapter implements QuoteRepositoryPort {
     }
 
     @Override
+    @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
     public Optional<Quote> findByIdForUpdate(Long id) {
-        return quoteJpaRepository.findByIdForUpdate(id).map(QuoteMapper::toDomain);
+        // Lock the header BEFORE loading its collection (avoids stale follow-on-lock snapshots).
+        if (jdbc.queryForList("select id from quotes where id=? for update", Long.class, id).isEmpty()) return Optional.empty();
+        return quoteJpaRepository.findById(id).map(entity -> {
+            entityManager.refresh(entity); // Also refreshes items through CascadeType.ALL.
+            return QuoteMapper.toDomain(entity);
+        });
     }
 
     @Override

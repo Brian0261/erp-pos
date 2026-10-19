@@ -2927,6 +2927,39 @@ Solo crear tag cuando se cumpla todo:
 - No iniciar QA-FE-2, 4D-2C ni NG-UP-CF. Riesgos y límites, requisitos del runner,
   inventario y evidencias en `docs/qa/QA_E2E_AUTH_1_QA.md`.
 
+### MONEY-CHECKOUT-P1 — consolidacion documental local (2026-10-17)
+
+- Alcance exclusivo: registrar evidencia previamente obtenida de P1-A, P1-B y
+  la corrección UX final en `docs/qa/MONEY_CHECKOUT_P1_QA.md`,
+  `docs/ai/CURRENT_STATUS.md` y este control. No se modifican código, pruebas,
+  migraciones ni los 60 archivos funcionales ya presentes en el worktree.
+- Base `0548931f01239735c6fad58da4ed4710cfca51fb`; rama
+  `feat/money-checkout-p1`; `master` y `origin/master` permanecen en la base.
+  Worktree inicial con 60 cambios funcionales previos, staging vacío y sin
+  commits locales nuevos. Originales y respaldos MONEY-QA-0 permanecen
+  preservados; Angular D original queda excluido de este alcance.
+- El trabajo funcional incorpora representación decimal explícita para
+  checkout, confirmaciones de precio/total autoritativas en backend, controles
+  transaccionales de stock/productos, conversión confirmada de cotización y
+  registro de idempotencia V27 por actor/operationId/hash. El detalle de
+  validación HTTP, replay, conflicto de contenido y tombstone queda en la QA.
+- Evidencia local anterior reutilizada, no reejecutada: P1-A Angular 59 PASS,
+  build PASS y reproducción D PASS; P1-B backend focal 147 PASS, Angular 90
+  PASS, build PASS, V27/Flyway en PostgreSQL aislado PASS y E2E autenticado
+  no-write aislado PASS; UX 57 PASS (12 nuevos), build y diff-check PASS,
+  comparaciones 1/5/100 productos y cuatro viewports PASS. Conteos por fase
+  corresponden a ejecuciones distintas, no deben sumarse ni presentarse como
+  una suite única. Sin prueba de producción, inspección visual manual o zoom
+  nativo; clientes antiguos sin los campos confirmatorios requeridos no son
+  compatibles y la recuperación depende del operationId retenido en el cliente.
+- Resultado: `PASS — MONEY_CHECKOUT_P1_DOCS_READY`,
+  `READY_FOR_MONEY_CHECKOUT_P1_COMMIT_APPROVAL`. El estado es local y
+  documental, no cierre de fase: commit, push, PR, CI, revisión y merge siguen
+  pendientes de sus autorizaciones separadas. No se inicia otra fase ni se
+  declara aptitud de producción.
+- Sin `git add`, commit, push, PR, merge, tag, rebase, reset, stash o cambio de
+  rama. QA registrada en `docs/qa/MONEY_CHECKOUT_P1_QA.md`.
+
 ### MONEY-CORE-P0 — validacion local y preparacion pre-commit (2026-10-15)
 
 - Alcance autorizado: nucleo monetario P0 de catalogo, ventas/caja y
