@@ -1,7 +1,8 @@
 import { Injectable } from "@angular/core";
 
 import { PosProductResponse, PaymentMethod, CreateSaleRequest } from "./sales.models";
-import { PaymentLine, PosCartItem } from "./pos-ui.models";
+import { PaymentLine, PosCartItem, PosReceiptType } from "./pos-ui.models";
+import { CreateElectronicDocumentFromSaleRequest } from "../../billing/data/billing.models";
 import { posLineCents, posPaidCents, posTotalCents } from "../utils/pos-calculations";
 import { decimalText, isQuantityPolicy, moneyCents, quantityHundredths, stockMillis } from "../utils/pos-decimal";
 
@@ -9,8 +10,29 @@ export interface PosCartItemState extends PosCartItem {}
 
 export interface PosPaymentState extends PaymentLine {}
 
+export interface PosReceiptRecovery {
+  readonly version: 1;
+  readonly operationId: string | null;
+  readonly userId: string | null;
+  readonly receiptType: PosReceiptType | "UNKNOWN";
+  readonly payload: Readonly<CreateElectronicDocumentFromSaleRequest> | null;
+  readonly reviewPayload?: Readonly<Partial<CreateElectronicDocumentFromSaleRequest>> | null;
+  readonly customerAddress: string;
+  readonly saleId: number | null;
+  readonly documentId: number | null;
+  readonly creationState: "NOT_STARTED" | "POSSIBLY_SENT" | "CONFIRMED" | "REVIEW_REQUIRED";
+}
+
+export function immutableReceiptRecovery(value: PosReceiptRecovery): PosReceiptRecovery {
+  const copy = structuredClone(value);
+  if (copy.payload) Object.freeze(copy.payload);
+  if (copy.reviewPayload) Object.freeze(copy.reviewPayload);
+  return Object.freeze(copy);
+}
+
 export interface PosDraftState {
   pendingSaleRequest?: CreateSaleRequest | null;
+  receiptRecovery?: PosReceiptRecovery | null;
   formatVersion?: number;
   sourceFormatVersion?: number;
   requiresRevalidation?: boolean;
@@ -94,6 +116,9 @@ export class PosStateService {
     if (!currentState) {
       return;
     }
+    const receipt = currentState.receiptRecovery;
+    if (currentState.pendingSaleRequest || (receipt && receipt.creationState !== "CONFIRMED"
+        && !(receipt.receiptType === "TICKET" && receipt.saleId && receipt.creationState === "NOT_STARTED"))) return;
 
     this.save({
       ...EMPTY_STATE,
@@ -141,6 +166,7 @@ export class PosStateService {
     } catch { issues.push("El total guardado no es un importe válido; revisa el borrador."); }
     return {
       pendingSaleRequest: state.pendingSaleRequest ? structuredClone(state.pendingSaleRequest) : null,
+      receiptRecovery: this.normalizeReceiptRecovery(state.receiptRecovery, state.pendingSaleRequest, state.userId),
       formatVersion,
       sourceFormatVersion,
       requiresRevalidation: Boolean(state.requiresRevalidation) || (restored && cart.length > 0) || issues.length > 0,
@@ -159,6 +185,52 @@ export class PosStateService {
       payments,
       lastSaleId: this.normalizeNullableNumber(state.lastSaleId),
     };
+  }
+
+  private normalizeReceiptRecovery(
+    raw: unknown, pending: CreateSaleRequest | null | undefined, owner: string | null | undefined,
+  ): PosReceiptRecovery | null {
+    if (!raw && !pending) return null;
+    const value = (raw && typeof raw === "object" ? raw : {}) as Partial<PosReceiptRecovery>;
+    const id = (input: unknown): number | null => typeof input === "number" && Number.isSafeInteger(input) && input > 0 ? input : null;
+    const operationId = this.normalizeNullableString(raw ? value.operationId : pending?.operationId);
+    const userId = this.normalizeNullableString(raw ? value.userId : owner);
+    const receiptType = ["TICKET", "RECEIPT", "INVOICE"].includes(value.receiptType ?? "")
+      ? value.receiptType! : "UNKNOWN";
+    const payload = value.payload;
+    const optionalText = (text: unknown): boolean => text === null || text === undefined || typeof text === "string";
+    const validPayload = receiptType !== "TICKET" && receiptType !== "UNKNOWN" && payload
+      && payload.documentType === receiptType && id(payload.billingSeriesId) !== null
+      && optionalText(payload.customerName) && optionalText(payload.customerDocument)
+      && (receiptType !== "INVOICE" || (typeof payload.customerName === "string" && !!payload.customerName.trim()
+        && typeof payload.customerDocument === "string" && /^\d{11}$/.test(payload.customerDocument)))
+      && (receiptType !== "RECEIPT" || !payload.customerDocument || /^\d{8}$/.test(payload.customerDocument));
+    const saleId = id(value.saleId), documentId = id(value.documentId);
+    const reviewSource = payload ?? value.reviewPayload;
+    const reviewPayload: Partial<CreateElectronicDocumentFromSaleRequest> = {};
+    if (reviewSource && typeof reviewSource === "object") {
+      if (reviewSource.documentType === "RECEIPT" || reviewSource.documentType === "INVOICE") reviewPayload.documentType = reviewSource.documentType;
+      if (id(reviewSource.billingSeriesId)) reviewPayload.billingSeriesId = reviewSource.billingSeriesId;
+      if (typeof reviewSource.customerName === "string" || reviewSource.customerName === null) reviewPayload.customerName = reviewSource.customerName;
+      if (typeof reviewSource.customerDocument === "string" || reviewSource.customerDocument === null) reviewPayload.customerDocument = reviewSource.customerDocument;
+    }
+    let creationState = value.creationState;
+    const identityValid = !!operationId && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(operationId)
+      && !!userId && userId === owner && (!pending || pending.operationId === operationId);
+    if (value.version !== 1 || !identityValid || receiptType === "UNKNOWN"
+        || (receiptType === "TICKET" ? payload !== null : !validPayload)
+        || !["NOT_STARTED", "POSSIBLY_SENT", "CONFIRMED", "REVIEW_REQUIRED"].includes(creationState ?? "")
+        || (creationState === "NOT_STARTED" && documentId !== null)
+        || (creationState === "POSSIBLY_SENT" && (!saleId || receiptType === "TICKET"))
+        || (creationState === "CONFIRMED" && (!saleId || !documentId || receiptType === "TICKET"))) {
+      creationState = "REVIEW_REQUIRED";
+    }
+    return immutableReceiptRecovery({ version: 1, operationId, userId, receiptType,
+      payload: validPayload ? { documentType: payload!.documentType, billingSeriesId: payload!.billingSeriesId,
+        customerName: payload!.customerName ?? null, customerDocument: payload!.customerDocument ?? null } : null,
+      ...(!validPayload && Object.keys(reviewPayload).length ? { reviewPayload } : {}),
+      customerAddress: this.normalizeString(value.customerAddress), saleId, documentId,
+      creationState: creationState as PosReceiptRecovery["creationState"] });
   }
 
   private normalizeSearchResults(

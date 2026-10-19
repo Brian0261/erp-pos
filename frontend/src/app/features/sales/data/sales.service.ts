@@ -1,4 +1,4 @@
-import { HttpClient, HttpParams } from "@angular/common/http";
+import { HttpClient, HttpContext, HttpParams } from "@angular/common/http";
 import { Injectable } from "@angular/core";
 import { Observable } from "rxjs";
 
@@ -17,8 +17,8 @@ export class SalesService {
 
   constructor(private readonly http: HttpClient) {}
 
-  create(payload: CreateSaleRequest): Observable<SaleResponse> {
-    return this.http.post<SaleResponse>(this.endpoint, payload);
+  create(payload: CreateSaleRequest, context?: HttpContext): Observable<SaleResponse> {
+    return this.http.post<SaleResponse>(this.endpoint, payload, { context });
   }
 
   list(filters?: SalesFilters): Observable<SaleResponse[]> {

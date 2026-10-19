@@ -2,11 +2,12 @@ import { CommonModule } from "@angular/common";
 import { Component, ElementRef, HostListener, OnDestroy, OnInit, ViewChild } from "@angular/core";
 import { FormBuilder, Validators } from "@angular/forms";
 import { RouterLink } from "@angular/router";
-import { Subscription } from "rxjs";
-import { HttpErrorResponse } from "@angular/common/http";
+import { catchError, defer, EMPTY, Observable, Subscription, switchMap, throwError } from "rxjs";
+import { HttpContext, HttpErrorResponse } from "@angular/common/http";
 import { immutableRequest } from "./utils/checkout-confirmation";
 
 import { AuthService } from "../../core/auth/auth.service";
+import { BoundAuthSessionError, createBoundAuthContext } from "../../core/auth/bound-auth-context";
 import { WarehouseService } from "../inventory/data/warehouse.service";
 import { WarehouseResponse } from "../inventory/data/inventory.models";
 import { PosCartPanelComponent } from "./components/pos-cart-panel.component";
@@ -18,7 +19,8 @@ import { PosTotalsSummaryComponent } from "./components/pos-totals-summary.compo
 import { CashRegisterService } from "./data/cash-register.service";
 import { toHttpErrorMessage } from "./data/http-error-message";
 import { PosService } from "./data/pos.service";
-import { POS_DRAFT_FORMAT_VERSION, PosDraftState, PosStateService } from "./data/pos-state.service";
+import { POS_DRAFT_FORMAT_VERSION, PosDraftState, PosReceiptRecovery, PosStateService,
+  immutableReceiptRecovery } from "./data/pos-state.service";
 import { PaymentLine, PosCartItem, PosReceiptType } from "./data/pos-ui.models";
 import { SalesService } from "./data/sales.service";
 import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.service";
@@ -26,6 +28,7 @@ import {
   BillingSeriesResponse,
   CreateElectronicDocumentFromSaleRequest,
   ElectronicDocumentType,
+  ElectronicDocumentResponse,
 } from "../billing/data/billing.models";
 import { BillingSeriesService } from "../billing/data/billing-series.service";
 import { ElectronicDocumentService } from "../billing/data/electronic-document.service";
@@ -114,7 +117,7 @@ import { availableQuantity, decimalText, isQuantityPolicy, moneyCents, quantityH
 
           <div
             class="message-stack"
-            *ngIf="activeErrorMessage || warningMessage || successMessage || draftReviewMessage || pendingSaleRequest || (discountAdjustmentMessage && !isFullCartOpen)"
+            *ngIf="activeErrorMessage || warningMessage || successMessage || draftReviewMessage || pendingSaleRequest || receiptRecovery || (discountAdjustmentMessage && !isFullCartOpen)"
           >
             <p class="ui-alert ui-alert--error" *ngIf="activeErrorMessage">
               {{ activeErrorMessage }}
@@ -127,12 +130,13 @@ import { availableQuantity, decimalText, isQuantityPolicy, moneyCents, quantityH
               <p id="price-review-instruction">Si mantienes el carrito, no podrás cobrar hasta revisar los precios actualizados</p>
             </div>
             <p class="ui-alert ui-alert--info" *ngIf="draftReviewMessage">{{ draftReviewMessage }}</p>
-            <button #priceReviewButton class="ui-button ui-button--secondary" type="button" *ngIf="needsRevalidation && !pendingSaleRequest"
+            <button #priceReviewButton class="ui-button ui-button--secondary" type="button" *ngIf="needsRevalidation && !pendingSaleRequest && !receiptRecovery"
               [attr.aria-describedby]="priceReviewRequired ? 'price-review-instruction' : null"
               [disabled]="revalidating" (click)="revalidateCart()">{{ revalidating ? 'Revalidando…' : priceReviewRequired ? 'Revisar precios' : 'Revalidar borrador y revisar precios' }}</button>
             <p class="ui-alert ui-alert--warning" *ngIf="pendingSaleRequest">Resultado de cobro pendiente. No inicies otra venta: reintenta la misma operación para recuperar su resultado.</p>
-            <button class="ui-button ui-button--secondary" type="button" *ngIf="pendingSaleRequest"
-              [disabled]="submitting" (click)="finalizeSale()">Recuperar resultado del cobro</button>
+            <p class="ui-alert ui-alert--warning" role="status" *ngIf="receiptRecovery && !pendingSaleRequest">{{ receiptRecoveryMessage }}</p>
+            <button class="ui-button ui-button--secondary" type="button" *ngIf="pendingSaleRequest || receiptRecovery"
+              [disabled]="submitting" (click)="finalizeSale()">{{ pendingSaleRequest ? 'Recuperar resultado del cobro' : receiptRecoveryActionLabel }}</button>
             <p
               class="ui-alert ui-alert--info"
               *ngIf="discountAdjustmentMessage && !isFullCartOpen"
@@ -564,8 +568,10 @@ export class PosPageComponent implements OnInit, OnDestroy {
   submitting = false;
   revalidating = false;
   pendingSaleRequest: CreateSaleRequest | null = null;
+  receiptRecovery: PosReceiptRecovery | null = null;
   private confirmingSale = false;
   private pendingOwnerBlocked = false;
+  private destroyed = false;
   isFullCartOpen = false;
   isCheckoutModalOpen = false;
 
@@ -626,6 +632,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.destroyed = true;
     this.subscriptions.unsubscribe();
   }
 
@@ -657,8 +664,8 @@ export class PosPageComponent implements OnInit, OnDestroy {
     this.subscriptions.add(
       warehouseControl.valueChanges.subscribe(() => {
         if (!this.isHydratingDraft) {
-          if (this.pendingSaleRequest) {
-            warehouseControl.setValue(this.pendingSaleRequest.warehouseId, { emitEvent: false });
+          if (this.pendingSaleRequest || this.receiptRecovery || this.pendingOwnerBlocked) {
+            warehouseControl.setValue(this.pendingSaleRequest?.warehouseId ?? this.posStateService.load()?.warehouseId ?? null, { emitEvent: false });
             this.preventPendingEdit();
             return;
           }
@@ -700,8 +707,11 @@ export class PosPageComponent implements OnInit, OnDestroy {
 
     const draft = this.posStateService.load();
 
-    if (draft?.pendingSaleRequest) {
-      if (!this.currentUserId || draft.userId !== this.currentUserId) {
+    if (draft?.pendingSaleRequest || draft?.receiptRecovery) {
+      if (!this.currentUserId || draft.userId !== this.currentUserId
+          || (draft.receiptRecovery && (draft.receiptRecovery.userId !== this.currentUserId
+            || !draft.receiptRecovery.operationId
+            || (draft.pendingSaleRequest && draft.receiptRecovery.operationId !== draft.pendingSaleRequest.operationId)))) {
         this.pendingOwnerBlocked = true;
         this.errorMessage = "Existe un cobro pendiente cuyo usuario no pudo verificarse. Recarga con el usuario original para recuperar el resultado; no se borró la operación.";
         return;
@@ -762,6 +772,8 @@ export class PosPageComponent implements OnInit, OnDestroy {
     this.searchResults = [...draft.searchResults];
     this.cart = draft.cart.map((item) => ({ ...item, requiresRevalidation: true }));
     this.pendingSaleRequest = draft.pendingSaleRequest ? immutableRequest(draft.pendingSaleRequest) : null;
+    this.receiptRecovery = draft.receiptRecovery ? immutableReceiptRecovery(draft.receiptRecovery) : null;
+    if (this.receiptRecovery?.saleId) this.pendingSaleRequest = null;
     this.discountAdjustmentMessage = "";
     this.restoredDraftTotal = draft.preliminaryTotal ?? null;
     this.draftSourceFormatVersion = draft.sourceFormatVersion ?? draft.formatVersion ?? 0;
@@ -770,16 +782,23 @@ export class PosPageComponent implements OnInit, OnDestroy {
       ? "Borrador restaurado: precios, políticas y stock pendientes de revalidación. Los importes originales se conservarán hasta tu aceptación."
       : "";
     if (draft.validationIssues?.length) this.draftReviewMessage += ` ${draft.validationIssues.join(" ")}`;
+    if (this.receiptRecovery?.saleId) this.draftReviewMessage = "";
     this.payments =
       draft.payments.length > 0
         ? draft.payments.map((payment) => ({ ...payment }))
         : [{ paymentMethod: "CASH", amount: 0, reference: "" }];
-    this.lastSaleId = draft.lastSaleId;
-    this.receiptType = "TICKET";
-    this.receiptSeriesId = "";
-    this.receiptCustomerDocument = "";
-    this.receiptCustomerName = "";
-    this.receiptCustomerAddress = "";
+    this.lastSaleId = this.receiptRecovery?.saleId ?? draft.lastSaleId;
+    const intent = this.receiptRecovery;
+    const displayIntent = intent?.payload ?? intent?.reviewPayload;
+    this.receiptType = intent && intent.receiptType !== "UNKNOWN" ? intent.receiptType : "TICKET";
+    this.receiptSeriesId = displayIntent?.billingSeriesId ? String(displayIntent.billingSeriesId) : "";
+    this.receiptCustomerDocument = displayIntent?.customerDocument ?? "";
+    this.receiptCustomerName = displayIntent?.customerName ?? "";
+    this.receiptCustomerAddress = intent?.customerAddress ?? "";
+    this.showGoToBillingAction = !!intent?.saleId;
+    if (intent?.receiptType === "UNKNOWN" || intent?.creationState === "REVIEW_REQUIRED") {
+      this.warningMessage = "La intención original del comprobante es desconocida o incompleta. Recupera la misma venta y revisa Comprobantes; no se emitirá automáticamente.";
+    }
     this.showFiscalDetails = false;
     this.loadingLookup = false;
     this.loadingSearch = false;
@@ -853,7 +872,9 @@ export class PosPageComponent implements OnInit, OnDestroy {
   }
 
   private persistDraftState(): boolean {
-    if (this.pendingOwnerBlocked || this.isHydratingDraft || !this.currentUserId || (!this.currentCashSession && !this.pendingSaleRequest)) {
+    if (this.pendingOwnerBlocked || this.isHydratingDraft || !this.currentUserId
+        || (this.receiptRecovery && !this.receiptRecoveryOwnerMatches())
+        || (!this.currentCashSession && !this.pendingSaleRequest && !this.receiptRecovery)) {
       return false;
     }
 
@@ -862,6 +883,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
 
     return this.posStateService.save({
       pendingSaleRequest: this.pendingSaleRequest,
+      receiptRecovery: this.receiptRecovery,
       formatVersion: POS_DRAFT_FORMAT_VERSION,
       sourceFormatVersion: this.cart.some(item => item.requiresRevalidation)
         ? this.draftSourceFormatVersion : POS_DRAFT_FORMAT_VERSION,
@@ -883,6 +905,13 @@ export class PosPageComponent implements OnInit, OnDestroy {
   }
 
   private resetDraftAfterCheckout(preserveLastSaleId: boolean): void {
+    if (this.pendingSaleRequest || (this.receiptRecovery && this.receiptRecovery.creationState !== "CONFIRMED"
+        && !(this.receiptRecovery.receiptType === "TICKET" && this.receiptRecovery.saleId
+          && this.receiptRecovery.creationState === "NOT_STARTED"))) {
+      this.warningMessage = this.receiptRecoveryMessage;
+      return;
+    }
+    this.receiptRecovery = null;
     const warehouseId = this.saleForm.value.warehouseId ?? null;
 
     this.isHydratingDraft = true;
@@ -1020,7 +1049,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
       "",
       this.receiptType === "TICKET"
         ? "Se registrará una venta interna."
-        : "Se registrará la venta y se generará el comprobante.",
+        : "Se registrará la venta y se creará un borrador del comprobante. Su procesamiento fiscal es independiente.",
       `Comprobante: ${this.receiptTypeLabel}`,
       ...customerLines,
       `Cantidad de items: ${this.cart.length}`,
@@ -1227,6 +1256,10 @@ export class PosPageComponent implements OnInit, OnDestroy {
   }
 
   openCheckoutModal(): void {
+    if (this.receiptRecovery?.saleId || this.receiptRecovery?.receiptType === "UNKNOWN" || this.pendingOwnerBlocked) {
+      this.finalizeSale();
+      return;
+    }
     if (this.priceReviewRequired && this.needsRevalidation) {
       this.revalidateCart();
       return;
@@ -1542,6 +1575,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
   }
 
   get receiptTypeLabel(): string {
+    if (this.receiptRecovery?.receiptType === "UNKNOWN") return "Comprobante original desconocido";
     switch (this.receiptType) {
       case "RECEIPT":
         return "Boleta";
@@ -1553,7 +1587,21 @@ export class PosPageComponent implements OnInit, OnDestroy {
   }
 
   get checkoutButtonLabel(): string {
+    if (this.receiptRecovery?.saleId) {
+      if (this.receiptRecovery.receiptType === "TICKET" && this.receiptRecovery.creationState === "NOT_STARTED") return "FINALIZAR RECUPERACIÓN";
+      if (this.receiptRecovery.payload) return this.receiptRecovery.creationState === "NOT_STARTED" ? "CREAR COMPROBANTE" : "CONSULTAR COMPROBANTE";
+      return "REVISAR COMPROBANTE";
+    }
+    if (this.pendingSaleRequest) return "RECUPERAR COBRO";
     return this.receiptType === "TICKET" ? "COBRAR" : "COBRAR Y EMITIR";
+  }
+
+  get receiptRecoveryActionLabel(): string {
+    const context = this.receiptRecovery;
+    if (context?.receiptType === "TICKET" && context.creationState === "NOT_STARTED") return "Finalizar recuperación del cobro";
+    if (context?.payload) return context.creationState === "NOT_STARTED"
+      ? "Crear comprobante pendiente" : "Consultar comprobante de venta registrada";
+    return "Revisar comprobante de venta registrada";
   }
 
   get filteredBillingSeries(): BillingSeriesResponse[] {
@@ -1571,7 +1619,8 @@ export class PosPageComponent implements OnInit, OnDestroy {
     if (this.receiptType === "TICKET") {
       return false;
     }
-    return !this.receiptSeriesId;
+    const seriesId = Number(this.receiptSeriesId);
+    return !Number.isSafeInteger(seriesId) || seriesId <= 0;
   }
 
   get showNoSeriesMessage(): boolean {
@@ -1649,11 +1698,19 @@ export class PosPageComponent implements OnInit, OnDestroy {
   finalizeSale(): void {
     if (this.pendingOwnerBlocked) { this.preventPendingEdit(); return; }
     if (this.submitting || this.confirmingSale || this.revalidating) return;
+    if (this.receiptRecovery && !this.receiptRecoveryOwnerMatches()) {
+      this.errorMessage = "El comprobante pendiente pertenece a otra identidad o contiene datos incompatibles. Conserva la operación para revisión.";
+      return;
+    }
+    if (this.receiptRecovery?.saleId) {
+      this.continueReceiptRecovery();
+      return;
+    }
     if (this.pendingSaleRequest) {
       const pending = this.pendingSaleRequest;
       this.confirmingSale = true;
       void this.confirmDialog.confirm({ title: "Recuperar cobro pendiente",
-        description: `Se consultará la misma operación ${pending.operationId}, sin crear otra identidad de venta. Total confirmado: S/ ${decimalText(moneyCents(pending.confirmedTotal))}.`,
+        description: `Se recuperará la misma operación ${pending.operationId}. Si la venta aún no fue registrada, este intento podría completarla, sin crear una operación diferente. Total confirmado: S/ ${decimalText(moneyCents(pending.confirmedTotal))}.`,
         confirmText: "Reintentar misma operación", cancelText: "Cancelar", variant: "warning" })
         .then(ok => { if (ok) this.submitConfirmedSale(pending); }).finally(() => this.confirmingSale = false);
       return;
@@ -1671,6 +1728,9 @@ export class PosPageComponent implements OnInit, OnDestroy {
     }
 
     const payload = immutableRequest(this.buildSaleRequest(crypto.randomUUID()));
+    const receipt = immutableReceiptRecovery({ version: 1, operationId: payload.operationId, userId: this.currentUserId,
+      receiptType: this.receiptType, payload: this.buildElectronicDocumentPayload(), customerAddress: this.receiptCustomerAddress,
+      saleId: null, documentId: null, creationState: "NOT_STARTED" });
     const fingerprint = this.checkoutFingerprint();
     this.confirmingSale = true;
     void this.confirmDialog.confirm({
@@ -1695,6 +1755,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
         return;
       }
 
+      this.receiptRecovery = receipt;
       this.submitConfirmedSale(payload);
     }).finally(() => this.confirmingSale = false);
   }
@@ -1717,35 +1778,43 @@ export class PosPageComponent implements OnInit, OnDestroy {
   }
 
   private submitConfirmedSale(payload: CreateSaleRequest): void {
+      if (this.destroyed) return;
+      if (!this.receiptRecoveryOwnerMatches() || this.receiptRecovery?.operationId !== payload.operationId) {
+        this.errorMessage = "No se pudo verificar la intención y el usuario del cobro pendiente.";
+        return;
+      }
+      const alreadyPending = this.pendingSaleRequest !== null;
       this.pendingSaleRequest = payload;
       if (!this.persistDraftState()) {
-        this.pendingSaleRequest = null;
+        if (!alreadyPending) { this.pendingSaleRequest = null; this.receiptRecovery = null; }
         this.errorMessage = "No se pudo conservar la identidad del cobro. No se envió la venta.";
         return;
       }
       this.submitting = true;
-      this.salesService.create(payload).subscribe({
+      this.subscriptions.add(this.withVerifiedIdentity(this.receiptRecovery!, context => this.salesService.create(payload, context)).subscribe({
         next: (sale) => {
           this.pendingSaleRequest = null;
-          if (this.receiptType === "TICKET") {
+          this.lastSaleId = sale.id;
+          this.receiptRecovery = immutableReceiptRecovery({ ...this.receiptRecovery!, saleId: sale.id });
+          if (!this.persistDraftState()) {
             this.submitting = false;
-            this.successMessage = `Venta ${sale.saleNumber} registrada correctamente.`;
-            this.warningMessage = "";
-            this.lastSaleId = sale.id;
-            this.resetDraftAfterCheckout(true);
+            this.warningMessage = "Venta registrada. No se pudo guardar su recuperación; no se solicitó el comprobante. Revisa la misma operación.";
             return;
           }
-
-          this.issueElectronicDocumentFromSale(sale);
+          this.continueReceiptRecovery(sale.saleNumber);
         },
         error: (error: unknown) => {
           this.submitting = false;
           const response = error as HttpErrorResponse;
-          if (response.status >= 400 && response.status < 500 && response.status !== 408
-              && !["OPERATION_CONTENT_MISMATCH", "OPERATION_RESULT_UNAVAILABLE"].includes(response.error?.code)) {
+          const priceConflict = response.status === 409 && response.error?.code === "PRICE_CONFIRMATION_REQUIRED";
+          // A rejection of a later request is not proof that an earlier uncertain POST rolled back.
+          const definitiveRejection = priceConflict || (!alreadyPending && [400, 404, 409, 422].includes(response.status)
+            && !["OPERATION_CONTENT_MISMATCH", "OPERATION_RESULT_UNAVAILABLE"].includes(response.error?.code));
+          if (definitiveRejection) {
             this.pendingSaleRequest = null;
+            this.receiptRecovery = null;
           }
-          if (response.status === 409 && response.error?.code === "PRICE_CONFIRMATION_REQUIRED") {
+          if (priceConflict) {
             this.isCheckoutModalOpen = false;
             this.isFullCartOpen = false;
             this.priceReviewRequired = true;
@@ -1754,13 +1823,37 @@ export class PosPageComponent implements OnInit, OnDestroy {
               response.error.changes.map((c: { productId: number; confirmedUnitPrice: number; currentUnitPrice: number }) =>
                 `Producto #${c.productId}: S/ ${decimalText(moneyCents(c.confirmedUnitPrice))} → S/ ${decimalText(moneyCents(c.currentUnitPrice))}.`).join(" ");
           }
-          this.errorMessage = toHttpErrorMessage(
+          this.errorMessage = this.isAuthenticationRecoveryError(error) ? new BoundAuthSessionError().message : toHttpErrorMessage(
             error,
             "No se pudo registrar la venta.",
           );
           this.persistDraftState();
         },
-      });
+      }));
+  }
+
+  private withVerifiedIdentity<T>(recovery: PosReceiptRecovery, request: (context: HttpContext) => Observable<T>): Observable<T> {
+    return defer(() => {
+      let context: HttpContext;
+      try {
+        context = createBoundAuthContext(this.authService.getToken());
+      } catch {
+        return throwError(() => new BoundAuthSessionError());
+      }
+      return this.authService.me(context).pipe(
+        catchError(() => throwError(() => new BoundAuthSessionError())),
+        switchMap(user => {
+          if (this.destroyed || this.receiptRecovery !== recovery || !recovery.userId || user.id !== recovery.userId) {
+            return throwError(() => new BoundAuthSessionError());
+          }
+          return request(context);
+        }),
+      );
+    });
+  }
+
+  private isAuthenticationRecoveryError(error: unknown): boolean {
+    return error instanceof BoundAuthSessionError || (error instanceof HttpErrorResponse && [401, 403].includes(error.status));
   }
 
   private loadWarehouses(): void {
@@ -1788,7 +1881,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
       this.errorMessage = "Recupera el cobro pendiente con el usuario original antes de iniciar otra venta.";
       return true;
     }
-    if (!this.pendingSaleRequest) return false;
+    if (!this.pendingSaleRequest && !this.receiptRecovery) return false;
     this.errorMessage = "Hay un cobro con resultado pendiente. Recupera su resultado antes de modificar o cancelar la venta.";
     return true;
   }
@@ -1860,38 +1953,140 @@ export class PosPageComponent implements OnInit, OnDestroy {
     });
   }
 
-  private issueElectronicDocumentFromSale(sale: SaleResponse): void {
-    const payload = this.buildElectronicDocumentPayload();
-    if (!payload) {
+  get receiptRecoveryMessage(): string {
+    const context = this.receiptRecovery;
+    if (!context) return "Hay un cobro pendiente. Recupera la misma operación antes de continuar.";
+    if (context.receiptType === "UNKNOWN") return context.saleId
+      ? "Venta registrada. La intención original del comprobante es desconocida. Revisa Comprobantes; no se emitirá automáticamente."
+      : "La intención original del comprobante es desconocida. Recupera la misma venta y revisa Comprobantes; no se emitirá automáticamente.";
+    if (context.creationState === "CONFIRMED") return "Venta registrada. Comprobante localizado; esto no confirma su aceptación fiscal. Conserva su referencia y finaliza la recuperación.";
+    if (context.creationState === "POSSIBLY_SENT") return "Venta registrada; la creación del comprobante tiene resultado incierto. Consulta su estado. No se reenviará automáticamente.";
+    if (context.creationState === "REVIEW_REQUIRED") return "Los datos del comprobante requieren revisión. La venta se conserva; revisa Comprobantes antes de continuar.";
+    return context.receiptType === "TICKET" ? "Venta registrada. Finaliza la recuperación del ticket interno."
+      : "Venta registrada. Comprobante pendiente de creación: continúa para crear su borrador con los datos confirmados originalmente.";
+  }
+
+  private receiptRecoveryOwnerMatches(): boolean {
+    const context = this.receiptRecovery;
+    return !!context && !!this.currentUserId && context.userId === this.currentUserId
+      && !!context.operationId && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(context.operationId)
+      && (!this.pendingSaleRequest || this.pendingSaleRequest.operationId === context.operationId);
+  }
+
+  private continueReceiptRecovery(saleNumber?: string): void {
+    const context = this.receiptRecovery;
+    if (!context?.saleId || !this.receiptRecoveryOwnerMatches()) { this.submitting = false; return; }
+    this.lastSaleId = context.saleId;
+    if (context.receiptType === "TICKET" && context.creationState === "NOT_STARTED") {
+      this.completeReceiptRecovery(`Venta ${saleNumber ?? '#' + context.saleId} registrada correctamente.`);
+    } else if (context.creationState === "CONFIRMED") {
+      this.queryReceiptResult();
+    } else if (context.creationState === "NOT_STARTED" && context.payload) {
+      this.issueElectronicDocumentFromSale();
+    } else if (context.receiptType !== "UNKNOWN" && context.payload) {
+      this.queryReceiptResult();
+    } else {
       this.submitting = false;
-      this.lastSaleId = sale.id;
       this.successMessage = "";
-      this.warningMessage =
-        "Venta registrada, pero el comprobante quedó pendiente de emisión. Puedes reintentarlo desde Comprobantes.";
+      this.warningMessage = this.receiptRecoveryMessage;
       this.showGoToBillingAction = true;
-      this.resetDraftAfterCheckout(true);
+    }
+  }
+
+  private completeReceiptRecovery(message: string): void {
+    this.submitting = false;
+    if (!this.persistDraftState()) {
+      this.warningMessage = "Resultado conocido, pero no se pudo guardar su recuperación. Conserva la operación y vuelve a revisarla; no se reenviará el comprobante.";
       return;
     }
+    this.warningMessage = "";
+    this.successMessage = message;
+    this.showGoToBillingAction = false;
+    this.resetDraftAfterCheckout(true);
+  }
 
-    this.electronicDocumentService.createFromSale(sale.id, payload).subscribe({
-      next: (document) => {
+  private issueElectronicDocumentFromSale(): void {
+    const context = this.receiptRecovery;
+    if (!context?.saleId || !context.payload || context.creationState !== "NOT_STARTED"
+        || !this.receiptRecoveryOwnerMatches()) { this.submitting = false; return; }
+    this.submitting = true;
+    this.subscriptions.add(this.withVerifiedIdentity(context, authContext => {
+      this.receiptRecovery = immutableReceiptRecovery({ ...context, creationState: "POSSIBLY_SENT" });
+      if (!this.persistDraftState()) {
+        this.receiptRecovery = context;
         this.submitting = false;
-        this.warningMessage = "";
-        this.showGoToBillingAction = false;
-        this.successMessage = `Venta ${sale.saleNumber} registrada y comprobante ${document.fullNumber} generado.`;
-        this.lastSaleId = sale.id;
-        this.resetDraftAfterCheckout(true);
-      },
-      error: () => {
+        this.warningMessage = "Venta registrada. No se pudo guardar el control del comprobante; no se envió su solicitud.";
+        this.showGoToBillingAction = true;
+        return EMPTY;
+      }
+      return this.electronicDocumentService.createFromSale(context.saleId!, context.payload!, authContext);
+    }).subscribe({
+      next: document => this.acceptRecoveredDocument(document, context),
+      error: error => {
         this.submitting = false;
         this.successMessage = "";
-        this.warningMessage =
-          "Venta registrada, pero el comprobante quedó pendiente de emisión. Puedes reintentarlo desde Comprobantes.";
+        this.warningMessage = this.isAuthenticationRecoveryError(error) ? new BoundAuthSessionError().message : this.receiptRecoveryMessage;
         this.showGoToBillingAction = true;
-        this.lastSaleId = sale.id;
-        this.resetDraftAfterCheckout(true);
+        // The durable marker is intentionally kept: a failed response is not proof of absence.
+        if (!this.isAuthenticationRecoveryError(error)) this.queryReceiptResult();
       },
-    });
+    }));
+  }
+
+  private queryReceiptResult(): void {
+    const context = this.receiptRecovery;
+    if (!context?.saleId || !context.payload || !this.receiptRecoveryOwnerMatches()) return;
+    this.submitting = true;
+    this.subscriptions.add(this.withVerifiedIdentity(context, authContext =>
+      this.electronicDocumentService.listBySaleId(context.saleId!, authContext)).subscribe({
+      next: rows => {
+        if (Array.isArray(rows) && rows.length === 1 && this.receiptDocumentMatches(rows[0], context)) {
+          this.acceptRecoveredDocument(rows[0], context);
+        } else {
+          this.submitting = false;
+          this.successMessage = "";
+          this.warningMessage = "No se encontró un comprobante compatible de forma inequívoca. El resultado sigue pendiente; revisa Comprobantes. No se repetirá su creación.";
+          this.showGoToBillingAction = true;
+        }
+      },
+      error: error => {
+        this.submitting = false;
+        this.successMessage = "";
+        this.warningMessage = this.isAuthenticationRecoveryError(error) ? new BoundAuthSessionError().message
+          : "No se pudo consultar el comprobante. La operación sigue conservada; revisa Comprobantes antes de continuar.";
+        this.showGoToBillingAction = true;
+      },
+    }));
+  }
+
+  private receiptDocumentMatches(document: ElectronicDocumentResponse, context: PosReceiptRecovery): boolean {
+    const payload = context.payload;
+    const text = (value: unknown): string | null => typeof value === "string" && value.trim() ? value.trim() : null;
+    return !!document && !!payload && Number.isSafeInteger(document.id) && document.id > 0
+      && (context.documentId === null || document.id === context.documentId)
+      && document.saleId === context.saleId && document.documentType === payload.documentType
+      && document.billingSeriesId === payload.billingSeriesId
+      && typeof document.fullNumber === "string" && !!document.fullNumber.trim()
+      && ["DRAFT", "GENERATED", "SIGNED", "SENT", "ACCEPTED", "REJECTED", "ERROR"].includes(document.status)
+      && typeof document.customerName === "string" && !!document.customerName.trim()
+      && (document.customerDocument === null || typeof document.customerDocument === "string")
+      && text(document.customerName) === (text(payload.customerName) ?? "CONSUMIDOR FINAL")
+      && text(document.customerDocument) === text(payload.customerDocument);
+  }
+
+  private acceptRecoveredDocument(document: ElectronicDocumentResponse, context: PosReceiptRecovery): void {
+    if (!this.receiptRecoveryOwnerMatches() || this.receiptRecovery?.operationId !== context.operationId
+        || !this.receiptDocumentMatches(document, context)) {
+      this.submitting = false;
+      this.warningMessage = "La respuesta del comprobante contiene datos incompatibles. Conserva la operación y revisa Comprobantes.";
+      this.showGoToBillingAction = true;
+      return;
+    }
+    this.receiptRecovery = immutableReceiptRecovery({ ...context, creationState: "CONFIRMED", documentId: document.id });
+    const result = document.status === "DRAFT"
+      ? `comprobante ${document.fullNumber} ${context.creationState === "NOT_STARTED" ? "creado como borrador" : "recuperado como borrador"}. Pendiente de procesamiento fiscal`
+      : `comprobante ${document.fullNumber} localizado (estado: ${document.status}). Localizarlo no confirma su aceptación fiscal`;
+    this.completeReceiptRecovery(`Venta #${context.saleId} registrada: ${result}.`);
   }
 
   private buildElectronicDocumentPayload(): CreateElectronicDocumentFromSaleRequest | null {
@@ -1900,7 +2095,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
     }
 
     const seriesId = Number(this.receiptSeriesId);
-    if (!Number.isFinite(seriesId) || seriesId <= 0) {
+    if (!Number.isSafeInteger(seriesId) || seriesId <= 0) {
       return null;
     }
 

@@ -1,10 +1,11 @@
 # MONEY-CHECKOUT-P1 — cierre QA local
 
-**Resultado: PASS_LOCAL — MONEY_CHECKOUT_P1_DOCS_READY.** P1-A, P1-B y la
-corrección UX final se validaron localmente según la evidencia previa indicada
-abajo. Este documento consolida esos resultados; no ejecuta ni repite QA. No
-equivale a integración en `master`, CI remoto, revisión, merge o autorización de
-producción.
+**Estado vigente: PASS — MONEY_CHECKOUT_P1_FINAL_QA_LOCAL.** La corrección P2
+de recuperación de comprobantes y el hardening de vinculación de identidad
+también se validaron localmente según la evidencia registrada en esta página.
+Este documento consolida resultados de ejecuciones distintas y no las presenta
+como una única suite. No equivale a integración en `master`, CI remoto, revisión,
+merge o autorización de producción.
 
 ## Estado y alcance
 
@@ -61,6 +62,46 @@ una única suite, ni presentarse como cobertura integral de todo el ERP/POS.
 No se hizo validación visual manual ni prueba del zoom nativo del navegador; no
 se probó en producción.
 
+## Correcciones posteriores y evidencia final local
+
+### Recuperación P2 de comprobantes
+
+La corrección P2 conserva la intención original del comprobante (tipo, serie y
+datos del cliente) junto con la operación pendiente. La recuperación consulta
+el resultado existente y no reenvía automáticamente la creación de un
+comprobante cuyo resultado sea incierto. La validación P2 anterior reportó
+104 pruebas PASS; ese conteo corresponde a su propia ejecución y no se suma a
+las pruebas finales descritas abajo.
+
+### Hardening correctivo de P1-B
+
+- La credencial se vincula a la solicitud mediante `HttpContextToken`; el
+  interceptor valida que la identidad autenticada siga correspondiendo a la
+  credencial fijada para esa operación.
+- Un cambio de sesión o de usuario detiene la solicitud protegida y preserva
+  la operación pendiente para recuperación con su usuario original.
+- Los resultados inciertos y las respuestas `401/403` no provocan reenvíos
+  automáticos; el estado pendiente se conserva para revisión/recuperación.
+- Los mensajes operativos distinguen la venta registrada, el borrador del
+  comprobante y su estado electrónico, sin equiparar un documento localizado
+  con aceptación fiscal.
+
+### QA final focal de Angular
+
+- `pos-page.component.spec.ts`: 25 PASS, 0 FAIL, 0 SKIPPED.
+- Regresión focal integrada de ocho specs: 144 PASS, 0 FAIL, 0 SKIPPED.
+- Se conservaron las 127 assertions originales del spec y se añadieron ocho
+  comprobaciones específicas del contexto de identidad; las expectations de
+  negocio existentes permanecen.
+- Build Angular: PASS en la validación anterior ya acreditada; no se repitió
+  para esta corrección limitada a pruebas.
+- `git diff --check`: PASS, con advertencias informativas de normalización
+  LF/CRLF de Windows.
+
+Los resultados de la suite P2, las dos ejecuciones focales y las etapas P1-A,
+P1-B y UX pertenecen a corridas diferentes. No deben sumarse ni describirse
+como una sola ejecución.
+
 ## Límites y riesgos residuales
 
 - El despliegue debe coordinar frontend, backend y V27. Clientes REST antiguos
@@ -69,12 +110,30 @@ se probó en producción.
 - La recuperación de respuesta incierta depende de conservar `operationId` en
   el navegador. La pérdida de esos datos no tiene recuperación administrativa
   automática; una operación tombstone no admite reutilización de identidad.
+- La recuperación local de comprobantes depende del almacenamiento del
+  navegador y del usuario original. Logout o pérdida del almacenamiento pueden
+  impedir retomar directamente la operación; no se ha implementado una
+  recuperación durable centralizada.
+- Las operaciones inciertas pueden requerir conciliación administrativa y
+  seguimiento operativo. La continuidad administrativa ante esos pendientes
+  sigue pendiente.
+- Las validaciones fiscales productivas, la aceptación fiscal y la integración
+  con proveedores reales requieren pruebas y controles independientes; esta
+  evidencia no las acredita.
 - La evidencia local no establece resultado de CI remoto, revisión de PR,
   comportamiento de producción ni cierre de GitHub Flow.
 
 ## Estado de cierre
 
-`PASS — MONEY_CHECKOUT_P1_DOCS_READY` y `READY_FOR_MONEY_CHECKOUT_P1_COMMIT_APPROVAL`.
-Pendientes: aprobación independiente del commit local y, después, los gates
-separados de push, PR, CI, revisión y merge. No marcar MONEY-CHECKOUT-P1 como
-`CLOSED` ni como lista para producción en esta etapa.
+`PASS — MONEY_CHECKOUT_P1_FINAL_QA_LOCAL`
+
+`READY_FOR_P1_FINAL_CLOSURE`
+
+El inventario local contiene 14 archivos de implementación/pruebas pendientes
+(9 modificados y 5 nuevos), además de este documento en la actualización actual.
+El staging sigue vacío y las correcciones finales no tienen commit ni push.
+Pendientes: autorización independiente para commit; push autorizado de la rama;
+checks actualizados del PR #6; revisión y resolución de la conversación P2;
+autorización de squash merge; y verificación posterior de `master`.
+No marcar MONEY-CHECKOUT-P1 como `CLOSED` ni como `POS READY FOR PRODUCTION` en
+esta etapa.

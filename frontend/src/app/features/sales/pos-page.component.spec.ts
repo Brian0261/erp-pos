@@ -1,4 +1,4 @@
-import { provideHttpClient } from "@angular/common/http";
+import { HttpContext, provideHttpClient } from "@angular/common/http";
 import {
   HttpTestingController,
   provideHttpClientTesting,
@@ -10,6 +10,7 @@ import { of, throwError } from "rxjs";
 
 import { AuthService } from "../../core/auth/auth.service";
 import { UserProfile } from "../../core/auth/auth.models";
+import { BOUND_AUTH_CREDENTIALS } from "../../core/auth/bound-auth-context";
 import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.service";
 import { BillingSeriesService } from "../billing/data/billing-series.service";
 import { ElectronicDocumentService } from "../billing/data/electronic-document.service";
@@ -23,6 +24,36 @@ import { SalesService } from "./data/sales.service";
 import { PosPageComponent } from "./pos-page.component";
 import { PaymentLine } from "./data/pos-ui.models";
 
+const SPEC_CREDENTIAL = "synthetic-pos-component-credential";
+
+function createAuthDouble(user: UserProfile): jasmine.SpyObj<AuthService> {
+  const auth = jasmine.createSpyObj<AuthService>("AuthService", ["me", "getToken"]);
+  auth.getToken.and.returnValue(SPEC_CREDENTIAL);
+  auth.me.and.callFake((context?: HttpContext) => {
+    if (context !== undefined && (!(context instanceof HttpContext)
+        || !context.has(BOUND_AUTH_CREDENTIALS)
+        || context.get(BOUND_AUTH_CREDENTIALS)?.token !== SPEC_CREDENTIAL)) {
+      return throwError(() => new Error("Expected the component's bound verification context"));
+    }
+    return of(user);
+  });
+  return auth;
+}
+
+function expectVerifiedContext(auth: jasmine.SpyObj<AuthService>, sales: jasmine.SpyObj<SalesService>): HttpContext {
+  expect(auth.getToken).toHaveBeenCalledTimes(1);
+  expect(auth.me).toHaveBeenCalledTimes(2);
+  expect(auth.me.calls.first().args[0]).toBeUndefined();
+  const context = auth.me.calls.mostRecent().args[0];
+  expect(context instanceof HttpContext).toBeTrue();
+  if (!(context instanceof HttpContext)) throw new Error("Missing bound verification context");
+  expect(context.has(BOUND_AUTH_CREDENTIALS)).toBeTrue();
+  expect(context.get(BOUND_AUTH_CREDENTIALS)).toEqual({ token: SPEC_CREDENTIAL });
+  expect(Object.isFrozen(context.get(BOUND_AUTH_CREDENTIALS))).toBeTrue();
+  expect(sales.create.calls.mostRecent().args[1]).toBe(context);
+  return context;
+}
+
 describe("PosPageComponent cash and electronic payment policy", () => {
   let fixture: ReturnType<typeof TestBed.createComponent<PosPageComponent>>;
   let component: PosPageComponent;
@@ -30,10 +61,12 @@ describe("PosPageComponent cash and electronic payment policy", () => {
   let confirm: jasmine.SpyObj<ConfirmDialogService>;
   let documents: jasmine.SpyObj<ElectronicDocumentService>;
   let http: HttpTestingController;
+  let auth: jasmine.SpyObj<AuthService>;
   const line = (paymentMethod: PaymentLine["paymentMethod"], amount: number): PaymentLine =>
     ({ paymentMethod, amount, reference: `QA-${paymentMethod}` });
 
   beforeEach(async () => {
+    auth = createAuthDouble({ id: "qa-money", username: "qa", email: "qa@example.test", roles: ["CAJERO"] });
     sales = jasmine.createSpyObj<SalesService>("SalesService", ["create"]);
     sales.create.and.returnValue(of());
     confirm = jasmine.createSpyObj<ConfirmDialogService>("ConfirmDialogService", ["confirm"]);
@@ -45,7 +78,7 @@ describe("PosPageComponent cash and electronic payment policy", () => {
       imports: [PosPageComponent],
       providers: [
         provideZoneChangeDetection(), provideRouter([]), provideHttpClient(), provideHttpClientTesting(),
-        { provide: AuthService, useValue: { me: () => of({ id: "qa-money", roles: ["CAJERO"] }) } },
+        { provide: AuthService, useValue: auth },
         { provide: WarehouseService, useValue: { list: () => of([
           { id: 1, code: "QA", name: "Synthetic warehouse", type: "STORE", active: true },
         ]) } },
@@ -126,7 +159,7 @@ describe("PosPageComponent cash and electronic payment policy", () => {
     expect(sales.create).toHaveBeenCalledOnceWith({ warehouseId: 1,
       operationId: jasmine.any(String), confirmedTotal: 100,
       items: [{ productId: 101, quantity: 1, discountAmount: 0, confirmedUnitPrice: 100 }],
-      payments: originalPayments });
+      payments: originalPayments }, expectVerifiedContext(auth, sales));
     expect(component.cart).toEqual(originalCart);
     expect(component.payments).toEqual(originalPayments);
     expect(component.submitting).toBeFalse();
@@ -192,7 +225,7 @@ describe("PosPageComponent monetary reconciliation", () => {
         provideRouter([]),
         provideHttpClient(),
         provideHttpClientTesting(),
-        { provide: AuthService, useValue: { me: () => of(user) } },
+        { provide: AuthService, useValue: createAuthDouble(user) },
         { provide: WarehouseService, useValue: { list: () => of([warehouse]) } },
         { provide: CashRegisterService, useValue: cash },
         { provide: PosService, useValue: pos },
@@ -342,6 +375,7 @@ describe("PosPageComponent controlled discount correction", () => {
   let confirm: jasmine.SpyObj<ConfirmDialogService>;
   let allowedMockSalesCalls: number;
   let saveDraft: jasmine.Spy;
+  let auth: jasmine.SpyObj<AuthService>;
 
   const cart = () => [
     { productId: 101, sku: "QA-A", barcode: null, name: "QA Product A", salePrice: 10,
@@ -380,6 +414,7 @@ describe("PosPageComponent controlled discount correction", () => {
   };
 
   beforeEach(async () => {
+    auth = createAuthDouble(user);
     fixture = undefined;
     draft = null;
     allowedMockSalesCalls = 0;
@@ -401,7 +436,7 @@ describe("PosPageComponent controlled discount correction", () => {
       imports: [PosPageComponent],
       providers: [
         provideZoneChangeDetection(), provideRouter([]), provideHttpClient(), provideHttpClientTesting(),
-        { provide: AuthService, useValue: { me: () => of(user) } },
+        { provide: AuthService, useValue: auth },
         { provide: WarehouseService, useValue: { list: () => of([warehouse]) } },
         { provide: CashRegisterService, useValue: cash },
         { provide: PosService, useValue: pos },
@@ -625,7 +660,7 @@ describe("PosPageComponent controlled discount correction", () => {
         { productId: 102, quantity: 1, discountAmount: 1.25, confirmedUnitPrice: 5.25 },
       ],
       payments: [{ paymentMethod: "CASH", amount: 10, reference: "QA payment" }],
-    });
+    }, expectVerifiedContext(auth, sales));
   });
 
   it("steps fractional quantities exactly in both cart views and preserves the P0 discount adjustment", async () => {
