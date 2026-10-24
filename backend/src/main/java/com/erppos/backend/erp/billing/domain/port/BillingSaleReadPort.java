@@ -6,5 +6,6 @@ import java.util.Optional;
 
 public interface BillingSaleReadPort {
     Optional<BillingSaleSnapshot> findById(Long saleId);
+    Optional<BillingSaleSnapshot> findByIdForUpdate(Long saleId);
 }
 

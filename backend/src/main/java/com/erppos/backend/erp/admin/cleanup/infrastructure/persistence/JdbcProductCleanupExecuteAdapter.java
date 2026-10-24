@@ -1,6 +1,8 @@
 package com.erppos.backend.erp.admin.cleanup.infrastructure.persistence;
 
 import com.erppos.backend.erp.admin.cleanup.domain.port.ProductCleanupExecutePort;
+import com.erppos.backend.erp.admin.cleanup.domain.exception.CleanupBusinessRuleException;
+import com.erppos.backend.erp.sales.domain.port.CommercialOperationCoordinationPort;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Component;
@@ -11,9 +13,42 @@ import java.util.Set;
 public class JdbcProductCleanupExecuteAdapter implements ProductCleanupExecutePort {
 
     private final NamedParameterJdbcTemplate jdbcTemplate;
+    private final CommercialOperationCoordinationPort operationCoordinationPort;
 
-    public JdbcProductCleanupExecuteAdapter(NamedParameterJdbcTemplate jdbcTemplate) {
+    public JdbcProductCleanupExecuteAdapter(NamedParameterJdbcTemplate jdbcTemplate,
+                                           CommercialOperationCoordinationPort operationCoordinationPort) {
         this.jdbcTemplate = jdbcTemplate;
+        this.operationCoordinationPort = operationCoordinationPort;
+    }
+
+    @Override
+    public void lockCleanupTargets(Set<Long> productIds, Set<Long> saleIds) {
+        jdbcTemplate.getJdbcTemplate().execute("set local lock_timeout = '3s'");
+        if (productIds.isEmpty()) return;
+        var products = new MapSqlParameterSource("productIds", productIds);
+        // Quote conversion owns the quote before it acquires an operation/cash/sale.
+        jdbcTemplate.queryForList("""
+                select q.id from quotes q where q.id in
+                    (select qi.quote_id from quote_items qi where qi.product_id in (:productIds))
+                order by q.id for update
+                """, products);
+        operationCoordinationPort.lockForSales(saleIds.stream().sorted().toList());
+        if (!saleIds.isEmpty()) {
+            var sales = new MapSqlParameterSource("ids", saleIds);
+            jdbcTemplate.queryForList("""
+                    select c.id from cash_register_sessions c where c.id in
+                        (select s.cash_register_session_id from sales s where s.id in (:ids))
+                    order by c.id for update
+                    """, sales);
+            jdbcTemplate.queryForList("select s.id from sales s where s.id in (:ids) order by s.id for update", sales);
+            jdbcTemplate.queryForList("select d.id from electronic_documents d where d.sale_id in (:ids) order by d.id for update", sales);
+            Integer linkedQuotes = jdbcTemplate.queryForObject(
+                    "select count(*) from quotes where converted_sale_id in (:ids)", sales, Integer.class);
+            if (linkedQuotes != null && linkedQuotes > 0) {
+                throw new CleanupBusinessRuleException("Converted quote history blocks purge; no operation identity can be reused.");
+            }
+        }
+        jdbcTemplate.queryForList("select p.id from products p where p.id in (:productIds) order by p.id for update", products);
     }
 
     @Override
@@ -68,6 +103,15 @@ public class JdbcProductCleanupExecuteAdapter implements ProductCleanupExecutePo
 
     @Override
     public int deleteSalesByIds(Set<Long> saleIds) {
+        if (!saleIds.isEmpty()) {
+            // A purged result can no longer create its pending document. Keep only identity/fingerprints.
+            jdbcTemplate.update("""
+                    update sale_operations set command_snapshot=null,quote_snapshot=null,
+                        receipt_intent=case when receipt_intent is null then null else
+                            jsonb_build_object('receiptType',receipt_intent->>'receiptType','payload',null) end,
+                        updated_at=current_timestamp where sale_id in (:ids)
+                    """,new MapSqlParameterSource("ids",saleIds));
+        }
         return deleteByIds("delete from sales where id in (:ids)", saleIds);
     }
 

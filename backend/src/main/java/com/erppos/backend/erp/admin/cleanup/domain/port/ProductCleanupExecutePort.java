@@ -4,6 +4,9 @@ import java.util.Set;
 
 public interface ProductCleanupExecutePort {
 
+    /** Acquire only existing affected resources in the common commercial lock order. */
+    void lockCleanupTargets(Set<Long> productIds, Set<Long> saleIds);
+
     int deleteSaleItemsBySaleIds(Set<Long> saleIds);
 
     int deleteSalePaymentsBySaleIds(Set<Long> saleIds);

@@ -2,12 +2,12 @@ import { CommonModule } from "@angular/common";
 import { Component, ElementRef, HostListener, OnDestroy, OnInit, ViewChild } from "@angular/core";
 import { FormBuilder, Validators } from "@angular/forms";
 import { RouterLink } from "@angular/router";
-import { catchError, defer, EMPTY, Observable, Subscription, switchMap, throwError } from "rxjs";
+import { catchError, defer, EMPTY, map, Observable, Subscription, switchMap, throwError } from "rxjs";
 import { HttpContext, HttpErrorResponse } from "@angular/common/http";
 import { immutableRequest } from "./utils/checkout-confirmation";
 
 import { AuthService } from "../../core/auth/auth.service";
-import { BoundAuthSessionError, createBoundAuthContext } from "../../core/auth/bound-auth-context";
+import { BOUND_AUTH_CREDENTIALS, BoundAuthSessionError, createBoundAuthContext } from "../../core/auth/bound-auth-context";
 import { WarehouseService } from "../inventory/data/warehouse.service";
 import { WarehouseResponse } from "../inventory/data/inventory.models";
 import { PosCartPanelComponent } from "./components/pos-cart-panel.component";
@@ -23,6 +23,8 @@ import { POS_DRAFT_FORMAT_VERSION, PosDraftState, PosReceiptRecovery, PosStateSe
   immutableReceiptRecovery } from "./data/pos-state.service";
 import { PaymentLine, PosCartItem, PosReceiptType } from "./data/pos-ui.models";
 import { SalesService } from "./data/sales.service";
+import { SaleOperation, SaleOperationsService } from "./data/sale-operations.service";
+import { SaleOperationRecoveryComponent } from "./components/sale-operation-recovery.component";
 import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.service";
 import {
   BillingSeriesResponse,
@@ -67,10 +69,13 @@ import { availableQuantity, decimalText, isQuantityPolicy, moneyCents, quantityH
         PosFullCartModalComponent,
         PosSearchPanelComponent,
         PosSearchResultsComponent,
+        SaleOperationRecoveryComponent,
     ],
     template: `
     <section class="ui-card pos-page">
       <div class="pos-utility-header">
+        <app-sale-operation-recovery origin="POS" (resume)="selectServerOperation($event, true)"
+          (recover)="selectServerOperation($event, false)" (cancelled)="onServerOperationCancelled($event)"></app-sale-operation-recovery>
         <div class="pos-hero__actions">
           <div
             class="pos-cash-status"
@@ -133,10 +138,18 @@ import { availableQuantity, decimalText, isQuantityPolicy, moneyCents, quantityH
             <button #priceReviewButton class="ui-button ui-button--secondary" type="button" *ngIf="needsRevalidation && !pendingSaleRequest && !receiptRecovery"
               [attr.aria-describedby]="priceReviewRequired ? 'price-review-instruction' : null"
               [disabled]="revalidating" (click)="revalidateCart()">{{ revalidating ? 'Revalidando…' : priceReviewRequired ? 'Revisar precios' : 'Revalidar borrador y revisar precios' }}</button>
-            <p class="ui-alert ui-alert--warning" *ngIf="pendingSaleRequest">Resultado de cobro pendiente. No inicies otra venta: reintenta la misma operación para recuperar su resultado.</p>
+            <p class="ui-alert ui-alert--warning" *ngIf="pendingSaleRequest">Operación conservada. Consulta su estado en el servidor antes de reanudar o cancelar esta preparación.</p>
             <p class="ui-alert ui-alert--warning" role="status" *ngIf="receiptRecovery && !pendingSaleRequest">{{ receiptRecoveryMessage }}</p>
             <button class="ui-button ui-button--secondary" type="button" *ngIf="pendingSaleRequest || receiptRecovery"
-              [disabled]="submitting" (click)="finalizeSale()">{{ pendingSaleRequest ? 'Recuperar resultado del cobro' : receiptRecoveryActionLabel }}</button>
+              [disabled]="submitting" (click)="finalizeSale()">{{ pendingSaleRequest ? 'Consultar operación en servidor' : receiptRecoveryActionLabel }}</button>
+            <button *ngIf="pendingSaleRequest && preparationMissing" type="button" class="ui-button ui-button--secondary"
+              [disabled]="submitting" (click)="retryMissingPreparation()">Preparar la misma operación</button>
+            <button *ngIf="pendingSaleRequest && preparedOnServer" type="button" class="ui-button ui-button--secondary"
+              [disabled]="submitting" (click)="confirmPreparedResume()">Reanudar preparación conservada</button>
+            <button *ngIf="pendingSaleRequest && preparedOnServer" type="button" class="ui-button ui-button--secondary"
+              [disabled]="submitting" (click)="cancelPendingPreparation()">Cancelar preparación para revisar el carrito</button>
+            <button *ngIf="pendingSaleRequest || receiptRecovery" type="button" class="ui-button ui-button--secondary"
+              [disabled]="submitting" (click)="leaveOperationInServer()">Conservar en servidor y preparar otra compra</button>
             <p
               class="ui-alert ui-alert--info"
               *ngIf="discountAdjustmentMessage && !isFullCartOpen"
@@ -232,6 +245,10 @@ import { availableQuantity, decimalText, isQuantityPolicy, moneyCents, quantityH
         [checkoutButtonLabel]="checkoutButtonLabel"
         [submitting]="submitting"
         [receiptValidationError]="receiptValidationError"
+        [errorMessage]="activeErrorMessage"
+        [recoveryMessage]="!submitting && pendingSaleRequest
+          ? 'Este cobro no tiene un resultado confirmado en pantalla. Conserva la operación y usa RECUPERAR COBRO para consultar su estado; no inicies otra venta para el mismo cobro.'
+          : receiptRecovery?.saleId ? receiptRecoveryMessage : ''"
         (close)="closeCheckoutModal()"
         (finalize)="finalizeSale()"
         (addPayment)="addPaymentLine()"
@@ -292,8 +309,10 @@ import { availableQuantity, decimalText, isQuantityPolicy, moneyCents, quantityH
 
       .pos-utility-header {
         display: flex;
-        justify-content: flex-end;
+        justify-content: space-between;
         align-items: flex-start;
+        gap: .5rem;
+        flex-wrap: wrap;
         min-height: 0;
         margin-bottom: 0.4rem;
       }
@@ -568,9 +587,13 @@ export class PosPageComponent implements OnInit, OnDestroy {
   submitting = false;
   revalidating = false;
   pendingSaleRequest: CreateSaleRequest | null = null;
+  preparationMissing = false;
+  preparedOnServer = false;
+  private durableReceiptChecked = false;
   receiptRecovery: PosReceiptRecovery | null = null;
   private confirmingSale = false;
   private pendingOwnerBlocked = false;
+  private foreignDraftPreserved = false;
   private destroyed = false;
   isFullCartOpen = false;
   isCheckoutModalOpen = false;
@@ -621,6 +644,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
     private readonly salesService: SalesService,
     private readonly billingSeriesService: BillingSeriesService,
     private readonly electronicDocumentService: ElectronicDocumentService,
+    private readonly saleOperations: SaleOperationsService,
   ) {}
 
   ngOnInit(): void {
@@ -708,6 +732,13 @@ export class PosPageComponent implements OnInit, OnDestroy {
     const draft = this.posStateService.load();
 
     if (draft?.pendingSaleRequest || draft?.receiptRecovery) {
+      if (this.currentUserId && draft.userId && draft.userId !== this.currentUserId) {
+        // Do not display or overwrite another actor's local fallback. This actor works through durable server operations.
+        this.foreignDraftPreserved = true;
+        this.initializeEmptyDraft(null, false);
+        this.warningMessage = "La sesión actual puede consultar sus propias operaciones en el servidor.";
+        return;
+      }
       if (!this.currentUserId || draft.userId !== this.currentUserId
           || (draft.receiptRecovery && (draft.receiptRecovery.userId !== this.currentUserId
             || !draft.receiptRecovery.operationId
@@ -872,7 +903,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
   }
 
   private persistDraftState(): boolean {
-    if (this.pendingOwnerBlocked || this.isHydratingDraft || !this.currentUserId
+    if (this.foreignDraftPreserved || this.pendingOwnerBlocked || this.isHydratingDraft || !this.currentUserId
         || (this.receiptRecovery && !this.receiptRecoveryOwnerMatches())
         || (!this.currentCashSession && !this.pendingSaleRequest && !this.receiptRecovery)) {
       return false;
@@ -912,6 +943,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
       return;
     }
     this.receiptRecovery = null;
+    this.durableReceiptChecked = false;
     const warehouseId = this.saleForm.value.warehouseId ?? null;
 
     this.isHydratingDraft = true;
@@ -952,7 +984,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
     }
     this.isHydratingDraft = false;
 
-    this.posStateService.clearDraft(preserveLastSaleId);
+    if (!this.foreignDraftPreserved) this.posStateService.clearDraft(preserveLastSaleId);
 
     if (this.currentCashSession && this.currentUserId) {
       this.persistDraftState();
@@ -1707,12 +1739,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
       return;
     }
     if (this.pendingSaleRequest) {
-      const pending = this.pendingSaleRequest;
-      this.confirmingSale = true;
-      void this.confirmDialog.confirm({ title: "Recuperar cobro pendiente",
-        description: `Se recuperará la misma operación ${pending.operationId}. Si la venta aún no fue registrada, este intento podría completarla, sin crear una operación diferente. Total confirmado: S/ ${decimalText(moneyCents(pending.confirmedTotal))}.`,
-        confirmText: "Reintentar misma operación", cancelText: "Cancelar", variant: "warning" })
-        .then(ok => { if (ok) this.submitConfirmedSale(pending); }).finally(() => this.confirmingSale = false);
+      this.queryPendingOperation();
       return;
     }
     this.errorMessage = "";
@@ -1777,43 +1804,52 @@ export class PosPageComponent implements OnInit, OnDestroy {
       this.receiptSeriesId, this.receiptCustomerDocument, this.receiptCustomerName, this.receiptCustomerAddress]);
   }
 
-  private submitConfirmedSale(payload: CreateSaleRequest): void {
+  private submitConfirmedSale(payload: CreateSaleRequest, prepared = false): void {
       if (this.destroyed) return;
       if (!this.receiptRecoveryOwnerMatches() || this.receiptRecovery?.operationId !== payload.operationId) {
         this.errorMessage = "No se pudo verificar la intención y el usuario del cobro pendiente.";
         return;
       }
-      const alreadyPending = this.pendingSaleRequest !== null;
       this.pendingSaleRequest = payload;
-      if (!this.persistDraftState()) {
-        if (!alreadyPending) { this.pendingSaleRequest = null; this.receiptRecovery = null; }
-        this.errorMessage = "No se pudo conservar la identidad del cobro. No se envió la venta.";
-        return;
-      }
+      this.persistDraftState();
       this.submitting = true;
-      this.subscriptions.add(this.withVerifiedIdentity(this.receiptRecovery!, context => this.salesService.create(payload, context)).subscribe({
+      let preparationConfirmed = prepared;
+      this.subscriptions.add(this.withVerifiedIdentity(this.receiptRecovery!, context => {
+        const prepare = prepared ? defer(() => {
+          if (!this.preparedOnServer) throw new Error("Consulta y confirma la preparación antes de reanudar.");
+          return this.salesService.create(payload, context);
+        }) : this.saleOperations.prepare({ protocolVersion: 1, origin: "POS", operationId: payload.operationId,
+          command: payload, quoteId: null, quoteCommand: null,
+          receiptIntent: { receiptType: this.receiptRecovery!.receiptType as "TICKET" | "RECEIPT" | "INVOICE", payload: this.receiptRecovery!.payload } }, context).pipe(
+            switchMap(operation => {
+              if (operation.operationId !== payload.operationId || operation.origin !== "POS") throw new Error("La preparación recibida no corresponde a esta operación.");
+              this.preparationMissing = false;
+              if (operation.state !== "PREPARED") {
+                this.submitting = false;
+                this.applyServerOperation(operation);
+                return EMPTY;
+              }
+              preparationConfirmed = true;
+              this.preparedOnServer = true;
+              if (this.authService.getToken() !== context.get(BOUND_AUTH_CREDENTIALS)?.token) throw new BoundAuthSessionError();
+              return this.salesService.create(payload, context);
+            }));
+        return prepare;
+      }).subscribe({
         next: (sale) => {
+          this.preparedOnServer = false;
           this.pendingSaleRequest = null;
           this.lastSaleId = sale.id;
           this.receiptRecovery = immutableReceiptRecovery({ ...this.receiptRecovery!, saleId: sale.id });
-          if (!this.persistDraftState()) {
-            this.submitting = false;
-            this.warningMessage = "Venta registrada. No se pudo guardar su recuperación; no se solicitó el comprobante. Revisa la misma operación.";
-            return;
-          }
+          this.persistDraftState();
           this.continueReceiptRecovery(sale.saleNumber);
         },
         error: (error: unknown) => {
           this.submitting = false;
           const response = error as HttpErrorResponse;
           const priceConflict = response.status === 409 && response.error?.code === "PRICE_CONFIRMATION_REQUIRED";
-          // A rejection of a later request is not proof that an earlier uncertain POST rolled back.
-          const definitiveRejection = priceConflict || (!alreadyPending && [400, 404, 409, 422].includes(response.status)
-            && !["OPERATION_CONTENT_MISMATCH", "OPERATION_RESULT_UNAVAILABLE"].includes(response.error?.code));
-          if (definitiveRejection) {
-            this.pendingSaleRequest = null;
-            this.receiptRecovery = null;
-          }
+          // The frozen identity remains durable even when checkout is rejected. Only explicit cancellation releases it.
+          this.preparedOnServer = preparationConfirmed;
           if (priceConflict) {
             this.isCheckoutModalOpen = false;
             this.isFullCartOpen = false;
@@ -1823,7 +1859,9 @@ export class PosPageComponent implements OnInit, OnDestroy {
               response.error.changes.map((c: { productId: number; confirmedUnitPrice: number; currentUnitPrice: number }) =>
                 `Producto #${c.productId}: S/ ${decimalText(moneyCents(c.confirmedUnitPrice))} → S/ ${decimalText(moneyCents(c.currentUnitPrice))}.`).join(" ");
           }
-          this.errorMessage = this.isAuthenticationRecoveryError(error) ? new BoundAuthSessionError().message : toHttpErrorMessage(
+          this.errorMessage = !preparationConfirmed && !this.isAuthenticationRecoveryError(error)
+            ? "No se confirmó la respuesta de preparación. No se envió el checkout. Consulta la misma operación en el servidor."
+            : this.isAuthenticationRecoveryError(error) ? new BoundAuthSessionError().message : toHttpErrorMessage(
             error,
             "No se pudo registrar la venta.",
           );
@@ -1832,11 +1870,143 @@ export class PosPageComponent implements OnInit, OnDestroy {
       }));
   }
 
+  private queryPendingOperation(): void {
+    const recovery = this.receiptRecovery;
+    const request = this.pendingSaleRequest;
+    if (!recovery || !request) return;
+    this.submitting = true;
+    this.subscriptions.add(this.withVerifiedIdentity(recovery, context => this.saleOperations.get(request.operationId, context)).subscribe({
+      next: operation => { this.submitting = false; this.applyServerOperation(operation); },
+      error: error => { this.submitting = false; this.preparationMissing = error instanceof HttpErrorResponse && error.status === 404;
+        this.errorMessage = this.isAuthenticationRecoveryError(error) ? new BoundAuthSessionError().message
+          : this.preparationMissing ? "No se encontró una preparación propia. Puedes preparar explícitamente la misma identidad; no se ejecutó ningún cobro."
+          : toHttpErrorMessage(error, "No se pudo consultar el resultado. Conserva la misma operación."); },
+    }));
+  }
+
+  retryMissingPreparation(): void {
+    if (!this.preparationMissing || !this.pendingSaleRequest || this.submitting || this.confirmingSale) return;
+    const payload = this.pendingSaleRequest;
+    this.confirmingSale = true;
+    void this.confirmDialog.confirm({ title: "Preparar la misma operación", description: "Se conservarán identidad, importes y comprobante. Solo después de confirmar la preparación se enviará el checkout.",
+      confirmText: "Preparar y cobrar", cancelText: "Conservar", variant: "warning" }).then(ok => { if (ok) this.submitConfirmedSale(payload); }).finally(() => this.confirmingSale = false);
+  }
+
+  selectServerOperation(operation: SaleOperation, resume: boolean): void {
+    if (this.submitting || operation.origin !== "POS") return;
+    if ((this.pendingSaleRequest || this.receiptRecovery) && this.receiptRecovery?.operationId !== operation.operationId) {
+      this.warningMessage = "Conserva primero la operación actual en el servidor antes de seleccionar otra."; return;
+    }
+    if (!this.currentUserId) { this.errorMessage = "Verifica tu sesión antes de recuperar."; return; }
+    const operationId = operation.operationId;
+    this.submitting = true;
+    const expectedOwner = this.currentUserId;
+    this.subscriptions.add(defer(() => {
+      const token = this.authService.getToken(); const context = createBoundAuthContext(token);
+      return this.authService.me(context).pipe(switchMap(actor => {
+        if (actor.id !== expectedOwner) throw new BoundAuthSessionError();
+        return this.saleOperations.get(operationId, context).pipe(map(result => {
+          if (this.destroyed || this.authService.getToken() !== token) throw new BoundAuthSessionError();
+          return result;
+        }));
+      }));
+    }).subscribe({ next: result => { this.submitting = false; this.applyServerOperation(result);
+      if (resume && result.state === "PREPARED" && this.pendingSaleRequest) this.confirmPreparedResume(); },
+      error: error => { this.submitting = false; this.errorMessage = toHttpErrorMessage(error, "No se pudo recuperar esta operación."); } }));
+  }
+
+  private applyServerOperation(operation: SaleOperation): void {
+    if (operation.origin !== "POS" || operation.protocolVersion !== 1) {
+      this.warningMessage = "Operación histórica o de cotización: consulta su venta o abre su conversión original."; return;
+    }
+    if (operation.state === "RESULT_UNAVAILABLE" || operation.state === "CANCELLED") {
+      this.errorMessage = operation.state === "CANCELLED" ? "Esta operación está cancelada y no puede reactivarse." : "El resultado fue retirado. Conserva la referencia para revisión; no repitas el cobro.";
+      return;
+    }
+    if ((operation.state === "PREPARED" && (!operation.command || operation.command.operationId !== operation.operationId
+        || !operation.receiptIntent || !operation.cashRegisterSessionId)) || (operation.state === "COMPLETED" && !operation.saleId)) {
+      this.errorMessage = "La operación no contiene una identidad o intención recuperable completa. Conserva la referencia para revisión.";
+      return;
+    }
+    this.pendingOwnerBlocked = false;
+    this.durableReceiptChecked = false;
+    this.preparationMissing = false;
+    this.preparedOnServer = operation.state === "PREPARED";
+    this.pendingSaleRequest = operation.state === "PREPARED" && operation.command ? immutableRequest(operation.command) : null;
+    this.receiptRecovery = immutableReceiptRecovery({ version: 1, userId: this.currentUserId, operationId: operation.operationId,
+      receiptType: operation.receiptIntent?.receiptType ?? "UNKNOWN", payload: operation.receiptIntent?.payload ?? null,
+      customerAddress: "", saleId: operation.saleId, documentId: operation.documentId,
+      creationState: operation.receiptState === "LOCATED" ? "CONFIRMED" : operation.receiptState === "REVIEW_REQUIRED" ? "REVIEW_REQUIRED" : "NOT_STARTED" });
+    this.receiptType = operation.receiptIntent?.receiptType ?? "TICKET";
+    this.receiptSeriesId = operation.receiptIntent?.payload?.billingSeriesId ? String(operation.receiptIntent.payload.billingSeriesId) : "";
+    this.receiptCustomerName = operation.receiptIntent?.payload?.customerName ?? "";
+    this.receiptCustomerDocument = operation.receiptIntent?.payload?.customerDocument ?? "";
+    const request = this.pendingSaleRequest;
+    if (request) {
+      this.saleForm.patchValue({ warehouseId: request.warehouseId }, { emitEvent: false });
+      this.cart = request.items.map(item => ({ productId: item.productId, sku: `#${item.productId}`, name: `Producto #${item.productId}`,
+        barcode: null, quantity: item.quantity, discountAmount: item.discountAmount ?? 0, salePrice: item.confirmedUnitPrice,
+        stockAvailable: 0, requiresRevalidation: true }));
+      this.payments = request.payments.map(payment => ({ ...payment, reference: payment.reference ?? "" }));
+      this.warningMessage = `Preparación recuperada en caja #${operation.cashRegisterSessionId}. Importe confirmado: S/ ${decimalText(moneyCents(request.confirmedTotal))}. Selecciona Reanudar en Mis operaciones o cancela para revisar precios.`;
+    } else {
+      this.lastSaleId = operation.saleId;
+      this.successMessage = `Venta #${operation.saleId} confirmada. Comprobante: ${operation.receiptState}${operation.documentStatus ? ' (' + operation.documentStatus + ')' : ''}.`;
+      this.warningMessage = operation.receiptState === "LOCATED" ? "Comprobante localizado. Su estado fiscal se muestra por separado; no se creó otro documento." : this.receiptRecoveryMessage;
+    }
+    this.persistDraftState();
+  }
+
+  confirmPreparedResume(): void {
+    const payload = this.pendingSaleRequest;
+    if (!payload || !this.preparedOnServer || this.confirmingSale || this.submitting) return;
+    this.confirmingSale = true;
+    void this.confirmDialog.confirm({ title: "Reanudar preparación", description: `Se ejecutará la operación ${payload.operationId} con su caja e importes originales. Total S/ ${decimalText(moneyCents(payload.confirmedTotal))}.`,
+      confirmText: "Reanudar mismo cobro", cancelText: "Conservar", variant: "warning" }).then(ok => { if (ok && this.pendingSaleRequest === payload) this.submitConfirmedSale(payload, true); }).finally(() => this.confirmingSale = false);
+  }
+
+  cancelPendingPreparation(): void {
+    const recovery = this.receiptRecovery;
+    if (!recovery?.operationId || !this.preparedOnServer || this.submitting || this.confirmingSale) return;
+    this.confirmingSale = true;
+    void this.confirmDialog.confirm({ title: "Cancelar preparación", description: "La identidad quedará cancelada. Podrás revisar el carrito y confirmar una compra nueva de forma explícita.",
+      confirmText: "Cancelar preparación", cancelText: "Conservar", variant: "warning" }).then(ok => {
+        if (!ok) return; this.submitting = true;
+        this.subscriptions.add(this.withVerifiedIdentity(recovery, context => this.saleOperations.cancel(recovery.operationId!, context)).subscribe({
+          next: operation => { this.submitting = false; this.onServerOperationCancelled(operation); },
+          error: error => { this.submitting = false; this.errorMessage = toHttpErrorMessage(error, "No se pudo cancelar. Consulta el resultado antes de continuar."); },
+        }));
+      }).finally(() => this.confirmingSale = false);
+  }
+
+  onServerOperationCancelled(operation: SaleOperation): void {
+    if (operation.state !== "CANCELLED" || this.receiptRecovery?.operationId !== operation.operationId) return;
+    this.pendingSaleRequest = null; this.receiptRecovery = null; this.preparedOnServer = false; this.preparationMissing = false;
+    this.cart = this.cart.map(item => ({ ...item, requiresRevalidation: true }));
+    this.warningMessage = "Preparación cancelada. Revisa precios antes de confirmar otra compra."; this.persistDraftState();
+  }
+
+  leaveOperationInServer(): void {
+    if (this.submitting || !this.receiptRecovery?.operationId) return;
+    const recovery = this.receiptRecovery;
+    this.submitting = true;
+    this.subscriptions.add(this.withVerifiedIdentity(recovery, context => this.saleOperations.get(recovery.operationId!, context)).subscribe({
+      next: operation => {
+        this.submitting = false;
+        if (!["PREPARED", "COMPLETED", "CANCELLED", "RESULT_UNAVAILABLE"].includes(operation.state)) return;
+        this.pendingSaleRequest = null; this.receiptRecovery = null; this.preparedOnServer = false; this.preparationMissing = false;
+        this.cart = []; this.payments = [{ paymentMethod: "CASH", amount: 0, reference: "" }]; this.lastSaleId = null;
+        if (!this.foreignDraftPreserved) this.posStateService.clearAll(); this.warningMessage = "Operación conservada en Mis operaciones. Puedes preparar otra compra."; this.errorMessage = "";
+      }, error: error => { this.submitting = false; this.errorMessage = toHttpErrorMessage(error, "Verifica primero que la operación está conservada en el servidor."); },
+    }));
+  }
+
   private withVerifiedIdentity<T>(recovery: PosReceiptRecovery, request: (context: HttpContext) => Observable<T>): Observable<T> {
     return defer(() => {
       let context: HttpContext;
+      const token = this.authService.getToken();
       try {
-        context = createBoundAuthContext(this.authService.getToken());
+        context = createBoundAuthContext(token);
       } catch {
         return throwError(() => new BoundAuthSessionError());
       }
@@ -1846,7 +2016,10 @@ export class PosPageComponent implements OnInit, OnDestroy {
           if (this.destroyed || this.receiptRecovery !== recovery || !recovery.userId || user.id !== recovery.userId) {
             return throwError(() => new BoundAuthSessionError());
           }
-          return request(context);
+          return request(context).pipe(map(value => {
+            if (this.destroyed || this.authService.getToken() !== token) throw new BoundAuthSessionError();
+            return value;
+          }));
         }),
       );
     });
@@ -1982,7 +2155,8 @@ export class PosPageComponent implements OnInit, OnDestroy {
     } else if (context.creationState === "CONFIRMED") {
       this.queryReceiptResult();
     } else if (context.creationState === "NOT_STARTED" && context.payload) {
-      this.issueElectronicDocumentFromSale();
+      if (saleNumber || this.durableReceiptChecked) this.issueElectronicDocumentFromSale();
+      else this.queryReceiptResult();
     } else if (context.receiptType !== "UNKNOWN" && context.payload) {
       this.queryReceiptResult();
     } else {
@@ -1995,10 +2169,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
 
   private completeReceiptRecovery(message: string): void {
     this.submitting = false;
-    if (!this.persistDraftState()) {
-      this.warningMessage = "Resultado conocido, pero no se pudo guardar su recuperación. Conserva la operación y vuelve a revisarla; no se reenviará el comprobante.";
-      return;
-    }
+    this.persistDraftState();
     this.warningMessage = "";
     this.successMessage = message;
     this.showGoToBillingAction = false;
@@ -2012,13 +2183,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
     this.submitting = true;
     this.subscriptions.add(this.withVerifiedIdentity(context, authContext => {
       this.receiptRecovery = immutableReceiptRecovery({ ...context, creationState: "POSSIBLY_SENT" });
-      if (!this.persistDraftState()) {
-        this.receiptRecovery = context;
-        this.submitting = false;
-        this.warningMessage = "Venta registrada. No se pudo guardar el control del comprobante; no se envió su solicitud.";
-        this.showGoToBillingAction = true;
-        return EMPTY;
-      }
+      this.persistDraftState();
       return this.electronicDocumentService.createFromSale(context.saleId!, context.payload!, authContext);
     }).subscribe({
       next: document => this.acceptRecoveredDocument(document, context),
@@ -2035,23 +2200,45 @@ export class PosPageComponent implements OnInit, OnDestroy {
 
   private queryReceiptResult(): void {
     const context = this.receiptRecovery;
-    if (!context?.saleId || !context.payload || !this.receiptRecoveryOwnerMatches()) return;
+    if (!context?.saleId || !context.operationId || !this.receiptRecoveryOwnerMatches()) return;
     this.submitting = true;
     this.subscriptions.add(this.withVerifiedIdentity(context, authContext =>
-      this.electronicDocumentService.listBySaleId(context.saleId!, authContext)).subscribe({
-      next: rows => {
-        if (Array.isArray(rows) && rows.length === 1 && this.receiptDocumentMatches(rows[0], context)) {
-          this.acceptRecoveredDocument(rows[0], context);
+      this.saleOperations.get(context.operationId!, authContext)).subscribe({
+      next: operation => {
+        const sameOperation = operation.operationId === context.operationId && operation.saleId === context.saleId && operation.state === "COMPLETED";
+        const serverIntent = operation.receiptIntent;
+        const normalized = (value: string | null | undefined) => value?.trim() || null;
+        const samePendingIntent = sameOperation && operation.receiptState === "PENDING" && operation.documentId === null
+          && serverIntent?.receiptType === context.receiptType && serverIntent.payload !== null
+          && serverIntent.payload.documentType === context.payload?.documentType
+          && serverIntent.payload.billingSeriesId === context.payload?.billingSeriesId
+          && normalized(serverIntent.payload.customerName) === normalized(context.payload?.customerName)
+          && normalized(serverIntent.payload.customerDocument) === normalized(context.payload?.customerDocument);
+        this.durableReceiptChecked = samePendingIntent;
+        if (operation.operationId === context.operationId && operation.saleId === context.saleId && operation.state === "COMPLETED"
+            && operation.receiptState === "LOCATED" && operation.documentId && operation.documentStatus
+            && (context.documentId === null || context.documentId === operation.documentId)
+            && operation.receiptIntent?.receiptType === context.receiptType
+            && ["DRAFT", "GENERATED", "SIGNED", "SENT", "ACCEPTED", "REJECTED", "ERROR"].includes(operation.documentStatus)) {
+          this.receiptRecovery = immutableReceiptRecovery({ ...context, documentId: operation.documentId, creationState: "CONFIRMED" });
+          this.completeReceiptRecovery(`Venta #${context.saleId} registrada; comprobante #${operation.documentId} localizado (estado: ${operation.documentStatus}).${operation.documentStatus === 'DRAFT' ? ' Borrador pendiente de procesamiento fiscal.' : ' Localizarlo no confirma aceptación fiscal.'}`);
         } else {
           this.submitting = false;
           this.successMessage = "";
-          this.warningMessage = "No se encontró un comprobante compatible de forma inequívoca. El resultado sigue pendiente; revisa Comprobantes. No se repetirá su creación.";
+          if (sameOperation && !samePendingIntent && context.creationState === "NOT_STARTED") {
+            this.receiptRecovery = immutableReceiptRecovery({ ...context, creationState: "REVIEW_REQUIRED" });
+            this.persistDraftState();
+          }
+          this.warningMessage = samePendingIntent && context.creationState === "NOT_STARTED"
+            ? "Venta confirmada. El servidor conserva la intención del comprobante, aún sin documento vinculado. Crear su borrador requiere otra acción explícita; conserva esta referencia si existe incertidumbre."
+            : "No se encontró un comprobante compatible de forma inequívoca. El resultado sigue pendiente; revisa Comprobantes. No se repetirá su creación.";
           this.showGoToBillingAction = true;
         }
       },
       error: error => {
         this.submitting = false;
         this.successMessage = "";
+        this.durableReceiptChecked = false;
         this.warningMessage = this.isAuthenticationRecoveryError(error) ? new BoundAuthSessionError().message
           : "No se pudo consultar el comprobante. La operación sigue conservada; revisa Comprobantes antes de continuar.";
         this.showGoToBillingAction = true;

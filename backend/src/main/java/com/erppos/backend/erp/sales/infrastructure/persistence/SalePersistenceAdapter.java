@@ -9,6 +9,9 @@ import com.erppos.backend.erp.sales.domain.port.SaleRepositoryPort;
 import com.erppos.backend.erp.sales.infrastructure.mapper.SaleMapper;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 
 import java.time.LocalDate;
 import java.util.HashMap;
@@ -21,6 +24,7 @@ public class SalePersistenceAdapter implements SaleRepositoryPort {
 
     private final SaleJpaRepository saleJpaRepository;
     private final CashRegisterSessionJpaRepository cashRegisterSessionJpaRepository;
+    @PersistenceContext private EntityManager entityManager;
 
     public SalePersistenceAdapter(SaleJpaRepository saleJpaRepository,
                                   CashRegisterSessionJpaRepository cashRegisterSessionJpaRepository) {
@@ -50,6 +54,16 @@ public class SalePersistenceAdapter implements SaleRepositoryPort {
     @Transactional(readOnly = true)
     public Optional<Sale> findById(Long id) {
         return saleJpaRepository.findById(id).map(SaleMapper::toDomain);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Optional<Sale> findByIdForUpdate(Long id) {
+        entityManager.createNativeQuery("set local lock_timeout = '3s'").executeUpdate();
+        return saleJpaRepository.findByIdForUpdate(id).map(entity -> {
+            entityManager.refresh(entity);
+            return SaleMapper.toDomain(entity);
+        });
     }
 
     @Override

@@ -9,6 +9,7 @@ import java.util.UUID;
 public interface CashRegisterRepositoryPort {
     CashRegisterSession save(CashRegisterSession session);
     Optional<CashRegisterSession> findById(Long id);
+    Optional<CashRegisterSession> findByIdForUpdate(Long id);
     Optional<CashRegisterSession> findOpenByUserId(UUID userId);
     Optional<CashRegisterSession> findLatestByUserId(UUID userId);
     Instant findFirstSaleAt(Long cashRegisterSessionId);

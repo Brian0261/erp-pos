@@ -103,8 +103,12 @@ public class SalesApplicationService implements SalesUseCase {
         saleOperationPort.lock(actorId, command.operationId());
         java.util.Optional<Sale> replay = completedOperation(actorId, command, requestHash);
         if (replay.isPresent()) return replay.get();
-        CashRegisterSession cashSession = cashRegisterRepositoryPort.findOpenByUserId(auditUserProvider.currentUserId())
-                .orElseThrow(() -> new SalesConflictException("Current user does not have an OPEN cash register"));
+        Long originalCashId=saleOperationPort.preparedCashSession(actorId,command.operationId(),requestHash);
+        CashRegisterSession cashSession = cashRegisterRepositoryPort.findByIdForUpdate(originalCashId)
+                .orElseThrow(() -> new SalesConflictException("Original cash register no longer exists"));
+
+        if (!actorId.equals(cashSession.openedByUserId()))
+            throw new SalesNotFoundException("Cash register not found");
 
         if (cashSession.status() != CashRegisterStatus.OPEN) {
             throw new SalesConflictException("Cash register session is not OPEN");
@@ -334,7 +338,12 @@ public class SalesApplicationService implements SalesUseCase {
     @Override
     @Transactional
     public Sale voidSale(Long id, VoidSaleCommand command) {
-        Sale current = getById(id);
+        saleOperationPort.lockForSale(id);
+        Sale hint = getById(id);
+        CashRegisterSession cashSession = cashRegisterRepositoryPort.findByIdForUpdate(hint.cashRegisterSessionId())
+                .orElseThrow(() -> new SalesNotFoundException("Cash register session not found"));
+        Sale current = saleRepositoryPort.findByIdForUpdate(id)
+                .orElseThrow(() -> new SalesNotFoundException("Sale not found"));
         if (current.status() != SaleStatus.COMPLETED) {
             throw new SalesConflictException("Only COMPLETED sales can be voided");
         }
@@ -344,17 +353,16 @@ public class SalesApplicationService implements SalesUseCase {
             throw new SalesBusinessRuleException("voidReason is required");
         }
 
-        CashRegisterSession cashSession = cashRegisterRepositoryPort.findById(current.cashRegisterSessionId())
-                .orElseThrow(() -> new SalesNotFoundException("Cash register session not found"));
         if (cashSession.status() == CashRegisterStatus.CLOSED) {
             throw new SalesBusinessRuleException("Cannot void sale from CLOSED cash register session");
         }
 
+        salesBillingSummaryReadPort.lockDocumentsForSale(id);
         Map<Long, SaleBillingSummary> summaries = salesBillingSummaryReadPort.findLatestBySaleIds(List.of(id));
         SaleBillingSummary summary = summaries.get(id);
         validateVoidAgainstBillingStatus(summary);
 
-        for (SaleItem item : current.items()) {
+        for (SaleItem item : current.items().stream().sorted(java.util.Comparator.comparing(SaleItem::productId)).toList()) {
             inventorySalesPort.registerSaleVoidIn(
                     item.productId(),
                     current.warehouseId(),

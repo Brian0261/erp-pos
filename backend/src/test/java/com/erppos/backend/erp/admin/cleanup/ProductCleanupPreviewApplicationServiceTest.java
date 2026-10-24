@@ -337,6 +337,8 @@ class ProductCleanupPreviewApplicationServiceTest {
     }
 
     private static final class StubProductCleanupExecutePort implements ProductCleanupExecutePort {
+        @Override
+        public void lockCleanupTargets(Set<Long> productIds, Set<Long> saleIds) {}
         private Set<Long> deletedProductIds = Set.of();
         private final List<String> operations = new java.util.ArrayList<>();
 

@@ -1,14 +1,18 @@
 import { CommonModule } from "@angular/common";
-import { HttpErrorResponse } from "@angular/common/http";
+import { HttpContext, HttpErrorResponse } from "@angular/common/http";
 import { PosService } from "../sales/data/pos.service";
 import { PosProductResponse } from "../sales/data/sales.models";
 import { immutableRequest } from "../sales/utils/checkout-confirmation";
 import { posLineCents, posPaidCents, posTotalCents } from "../sales/utils/pos-calculations";
 import { decimalText, moneyCents, quantityHundredths, scaledNumber, stockMillis } from "../sales/utils/pos-decimal";
-import { Component, OnInit } from "@angular/core";
+import { Component, OnDestroy, OnInit } from "@angular/core";
 import { FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
 import { ActivatedRoute, RouterLink } from "@angular/router";
-import { catchError, forkJoin, of } from "rxjs";
+import { catchError, defer, EMPTY, forkJoin, map, Observable, of, Subscription, switchMap } from "rxjs";
+import { AuthService } from "../../core/auth/auth.service";
+import { BOUND_AUTH_CREDENTIALS, BoundAuthSessionError, createBoundAuthContext } from "../../core/auth/bound-auth-context";
+import { SaleOperation, SaleOperationsService } from "../sales/data/sale-operations.service";
+import { SaleOperationRecoveryComponent } from "../sales/components/sale-operation-recovery.component";
 
 import { Product } from "../catalog/data/catalog.models";
 import { ProductService } from "../catalog/data/product.service";
@@ -34,9 +38,11 @@ interface PaymentLine {
 
 @Component({
     selector: "app-quote-convert-page",
-    imports: [CommonModule, ReactiveFormsModule, RouterLink],
+    imports: [CommonModule, ReactiveFormsModule, RouterLink, SaleOperationRecoveryComponent],
     template: `
     <section class="ui-card quote-convert-page" *ngIf="quote">
+      <app-sale-operation-recovery origin="QUOTE" [quoteId]="quoteId" (resume)="recoverOperation($event, true)"
+        (recover)="recoverOperation($event, false)" (cancelled)="operationCancelled($event)"></app-sale-operation-recovery>
       <header class="ui-page-head">
         <div>
           <p class="ui-page-kicker">Comercial InkToy</p>
@@ -208,7 +214,10 @@ interface PaymentLine {
         </header>
         <p class="ui-alert ui-alert--info">Los importes históricos no cambian. Revisa los precios vigentes y confirma el total de la venta resultante.</p>
         <button type="button" class="ui-button ui-button--secondary" [disabled]="submitting || revalidating || !!pendingRequest" (click)="refreshProposal()">Revalidar precios y disponibilidad</button>
-        <p *ngIf="pendingRequest" class="ui-alert ui-alert--warning">Resultado pendiente: solo se permite recuperar la misma operación.</p>
+        <p *ngIf="pendingRequest" class="ui-alert ui-alert--warning">Operación conservada. Consulta el servidor para verificar el resultado antes de reanudar.</p>
+        <button *ngIf="pendingRequest && preparationMissing" type="button" class="ui-button ui-button--secondary" [disabled]="submitting" (click)="retryPreparation()">Preparar la misma conversión</button>
+        <button *ngIf="pendingRequest && preparedOnServer" type="button" class="ui-button ui-button--secondary" [disabled]="submitting" (click)="cancelPreparation()">Cancelar preparación para revisar precios</button>
+        <button *ngIf="pendingRequest && preparedOnServer" type="button" class="ui-button ui-button--secondary" [disabled]="submitting" (click)="resumePreparedConversion()">Reanudar conversión preparada</button>
 
         <form [formGroup]="form" class="form-grid form-grid--two">
           <label class="field">
@@ -648,7 +657,7 @@ interface PaymentLine {
     `,
     ]
 })
-export class QuoteConvertPageComponent implements OnInit {
+export class QuoteConvertPageComponent implements OnInit, OnDestroy {
   readonly form = this.formBuilder.group({
     warehouseId: [null as number | null, Validators.required],
     comment: ["", Validators.maxLength(400)],
@@ -668,6 +677,11 @@ export class QuoteConvertPageComponent implements OnInit {
   revalidating = false;
   proposalTotal: number | null = null;
   pendingRequest: ConvertQuoteToSaleRequest | null = null;
+  preparationMissing = false;
+  preparedOnServer = false;
+  private pendingOwner: string | null = null;
+  private destroyed = false;
+  private readonly subscriptions = new Subscription();
   private proposalProducts: PosProductResponse[] = [];
   private confirming = false;
   errorMessage = "";
@@ -682,6 +696,8 @@ export class QuoteConvertPageComponent implements OnInit {
     private readonly cashRegisterService: CashRegisterService,
     private readonly confirmDialogService: ConfirmDialogService,
     private readonly posService: PosService,
+    private readonly auth: AuthService,
+    private readonly operations: SaleOperationsService,
   ) {}
 
   ngOnInit(): void {
@@ -692,19 +708,12 @@ export class QuoteConvertPageComponent implements OnInit {
     }
 
     this.quoteId = id;
-    try {
-      const saved = sessionStorage.getItem(this.pendingKey);
-      if (saved) {
-        this.pendingRequest = immutableRequest(JSON.parse(saved));
-        this.form.patchValue({ warehouseId: this.pendingRequest!.warehouseId, comment: this.pendingRequest!.comment ?? "" }, { emitEvent: false });
-        this.payments = this.pendingRequest!.payments.map(p => ({ paymentMethod: p.paymentMethod, amount: decimalText(moneyCents(p.amount)), reference: p.reference ?? "" }));
-        this.form.disable({ emitEvent: false });
-      }
-    }
-    catch { this.errorMessage = "No se pudo recuperar la operación pendiente."; }
+    // Server discovery is authoritative. Unowned legacy browser snapshots are never displayed or executed.
     this.form.controls.warehouseId.valueChanges.subscribe(() => { this.proposalTotal = null; this.proposalProducts = []; });
     this.loadData();
   }
+
+  ngOnDestroy(): void { this.destroyed = true; this.subscriptions.unsubscribe(); }
 
   get paidTotal(): number {
     try { return scaledNumber(posPaidCents(this.payments.map(p => ({ ...p, amount: Number(p.amount), amountInput: p.amount })))); }
@@ -917,12 +926,7 @@ export class QuoteConvertPageComponent implements OnInit {
   private async convertInternal(): Promise<void> {
     if (this.submitting || this.confirming || this.revalidating) return;
     if (this.pendingRequest) {
-      this.confirming = true;
-      try {
-        if (await this.confirmDialogService.confirm({ title: "Recuperar conversión pendiente",
-          description: `Se reintentará la misma operación ${this.pendingRequest.operationId} sin crear otra venta.`,
-          confirmText: "Recuperar resultado", cancelText: "Cancelar", variant: "warning" })) this.submitConversion(this.pendingRequest);
-      } finally { this.confirming = false; }
+      this.queryPendingConversion();
       return;
     }
     if (!this.quote) {
@@ -957,32 +961,40 @@ export class QuoteConvertPageComponent implements OnInit {
     this.submitConversion(payload);
   }
 
-  private submitConversion(payload: ConvertQuoteToSaleRequest): void {
+  private submitConversion(payload: ConvertQuoteToSaleRequest, prepared = false): void {
     if (!this.quote) return;
     this.pendingRequest = payload;
-    try { sessionStorage.setItem(this.pendingKey, JSON.stringify(payload)); }
-    catch { this.errorMessage = "No se pudo conservar la identidad del cobro. No se envió la conversión."; this.pendingRequest = null; return; }
     this.form.disable({ emitEvent: false });
     this.submitting = true;
-
-    this.quoteService.convertToSale(this.quote.id, payload).subscribe({
+    let preparationConfirmed = prepared;
+    this.subscriptions.add(this.verified(context => {
+      if (prepared) return this.quoteService.convertToSale(this.quoteId, payload, context);
+      return this.operations.prepare({ protocolVersion: 1, origin: "QUOTE", operationId: payload.operationId,
+        command: null, quoteId: this.quoteId, quoteCommand: payload, receiptIntent: null }, context).pipe(switchMap(operation => {
+          if (operation.operationId !== payload.operationId || operation.origin !== "QUOTE" || operation.quoteId !== this.quoteId)
+            throw new Error("La preparación no corresponde a esta cotización.");
+          if (operation.state !== "PREPARED") { this.submitting = false; this.applyOperation(operation); return EMPTY; }
+          this.preparedOnServer = true; preparationConfirmed = true;
+          if (this.auth.getToken() !== context.get(BOUND_AUTH_CREDENTIALS)?.token) throw new BoundAuthSessionError();
+          return this.quoteService.convertToSale(this.quoteId, payload, context);
+        }));
+    }).subscribe({
       next: (convertedQuote) => {
         this.pendingRequest = null;
-        sessionStorage.removeItem(this.pendingKey);
+        this.clearLocalHint();
         this.submitting = false;
+        this.preparedOnServer = false;
         this.quote = convertedQuote;
         this.successMessage = `Cotizacion convertida correctamente a venta #${convertedQuote.convertedSaleId}.`;
       },
       error: (error: unknown) => {
         this.submitting = false;
         const response = error as HttpErrorResponse;
-        if (response.status >= 400 && response.status < 500 && response.status !== 408
-            && !["OPERATION_CONTENT_MISMATCH", "OPERATION_RESULT_UNAVAILABLE"].includes(response.error?.code)) {
-          this.pendingRequest = null; sessionStorage.removeItem(this.pendingKey); this.form.enable({ emitEvent: false });
-        }
+        this.preparedOnServer = preparationConfirmed;
+        if (!preparationConfirmed) { this.errorMessage = "Respuesta de preparación incierta. No se envió la conversión. Consulta esta misma operación en el servidor."; return; }
         if (response.status === 409 && response.error?.code === "PRICE_CONFIRMATION_REQUIRED") {
           this.proposalTotal = null; this.proposalProducts = [];
-          this.errorMessage = `Total confirmado ${response.error.confirmedTotal}; total vigente ${response.error.proposedTotal ?? 'requiere revisar descuentos'}. Revalida y confirma otra vez. ` +
+          this.errorMessage = `Total confirmado ${response.error.confirmedTotal}; total vigente ${response.error.proposedTotal ?? 'requiere revisar descuentos'}. Cancela explícitamente la preparación antes de revisar y confirmar otra compra. ` +
             response.error.changes.map((c: { productId: number; confirmedUnitPrice: number; currentUnitPrice: number }) =>
               `Producto #${c.productId}: ${c.confirmedUnitPrice} → ${c.currentUnitPrice}`).join("; ");
           return;
@@ -992,7 +1004,101 @@ export class QuoteConvertPageComponent implements OnInit {
           "No se pudo convertir la cotizacion.",
         );
       },
+    }));
+  }
+
+  private verified<T>(request: (context: HttpContext) => Observable<T>): Observable<T> {
+    return defer(() => {
+      const token = this.auth.getToken(); const context = createBoundAuthContext(token);
+      return this.auth.me(context).pipe(switchMap(actor => {
+        if (this.destroyed || (this.pendingOwner && this.pendingOwner !== actor.id)) throw new BoundAuthSessionError();
+        this.pendingOwner = actor.id;
+        return request(context).pipe(map(result => {
+          if (this.destroyed || this.auth.getToken() !== token) throw new BoundAuthSessionError();
+          return result;
+        }));
+      }));
     });
+  }
+
+  private queryPendingConversion(): void {
+    if (!this.pendingRequest) return;
+    this.submitting = true;
+    this.subscriptions.add(this.verified(context => this.operations.get(this.pendingRequest!.operationId, context)).subscribe({
+      next: operation => { this.submitting = false; this.applyOperation(operation); },
+      error: error => { this.submitting = false; this.preparationMissing = error instanceof HttpErrorResponse && error.status === 404;
+        this.errorMessage = toHttpErrorMessage(error, "No se pudo consultar esta conversión. Conserva su identidad."); },
+    }));
+  }
+
+  recoverOperation(operation: SaleOperation, resume: boolean): void {
+    if (this.submitting || operation.origin !== "QUOTE" || operation.quoteId !== this.quoteId) return;
+    this.submitting = true;
+    this.subscriptions.add(this.verified(context => this.operations.get(operation.operationId, context)).subscribe({
+      next: row => {
+        this.submitting = false; this.applyOperation(row);
+        if (resume && row.state === "PREPARED" && this.pendingRequest) this.resumePreparedConversion();
+      }, error: error => { this.submitting = false; this.errorMessage = toHttpErrorMessage(error, "No se pudo recuperar la conversión."); },
+    }));
+  }
+
+  resumePreparedConversion(): void {
+    const pending = this.pendingRequest;
+    if (!pending || !this.preparedOnServer || this.confirming || this.submitting) return;
+    this.confirming = true;
+    void this.confirmDialogService.confirm({ title: "Reanudar conversión preparada", description: `Se conservarán la cotización, caja e importes originales. Total ${pending.confirmedTotal}.`,
+      confirmText: "Reanudar conversión", cancelText: "Conservar", variant: "warning" }).then(ok => {
+        if (ok && this.pendingRequest === pending) this.submitConversion(pending, true);
+      }).finally(() => this.confirming = false);
+  }
+
+  private applyOperation(operation: SaleOperation): void {
+    if (operation.origin !== "QUOTE" || operation.quoteId !== this.quoteId) { this.errorMessage = "La operación pertenece a otro flujo."; return; }
+    if (operation.state === "COMPLETED" && operation.saleId) {
+      this.pendingRequest = null; this.preparedOnServer = false;
+      this.successMessage = `Conversión confirmada a venta #${operation.saleId}. No se ejecutó otro cobro.`;
+      if (this.quote) this.quote = { ...this.quote, status: "CONVERTED", convertedSaleId: operation.saleId };
+      this.form.disable({ emitEvent: false }); return;
+    }
+    if (operation.state !== "PREPARED" || !operation.quoteCommand) {
+      this.errorMessage = operation.state === "CANCELLED" ? "Operación cancelada; esta identidad no puede reactivarse." : "Resultado no disponible. Conserva la referencia para revisión y no repitas el cobro."; return;
+    }
+    this.pendingRequest = immutableRequest(operation.quoteCommand); this.preparedOnServer = true; this.preparationMissing = false;
+    this.form.patchValue({ warehouseId: this.pendingRequest.warehouseId, comment: this.pendingRequest.comment ?? "" }, { emitEvent: false });
+    this.payments = this.pendingRequest.payments.map(p => ({ paymentMethod: p.paymentMethod, amount: decimalText(moneyCents(p.amount)), reference: p.reference ?? "" }));
+    this.form.disable({ emitEvent: false });
+    this.successMessage = `Preparación recuperada de caja #${operation.cashRegisterSessionId}. Reanudar requiere confirmación explícita.`;
+  }
+
+  retryPreparation(): void {
+    const pending = this.pendingRequest;
+    if (!pending || !this.preparationMissing || this.submitting) return;
+    void this.confirmDialogService.confirm({ title: "Preparar la misma conversión", description: "Se conservarán la identidad e importes originales.",
+      confirmText: "Preparar y convertir", cancelText: "Conservar", variant: "warning" }).then(ok => { if (ok) this.submitConversion(pending); });
+  }
+
+  cancelPreparation(): void {
+    const pending = this.pendingRequest;
+    if (!pending || !this.preparedOnServer || this.submitting) return;
+    void this.confirmDialogService.confirm({ title: "Cancelar preparación", description: "La identidad quedará cancelada antes de revisar la propuesta.", confirmText: "Cancelar preparación", cancelText: "Conservar", variant: "warning" }).then(ok => {
+      if (!ok) return; this.submitting = true;
+      this.subscriptions.add(this.verified(context => this.operations.cancel(pending.operationId, context)).subscribe({
+        next: operation => { this.submitting = false; this.operationCancelled(operation); },
+        error: error => { this.submitting = false; this.errorMessage = toHttpErrorMessage(error, "No se pudo cancelar; consulta el resultado."); },
+      }));
+    });
+  }
+
+  operationCancelled(operation: SaleOperation): void {
+    if (operation.state !== "CANCELLED" || operation.operationId !== this.pendingRequest?.operationId) return;
+    this.pendingRequest = null; this.preparedOnServer = false; this.preparationMissing = false; this.pendingOwner = null;
+    this.form.enable({ emitEvent: false }); this.proposalTotal = null; this.proposalProducts = [];
+    this.errorMessage = "Preparación cancelada. Revalida los precios antes de confirmar una compra nueva.";
+    this.clearLocalHint();
+  }
+
+  private clearLocalHint(): void {
+    try { sessionStorage.removeItem(this.pendingKey); } catch { /* Server operation remains authoritative. */ }
   }
 
   private loadData(): void {

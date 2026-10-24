@@ -85,3 +85,56 @@ jobs:
         working-directory: frontend
         run: node e2e/qa/run-qa.mjs
 
+  e2e-commercial:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - name: Set up approved Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: frontend/.nvmrc
+      - name: Grant Maven wrapper permission
+        run: chmod +x backend/mvnw
+      - name: Complete isolated commercial and UX gate
+        working-directory: frontend
+        run: node e2e/qa/run-recovery.mjs
+      - name: Validate sanitized final evidence
+        id: evidence
+        if: always()
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import { appendFile, readdir } from 'node:fs/promises';
+          import { resolve, join } from 'node:path';
+          import { readRecoveryEvidence, validateRecoveryEvidence } from './frontend/e2e/qa/run-recovery.mjs';
+          const base = resolve('backend/target/recovery-e2e');
+          const runs = (await readdir(base)).filter(name => /^[a-f0-9]{24}$/.test(name));
+          if (runs.length !== 1) throw Error('QA_SINGLE_RUN_EVIDENCE_REQUIRED');
+          const directory = join(base, runs[0], 'evidence');
+          const { summary, progress } = await readRecoveryEvidence(directory);
+          // Publish only the inspected allowlist, including safe evidence of a failed run.
+          await appendFile(process.env.GITHUB_OUTPUT, `directory=${directory}\n`);
+          validateRecoveryEvidence(summary, progress);
+          NODE
+      - name: Upload sanitized commercial evidence
+        if: always() && steps.evidence.outputs.directory != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-commercial-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ steps.evidence.outputs.directory }}
+          retention-days: 7
+          if-no-files-found: error
+          include-hidden-files: false
+

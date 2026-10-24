@@ -9,6 +9,7 @@ import com.erppos.backend.erp.sales.domain.model.PosProductSnapshot;
 import com.erppos.backend.erp.sales.domain.model.Sale;
 import com.erppos.backend.erp.sales.domain.model.SaleItem;
 import com.erppos.backend.erp.sales.domain.port.CatalogReadPort;
+import com.erppos.backend.erp.sales.domain.port.SaleRepositoryPort;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
@@ -18,10 +19,20 @@ public class SalesBillingReadAdapter implements BillingSaleReadPort {
 
     private final SalesUseCase salesUseCase;
     private final CatalogReadPort catalogReadPort;
+    private final SaleRepositoryPort saleRepositoryPort;
 
-    public SalesBillingReadAdapter(SalesUseCase salesUseCase, CatalogReadPort catalogReadPort) {
+    public SalesBillingReadAdapter(SalesUseCase salesUseCase, CatalogReadPort catalogReadPort,
+                                  SaleRepositoryPort saleRepositoryPort) {
         this.salesUseCase = salesUseCase;
         this.catalogReadPort = catalogReadPort;
+        this.saleRepositoryPort = saleRepositoryPort;
+    }
+
+    @Override
+    public Optional<BillingSaleSnapshot> findByIdForUpdate(Long saleId) {
+        if (saleRepositoryPort.findByIdForUpdate(saleId).isEmpty()) return Optional.empty();
+        // Keep existing sale-level authorization after acquiring the common sale lock.
+        return findById(saleId);
     }
 
     @Override

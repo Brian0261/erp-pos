@@ -23,6 +23,8 @@ import { CashRegisterResponse, PosProductResponse } from "./data/sales.models";
 import { SalesService } from "./data/sales.service";
 import { PosPageComponent } from "./pos-page.component";
 import { PaymentLine } from "./data/pos-ui.models";
+import { SaleOperationsService } from "./data/sale-operations.service";
+import { createOperationDouble } from "./testing/sale-operation-double.spec";
 
 const SPEC_CREDENTIAL = "synthetic-pos-component-credential";
 
@@ -41,7 +43,7 @@ function createAuthDouble(user: UserProfile): jasmine.SpyObj<AuthService> {
 }
 
 function expectVerifiedContext(auth: jasmine.SpyObj<AuthService>, sales: jasmine.SpyObj<SalesService>): HttpContext {
-  expect(auth.getToken).toHaveBeenCalledTimes(1);
+  expect(auth.getToken).toHaveBeenCalledTimes(2);
   expect(auth.me).toHaveBeenCalledTimes(2);
   expect(auth.me.calls.first().args[0]).toBeUndefined();
   const context = auth.me.calls.mostRecent().args[0];
@@ -87,6 +89,7 @@ describe("PosPageComponent cash and electronic payment policy", () => {
         { provide: PosStateService, useValue: { load: () => null, save: () => {}, clearAll: () => {} } },
         { provide: ConfirmDialogService, useValue: confirm },
         { provide: SalesService, useValue: sales },
+        { provide: SaleOperationsService, useValue: createOperationDouble() },
         { provide: BillingSeriesService, useValue: { list: () => of([]) } },
         { provide: ElectronicDocumentService, useValue: documents },
       ],
@@ -232,6 +235,7 @@ describe("PosPageComponent monetary reconciliation", () => {
         { provide: PosStateService, useValue: draftState },
         { provide: ConfirmDialogService, useValue: confirm },
         { provide: SalesService, useValue: sales },
+        { provide: SaleOperationsService, useValue: createOperationDouble() },
         { provide: BillingSeriesService, useValue: { list: () => of([]) } },
         { provide: ElectronicDocumentService, useValue: documents },
       ],
@@ -444,6 +448,7 @@ describe("PosPageComponent controlled discount correction", () => {
           load: () => draft === null ? null : structuredClone(draft),
           save: saveDraft, clearAll: () => { draft = null; },
         } },
+        { provide: SaleOperationsService, useValue: createOperationDouble() },
         { provide: ConfirmDialogService, useValue: confirm },
         { provide: SalesService, useValue: sales },
         { provide: BillingSeriesService, useValue: { list: () => of([]) } },

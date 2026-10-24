@@ -340,6 +340,8 @@ class PosMoneyPrecisionReproductionIntegrationTest extends AbstractHttpIntegrati
         ObjectNode request = objectMapper.createObjectNode().put("warehouseId", f.warehouse());
         request.putArray("payments").addObject().put("paymentMethod", "CASH").put("amount", payment);
         confirmQuotePayload(id, request);
+        MvcResult preparationFailure = prepareQuoteFixture(f.token(), id, request);
+        if (preparationFailure != null) return preparationFailure;
         return mockMvc.perform(post("/api/v1/quotes/{id}/convert-to-sale", id)
                 .header(HttpHeaders.AUTHORIZATION, bearer(f.token())).contentType(MediaType.APPLICATION_JSON)
                 .content(request.toString())).andReturn();
@@ -383,6 +385,8 @@ class PosMoneyPrecisionReproductionIntegrationTest extends AbstractHttpIntegrati
         var violations = validator.validate(objectMapper.treeToValue(payload, CreateSaleRequest.class));
         evidence(scenario + "_INPUT", Map.of("quantities", quantities, "payments", paymentNodes,
                 "validationViolations", violations.stream().map(v -> v.getPropertyPath() + ": " + v.getMessage()).toList()));
+        MvcResult preparationFailure = prepareSaleFixture(f.token(), payload);
+        if (preparationFailure != null) return preparationFailure;
         return mockMvc.perform(post("/api/v1/sales")
                         .header(HttpHeaders.AUTHORIZATION, bearer(f.token()))
                         .contentType(MediaType.APPLICATION_JSON).content(payload.toString())).andReturn();

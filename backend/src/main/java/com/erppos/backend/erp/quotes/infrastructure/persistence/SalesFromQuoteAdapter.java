@@ -36,30 +36,7 @@ public class SalesFromQuoteAdapter implements QuoteSalesPort {
     }
 
     private CreateSaleCommand toCommand(Quote quote, ConvertQuoteToSaleCommand command) {
-        if (command.items() == null || command.items().size() != quote.items().size())
-            throw new QuoteBusinessRuleException("Confirmed quote items must match the current quote");
-        java.util.Map<Long, QuoteConfirmedItemCommand> confirmed = new java.util.HashMap<>();
-        for (QuoteConfirmedItemCommand item : command.items()) {
-            if (item.quoteItemId() == null || confirmed.put(item.quoteItemId(), item) != null)
-                throw new QuoteBusinessRuleException("Duplicate or missing quoteItemId");
-        }
-        List<CreateSaleItemCommand> saleItems = quote.items().stream()
-                .map(item -> {
-                    QuoteConfirmedItemCommand input = confirmed.get(item.id());
-                    if (input == null || input.quantity() == null || input.discountAmount() == null
-                            || input.quantity().compareTo(item.quantity()) != 0 || input.discountAmount().compareTo(item.discountAmount()) != 0)
-                        throw new QuoteBusinessRuleException("Quote quantities or discounts changed; reload before conversion");
-                    return new CreateSaleItemCommand(item.productId(), input.quantity(), input.discountAmount(), input.confirmedUnitPrice());
-                })
-                .toList();
-        List<CreateSalePaymentCommand> salePayments = command.payments().stream()
-                .map(p -> new CreateSalePaymentCommand(p.paymentMethod(), p.amount(), p.reference()))
-                .toList();
-
-        String itemIdentity = quote.items().stream().map(QuoteItem::id).sorted().map(String::valueOf)
-                .collect(java.util.stream.Collectors.joining(","));
-        return new CreateSaleCommand(command.warehouseId(), saleItems, salePayments, command.operationId(),
-                command.confirmedTotal(), "QUOTE:" + quote.id() + ":" + itemIdentity + ":" + (command.comment() == null ? "" : command.comment().trim()));
+        return com.erppos.backend.erp.quotes.application.service.QuoteSaleCommandFactory.toCommand(quote, command);
     }
 }
 

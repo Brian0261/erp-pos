@@ -80,17 +80,23 @@ class CheckoutConfirmationIntegrationTest extends AbstractHttpIntegrationTest {
         assertEquals(400, submit(f, request).getResponse().getStatus()); assertEquals(before, snapshot(f));
     }
 
-    @ParameterizedTest @ValueSource(strings={"price","total"})
-    void stalePriceOrTotalHasStableConflictAndNoPartialWrites(String field) throws Exception {
+    @Test
+    void stalePriceHasStableConflictAndNoPartialWrites() throws Exception {
         Fixture f = fixture(1); ObjectNode request = sale(f); var before = snapshot(f);
-        if (field.equals("price")) ((ObjectNode)request.withArray("items").get(0)).put("confirmedUnitPrice", 9);
-        else request.put("confirmedTotal", 9);
+        ((ObjectNode)request.withArray("items").get(0)).put("confirmedUnitPrice", 9);
+        request.put("confirmedTotal", 9);
         MvcResult result = submit(f, request);
         assertEquals(409, result.getResponse().getStatus());
         JsonNode body = readJson(result);
         assertEquals("PRICE_CONFIRMATION_REQUIRED", body.path("code").asText());
         assertEquals(0, BigDecimal.TEN.compareTo(body.path("proposedTotal").decimalValue()));
-        assertEquals(field.equals("price") ? 1 : 0, body.path("changes").size());
+        assertEquals(1, body.path("changes").size());
+        assertEquals(before, snapshot(f));
+    }
+
+    @Test void inconsistentConfirmedTotalIsRejectedAtPreparationWithoutPartialWrites() throws Exception {
+        Fixture f = fixture(1); ObjectNode request = sale(f).put("confirmedTotal", 9); var before = snapshot(f);
+        assertEquals(422, submit(f, request).getResponse().getStatus());
         assertEquals(before, snapshot(f));
     }
 
@@ -354,6 +360,8 @@ class CheckoutConfirmationIntegrationTest extends AbstractHttpIntegrationTest {
         confirmSalePayload(body); return body;
     }
     private MvcResult submit(Fixture f, ObjectNode request) throws Exception {
+        MvcResult preparationFailure = prepareSaleFixture(f.token(), request);
+        if (preparationFailure != null) return preparationFailure;
         return mockMvc.perform(post("/api/v1/sales").header(HttpHeaders.AUTHORIZATION,bearer(f.token())).contentType(MediaType.APPLICATION_JSON).content(request.toString())).andReturn();
     }
     private ObjectNode quoteBody(Fixture f) {
@@ -370,6 +378,8 @@ class CheckoutConfirmationIntegrationTest extends AbstractHttpIntegrationTest {
         confirmQuotePayload(quote,body); return body;
     }
     private MvcResult convert(Fixture f,long quote,ObjectNode body) throws Exception {
+        MvcResult preparationFailure = prepareQuoteFixture(f.token(), quote, body);
+        if (preparationFailure != null) return preparationFailure;
         return mockMvc.perform(post("/api/v1/quotes/{id}/convert-to-sale",quote).header(HttpHeaders.AUTHORIZATION,bearer(f.token())).contentType(MediaType.APPLICATION_JSON).content(body.toString())).andReturn();
     }
     private Map<String,Object> quoteAmounts(long quote) {

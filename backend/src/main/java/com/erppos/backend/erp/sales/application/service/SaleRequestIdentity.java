@@ -17,6 +17,7 @@ final class SaleRequestIdentity {
         if (command.warehouseId() == null) throw new SalesBusinessRuleException("warehouseId is required");
         if (command.items() == null || command.items().isEmpty()) throw new SalesBusinessRuleException("Sale must include at least one item");
         if (command.payments() == null || command.payments().isEmpty()) throw new SalesBusinessRuleException("Sale must include at least one payment");
+        if (command.payments().stream().anyMatch(java.util.Objects::isNull)) throw new SalesBusinessRuleException("Payment line is required");
         if (command.source() == null || command.source().isBlank()) throw new SalesBusinessRuleException("Operation source is required");
         if (command.items().stream().anyMatch(i -> i == null || i.productId() == null)) throw new SalesBusinessRuleException("productId is required");
         StringBuilder out = new StringBuilder();

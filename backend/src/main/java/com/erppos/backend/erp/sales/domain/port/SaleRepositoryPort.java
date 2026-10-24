@@ -10,6 +10,7 @@ import java.util.Optional;
 public interface SaleRepositoryPort {
     Sale save(Sale sale);
     Optional<Sale> findById(Long id);
+    Optional<Sale> findByIdForUpdate(Long id);
     List<Sale> findByFilters(LocalDate from, LocalDate to, Long cashRegisterSessionId, SaleStatus status, String createdBy);
 }
 

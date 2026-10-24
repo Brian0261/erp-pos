@@ -182,7 +182,8 @@ class BillingApplicationServiceTest {
                 fiscalAuditSanitizer,
                 providerResultClassifier,
                 fiscalSendTransactionService,
-                auditUserProvider
+                auditUserProvider,
+                org.mockito.Mockito.mock(com.erppos.backend.erp.sales.domain.port.CommercialOperationCoordinationPort.class)
         );
 
         profileService.create(new CreateCompanyBillingProfileCommand(
@@ -3529,6 +3530,11 @@ class BillingApplicationServiceTest {
         @Override
         public Optional<BillingSaleSnapshot> findById(Long saleId) {
             return Optional.ofNullable(sales.get(saleId));
+        }
+
+        @Override
+        public Optional<BillingSaleSnapshot> findByIdForUpdate(Long saleId) {
+            return findById(saleId);
         }
     }
 

@@ -86,6 +86,44 @@ abstract class AbstractHttpIntegrationTest {
         payload.put("confirmedTotal", total);
     }
 
+    /** Explicit input adaptation for consumers whose business assertions predate durable preparation. */
+    protected MvcResult prepareSaleFixture(String token, ObjectNode command) throws Exception {
+        if (!hasExecutableConfirmation(command, false)) return null;
+        MvcResult existing = mockMvc.perform(get("/api/v1/sales/operations/{id}", command.path("operationId").asText())
+                .header(HttpHeaders.AUTHORIZATION, bearer(token))).andReturn();
+        if (existing.getResponse().getStatus() == 200) return null;
+        if (existing.getResponse().getStatus() != 404) return existing;
+        ObjectNode request = objectMapper.createObjectNode().put("protocolVersion", 1).put("origin", "POS")
+                .put("operationId", command.path("operationId").asText());
+        request.set("command", command.deepCopy());
+        request.putObject("receiptIntent").put("receiptType", "TICKET").putNull("payload");
+        MvcResult prepared = mockMvc.perform(post("/api/v1/sales/operations").header(HttpHeaders.AUTHORIZATION, bearer(token))
+                .contentType(MediaType.APPLICATION_JSON).content(request.toString())).andReturn();
+        return prepared.getResponse().getStatus() < 300 ? null : prepared;
+    }
+
+    protected MvcResult prepareQuoteFixture(String token, long quoteId, ObjectNode command) throws Exception {
+        if (!hasExecutableConfirmation(command, true)) return null;
+        MvcResult existing = mockMvc.perform(get("/api/v1/sales/operations/{id}", command.path("operationId").asText())
+                .header(HttpHeaders.AUTHORIZATION, bearer(token))).andReturn();
+        if (existing.getResponse().getStatus() == 200) return null;
+        if (existing.getResponse().getStatus() != 404) return existing;
+        ObjectNode request = objectMapper.createObjectNode().put("protocolVersion", 1).put("origin", "QUOTE")
+                .put("operationId", command.path("operationId").asText()).put("quoteId", quoteId);
+        request.set("quoteCommand", command.deepCopy());
+        MvcResult prepared = mockMvc.perform(post("/api/v1/sales/operations").header(HttpHeaders.AUTHORIZATION, bearer(token))
+                .contentType(MediaType.APPLICATION_JSON).content(request.toString())).andReturn();
+        return prepared.getResponse().getStatus() < 300 ? null : prepared;
+    }
+
+    private boolean hasExecutableConfirmation(ObjectNode command, boolean quote) {
+        if (!command.hasNonNull("operationId") || !command.hasNonNull("warehouseId") || !command.hasNonNull("confirmedTotal")) return false;
+        try { java.util.UUID.fromString(command.path("operationId").asText()); } catch (IllegalArgumentException ex) { return false; }
+        if (!command.path("items").isArray() || command.path("items").isEmpty()) return false;
+        for (JsonNode item : command.path("items")) if (!item.hasNonNull("confirmedUnitPrice") || !item.hasNonNull(quote ? "quoteItemId" : "productId")) return false;
+        return true;
+    }
+
     @DynamicPropertySource
     static void configureDatasource(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
@@ -271,6 +309,9 @@ abstract class AbstractHttpIntegrationTest {
         payload.putArray("payments").add(payment);
 
         confirmQuotePayload(quoteId, payload);
+
+        MvcResult preparationFailure = prepareQuoteFixture(token, quoteId, payload);
+        if (preparationFailure != null) return preparationFailure;
 
         return mockMvc.perform(post("/api/v1/quotes/{id}/convert-to-sale", quoteId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(token))

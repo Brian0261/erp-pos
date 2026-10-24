@@ -33,6 +33,7 @@ import com.erppos.backend.erp.billing.domain.port.ElectronicDocumentRepositoryPo
 import com.erppos.backend.erp.billing.domain.port.ElectronicDocumentStatusHistoryRepositoryPort;
 import com.erppos.backend.erp.billing.domain.port.UblXmlGeneratorPort;
 import com.erppos.backend.erp.billing.domain.port.XmlSignerPort;
+import com.erppos.backend.erp.sales.domain.port.CommercialOperationCoordinationPort;
 import org.slf4j.MDC;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -68,6 +69,7 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
     private final FiscalProviderResultClassifier providerResultClassifier;
     private final FiscalSendTransactionService fiscalSendTransactionService;
     private final AuditUserProvider auditUserProvider;
+    private final CommercialOperationCoordinationPort operationCoordinationPort;
 
     public ElectronicDocumentApplicationService(
             ElectronicDocumentRepositoryPort documentRepositoryPort,
@@ -87,7 +89,8 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
             FiscalAuditSanitizer fiscalAuditSanitizer,
             FiscalProviderResultClassifier providerResultClassifier,
             FiscalSendTransactionService fiscalSendTransactionService,
-            AuditUserProvider auditUserProvider
+            AuditUserProvider auditUserProvider,
+            CommercialOperationCoordinationPort operationCoordinationPort
     ) {
         this.documentRepositoryPort = documentRepositoryPort;
         this.itemRepositoryPort = itemRepositoryPort;
@@ -107,6 +110,7 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
         this.providerResultClassifier = providerResultClassifier;
         this.fiscalSendTransactionService = fiscalSendTransactionService;
         this.auditUserProvider = auditUserProvider;
+        this.operationCoordinationPort = operationCoordinationPort;
     }
 
     @Override
@@ -122,14 +126,30 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
             throw new BillingBusinessRuleException("billingSeriesId is required");
         }
 
-        BillingSaleSnapshot sale = saleReadPort.findById(saleId)
+        // Every creator (POS or manual billing) uses operation -> sale before existence/series.
+        operationCoordinationPort.lockForSale(saleId);
+        var intent = operationCoordinationPort.receiptIntentForSale(saleId);
+        if (intent.isPresent() && !intent.get().actorId().equals(auditUserProvider.currentUserId())) {
+            throw new BillingNotFoundException("Sale not found");
+        }
+        BillingSaleSnapshot sale = saleReadPort.findByIdForUpdate(saleId)
                 .orElseThrow(() -> new BillingNotFoundException("Sale not found"));
 
         if (!"COMPLETED".equalsIgnoreCase(sale.status())) {
             throw new BillingBusinessRuleException("Only COMPLETED sales can be billed");
         }
-        if (documentRepositoryPort.existsBySaleId(saleId)) {
-            throw new BillingConflictException("La venta ya tiene un comprobante asociado.");
+        validateOriginalIntent(intent, command);
+        List<ElectronicDocument> existing = documentRepositoryPort.findByFilters(null, null, saleId, null, null);
+        if (!existing.isEmpty()) {
+            if (existing.size() == 1 && intent.isPresent()
+                    && compatibleDocument(existing.get(0), command)) {
+                ElectronicDocument document = existing.get(0);
+                operationCoordinationPort.linkDocument(saleId, document.id(), document.documentType().name(),
+                        document.billingSeriesId(), document.customerName(), document.customerDocument());
+                return document;
+            }
+            throw new BillingConflictException(intent.isEmpty() ? "La venta ya tiene un comprobante asociado."
+                    : "DOCUMENT_REVIEW_REQUIRED: La venta ya tiene un comprobante asociado; requiere revisión.");
         }
         if (sale.totalAmount() == null || sale.totalAmount().compareTo(ZERO) <= 0) {
             throw new BillingBusinessRuleException("Sale total must be > 0");
@@ -214,7 +234,36 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
         itemRepositoryPort.saveAll(draft.id(), items);
 
         addHistory(draft.id(), null, ElectronicDocumentStatus.DRAFT, "Document created from sale");
+        operationCoordinationPort.linkDocument(saleId, draft.id(), draft.documentType().name(),
+                draft.billingSeriesId(), draft.customerName(), draft.customerDocument());
         return draft;
+    }
+
+    private void validateOriginalIntent(java.util.Optional<CommercialOperationCoordinationPort.ReceiptIntent> intent,
+                                        CreateElectronicDocumentFromSaleCommand command) {
+        if (intent.isEmpty() || intent.get().receiptType() == null || "TICKET".equals(intent.get().receiptType())) return;
+        var original = intent.get();
+        if (!original.receiptType().equals(command.documentType().name())
+                || !java.util.Objects.equals(original.billingSeriesId(), command.billingSeriesId())
+                || !java.util.Objects.equals(normalizedCustomer(command.documentType(), original.customerName()),
+                        normalizedCustomer(command.documentType(), command.customerName()))
+                || !java.util.Objects.equals(trimToNull(original.customerDocument()), trimToNull(command.customerDocument()))) {
+            throw new BillingConflictException("DOCUMENT_INTENT_MISMATCH: El comprobante debe conservar la intención confirmada.");
+        }
+    }
+
+    private boolean compatibleDocument(ElectronicDocument document, CreateElectronicDocumentFromSaleCommand command) {
+        return document.status() != ElectronicDocumentStatus.CANCELLED
+                && document.documentType() == command.documentType()
+                && java.util.Objects.equals(document.billingSeriesId(), command.billingSeriesId())
+                && java.util.Objects.equals(normalizedCustomer(command.documentType(), document.customerName()),
+                        normalizedCustomer(command.documentType(), command.customerName()))
+                && java.util.Objects.equals(trimToNull(document.customerDocument()), trimToNull(command.customerDocument()));
+    }
+
+    private String normalizedCustomer(ElectronicDocumentType type, String name) {
+        String value = trimToNull(name);
+        return type == ElectronicDocumentType.RECEIPT && value == null ? "CONSUMIDOR FINAL" : value;
     }
 
     @Override

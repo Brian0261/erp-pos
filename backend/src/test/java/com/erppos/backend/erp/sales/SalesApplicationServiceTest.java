@@ -79,7 +79,7 @@ class SalesApplicationServiceTest {
 
         auditUserProvider = new TestAuditUserProvider();
         cashService = new CashRegisterApplicationService(cashRepo, auditUserProvider);
-        salesService = new SalesApplicationService(saleRepo, cashRepo, catalogReadPort, warehouseReadPort, inventoryPort, salesBillingSummaryReadPort, auditUserProvider, catalogReadPort, new InMemoryOperations());
+        salesService = new SalesApplicationService(saleRepo, cashRepo, catalogReadPort, warehouseReadPort, inventoryPort, salesBillingSummaryReadPort, auditUserProvider, catalogReadPort, new InMemoryOperations(cashRepo));
 
         warehouseReadPort.activeWarehouses.put(1L, true);
         catalogReadPort.products.put(1L, new PosProductSnapshot(1L, "SKU-1", "EAN-1", "Producto 1", BigDecimal.valueOf(5), QuantityPolicy.WHOLE, true));
@@ -446,10 +446,17 @@ class SalesApplicationServiceTest {
         return new CreateSaleCommand(warehouse, items, payments, UUID.randomUUID(), total, "POS");
     }
     static class InMemoryOperations implements com.erppos.backend.erp.sales.domain.port.SaleOperationPort {
+        private final InMemoryCashRegisterRepository cash;
+        InMemoryOperations(InMemoryCashRegisterRepository cash) { this.cash=cash; }
         private final Map<String, CompletedOperation> values = new HashMap<>();
         @Override public void lock(UUID actor, UUID operation) {}
         @Override public Optional<CompletedOperation> find(UUID actor, UUID operation) { return Optional.ofNullable(values.get(actor + ":" + operation)); }
         @Override public void complete(UUID actor, UUID operation, String hash, Long sale) { values.put(actor + ":" + operation, new CompletedOperation(hash, sale)); }
+        // These unit cases isolate monetary rules; durable preparation is covered with PostgreSQL.
+        @Override public Long preparedCashSession(UUID actor, UUID operation, String hash) {
+            return cash.findOpenByUserId(actor).orElseThrow(() -> new SalesConflictException("No open cash")).id();
+        }
+        @Override public void lockForSale(Long id) {}
     }
 
     private CreateSaleCommand validSaleCommand() {
@@ -558,6 +565,7 @@ class SalesApplicationServiceTest {
         public Optional<CashRegisterSession> findById(Long id) {
             return Optional.ofNullable(storage.get(id));
         }
+        @Override public Optional<CashRegisterSession> findByIdForUpdate(Long id) { return findById(id); }
 
         @Override
         public Optional<CashRegisterSession> findOpenByUserId(UUID userId) {
@@ -643,6 +651,7 @@ class SalesApplicationServiceTest {
         public Optional<Sale> findById(Long id) {
             return Optional.ofNullable(storage.get(id));
         }
+        @Override public Optional<Sale> findByIdForUpdate(Long id) { return findById(id); }
 
         @Override
         public List<Sale> findByFilters(LocalDate from, LocalDate to, Long cashRegisterSessionId, SaleStatus status, String createdBy) {
@@ -711,6 +720,7 @@ class SalesApplicationServiceTest {
     }
 
     static class InMemorySalesBillingSummaryReadPort implements SalesBillingSummaryReadPort {
+        @Override public void lockDocumentsForSale(Long saleId) {}
         private final Map<Long, List<SaleBillingSummary>> storage = new HashMap<>();
         private int callCount = 0;
 

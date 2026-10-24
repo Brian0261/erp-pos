@@ -12,9 +12,17 @@ import java.util.Map;
 public class SalesBillingSummaryReadAdapter implements SalesBillingSummaryReadPort {
 
     private final ElectronicDocumentJpaRepository electronicDocumentJpaRepository;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
 
-    public SalesBillingSummaryReadAdapter(ElectronicDocumentJpaRepository electronicDocumentJpaRepository) {
+    public SalesBillingSummaryReadAdapter(ElectronicDocumentJpaRepository electronicDocumentJpaRepository,org.springframework.jdbc.core.JdbcTemplate jdbc) {
         this.electronicDocumentJpaRepository = electronicDocumentJpaRepository;
+        this.jdbc=jdbc;
+    }
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional(propagation=org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public void lockDocumentsForSale(Long saleId) {
+        jdbc.queryForList("select id from electronic_documents where sale_id=? order by id for update",saleId);
     }
 
     @Override

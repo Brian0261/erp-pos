@@ -82,7 +82,8 @@ public class CashRegisterApplicationService implements CashRegisterUseCase {
             throw new SalesBusinessRuleException("countedAmount must be >= 0");
         }
 
-        CashRegisterSession current = getById(id);
+        CashRegisterSession current = cashRegisterRepositoryPort.findByIdForUpdate(id)
+                .orElseThrow(() -> new SalesNotFoundException("Cash register session not found"));
         if (current.status() != CashRegisterStatus.OPEN) {
             throw new SalesConflictException("Only OPEN cash register sessions can be closed");
         }
