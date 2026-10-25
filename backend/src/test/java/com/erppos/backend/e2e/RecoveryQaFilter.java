@@ -116,7 +116,7 @@ public final class RecoveryQaFilter extends OncePerRequestFilter {
         if(!"GET".equals(method))return false;
         return Set.of("/api/v1/auth/me","/api/v1/warehouses","/api/v1/billing/series","/api/v1/cash-registers/current",
                 "/api/v1/pos/products/search","/api/v1/pos/products/lookup","/api/v1/pos/products/snapshot","/api/v1/products",
-                "/api/v1/sales","/api/v1/sales/operations","/api/v1/quotes","/api/v1/billing/documents").contains(path)
+                "/api/v1/sales","/api/v1/sales/operations","/api/v1/quotes","/api/v1/billing/documents","/api/v1/inventory/stocks").contains(path)
                 ||path.matches("/api/v1/(quotes|sales|cash-registers)/[0-9]+")
                 ||path.matches("/api/v1/sales/operations/[0-9a-fA-F-]{36}");
     }

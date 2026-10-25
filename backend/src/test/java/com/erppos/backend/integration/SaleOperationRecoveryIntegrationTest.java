@@ -26,6 +26,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -57,13 +59,37 @@ class SaleOperationRecoveryIntegrationTest extends AbstractHttpIntegrationTest {
     @MockitoSpyBean SaleOperationPort operations;
     @MockitoSpyBean com.erppos.backend.erp.sales.domain.port.CatalogReadPort catalog;
     @Autowired com.erppos.backend.erp.sales.application.usecase.SaleOperationUseCase preparationUseCase;
+    private final Map<Long, String> createdReceiptSeries = new LinkedHashMap<>();
+    private final List<Map.Entry<Gate, ExecutorService>> workers = new ArrayList<>();
 
-    @AfterEach void resetPreparationCatalog() {
-        reset(AopTestUtils.<com.erppos.backend.erp.sales.domain.port.CatalogReadPort>getUltimateTargetObject(catalog));
+    @AfterEach void cleanupPreparationFixtures() throws InterruptedException {
+        try {
+            // Also runs after failed assertions: no worker may still commit when its fixtures are released.
+            for (var worker : workers) finish(worker.getValue(), worker.getKey());
+            deactivateCreatedReceiptSeries();
+        } finally {
+            reset(AopTestUtils.<com.erppos.backend.erp.sales.domain.port.CatalogReadPort>getUltimateTargetObject(catalog));
+        }
     }
 
     record Fixture(String token, long warehouse, long cash, List<Long> products) {}
     record Gate(CountDownLatch entered, CountDownLatch release, AtomicInteger pid) {}
+    record ReceiptSeries(long id, String series) {}
+
+    @Test void receiptFixtureCleanupPreservesBorrowedSeriesWithoutClaimingOwnership() {
+        new TransactionTemplate(transactionManager).executeWithoutResult(tx -> {
+            // This separate fixture owner rolls back its setup; the recovery helper may only borrow it.
+            long borrowed = jdbc.query("select id from billing_series where document_type='RECEIPT' and active=true and environment='LOCAL' order by id limit 1",
+                    (rs, row) -> rs.getLong(1)).stream().findFirst().orElseGet(() -> insertReceiptSeries().id());
+            var before = jdbc.queryForMap("select * from billing_series where id=?", borrowed);
+            assertTrue(createdReceiptSeries.isEmpty());
+            assertEquals(borrowed, receiptSeries());
+            assertTrue(createdReceiptSeries.isEmpty(), "Reused series must never enter the ownership registry");
+            deactivateCreatedReceiptSeries();
+            assertEquals(before, jdbc.queryForMap("select * from billing_series where id=?", borrowed));
+            tx.setRollbackOnly();
+        });
+    }
 
     @Test void definitiveRejectionIsCertifiedOnlyAfterSuccessfulPreparationTransaction() throws Exception {
         Fixture f = fixture(1); ObjectNode command = sale(f); var before = effects(f);
@@ -135,7 +161,7 @@ class SaleOperationRecoveryIntegrationTest extends AbstractHttpIntegrationTest {
         assertEquals(403, mockMvc.perform(post("/api/v1/quotes/{id}/convert-to-sale", quote)
                 .header(HttpHeaders.AUTHORIZATION, bearer(unauthorized)).contentType(MediaType.APPLICATION_JSON)
                 .content(command.toString())).andReturn().getResponse().getStatus());
-        Gate gate = pauseAfterCatalog(); ExecutorService pool = Executors.newFixedThreadPool(2);
+        Gate gate = pauseAfterCatalog(); ExecutorService pool = executor(gate, 2);
         try {
             Future<MvcResult> first = pool.submit(() -> convert(converter, quote, command.deepCopy())); awaitEntered(gate);
             Future<MvcResult> second = pool.submit(() -> convert(converter, quote, command.deepCopy()));
@@ -269,12 +295,7 @@ class SaleOperationRecoveryIntegrationTest extends AbstractHttpIntegrationTest {
 
     @Test void validElectronicIntentIsFrozenAndRetainedAfterCommercialCompletionWithoutCreatingADocument() throws Exception {
         Fixture f = fixture(1); ObjectNode command = sale(f), preparation = pos(command);
-        Long series = jdbc.query("select id from billing_series where document_type='RECEIPT' and active=true and environment='LOCAL' order by id limit 1",
-                (rs, row) -> rs.getLong(1)).stream().findFirst().orElse(null);
-        if (series == null) series = jdbc.queryForObject("""
-                insert into billing_series(document_type,series,current_number,environment,created_by,updated_by)
-                values('RECEIPT',?,1,'LOCAL','synthetic','synthetic') returning id
-                """, Long.class, "B" + UUID.randomUUID().toString().replace("-", "").substring(0, 7));
+        long series = receiptSeries();
         ObjectNode intent = preparation.putObject("receiptIntent").put("receiptType", "RECEIPT");
         intent.putObject("payload").put("documentType", "RECEIPT").put("billingSeriesId", series)
                 .put("customerName", "Synthetic receipt owner").put("customerDocument", "12345678");
@@ -396,7 +417,7 @@ class SaleOperationRecoveryIntegrationTest extends AbstractHttpIntegrationTest {
 
     @Test void concurrentDuplicateExecutionsShareOneSaleAndOnePaymentSet() throws Exception {
         Fixture f = fixture(1); ObjectNode command = sale(f); prepareSuccessfully(f, command);
-        Gate gate = pauseAfterCatalog(); ExecutorService pool = Executors.newFixedThreadPool(2);
+        Gate gate = pauseAfterCatalog(); ExecutorService pool = executor(gate, 2);
         try {
             Future<MvcResult> first = pool.submit(() -> execute(f, command.deepCopy())); awaitEntered(gate);
             Future<MvcResult> second = pool.submit(() -> execute(f, command.deepCopy()));
@@ -411,7 +432,7 @@ class SaleOperationRecoveryIntegrationTest extends AbstractHttpIntegrationTest {
 
     @Test void checkoutWinningTheOperationLockMakesConcurrentCancellationFailWithoutUndoingTheSale() throws Exception {
         Fixture f = fixture(1); ObjectNode command = sale(f); prepareSuccessfully(f, command);
-        Gate gate = pauseAfterCatalog(); ExecutorService pool = Executors.newFixedThreadPool(2);
+        Gate gate = pauseAfterCatalog(); ExecutorService pool = executor(gate, 2);
         try {
             Future<MvcResult> checkoutResult = pool.submit(() -> execute(f, command)); awaitEntered(gate);
             Future<MvcResult> cancellation = pool.submit(() -> cancel(f.token(), command));
@@ -435,7 +456,7 @@ class SaleOperationRecoveryIntegrationTest extends AbstractHttpIntegrationTest {
             }
             return null;
         }).when(target).lock(eq(actor(f.cash())), eq(uuid(command)));
-        ExecutorService pool = Executors.newFixedThreadPool(2);
+        ExecutorService pool = executor(gate, 2);
         try {
             Future<MvcResult> cancellation = pool.submit(() -> {
                 String old = Thread.currentThread().getName(); Thread.currentThread().setName("controlled-recovery-cancel");
@@ -452,7 +473,7 @@ class SaleOperationRecoveryIntegrationTest extends AbstractHttpIntegrationTest {
     @Test void operationLockTimeoutReturnsSafeConflictAndPreservesPreparationWithoutEffects() throws Exception {
         Fixture f = fixture(1); ObjectNode command = sale(f); prepareSuccessfully(f, command); var before = effects(f);
         Gate gate = new Gate(new CountDownLatch(1), new CountDownLatch(1), new AtomicInteger());
-        ExecutorService pool = Executors.newSingleThreadExecutor();
+        ExecutorService pool = executor(gate, 1);
         try {
             Future<?> holder = pool.submit(() -> new TransactionTemplate(transactionManager).executeWithoutResult(tx -> {
                 operations.lock(actor(f.cash()), uuid(command));
@@ -503,7 +524,7 @@ class SaleOperationRecoveryIntegrationTest extends AbstractHttpIntegrationTest {
     @Test void concurrentPreparedQuoteConversionsHaveOneSaleAndOneConversionHistory() throws Exception {
         Fixture f = fixture(1); long quote = quote(f); ObjectNode command = conversion(f, quote);
         assertEquals(201, prepare(f.token(), quotePreparation(quote, command)).getResponse().getStatus());
-        Gate gate = pauseAfterCatalog(); ExecutorService pool = Executors.newFixedThreadPool(2);
+        Gate gate = pauseAfterCatalog(); ExecutorService pool = executor(gate, 2);
         try {
             Future<MvcResult> first = pool.submit(() -> convert(f, quote, command.deepCopy())); awaitEntered(gate);
             Future<MvcResult> second = pool.submit(() -> convert(f, quote, command.deepCopy()));
@@ -565,10 +586,26 @@ class SaleOperationRecoveryIntegrationTest extends AbstractHttpIntegrationTest {
     private UUID uuid(ObjectNode command) { return UUID.fromString(command.path("operationId").asText()); }
     private long receiptSeries() {
         return jdbc.query("select id from billing_series where document_type='RECEIPT' and active=true and environment='LOCAL' order by id limit 1",
-                (rs, row) -> rs.getLong(1)).stream().findFirst().orElseGet(() -> jdbc.queryForObject("""
-                insert into billing_series(document_type,series,current_number,environment,created_by,updated_by)
-                values('RECEIPT',?,1,'LOCAL','synthetic','synthetic') returning id
-                """, Long.class, "B" + UUID.randomUUID().toString().replace("-", "").substring(0, 7)));
+                (rs, row) -> rs.getLong(1)).stream().findFirst().orElseGet(() -> {
+                    ReceiptSeries created = insertReceiptSeries();
+                    createdReceiptSeries.put(created.id(), created.series());
+                    return created.id();
+                });
+    }
+    private ReceiptSeries insertReceiptSeries() {
+        String series = "B" + UUID.randomUUID().toString().replace("-", "").substring(0, 7);
+        long id = jdbc.queryForObject("""
+                insert into billing_series(document_type,series,current_number,environment,active,created_by,updated_by)
+                values('RECEIPT',?,1,'LOCAL',true,'synthetic','synthetic') returning id
+                """, Long.class, series);
+        return new ReceiptSeries(id, series);
+    }
+    private void deactivateCreatedReceiptSeries() {
+        for (var series : createdReceiptSeries.entrySet()) {
+            assertEquals(1, jdbc.update("update billing_series set active=false where id=? and series=? and document_type='RECEIPT' and environment='LOCAL'",
+                    series.getKey(), series.getValue()), "Only the exact owned receipt fixture may be released");
+            assertFalse(jdbc.queryForObject("select active from billing_series where id=?", Boolean.class, series.getKey()));
+        }
     }
     private UUID actor(long cash) { return jdbc.queryForObject("select opened_by_user_id from cash_register_sessions where id=?", UUID.class, cash); }
     private int countOperation(ObjectNode command) { return jdbc.queryForObject("select count(*) from sale_operations where operation_id=?", Integer.class, uuid(command)); }
@@ -659,6 +696,15 @@ class SaleOperationRecoveryIntegrationTest extends AbstractHttpIntegrationTest {
         fail("Expected a real PostgreSQL lock waiter for controlled PID " + pid);
     }
     private void finish(ExecutorService pool, Gate gate) throws InterruptedException {
-        gate.release().countDown(); pool.shutdownNow(); assertTrue(pool.awaitTermination(5, TimeUnit.SECONDS));
+        gate.release().countDown(); pool.shutdown();
+        if (!pool.awaitTermination(20, TimeUnit.SECONDS)) {
+            pool.shutdownNow();
+            assertTrue(pool.awaitTermination(5, TimeUnit.SECONDS), "Workers must terminate before fixture cleanup");
+        }
+    }
+    private ExecutorService executor(Gate gate, int threads) {
+        ExecutorService pool = Executors.newFixedThreadPool(threads);
+        workers.add(Map.entry(gate, pool));
+        return pool;
     }
 }
