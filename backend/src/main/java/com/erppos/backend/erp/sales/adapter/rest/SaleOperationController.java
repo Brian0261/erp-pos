@@ -17,7 +17,7 @@ import java.util.UUID;
 public class SaleOperationController {
     private final SaleOperationUseCase useCase;
     public SaleOperationController(SaleOperationUseCase useCase){this.useCase=useCase;}
-    @PostMapping public ResponseEntity<SaleOperationResponse> prepare(@Valid @RequestBody PrepareSaleOperationRequest r){
+    @PostMapping public ResponseEntity<?> prepare(@Valid @RequestBody PrepareSaleOperationRequest r){
         var c=r.command(); var q=r.quoteCommand();
         var command=c==null?null:new CreateSaleCommand(c.warehouseId(),
                 c.items().stream().map(i->new CreateSaleItemCommand(i.productId(),i.quantity(),i.discountAmount(),i.confirmedUnitPrice())).toList(),
@@ -25,8 +25,15 @@ public class SaleOperationController {
         var quote=q==null?null:new ConvertQuoteToSaleCommand(q.warehouseId(),q.comment(),
                 q.payments().stream().map(p->new QuotePaymentCommand(p.paymentMethod(),p.amount(),p.reference())).toList(),q.operationId(),q.confirmedTotal(),
                 q.items().stream().map(i->new QuoteConfirmedItemCommand(i.quoteItemId(),i.quantity(),i.discountAmount(),i.confirmedUnitPrice())).toList());
-        return ResponseEntity.created(java.net.URI.create("/api/v1/sales/operations/"+r.operationId())).body(SaleOperationResponse.from(useCase.prepare(new PrepareSaleOperationCommand(r.protocolVersion(),
-                r.origin(),r.operationId(),command,r.quoteId(),quote,r.receiptIntent()))));
+        // The Spring transaction proxy completes before a NOT_STORED certificate can reach the caller.
+        var outcome = useCase.prepare(new PrepareSaleOperationCommand(r.protocolVersion(),
+                r.origin(),r.operationId(),command,r.quoteId(),quote,r.receiptIntent()));
+        if (outcome instanceof SaleOperationPreparationResult.Rejected rejected)
+            return ResponseEntity.unprocessableEntity().header("Cache-Control", "no-store")
+                    .body(SalePreparationRejectedResponse.from(rejected));
+        var durable = (SaleOperationPreparationResult.Durable) outcome;
+        return ResponseEntity.created(java.net.URI.create("/api/v1/sales/operations/"+r.operationId()))
+                .body(SaleOperationResponse.from(durable.operation()));
     }
     @GetMapping public ResponseEntity<PageResponse<SaleOperationResponse>> list(@RequestParam(defaultValue="0") @jakarta.validation.constraints.Min(0) @jakarta.validation.constraints.Max(100000) int page,
             @RequestParam(defaultValue="20") @jakarta.validation.constraints.Min(1) @jakarta.validation.constraints.Max(100) int size,@RequestParam(required=false) String state,

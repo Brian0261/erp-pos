@@ -40,14 +40,13 @@ public class SaleOperationApplicationService implements SaleOperationUseCase {
         this.catalog=catalog; this.quotes=quotes; this.series=series; this.actor=actor; this.json=json;
     }
     @Override @Transactional(timeout=15)
-    public SaleOperationResult prepare(PrepareSaleOperationCommand input) {
+    public SaleOperationPreparationResult prepare(PrepareSaleOperationCommand input) {
         if (input.protocolVersion()!=1 || input.operationId()==null) throw invalid("Unsupported operation protocol or missing operationId");
         CreateSaleCommand command;
         if ("QUOTE".equals(input.origin())) {
             if (input.quoteId()==null || input.quoteCommand()==null || input.command()!=null || input.receiptIntent()!=null
                     || !input.operationId().equals(input.quoteCommand().operationId())) throw invalid("Invalid quote preparation");
             var quote=quotes.findByIdForUpdate(input.quoteId()).orElseThrow(() -> new SalesNotFoundException("Quote not found"));
-            if (!actor.currentUsername().equals(quote.createdBy())) throw new SalesNotFoundException("Quote not found");
             command=QuoteSaleCommandFactory.toCommand(quote,input.quoteCommand());
             // Existing immutable operation can be recovered even after the quote conversion.
         } else if ("POS".equals(input.origin())) {
@@ -67,15 +66,23 @@ public class SaleOperationApplicationService implements SaleOperationUseCase {
             var old=prior.get();
             if (!old.requestHash().equals(hash) || !Objects.equals(old.intentHash(),intentHash))
                 throw conflict("OPERATION_CONTENT_MISMATCH","The frozen command or receipt intent differs");
-            return result(old,true);
+            return new SaleOperationPreparationResult.Durable(result(old,true));
         }
         if (input.quoteId()!=null) {
             var quote=quotes.findById(input.quoteId()).orElseThrow(() -> new SalesNotFoundException("Quote not found"));
             if (quote.convertedSaleId()!=null || (quote.status()!=QuoteStatus.DRAFT && quote.status()!=QuoteStatus.SENT)
                     || quote.expiresAt().isBefore(LocalDate.now())) throw conflict("OPERATION_QUOTE_UNAVAILABLE","Quote cannot be prepared");
         }
-        validateCommand(command);
-        validateSeries(intent);
+        // Only application validation before any write is certifiably NOT_STORED. Persistence, lock,
+        // authentication and unclassified failures still escape and can never produce this outcome.
+        try {
+            validateCommand(command);
+            validateSeries(intent);
+        } catch (SalesBusinessRuleException | SalesNotFoundException rejected) {
+            if (!"POS".equals(input.origin())) throw rejected;
+            return new SaleOperationPreparationResult.Rejected(input.operationId(), owner, input.origin(),
+                    rejected instanceof SalesNotFoundException ? "RESOURCE_UNAVAILABLE" : "COMMAND_INVALID");
+        }
         var open=cash.findOpenByUserId(owner).orElseThrow(() -> conflict("OPERATION_CASH_UNAVAILABLE","Open your cash register before preparation"));
         var original=cash.findByIdForUpdate(open.id()).orElseThrow(() -> new SalesNotFoundException("Cash register not found"));
         if (!owner.equals(original.openedByUserId()) || original.status()!=CashRegisterStatus.OPEN)
@@ -84,7 +91,7 @@ public class SaleOperationApplicationService implements SaleOperationUseCase {
                 intentHash,original.id(),null,input.quoteId(),encode(command),encode(input.quoteCommand()),intent==null?null:intentJson,
                 null,null,null,null));
         audit(input.operationId(),"PREPARED");
-        return get(input.operationId());
+        return new SaleOperationPreparationResult.Durable(get(input.operationId()));
     }
     @Override @Transactional(readOnly=true)
     public SaleOperationResult get(UUID id) { return result(owned(id),true); }

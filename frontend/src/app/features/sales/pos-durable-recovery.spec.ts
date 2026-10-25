@@ -59,6 +59,85 @@ describe("A durable POS recovery", () => {
   });
   afterEach(() => { http.verify(); fixture.destroy(); sessionStorage.clear(); });
 
+  const rejectDefinitively = () => operations.prepare.and.callFake(body => rejected(422, {
+    protocolVersion: 1, operationId: body.operationId, actorUserId: owner.id, origin: "POS",
+    code: "OPERATION_PREPARATION_REJECTED", outcome: "NOT_STORED", reasonCode: "COMMAND_INVALID",
+  }));
+
+  it("requires explicit discard of a certified rejection and preserves the editable cart and receipt", async () => {
+    page.billingSeriesRows = [{ id: 21, version: 0, documentType: "INVOICE", series: "F001", currentNumber: 1, environment: "LOCAL", active: true, createdAt: "", updatedAt: "" }];
+    page.setReceiptType("INVOICE"); page.setReceiptSeriesId("21"); page.setReceiptCustomerDocument("20123456789");
+    page.setReceiptCustomerName("Synthetic customer"); page.setReceiptCustomerAddress("Synthetic address");
+    rejectDefinitively(); page.openCheckoutModal(); page.finalizeSale(); await settle();
+    const identity = page.pendingSaleRequest!.operationId;
+    expect(page.preparationRejected).toBeTrue(); expect(page.errorMessage).toContain("No se registró una venta");
+    expect(page.isCheckoutModalOpen).toBeFalse();
+    expect(fixture.nativeElement.textContent).toContain("Descartar preparación rechazada y editar");
+    expect(sales.create).not.toHaveBeenCalled(); expect(documents.createFromSale).not.toHaveBeenCalled();
+    page.setQuantity(0, "2"); expect(page.cart[0].quantity).toBe(1);
+    confirm.confirm.and.returnValue(Promise.resolve(false)); page.discardRejectedPreparation(); await settle();
+    expect(page.pendingSaleRequest!.operationId).toBe(identity);
+    confirm.confirm.and.returnValue(Promise.resolve(true)); page.discardRejectedPreparation(); await settle();
+    expect(page.pendingSaleRequest).toBeNull(); expect(page.receiptRecovery).toBeNull();
+    expect(page.cart[0].quantity).toBe(1); expect(page.cart[0].salePrice).toBe(10); expect(page.payments[0].amount).toBe(10);
+    expect(page.receiptType).toBe("INVOICE"); expect(page.receiptSeriesId).toBe("21");
+    expect(page.receiptCustomerDocument).toBe("20123456789"); expect(page.receiptCustomerName).toBe("Synthetic customer");
+    expect(page.receiptCustomerAddress).toBe("Synthetic address");
+    expect(page.needsRevalidation).toBeTrue();
+    expect(operations.prepare).toHaveBeenCalledTimes(1); expect(sales.create).not.toHaveBeenCalled();
+    page.revalidateCart(); await settle();
+    expect(operations.prepare).toHaveBeenCalledTimes(1); expect(sales.create).not.toHaveBeenCalled();
+    page.payments[0].amount = 12;
+    page.finalizeSale(); await settle();
+    expect(operations.prepare).toHaveBeenCalledTimes(2);
+    expect(operations.prepare.calls.mostRecent().args[0].operationId).not.toBe(identity);
+    expect(sales.create).not.toHaveBeenCalled();
+  });
+
+  for (const status of [0, 401, 403, 404, 409, 422, 500, 504]) {
+    it("never releases an uncertified preparation after HTTP " + status, async () => {
+      operations.prepare.and.returnValue(rejected(status)); page.finalizeSale(); await settle();
+      const identity = page.pendingSaleRequest!.operationId;
+      expect(page.preparationRejected).toBeFalse(); page.discardRejectedPreparation(); await settle();
+      page.setQuantity(0, "2"); expect(page.cart[0].quantity).toBe(1);
+      expect(page.pendingSaleRequest!.operationId).toBe(identity); expect(sales.create).not.toHaveBeenCalled();
+      operations.get.and.returnValue(rejected(404)); page.finalizeSale(); await settle();
+      expect(page.preparationMissing).toBeTrue(); expect(page.preparationRejected).toBeFalse();
+      page.discardRejectedPreparation(); await settle(); expect(page.pendingSaleRequest!.operationId).toBe(identity);
+      expect(operations.prepare).toHaveBeenCalledTimes(1); expect(sales.create).not.toHaveBeenCalled();
+    });
+  }
+
+  for (const mismatch of ["actorUserId", "operationId", "origin", "outcome", "reasonCode", "protocolVersion"]) {
+    it("does not trust a rejection certificate with mismatched " + mismatch, async () => {
+      operations.prepare.and.callFake(body => rejected(422, { protocolVersion: 1, operationId: body.operationId,
+        actorUserId: owner.id, origin: "POS", code: "OPERATION_PREPARATION_REJECTED", outcome: "NOT_STORED",
+        reasonCode: "COMMAND_INVALID", [mismatch]: "invalid" }));
+      page.finalizeSale(); await settle();
+      expect(page.preparationRejected).toBeFalse(); page.discardRejectedPreparation(); await settle();
+      expect(page.pendingSaleRequest).not.toBeNull(); expect(sales.create).not.toHaveBeenCalled();
+    });
+  }
+
+  it("does not reuse a certificate after reload or a credential change", async () => {
+    rejectDefinitively(); page.finalizeSale(); await settle(); const identity = page.pendingSaleRequest!.operationId;
+    token = "different-credential"; page.discardRejectedPreparation(); await settle();
+    expect(page.pendingSaleRequest!.operationId).toBe(identity);
+    fixture.destroy(); fixture = TestBed.createComponent(PosPageComponent); page = fixture.componentInstance; await settle();
+    expect(page.preparationRejected).toBeFalse(); expect(page.pendingSaleRequest!.operationId).toBe(identity);
+    page.discardRejectedPreparation(); await settle(); expect(page.pendingSaleRequest!.operationId).toBe(identity);
+    expect(sales.create).not.toHaveBeenCalled();
+  });
+
+  it("never treats a checkout rejection as proof that its durable preparation is absent", async () => {
+    sales.create.and.callFake(body => rejected(422, { protocolVersion: 1, operationId: body.operationId,
+      actorUserId: owner.id, origin: "POS", code: "OPERATION_PREPARATION_REJECTED", outcome: "NOT_STORED", reasonCode: "COMMAND_INVALID" }));
+    page.finalizeSale(); await settle();
+    expect(page.preparedOnServer).toBeTrue(); expect(page.preparationRejected).toBeFalse();
+    page.discardRejectedPreparation(); await settle(); expect(page.pendingSaleRequest).not.toBeNull();
+    expect(sales.create).toHaveBeenCalledTimes(1);
+  });
+
   it("confirms preparation before checkout and pins both requests to the same verified credential", async () => {
     const prepared = new Subject<SaleOperation>(); operations.prepare.and.returnValue(prepared);
     page.finalizeSale(); await settle(); expect(sales.create).not.toHaveBeenCalled();

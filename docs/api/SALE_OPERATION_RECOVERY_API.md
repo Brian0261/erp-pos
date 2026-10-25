@@ -72,6 +72,48 @@ Lost prepare responses require owner GET verification and an explicit cashier de
 never runs another commercial POST. A price conflict leaves the frozen identity intact; cancellation and a
 new cashier confirmation are required to replace that intent.
 
+### Certified rejection before storage (PR7 local correction)
+
+The existing201 durable response is unchanged. For POS only, eligible command/resource validation may
+return422 with this additive, machine-readable rejection body:
+
+```json
+{
+  "protocolVersion": 1,
+  "operationId": "00000000-0000-4000-8000-000000000001",
+  "actorUserId": "00000000-0000-4000-8000-000000000002",
+  "origin": "POS",
+  "code": "OPERATION_PREPARATION_REJECTED",
+  "outcome": "NOT_STORED",
+  "reasonCode": "COMMAND_INVALID"
+}
+```
+
+`reasonCode` is the closed set COMMAND_INVALID/RESOURCE_UNAVAILABLE. The body contains no customer,
+payment, command snapshot or credentials. It certifies the current preparation transaction, not a
+permanent cancellation/tombstone or permission to replay a checkout.
+
+The application holds the authenticated actor/UUID transaction lock and confirms no prior operation
+before the eligible validation block. That block performs no commercial or operation writes. It returns
+an internal rejected outcome instead of throwing a certificate-producing exception. The controller is
+outside the transaction and maps the outcome only after the Spring proxy successfully completes it.
+Repository, lock, encoding, authentication and commit failures are not classified as absence; a rollback
+or commit failure cannot emit NOT_STORED. An existing durable operation is returned or conflicts, never
+certified absent. Earlier structural/intent errors and other unclassified errors retain their existing
+error contract and do not authorize release.
+
+The POS accepts the certificate only from its preparation request, with matching protocol, UUID, origin,
+actor and unchanged bound credential. It reveals an explicit confirmed discard action while preserving
+products, amounts, payments and receipt fields for correction/revalidation. Discard sends no preparation
+or checkout. Only a later explicit new checkout confirmation creates a new UUID. The certificate is
+in-memory only; reload, subsequent server recovery or a credential change cannot authorize local release.
+Timeout, response loss,5xx,401/403, unclassified conflicts/errors and a lone404 remain uncertain and
+retain the frozen identity. A checkout error can never be interpreted as preparation absence.
+
+Quote creator and converter are distinct: the existing ADMIN/SUPERVISOR/CAJERO conversion policy is
+preserved without a new creator-only restriction. The durable operation still belongs exclusively to
+the authenticated converter; quote authors cannot read/cancel another actor's operation.
+
 ## Concurrency and receipts
 
 Lock order is quote when applicable, operation, original cash, sale, documents, series, catalog/stock.

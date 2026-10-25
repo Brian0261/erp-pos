@@ -1,4 +1,4 @@
-import { HttpClient, HttpContext, HttpParams } from "@angular/common/http";
+import { HttpClient, HttpContext, HttpErrorResponse, HttpParams } from "@angular/common/http";
 import { Injectable } from "@angular/core";
 import { Observable } from "rxjs";
 import { environment } from "../../../../environments/environment";
@@ -42,6 +42,24 @@ export interface SaleOperationPage {
   size: number;
   totalItems: number;
   totalPages: number;
+}
+
+export interface SalePreparationRejected {
+  protocolVersion: 1;
+  operationId: string;
+  actorUserId: string;
+  origin: "POS";
+  code: "OPERATION_PREPARATION_REJECTED";
+  outcome: "NOT_STORED";
+  reasonCode: "RESOURCE_UNAVAILABLE" | "COMMAND_INVALID";
+}
+
+export function isSalePreparationRejected(error: unknown, operationId: string, actorUserId: string): boolean {
+  if (!(error instanceof HttpErrorResponse) || error.status !== 422) return false;
+  const proof = error.error as Partial<SalePreparationRejected> | null;
+  return !!proof && proof.protocolVersion === 1 && proof.operationId === operationId
+    && proof.actorUserId === actorUserId && proof.origin === "POS" && proof.code === "OPERATION_PREPARATION_REJECTED"
+    && proof.outcome === "NOT_STORED" && ["RESOURCE_UNAVAILABLE", "COMMAND_INVALID"].includes(proof.reasonCode ?? "");
 }
 
 @Injectable({ providedIn: "root" })

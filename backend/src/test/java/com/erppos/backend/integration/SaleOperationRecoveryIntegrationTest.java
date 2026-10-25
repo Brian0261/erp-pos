@@ -7,6 +7,7 @@ import com.erppos.backend.erp.sales.domain.port.SaleOperationPort;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -34,6 +35,9 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicBoolean;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import java.util.concurrent.locks.LockSupport;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -51,9 +55,100 @@ class SaleOperationRecoveryIntegrationTest extends AbstractHttpIntegrationTest {
     @MockitoSpyBean CheckoutReadPort checkout;
     @MockitoSpyBean InventorySalesPort inventory;
     @MockitoSpyBean SaleOperationPort operations;
+    @MockitoSpyBean com.erppos.backend.erp.sales.domain.port.CatalogReadPort catalog;
+    @Autowired com.erppos.backend.erp.sales.application.usecase.SaleOperationUseCase preparationUseCase;
+
+    @AfterEach void resetPreparationCatalog() {
+        reset(AopTestUtils.<com.erppos.backend.erp.sales.domain.port.CatalogReadPort>getUltimateTargetObject(catalog));
+    }
 
     record Fixture(String token, long warehouse, long cash, List<Long> products) {}
     record Gate(CountDownLatch entered, CountDownLatch release, AtomicInteger pid) {}
+
+    @Test void definitiveRejectionIsCertifiedOnlyAfterSuccessfulPreparationTransaction() throws Exception {
+        Fixture f = fixture(1); ObjectNode command = sale(f); var before = effects(f);
+        jdbc.update("update products set active=false where id=?", f.products().get(0));
+        AtomicBoolean committed = new AtomicBoolean();
+        assertTrue(org.springframework.aop.support.AopUtils.isAopProxy(preparationUseCase));
+        doAnswer(invocation -> {
+            assertTrue(TransactionSynchronizationManager.isActualTransactionActive());
+            assertEquals(0, countOperation(command));
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override public void afterCommit() { committed.set(true); }
+            });
+            return invocation.callRealMethod();
+        }).when(AopTestUtils.<com.erppos.backend.erp.sales.domain.port.CatalogReadPort>getUltimateTargetObject(catalog))
+                .findById(f.products().get(0));
+        MvcResult response = prepare(f.token(), pos(command));
+        assertEquals(422, response.getResponse().getStatus()); assertNoStore(response);
+        JsonNode proof = readJson(response);
+        assertEquals("OPERATION_PREPARATION_REJECTED", proof.path("code").asText());
+        assertEquals("NOT_STORED", proof.path("outcome").asText());
+        assertEquals("COMMAND_INVALID", proof.path("reasonCode").asText());
+        assertEquals(command.path("operationId").asText(), proof.path("operationId").asText());
+        assertEquals(actor(f.cash()).toString(), proof.path("actorUserId").asText());
+        assertEquals(1, proof.path("protocolVersion").asInt()); assertEquals("POS", proof.path("origin").asText());
+        assertTrue(committed.get(), "A rejection certificate must not leave the transaction before commit succeeds");
+        assertFalse(TransactionSynchronizationManager.isActualTransactionActive());
+        assertEquals(0, countOperation(command)); assertEquals(before, effects(f));
+        assertEquals(404, rawDetail(f.token(), command).getResponse().getStatus());
+    }
+
+    @Test void failedPreparationCommitNeverReturnsANotStoredCertificate() throws Exception {
+        Fixture f = fixture(1); ObjectNode command = sale(f); var before = effects(f);
+        jdbc.update("update products set active=false where id=?", f.products().get(0));
+        doAnswer(invocation -> {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override public void beforeCommit(boolean readOnly) { throw new IllegalStateException("Synthetic preparation commit failure"); }
+            });
+            return invocation.callRealMethod();
+        }).when(AopTestUtils.<com.erppos.backend.erp.sales.domain.port.CatalogReadPort>getUltimateTargetObject(catalog))
+                .findById(f.products().get(0));
+        MvcResult response = prepare(f.token(), pos(command));
+        assertEquals(500, response.getResponse().getStatus());
+        assertFalse(response.getResponse().getContentAsString().contains("NOT_STORED"));
+        assertEquals(0, countOperation(command)); assertEquals(before, effects(f));
+    }
+
+    @Test void existingPreparationIsNeverCertifiedAbsentAfterProductDeactivation() throws Exception {
+        Fixture f = fixture(1); ObjectNode command = sale(f);
+        assertEquals(201, prepare(f.token(), pos(command)).getResponse().getStatus());
+        jdbc.update("update products set active=false where id=?", f.products().get(0));
+        MvcResult response = prepare(f.token(), pos(command));
+        assertEquals(201, response.getResponse().getStatus());
+        assertEquals("PREPARED", readJson(response).path("state").asText());
+        assertFalse(response.getResponse().getContentAsString().contains("NOT_STORED"));
+        assertEquals(1, countOperation(command)); assertEquals(0, ((Number)effects(f).get("sales")).intValue());
+    }
+
+    @Test void authorizedOtherEmployeeOwnsThePreparationAndConcurrentQuoteConversionIsUnique() throws Exception {
+        Fixture creator = fixture(1); long quote = quote(creator);
+        String cashier = login(CAJERO_EMAIL, CAJERO_PASSWORD);
+        Fixture converter = new Fixture(cashier, creator.warehouse(), openCash(cashier, BigDecimal.ZERO, "Synthetic cross-employee quote"), creator.products());
+        ObjectNode command = conversion(converter, quote);
+        assertEquals(201, prepare(cashier, quotePreparation(quote, command)).getResponse().getStatus());
+        assertEquals(actor(converter.cash()), jdbc.queryForObject("select actor_user_id from sale_operations where operation_id=?", UUID.class, uuid(command)));
+        assertEquals(404, rawDetail(creator.token(), command).getResponse().getStatus());
+        assertEquals(404, cancel(creator.token(), command).getResponse().getStatus());
+        String unauthorized = login(ALMACENERO_EMAIL, ALMACENERO_PASSWORD);
+        assertEquals(403, prepare(unauthorized, quotePreparation(quote, command)).getResponse().getStatus());
+        assertEquals(403, mockMvc.perform(post("/api/v1/quotes/{id}/convert-to-sale", quote)
+                .header(HttpHeaders.AUTHORIZATION, bearer(unauthorized)).contentType(MediaType.APPLICATION_JSON)
+                .content(command.toString())).andReturn().getResponse().getStatus());
+        Gate gate = pauseAfterCatalog(); ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            Future<MvcResult> first = pool.submit(() -> convert(converter, quote, command.deepCopy())); awaitEntered(gate);
+            Future<MvcResult> second = pool.submit(() -> convert(converter, quote, command.deepCopy()));
+            awaitBlockedBy(gate.pid().get()); gate.release().countDown();
+            MvcResult a = first.get(15, TimeUnit.SECONDS), b = second.get(15, TimeUnit.SECONDS);
+            assertEquals(200, a.getResponse().getStatus()); assertEquals(200, b.getResponse().getStatus());
+            assertEquals(readJson(a).path("convertedSaleId"), readJson(b).path("convertedSaleId"));
+            assertEquals(1, ((Number)effects(converter).get("sales")).intValue());
+            assertEquals(1, jdbc.queryForObject("select count(*) from quote_status_history where quote_id=?", Integer.class, quote));
+            assertEquals("COMPLETED", detail(cashier, command).path("state").asText());
+            assertEquals(404, rawDetail(creator.token(), command).getResponse().getStatus());
+        } finally { finish(pool, gate); }
+    }
 
     @Test void preparationPersistsWithoutCommercialEffectsAndCanBeDiscoveredAfterResponseLoss() throws Exception {
         Fixture f = fixture(1); ObjectNode command = sale(f); var before = effects(f);

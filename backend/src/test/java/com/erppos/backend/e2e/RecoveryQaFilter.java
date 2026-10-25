@@ -16,6 +16,18 @@ public final class RecoveryQaFilter extends OncePerRequestFilter {
     public static final String DIAG="/api/v1/health/recovery-e2e";
     private final E2eQaConfiguration.Identity id;private final DataSource ds;private final AtomicBoolean ready;
     private final ObjectMapper json;private final AtomicInteger denied=new AtomicInteger();
+    private static final int MAX_DENIAL_RECORDS=32;
+    private static final Set<String> ROUTE_LITERALS=Set.of("api","v1","auth","login","logout","me","warehouses",
+            "billing","series","documents","from-sale","send","sign","generate-xml","sales","operations","cancel",
+            "quotes","convert-to-sale","cash-registers","current","open","close","pos","products","search","lookup",
+            "snapshot","inventory","stock","categories","units","customers","users","settings","dashboard","summary","payments","reports",
+            "adjustments","admin","approve","binary-import","brands","catalog","company-profile","confirm","confirm-file","db",
+            "ecommerce-admin","electronic-documents","evidence-readiness","execute","health","history","import","initial-stock",
+            "integrations","inventory-movements","kardex","list-items","low-stock","mark-published","online-categories","online-profile",
+            "online-profile-status","online-profiles","outbox-events","preview","price-override","primary-asset","primary-images",
+            "publication-validation","publish","purchase-orders","purchases","receive","retry","seo","sitemap","status","stocks",
+            "storefront","suppliers","template","test-data-cleanup","top-products","transfers","unpublish","upload","v2","void","xml");
+    private final List<Map<String,Object>> denialRecords=new ArrayList<>();
     public RecoveryQaFilter(E2eQaConfiguration.Identity id,DataSource ds,AtomicBoolean ready,ObjectMapper json){this.id=id;this.ds=ds;this.ready=ready;this.json=json;}
     @Override protected void doFilterInternal(HttpServletRequest request,HttpServletResponse response,FilterChain chain)throws IOException,ServletException{
         response.setHeader("X-QA-Run-Id",id.runId());response.setHeader("X-QA-Recovery","enforced");response.setHeader("Cache-Control","no-store");
@@ -30,6 +42,7 @@ public final class RecoveryQaFilter extends OncePerRequestFilter {
                     var data=new LinkedHashMap<String,Object>();data.put("runId",id.runId());data.put("database",id.database());data.put("dbUser",id.dbUser());
                     data.put("systemId",id.systemId());data.put("markerMatched",true);data.put("ready",true);data.put("filter","recovery-enforced");
                     data.put("pid",ProcessHandle.current().pid());data.put("proxyRunId",Objects.toString(request.getHeader("X-QA-Proxy-Run"),""));data.put("denied",denied.get());
+                    data.put("denialRecords",denialRecords());data.put("denialRecordsTruncated",denied.get()>MAX_DENIAL_RECORDS);
                     data.put("cases",jdbc.queryForList("""
                         select u.username,u.id as actor_id,c.id as cash_id,p.id as product_id,p.name as product_name,sb.warehouse_id,
                         (select id from quotes where created_by=u.username limit 1) as quote_id
@@ -74,8 +87,26 @@ public final class RecoveryQaFilter extends OncePerRequestFilter {
             }catch(Exception ex){response.setStatus(503);}return;
         }
         if(!ready.get()){response.setStatus(503);return;}
-        if(!allowed(request.getMethod(),path)){denied.incrementAndGet();response.setStatus(405);response.setContentType("application/json");response.getWriter().write("{\"code\":\"QA_RECOVERY_DENIED\"}");return;}
+        if(!allowed(request.getMethod(),path)){int sequence=denied.incrementAndGet();recordDenial(sequence,request.getMethod(),path);response.setStatus(405);response.setContentType("application/json");response.getWriter().write("{\"code\":\"QA_RECOVERY_DENIED\"}");return;}
         chain.doFilter(request,response);
+    }
+    private synchronized void recordDenial(int sequence,String method,String path){
+        if(denialRecords.size()<MAX_DENIAL_RECORDS)denialRecords.add(Map.of("sequence",sequence,
+                "method",Set.of("GET","POST","PUT","PATCH","DELETE","HEAD","OPTIONS").contains(method)?method:"OTHER",
+                "route",routeTemplate(path)));
+    }
+    synchronized List<Map<String,Object>> denialRecords(){return List.copyOf(denialRecords);}
+    static String routeTemplate(String path){
+        // Closed vocabulary: unknown names, encoded data, identifiers and query values can never be emitted.
+        StringBuilder route=new StringBuilder();
+        for(String segment:path.split("[?#]",2)[0].split("/")){
+            if(segment.isEmpty())continue;
+            String safe=ROUTE_LITERALS.contains(segment)?segment:segment.matches("[0-9]+")?"{id}"
+                    :segment.matches("[0-9a-fA-F-]{36}")?"{uuid}":"{segment}";
+            if(route.length()+safe.length()+1>160)return "/{truncated}";
+            route.append('/').append(safe);
+        }
+        return route.isEmpty()?"/":route.toString();
     }
     static boolean allowed(String method,String path){
         if("POST".equals(method))return Set.of("/api/v1/auth/login","/api/v1/sales","/api/v1/sales/operations").contains(path)

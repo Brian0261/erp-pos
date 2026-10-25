@@ -21,6 +21,10 @@ import org.springframework.test.web.servlet.MvcResult;
 
 import java.math.BigDecimal;
 import java.util.UUID;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -48,8 +52,17 @@ class PosRecoveryCoordinationIntegrationTest extends AbstractHttpIntegrationTest
 
     record Fixture(String token, long cash, long warehouse, long product, ObjectNode command) {}
     record Gate(CountDownLatch locked, CountDownLatch release, AtomicInteger pid) {}
+    private final Map<Long, String> createdSeries = new LinkedHashMap<>();
+    private final List<Map.Entry<Gate, ExecutorService>> workers = new ArrayList<>();
 
-    @AfterEach void clearSpies() {
+    @AfterEach void clearSpies() throws InterruptedException {
+        // Never release fixtures while a request can still commit against them, including assertion failures.
+        for (var worker : workers) stop(worker.getKey(), worker.getValue());
+        for (var series : createdSeries.entrySet()) {
+            assertEquals(1, jdbc.update("update billing_series set active=false where id=? and series=? and environment='LOCAL'",
+                    series.getKey(), series.getValue()));
+            assertFalse(jdbc.queryForObject("select active from billing_series where id=?", Boolean.class, series.getKey()));
+        }
         reset(AopTestUtils.getUltimateTargetObject(checkout), AopTestUtils.getUltimateTargetObject(cash),
                 AopTestUtils.getUltimateTargetObject(billingSale), AopTestUtils.getUltimateTargetObject(cleanup),
                 AopTestUtils.getUltimateTargetObject(billingSummary));
@@ -60,7 +73,7 @@ class PosRecoveryCoordinationIntegrationTest extends AbstractHttpIntegrationTest
         Gate gate = gate();
         doAnswer(inv -> { Object result = inv.callRealMethod(); hold(gate); return result; })
                 .when(AopTestUtils.<CheckoutReadPort>getUltimateTargetObject(checkout)).lockCatalog(anyList());
-        ExecutorService executor = Executors.newFixedThreadPool(2);
+        ExecutorService executor = executor(gate);
         try {
             Future<MvcResult> sale = executor.submit(() -> checkout(f));
             assertTrue(gate.locked().await(10, TimeUnit.SECONDS));
@@ -80,7 +93,7 @@ class PosRecoveryCoordinationIntegrationTest extends AbstractHttpIntegrationTest
         Gate gate = gate();
         doAnswer(inv -> { Object result = inv.callRealMethod(); hold(gate); return result; })
                 .when(AopTestUtils.<CashRegisterRepositoryPort>getUltimateTargetObject(cash)).sumSalesCashPaid(eq(f.cash()));
-        ExecutorService executor = Executors.newFixedThreadPool(2);
+        ExecutorService executor = executor(gate);
         try {
             Future<MvcResult> close = executor.submit(() -> close(f));
             assertTrue(gate.locked().await(10, TimeUnit.SECONDS));
@@ -97,7 +110,7 @@ class PosRecoveryCoordinationIntegrationTest extends AbstractHttpIntegrationTest
     @Test void duplicateCreatorsWaitAndReturnTheSameDraftWithoutAnotherNumber() throws Exception {
         Fixture f = fixture(); prepare(f); long sale = complete(f); long series = series("RECEIPT");
         long before = number(series); Gate gate = billingGate();
-        ExecutorService executor = Executors.newFixedThreadPool(2);
+        ExecutorService executor = executor(gate);
         try {
             Future<MvcResult> first = executor.submit(() -> document(f, sale, "RECEIPT", series));
             assertTrue(gate.locked().await(10, TimeUnit.SECONDS));
@@ -115,7 +128,7 @@ class PosRecoveryCoordinationIntegrationTest extends AbstractHttpIntegrationTest
         Fixture f = fixture(); prepare(f); long sale = complete(f);
         long receipt = series("RECEIPT"), invoice = series("INVOICE");
         long receiptBefore = number(receipt), invoiceBefore = number(invoice); Gate gate = billingGate();
-        ExecutorService executor = Executors.newFixedThreadPool(2);
+        ExecutorService executor = executor(gate);
         try {
             Future<MvcResult> first = executor.submit(() -> document(f, sale, "RECEIPT", receipt));
             assertTrue(gate.locked().await(10, TimeUnit.SECONDS));
@@ -129,7 +142,7 @@ class PosRecoveryCoordinationIntegrationTest extends AbstractHttpIntegrationTest
 
     @Test void draftCreationWinningOperationLockBlocksConcurrentVoid() throws Exception {
         Fixture f = fixture(); prepare(f); long sale = complete(f); long series = series("RECEIPT"); Gate gate = billingGate();
-        ExecutorService executor = Executors.newFixedThreadPool(2);
+        ExecutorService executor = executor(gate);
         try {
             Future<MvcResult> draft = executor.submit(() -> document(f, sale, "RECEIPT", series));
             assertTrue(gate.locked().await(10, TimeUnit.SECONDS));
@@ -148,7 +161,7 @@ class PosRecoveryCoordinationIntegrationTest extends AbstractHttpIntegrationTest
         doAnswer(inv->{inv.callRealMethod();hold(gate);return null;}).when(
                 AopTestUtils.<com.erppos.backend.erp.sales.domain.port.SalesBillingSummaryReadPort>getUltimateTargetObject(billingSummary))
                 .lockDocumentsForSale(eq(sale));
-        ExecutorService executor=Executors.newFixedThreadPool(2);
+        ExecutorService executor=executor(gate);
         try {
             Future<MvcResult> voiding=executor.submit(()->request(f.token(),"/api/v1/sales/"+sale+"/void",objectMapper.createObjectNode().put("reason","Synthetic void-first race")));
             assertTrue(gate.locked().await(10,TimeUnit.SECONDS));
@@ -180,7 +193,7 @@ class PosRecoveryCoordinationIntegrationTest extends AbstractHttpIntegrationTest
     @Test void billingWinningTheLockMakesCleanupRevalidateBeforeAnyDelete() throws Exception {
         Fixture f = fixture(); prepare(f); long sale = complete(f); long series = series("RECEIPT");
         jdbc.update("update products set active=false where id=?", f.product()); Gate gate = billingGate();
-        ExecutorService executor = Executors.newFixedThreadPool(2);
+        ExecutorService executor = executor(gate);
         try {
             Future<MvcResult> draft = executor.submit(() -> document(f, sale, "RECEIPT", series));
             assertTrue(gate.locked().await(10, TimeUnit.SECONDS));
@@ -200,7 +213,7 @@ class PosRecoveryCoordinationIntegrationTest extends AbstractHttpIntegrationTest
         jdbc.update("update products set active=false where id=?", f.product()); Gate gate = gate();
         doAnswer(inv -> { inv.callRealMethod(); hold(gate); return null; })
                 .when(AopTestUtils.<ProductCleanupExecutePort>getUltimateTargetObject(cleanup)).lockCleanupTargets(anySet(), anySet());
-        ExecutorService executor = Executors.newFixedThreadPool(2);
+        ExecutorService executor = executor(gate);
         try {
             Future<MvcResult> purge = executor.submit(() -> purge(f));
             assertTrue(gate.locked().await(10, TimeUnit.SECONDS));
@@ -284,7 +297,9 @@ class PosRecoveryCoordinationIntegrationTest extends AbstractHttpIntegrationTest
         var existing = jdbc.queryForList("select id from billing_series where environment='LOCAL' and document_type=? and active order by id", Long.class, type);
         if (!existing.isEmpty()) return existing.get(0);
         String series = (type.equals("RECEIPT") ? "B" : "F") + UUID.randomUUID().toString().replace("-", "").substring(0, 3).toUpperCase();
-        return jdbc.queryForObject("insert into billing_series(document_type,series,current_number,environment,active,created_by,updated_by) values(?,?,1,'LOCAL',true,'qa','qa') returning id", Long.class, type, series);
+        long id = jdbc.queryForObject("insert into billing_series(document_type,series,current_number,environment,active,created_by,updated_by) values(?,?,1,'LOCAL',true,'qa','qa') returning id", Long.class, type, series);
+        createdSeries.put(id, series);
+        return id;
     }
     private Gate billingGate() {
         Gate gate = gate(); AtomicInteger calls = new AtomicInteger();
@@ -306,6 +321,15 @@ class PosRecoveryCoordinationIntegrationTest extends AbstractHttpIntegrationTest
         fail("Expected a real PostgreSQL waiter blocked by controlled transaction " + pid);
     }
     private void stop(Gate gate, ExecutorService executor) throws InterruptedException {
-        gate.release().countDown(); executor.shutdownNow(); assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS));
+        gate.release().countDown(); executor.shutdown();
+        if (!executor.awaitTermination(20, TimeUnit.SECONDS)) {
+            executor.shutdownNow();
+            assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS), "Requests must terminate before fixture cleanup");
+        }
+    }
+    private ExecutorService executor(Gate gate) {
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        workers.add(Map.entry(gate, executor));
+        return executor;
     }
 }

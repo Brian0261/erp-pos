@@ -23,7 +23,7 @@ import { POS_DRAFT_FORMAT_VERSION, PosDraftState, PosReceiptRecovery, PosStateSe
   immutableReceiptRecovery } from "./data/pos-state.service";
 import { PaymentLine, PosCartItem, PosReceiptType } from "./data/pos-ui.models";
 import { SalesService } from "./data/sales.service";
-import { SaleOperation, SaleOperationsService } from "./data/sale-operations.service";
+import { isSalePreparationRejected, SaleOperation, SaleOperationsService } from "./data/sale-operations.service";
 import { SaleOperationRecoveryComponent } from "./components/sale-operation-recovery.component";
 import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.service";
 import {
@@ -138,7 +138,10 @@ import { availableQuantity, decimalText, isQuantityPolicy, moneyCents, quantityH
             <button #priceReviewButton class="ui-button ui-button--secondary" type="button" *ngIf="needsRevalidation && !pendingSaleRequest && !receiptRecovery"
               [attr.aria-describedby]="priceReviewRequired ? 'price-review-instruction' : null"
               [disabled]="revalidating" (click)="revalidateCart()">{{ revalidating ? 'Revalidando…' : priceReviewRequired ? 'Revisar precios' : 'Revalidar borrador y revisar precios' }}</button>
-            <p class="ui-alert ui-alert--warning" *ngIf="pendingSaleRequest">Operación conservada. Consulta su estado en el servidor antes de reanudar o cancelar esta preparación.</p>
+            <p class="ui-alert ui-alert--warning" *ngIf="pendingSaleRequest && !preparationRejected">Operación conservada. Consulta su estado en el servidor antes de reanudar o cancelar esta preparación.</p>
+            <p class="ui-alert ui-alert--warning" role="alert" *ngIf="pendingSaleRequest && preparationRejected">El servidor rechazó la preparación antes de guardarla. No se registró una venta. Puedes descartarla explícitamente para corregir el carrito.</p>
+            <button *ngIf="pendingSaleRequest && preparationRejected" type="button" class="ui-button ui-button--secondary"
+              [disabled]="submitting" (click)="discardRejectedPreparation()">Descartar preparación rechazada y editar</button>
             <p class="ui-alert ui-alert--warning" role="status" *ngIf="receiptRecovery && !pendingSaleRequest">{{ receiptRecoveryMessage }}</p>
             <button class="ui-button ui-button--secondary" type="button" *ngIf="pendingSaleRequest || receiptRecovery"
               [disabled]="submitting" (click)="finalizeSale()">{{ pendingSaleRequest ? 'Consultar operación en servidor' : receiptRecoveryActionLabel }}</button>
@@ -247,7 +250,8 @@ import { availableQuantity, decimalText, isQuantityPolicy, moneyCents, quantityH
         [receiptValidationError]="receiptValidationError"
         [errorMessage]="activeErrorMessage"
         [recoveryMessage]="!submitting && pendingSaleRequest
-          ? 'Este cobro no tiene un resultado confirmado en pantalla. Conserva la operación y usa RECUPERAR COBRO para consultar su estado; no inicies otra venta para el mismo cobro.'
+          ? preparationRejected ? 'Preparación rechazada sin venta registrada. Cierra esta ventana para descartar explícitamente la preparación y corregir el carrito.'
+          : 'Este cobro no tiene un resultado confirmado en pantalla. Conserva la operación y usa RECUPERAR COBRO para consultar su estado; no inicies otra venta para el mismo cobro.'
           : receiptRecovery?.saleId ? receiptRecoveryMessage : ''"
         (close)="closeCheckoutModal()"
         (finalize)="finalizeSale()"
@@ -589,6 +593,9 @@ export class PosPageComponent implements OnInit, OnDestroy {
   pendingSaleRequest: CreateSaleRequest | null = null;
   preparationMissing = false;
   preparedOnServer = false;
+  // In-memory certificate only: a reload must recover conservatively, never infer absence from local storage.
+  preparationRejected = false;
+  private rejectedPreparationToken: string | null = null;
   private durableReceiptChecked = false;
   receiptRecovery: PosReceiptRecovery | null = null;
   private confirmingSale = false;
@@ -1813,6 +1820,8 @@ export class PosPageComponent implements OnInit, OnDestroy {
       this.pendingSaleRequest = payload;
       this.persistDraftState();
       this.submitting = true;
+      this.preparationRejected = false;
+      this.rejectedPreparationToken = null;
       let preparationConfirmed = prepared;
       this.subscriptions.add(this.withVerifiedIdentity(this.receiptRecovery!, context => {
         const prepare = prepared ? defer(() => {
@@ -1821,6 +1830,14 @@ export class PosPageComponent implements OnInit, OnDestroy {
         }) : this.saleOperations.prepare({ protocolVersion: 1, origin: "POS", operationId: payload.operationId,
           command: payload, quoteId: null, quoteCommand: null,
           receiptIntent: { receiptType: this.receiptRecovery!.receiptType as "TICKET" | "RECEIPT" | "INVOICE", payload: this.receiptRecovery!.payload } }, context).pipe(
+            catchError(error => {
+              // Only the prepare response, for the same actor/UUID and still-bound credential, may certify absence.
+              this.preparationRejected = !this.destroyed && this.authService.getToken() === context.get(BOUND_AUTH_CREDENTIALS)?.token
+                && this.pendingSaleRequest === payload && !!this.receiptRecovery?.userId
+                && isSalePreparationRejected(error, payload.operationId, this.receiptRecovery.userId);
+              this.rejectedPreparationToken = this.preparationRejected ? context.get(BOUND_AUTH_CREDENTIALS)!.token : null;
+              return throwError(() => error);
+            }),
             switchMap(operation => {
               if (operation.operationId !== payload.operationId || operation.origin !== "POS") throw new Error("La preparación recibida no corresponde a esta operación.");
               this.preparationMissing = false;
@@ -1848,8 +1865,13 @@ export class PosPageComponent implements OnInit, OnDestroy {
           this.submitting = false;
           const response = error as HttpErrorResponse;
           const priceConflict = response.status === 409 && response.error?.code === "PRICE_CONFIRMATION_REQUIRED";
-          // The frozen identity remains durable even when checkout is rejected. Only explicit cancellation releases it.
+          // A confirmed preparation survives checkout rejection; only a separate NOT_STORED certificate proves absence.
           this.preparedOnServer = preparationConfirmed;
+          if (this.preparationRejected) {
+            // Reveal the explicit discard action without abandoning the certified rejected identity.
+            this.isCheckoutModalOpen = false;
+            this.isFullCartOpen = false;
+          }
           if (priceConflict) {
             this.isCheckoutModalOpen = false;
             this.isFullCartOpen = false;
@@ -1859,7 +1881,9 @@ export class PosPageComponent implements OnInit, OnDestroy {
               response.error.changes.map((c: { productId: number; confirmedUnitPrice: number; currentUnitPrice: number }) =>
                 `Producto #${c.productId}: S/ ${decimalText(moneyCents(c.confirmedUnitPrice))} → S/ ${decimalText(moneyCents(c.currentUnitPrice))}.`).join(" ");
           }
-          this.errorMessage = !preparationConfirmed && !this.isAuthenticationRecoveryError(error)
+          this.errorMessage = this.preparationRejected
+            ? "La preparación fue rechazada antes de guardarse. No se registró una venta. Descártala para corregir el carrito."
+            : !preparationConfirmed && !this.isAuthenticationRecoveryError(error)
             ? "No se confirmó la respuesta de preparación. No se envió el checkout. Consulta la misma operación en el servidor."
             : this.isAuthenticationRecoveryError(error) ? new BoundAuthSessionError().message : toHttpErrorMessage(
             error,
@@ -1875,6 +1899,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
     const request = this.pendingSaleRequest;
     if (!recovery || !request) return;
     this.submitting = true;
+    this.preparationRejected = false;
     this.subscriptions.add(this.withVerifiedIdentity(recovery, context => this.saleOperations.get(request.operationId, context)).subscribe({
       next: operation => { this.submitting = false; this.applyServerOperation(operation); },
       error: error => { this.submitting = false; this.preparationMissing = error instanceof HttpErrorResponse && error.status === 404;
@@ -1890,6 +1915,27 @@ export class PosPageComponent implements OnInit, OnDestroy {
     this.confirmingSale = true;
     void this.confirmDialog.confirm({ title: "Preparar la misma operación", description: "Se conservarán identidad, importes y comprobante. Solo después de confirmar la preparación se enviará el checkout.",
       confirmText: "Preparar y cobrar", cancelText: "Conservar", variant: "warning" }).then(ok => { if (ok) this.submitConfirmedSale(payload); }).finally(() => this.confirmingSale = false);
+  }
+
+  discardRejectedPreparation(): void {
+    const payload = this.pendingSaleRequest, recovery = this.receiptRecovery;
+    const token = this.authService.getToken();
+    if (!this.preparationRejected || token !== this.rejectedPreparationToken || !payload || !recovery || !this.receiptRecoveryOwnerMatches()
+        || this.submitting || this.confirmingSale) return;
+    this.confirmingSale = true;
+    void this.confirmDialog.confirm({ title: "Descartar preparación rechazada",
+      description: "El servidor confirmó que no la guardó. Se conservarán productos, importes y comprobante para corregirlos. No se ejecutará ningún cobro.",
+      confirmText: "Descartar y editar", cancelText: "Conservar", variant: "warning" }).then(ok => {
+      if (!ok || this.destroyed || !this.preparationRejected || this.pendingSaleRequest !== payload
+          || this.receiptRecovery !== recovery || this.authService.getToken() !== token || !this.receiptRecoveryOwnerMatches()) return;
+      this.pendingSaleRequest = null; this.receiptRecovery = null; this.preparationRejected = false;
+      this.rejectedPreparationToken = null;
+      this.preparedOnServer = false; this.preparationMissing = false;
+      this.cart = this.cart.map(item => ({ ...item, requiresRevalidation: true }));
+      this.errorMessage = "";
+      this.warningMessage = "Preparación rechazada descartada. Corrige y revalida el carrito antes de confirmar una nueva operación.";
+      this.persistDraftState();
+    }).finally(() => this.confirmingSale = false);
   }
 
   selectServerOperation(operation: SaleOperation, resume: boolean): void {
@@ -1916,6 +1962,8 @@ export class PosPageComponent implements OnInit, OnDestroy {
   }
 
   private applyServerOperation(operation: SaleOperation): void {
+    this.preparationRejected = false;
+    this.rejectedPreparationToken = null;
     if (operation.origin !== "POS" || operation.protocolVersion !== 1) {
       this.warningMessage = "Operación histórica o de cotización: consulta su venta o abre su conversión original."; return;
     }

@@ -77,6 +77,28 @@ export function validateRecoveryEvidence(summary,progress){
     &&REQUIRED_SCENARIOS.every(([,title])=>progress.some(t=>t.title===title&&t.status==='passed'&&Array.isArray(t.errors)&&!t.errors.length)),
     'QA_PROGRESS_EVIDENCE_REQUIRED');
 }
+export function denialDiagnostics(data){
+  assert(Number.isSafeInteger(data?.denied)&&data.denied>=1&&Array.isArray(data.denialRecords)
+    &&data.denialRecords.length<=32&&typeof data.denialRecordsTruncated==='boolean','QA_DENIAL_DIAGNOSTICS_INVALID');
+  const literals=new Set(['api','v1','auth','login','logout','me','warehouses','billing','series','documents','from-sale',
+    'send','sign','generate-xml','sales','operations','cancel','quotes','convert-to-sale','cash-registers','current','open','close',
+    'pos','products','search','lookup','snapshot','inventory','stock','categories','units','customers','users','settings',
+    'dashboard','summary','payments','reports','adjustments','admin','approve','binary-import','brands','catalog','company-profile',
+    'confirm','confirm-file','db','ecommerce-admin','electronic-documents','evidence-readiness','execute','health','history','import',
+    'initial-stock','integrations','inventory-movements','kardex','list-items','low-stock','mark-published','online-categories','online-profile',
+    'online-profile-status','online-profiles','outbox-events','preview','price-override','primary-asset','primary-images','publication-validation',
+    'publish','purchase-orders','purchases','receive','retry','seo','sitemap','status','stocks','storefront','suppliers','template',
+    'test-data-cleanup','top-products','transfers','unpublish','upload','v2','void','xml','{id}','{uuid}','{segment}','{truncated}']);
+  const records=data.denialRecords.map(row=>{
+    assert(Number.isSafeInteger(row.sequence)&&row.sequence>=1&&row.sequence<=data.denied
+      &&['GET','POST','PUT','PATCH','DELETE','HEAD','OPTIONS','OTHER'].includes(row.method)
+      &&typeof row.route==='string'&&row.route.startsWith('/')&&row.route.length<=160
+      &&(row.route==='/'||row.route.split('/').slice(1).every(segment=>literals.has(segment))),'QA_DENIAL_DIAGNOSTICS_UNSAFE');
+    return {sequence:row.sequence,method:row.method,route:row.route,
+      context:row.sequence===1&&row.method==='POST'&&row.route==='/api/v1/billing/documents/{id}/send'?'expected-preflight':'additional-denial'};
+  });
+  return {total:data.denied,expectedPreflight:1,truncated:data.denialRecordsTruncated,records};
+}
 async function noLinks(path,recursive=false){
   const absolute=resolve(path);let parent=parse(absolute).root;
   for(const part of absolute.slice(parent.length).split(sep).filter(Boolean)){
@@ -271,8 +293,11 @@ async function main(){
       errors:(t.results??[]).flatMap(r=>(r.errors??[]).map(e=>sanitize(e.message??'').slice(0,3500)))}));
     summary.errors.push(...(report.errors??[]).map(e=>sanitize(e.message??'').slice(0,3500)));await save();
     for(const t of summary.tests)log(`${t.status.toUpperCase()}: ${t.title}`);
+    const final=JSON.parse((await http(browser,'http://127.0.0.1:4201'+DIAG)).body);identity(final,true);
+    summary.denialDiagnostics=denialDiagnostics(final);await save();
+    for(const row of summary.denialDiagnostics.records)log(`DENIAL ${row.context}: ${row.method} ${row.route}`);
     validateRecoveryReport(report,result.code,selection);
-    const final=JSON.parse((await http(browser,'http://127.0.0.1:4201'+DIAG)).body);identity(final,true);assert(final.denied===1,'QA_UNEXPECTED_DENIED_REQUEST');
+    assert(final.denied===1,'QA_UNEXPECTED_DENIED_REQUEST');
     log(`${tests.length}/${tests.length} tests PASS; final gate still requires evidence and cleanup`);
   }catch(ex){error=ex;
     summary.errors.push(timedOut?'QA_LAUNCHER_TIMEOUT':sanitize(/^(QA_|UNSAFE_)/.test(ex.message)?ex.message:'QA_FAILED_SANITIZED'));

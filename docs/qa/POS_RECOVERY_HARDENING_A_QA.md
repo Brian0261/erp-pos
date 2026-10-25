@@ -862,3 +862,148 @@ Sin commit/push/PR/merge/rebase/tag, cambios CI/infra o nuevas fases.
 
 Siguiente accion unica:revision final local de A, con autorizacion independiente. No hacer commit
 ni publicar bajo esta autorizacion;no declarar POS-RECOVERY-HARDENING-A CLOSED.
+
+## PR7 — correcciones focales P2/backend y diagnostico E2E (2026-10-24, local)
+
+Resultado: **PASS — A_REMOTE_CORRECTIONS_LOCAL_READY**. Fuente local modificada sobre
+`a0aa86f8359c97ebfedb5a882dcf743ea5ffc5f9`, rama `feat/pos-recovery-hardening-a`.
+No es un SHA correctivo publicado. El run remoto anterior `40138190255` conserva su evidencia de
+backend/e2e-commercial FAIL; esta seccion no afirma CI remoto PASS ni cierra A o sus conversaciones.
+
+### Alcance exacto y justificacion (16 archivos)
+
+| Archivo relativo al repositorio | Cambio indispensable |
+| --- | --- |
+| backend/src/test/java/com/erppos/backend/integration/PosRecoveryCoordinationIntegrationTest.java | Registrar series creadas por el fixture, esperar todos sus workers y desactivar solo esas series al terminar; no eliminar documentos ni tocar series prestadas durante cleanup |
+| backend/src/main/java/com/erppos/backend/erp/sales/application/service/SaleOperationApplicationService.java | Quitar restriccion adicional por creador de cotizacion; producir rechazo interno solo tras ausencia bajo lock y antes de escrituras |
+| backend/src/main/java/com/erppos/backend/erp/sales/application/usecase/SaleOperationUseCase.java | Resultado explicito de preparacion durable o rechazada |
+| backend/src/main/java/com/erppos/backend/erp/sales/application/usecase/SaleOperationPreparationResult.java | Nuevo tipo cerrado de resultados internos, sin excepcion que prometa un rollback no observado |
+| backend/src/main/java/com/erppos/backend/erp/sales/adapter/rest/SaleOperationController.java | Mapear422 tipado solamente despues de que el proxy transaccional termine correctamente;201 existente preservado |
+| backend/src/main/java/com/erppos/backend/erp/sales/adapter/dto/SalePreparationRejectedResponse.java | Certificado limitado a protocolo, actor, UUID, origen y codigos fijos; sin payload ni PII |
+| backend/src/test/java/com/erppos/backend/integration/SaleOperationRecoveryIntegrationTest.java | Cuatro regresiones PostgreSQL de commit, ausencia, preparacion existente y conversion concurrente entre empleados con ownership/RBAC |
+| backend/src/test/java/com/erppos/backend/e2e/RecoveryQaFilter.java | Diagnostico test-only limitado a32 registros y160 caracteres por ruta, vocabulario cerrado de segmentos estaticos y placeholders; contador y allowlist intactos |
+| backend/src/test/java/com/erppos/backend/e2e/RecoveryQaFilterTest.java | Sanitizacion, limite, contador original y rechazo efectivo |
+| frontend/src/app/features/sales/data/sale-operations.service.ts | Tipo/guard del rechazo; validar status422, protocolo, UUID, actor, origen y codigos cerrados |
+| frontend/src/app/features/sales/pos-page.component.ts | Descarte confirmado de rechazo acreditado, carrito/comprobante conservados y revalidacion; incertidumbre bloqueada; certificado solo en memoria y ligado a credencial |
+| frontend/src/app/features/sales/pos-durable-recovery.spec.ts |17 regresiones adicionales; no eliminar assertions anteriores |
+| frontend/e2e/qa/run-recovery.mjs | Validar/copiar diagnosticos sanitizados al manifiesto y distinguir preflight; condicion original denied===1 preservada |
+| frontend/e2e/qa/recovery-denials.test.mjs | Dos pruebas puras de evidencia y rechazo de datos inseguros/no acotados, sin lanzar Docker |
+| docs/api/SALE_OPERATION_RECOVERY_API.md | Contrato aditivo del rechazo, limites transaccionales y ownership del convertidor |
+| docs/qa/POS_RECOVERY_HARDENING_A_QA.md | Esta evidencia local, separada del CI remoto previo |
+
+### Garantia transaccional y correcciones
+
+El controller no tiene transaccion; invoca el caso de uso mediante el proxy Spring real.
+`prepare` mantiene REQUIRED/timeout15. Bajo el lock del actor/UUID, consulta primero la operacion
+previa. Si existe, devuelve su resultado durable o conflicto: nunca NOT_STORED. Solamente las
+excepciones de validacion de comando/recursos en el bloque anterior a `recovery.prepare` producen un
+resultado interno rechazado, sin escrituras de operacion, venta, pago o stock. El resultado422 se
+construye despues de finalizar exitosamente la transaccion. Un repositorio que marque rollback-only,
+un fallo de commit, bloqueo, infraestructura, autenticacion u otro error no clasificable no puede emitir
+el certificado. No se captura genericamente un error de persistencia/commit para transformarlo en ausencia.
+
+La prueba real registra afterCommit antes de devolver el certificado y comprueba transaccion inactiva,
+ausencia de fila y snapshot comercial sin cambios. Otra fuerza un fallo beforeCommit y exige500,
+sin NOT_STORED ni efectos comerciales. La preparacion existente sobrevive a una desactivacion posterior
+del producto y no se certifica ausente.
+
+Angular acepta la prueba solo en el error de su POST de preparacion, para el mismo UUID/actor y
+credencial vinculada sin cambios. Revela el descarte explicito y confirmado sin abandonar previamente
+la identidad; conserva productos, importes/pagos y comprobante y exige revalidacion. No envia otro
+POST al descartar; un UUID nuevo surge solo de una confirmacion posterior. No persiste el certificado.
+Timeout, respuesta perdida,404 aislado,5xx,401/403,422 generico, conflictos no certificados y errores de
+checkout conservan el estado incierto. Un cambio de token, recarga o recuperacion del servidor invalida
+la posibilidad de liberar con un certificado local anterior.
+
+La conversion de cotizacion por otro empleado vuelve a respetar los roles existentes. La nueva
+operacion pertenece al convertidor autenticado, no al creador. La regresion prueba que el autor no
+puede consultarla/cancelarla, ALMACENERO no puede preparar/convertir y dos conversiones concurrentes
+del empleado autorizado producen una venta y una transicion de cotizacion.
+
+Las series creadas por coordinacion quedan inactivas al terminar cada test, conservando referencias
+de documentos sinteticos. Sus IDs/nombres exactos se registran al INSERT; no se desactivan series
+preexistentes. Todos los executors registrados terminan antes de cleanup, tambien tras assertions.
+V16 y FiscalSendTransactionBoundaryIntegrationTest permanecen sin modificar.
+
+### QA focal y backend completo
+
+Comandos desde backend, con JDK17 existente y PostgreSQL16 nuevo de Testcontainers:
+
+```powershell
+.\mvnw.cmd -B '-Dtest=PosRecoveryCoordinationIntegrationTest,FiscalSendTransactionBoundaryIntegrationTest' '-Dsurefire.runOrder=reversealphabetical' test
+.\mvnw.cmd -B '-Dtest=SaleOperationRecoveryIntegrationTest,RecoveryQaFilterTest' test
+.\mvnw.cmd -B clean verify
+```
+
+- Par de fixtures:27PASS,0failures,0errors,0skipped;59.316s. El log confirma coordinacion(11)
+  antes de fiscal-boundary(16), reproduciendo el orden conflictivo remoto sin duplicar serie activa.
+- Contrato/seguridad final:38PASS,0failures,0errors,0skipped;45.067s. Incluye36 de recuperacion
+  y2 de filtro. Una ejecucion previa tuvo36 errores exclusivamente en el nuevo teardown por inferencia
+  varargs de Mockito; se corrigio el tipo explicito del reset. No se relajaron assertions comerciales.
+- Unica ejecucion completa equivalente al job backend:804PASS,0failures,0errors,0skipped;
+  BUILD SUCCESS, exit0,2m39s. Incluye las regresiones anteriores; no sumar las repeticiones como casos nuevos.
+
+Frontend con Node22.23.3/npm10.9.9 existentes, sin cambiar manifiesto/lockfile:
+
+```powershell
+$env:PATH='C:\Users\USUARIO\AppData\Local\InkToyToolchains\node-v22.23.3;'+$env:PATH
+npm.cmd test -- --include=src/app/features/sales/pos-durable-recovery.spec.ts --include=src/app/features/sales/pos-checkout-confirmation.spec.ts --include=src/app/features/sales/pos-page.component.spec.ts
+npm.cmd run build
+node --test e2e/qa/recovery-denials.test.mjs
+```
+
+Regresion final:129PASS,0FAIL,0SKIPPED en ChromeHeadless155. Build PASS/exit0,17.787s,
+main-FIFO5AMA.js. Diagnostico puro:2PASS,0FAIL,0SKIPPED. Se conservan las assertions previas de
+dinero, pagos, identidad, recuperacion, comprobantes y ausencia de llamadas duplicadas.
+
+### Unica ejecucion E2E integral y diagnostico observado
+
+```powershell
+Remove-Item Env:DB_PASSWORD,Env:DB_USERNAME -ErrorAction SilentlyContinue
+$env:PATH='C:\Users\USUARIO\AppData\Local\InkToyToolchains\node-v22.23.3;'+$env:PATH
+node.exe e2e/qa/run-recovery.mjs
+```
+
+Las dos variables heredadas se retiraron exclusivamente del proceso lanzador sin leer sus valores;
+no se modificaron .env ni configuraciones persistentes. Se conservo rejectInherited fail-closed.
+
+Run local:`a69fe2a49a5ece3d924f9cff`, selection full, revision a0aa86f8/dirty=true. Exit0;
+exactamente10/10 nombres y archivos requeridos PASS, un intento por escenario, sin filtros/skips/retries
+ni clics forzados. Gate, manifiesto y progress(10) validos. Duracion total157811ms; fase comercial35326ms.
+Aislamiento PASS y cleanup PASS. Namespace network:none, solo loopback, host decoy inaccesible,
+PostgreSQL efimero comprobado por label/marker/system ID antes de Flyway y revalidacion backend/proxy;
+diez fixtures comerciales/UX independientes. Verificacion posterior: cero contenedores/imagen de tools
+con el label de este run y stage retirado. La evidencia sanitizada queda en:
+
+`backend/target/recovery-e2e/a69fe2a49a5ece3d924f9cff/evidence/summary.json`
+
+Diagnostico conservado en el manifiesto:
+
+```json
+{
+  "total": 1,
+  "expectedPreflight": 1,
+  "truncated": false,
+  "records": [{"sequence": 1, "method": "POST", "route": "/api/v1/billing/documents/{id}/send", "context": "expected-preflight"}]
+}
+```
+
+Cero denegaciones adicionales. No se reprodujo localmente la solicitud adicional del run remoto;
+su metodo/origen siguen sin acreditarse. No se anadio ninguna ruta a la allowlist ni se modifico el
+caller desconocido. La instrumentacion permite capturar el caso si reaparece: contador original,
+condicion denied===1, errores y gate fail-closed intactos, sin query/body/cabeceras/cookies/JWT/PII.
+El diccionario de diagnostico solo contiene literales estaticos conocidos; cualquier segmento desconocido
+o identificador se reemplaza por placeholder y se aplica limite32/160. El manifiesto se relee con
+readRecoveryEvidence y validateRecoveryEvidence:PASS.
+
+### Estado y limites del cierre local
+
+Diff exclusivamente autorizado; staging vacio; sin git add, commit, push, cambios del PR/reviews,
+resoluciones, merge, tags o protecciones. HEAD sigue a0aa86f8; master/origin-master siguen77c53fa3.
+Worktree principal limpio. Sin cambios de migraciones, dependencias, Auth/interceptor ni roles autorizados, infraestructura,
+suites no-write, originales/respaldos MONEY-QA-0/Angular D, fases fiscales, Storefront o B.
+git diff --check sin errores; solo avisos de normalizacion LF->CRLF.
+
+Riesgo residual: CI remoto sobre una nueva revision correctiva todavia no existe; no atribuir una causa
+no observada a la denegacion remota ni declarar A CLOSED. Siguiente accion minima:autorizacion
+independiente para el commit local correctivo, sin publicacion bajo esta tarea.
