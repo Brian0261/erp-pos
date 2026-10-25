@@ -1,11 +1,16 @@
 import { CommonModule } from "@angular/common";
 import {
   Component,
+  ElementRef,
   EventEmitter,
+  HostListener,
   Input,
   OnChanges,
+  OnDestroy,
   Output,
   SimpleChanges,
+  ViewChild,
+  inject,
 } from "@angular/core";
 
 import { BillingSeriesResponse } from "../../billing/data/billing.models";
@@ -13,6 +18,7 @@ import { PaymentLine, PosReceiptType } from "../data/pos-ui.models";
 import { PosCheckoutPaymentSectionComponent } from "./pos-checkout-payment-section.component";
 import { PosCheckoutReceiptSectionComponent } from "./pos-checkout-receipt-section.component";
 import { PosTotalsSummaryComponent } from "./pos-totals-summary.component";
+import { ConfirmDialogService } from "../../../shared/dialogs/confirm-dialog.service";
 
 @Component({
     selector: "app-pos-checkout-modal",
@@ -31,7 +37,7 @@ import { PosTotalsSummaryComponent } from "./pos-totals-summary.component";
       aria-labelledby="checkout-modal-title"
       (click)="handleClose()"
     >
-      <article class="checkout-modal" (click)="$event.stopPropagation()">
+      <article #checkoutPanel class="checkout-modal" (click)="$event.stopPropagation()">
         <header class="checkout-modal__header">
           <div class="checkout-modal__header-copy">
             <h2 id="checkout-modal-title">Cobrar venta</h2>
@@ -49,6 +55,10 @@ import { PosTotalsSummaryComponent } from "./pos-totals-summary.component";
         </header>
 
         <div class="checkout-modal__body">
+          <div #operationNotice class="checkout-modal__notice" tabindex="-1" *ngIf="errorMessage || recoveryMessage">
+            <p class="ui-alert ui-alert--error" role="alert" *ngIf="errorMessage">{{ errorMessage }}</p>
+            <p class="ui-alert ui-alert--warning" role="status" *ngIf="recoveryMessage">{{ recoveryMessage }}</p>
+          </div>
           <div class="checkout-modal__content-grid">
             <div class="checkout-modal__receipt-column">
               <app-pos-checkout-receipt-section
@@ -140,6 +150,7 @@ import { PosTotalsSummaryComponent } from "./pos-totals-summary.component";
       .checkout-modal {
         width: min(100%, 72rem);
         max-height: min(92vh, 50rem);
+        max-height: min(92dvh, 50rem);
         display: grid;
         grid-template-rows: auto minmax(0, 1fr) auto;
         gap: var(--space-2);
@@ -204,8 +215,12 @@ import { PosTotalsSummaryComponent } from "./pos-totals-summary.component";
         gap: var(--space-2);
         min-height: 0;
         overflow: auto;
+        overscroll-behavior: contain;
         padding-right: 0.2rem;
       }
+
+      .checkout-modal__notice { outline-offset: 2px; overflow-wrap: anywhere; }
+      .checkout-modal__notice p { margin: 0 0 var(--space-2); }
 
       .checkout-modal__content-grid {
         display: grid;
@@ -270,6 +285,7 @@ import { PosTotalsSummaryComponent } from "./pos-totals-summary.component";
         .checkout-modal {
           width: 100%;
           max-height: 94vh;
+          max-height: 94dvh;
           padding: var(--space-2);
         }
 
@@ -286,7 +302,53 @@ import { PosTotalsSummaryComponent } from "./pos-totals-summary.component";
     `,
     ]
 })
-export class PosCheckoutModalComponent implements OnChanges {
+export class PosCheckoutModalComponent implements OnChanges, OnDestroy {
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly confirmations = inject(ConfirmDialogService);
+  private panel?: HTMLElement;
+  private notice?: HTMLElement;
+  private previousFocus: HTMLElement | null = null;
+  private pendingFocusTarget: HTMLElement | null = null;
+  private readonly background = new Map<HTMLElement, boolean>();
+  private shell: HTMLElement | null = null;
+  private shellWasElevated = false;
+  private previousBodyOverflow: string | null = null;
+  private dialogGeneration = 0;
+
+  @ViewChild("checkoutPanel")
+  set checkoutPanel(ref: ElementRef<HTMLElement> | undefined) {
+    if (!ref) { this.releaseDialog(); return; }
+    if (this.panel === ref.nativeElement) return;
+    // A view query may run again without replacing the DOM node. Capture originals only once.
+    const previousFocus = this.panel ? this.previousFocus
+      : this.pendingFocusTarget ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
+    this.releaseDialog();
+    this.panel = ref.nativeElement;
+    const generation = ++this.dialogGeneration;
+    this.pendingFocusTarget = null;
+    this.previousFocus = previousFocus;
+    this.shell = this.host.nativeElement.closest<HTMLElement>(".layout-shell");
+    this.shellWasElevated = this.shell?.classList.contains("has-checkout-modal") ?? false;
+    this.shell?.classList.add("has-checkout-modal");
+    // Isolate only the modal's ancestor siblings. The shared confirmation overlay remains above it.
+    let branch = this.host.nativeElement;
+    while (branch.parentElement) {
+      const parent = branch.parentElement;
+      for (const sibling of Array.from(parent.children)) {
+        if (sibling instanceof HTMLElement && sibling !== branch && !sibling.matches("app-confirm-dialog,script,style")) {
+          this.background.set(sibling, sibling.inert); sibling.inert = true;
+        }
+      }
+      if (parent === this.shell || !this.shell) break;
+      branch = parent;
+    }
+    this.previousBodyOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    queueMicrotask(() => { if (this.dialogGeneration === generation) this.focusNoticeOrClose(); });
+  }
+
+  @ViewChild("operationNotice")
+  set operationNotice(ref: ElementRef<HTMLElement> | undefined) { this.notice = ref?.nativeElement; }
   @Input({ required: true }) isOpen = false;
   @Input({ required: true }) payments: PaymentLine[] = [];
   @Input({ required: true }) receiptType: PosReceiptType = "TICKET";
@@ -311,6 +373,8 @@ export class PosCheckoutModalComponent implements OnChanges {
   @Input({ required: true }) checkoutButtonLabel = "COBRAR";
   @Input({ required: true }) submitting = false;
   @Input({ required: true }) receiptValidationError = "";
+  @Input() errorMessage = "";
+  @Input() recoveryMessage = "";
 
   submitAttempted = false;
 
@@ -342,6 +406,60 @@ export class PosCheckoutModalComponent implements OnChanges {
     if (changes["isOpen"] && !this.isOpen) {
       this.submitAttempted = false;
     }
+    if (this.isOpen && (changes["errorMessage"] || changes["recoveryMessage"])) {
+      const generation = this.dialogGeneration;
+      queueMicrotask(() => { if (this.dialogGeneration === generation && this.notice) this.focusNoticeOrClose(); });
+    }
+  }
+
+  ngOnDestroy(): void { this.releaseDialog(); }
+
+  @HostListener("document:keydown", ["$event"])
+  onDialogKeydown(event: KeyboardEvent): void {
+    if (!this.panel || this.confirmations.currentState) return;
+    if (event.key === "Escape" && !this.submitting) { event.preventDefault(); this.handleClose(); return; }
+    if (event.key !== "Tab") return;
+    const controls = Array.from(this.panel.querySelectorAll<HTMLElement>(
+      'button:not([disabled]),a[href],input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex="0"]',
+    )).filter(element => element.getClientRects().length > 0 && getComputedStyle(element).visibility !== "hidden");
+    const first = controls[0], last = controls[controls.length - 1];
+    if (!first || !last) { event.preventDefault(); return; }
+    const active = document.activeElement as HTMLElement;
+    if (!controls.includes(active) || (event.shiftKey && active === first) || (!event.shiftKey && active === last)) {
+      event.preventDefault(); (event.shiftKey ? last : first).focus();
+    }
+  }
+
+  @HostListener("document:focusin", ["$event"])
+  onDialogFocus(event: FocusEvent): void {
+    if (this.panel && !this.confirmations.currentState && event.target instanceof Node && !this.panel.contains(event.target)) this.focusNoticeOrClose();
+  }
+
+  private focusNoticeOrClose(): void {
+    if (!this.isOpen || !this.panel?.isConnected || this.confirmations.currentState) return;
+    if (this.notice) { this.panel.querySelector(".checkout-modal__body")?.scrollTo({top: 0}); this.notice.focus({preventScroll: true}); }
+    else this.panel.querySelector<HTMLButtonElement>(".checkout-modal__close")?.focus({preventScroll: true});
+  }
+
+  private releaseDialog(): void {
+    if (!this.panel) return;
+    const generation = ++this.dialogGeneration;
+    this.panel = undefined; this.notice = undefined;
+    for (const [element, wasInert] of this.background) element.inert = wasInert;
+    this.background.clear();
+    if (!this.shellWasElevated) this.shell?.classList.remove("has-checkout-modal");
+    this.shell = null;
+    this.shellWasElevated = false;
+    if (this.previousBodyOverflow !== null) document.body.style.overflow = this.previousBodyOverflow;
+    this.previousBodyOverflow = null;
+    const target = this.previousFocus; this.previousFocus = null;
+    this.pendingFocusTarget = target;
+    queueMicrotask(() => {
+      if (this.dialogGeneration !== generation) return;
+      this.pendingFocusTarget = null;
+      if (!this.panel && !this.confirmations.currentState
+        && target?.isConnected && !target.closest("[inert]") && !target.matches(":disabled")) target.focus({preventScroll: true});
+    });
   }
 
   get cartItemsCountLabel(): string {

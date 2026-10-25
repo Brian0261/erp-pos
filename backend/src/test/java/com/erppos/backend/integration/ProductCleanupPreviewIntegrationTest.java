@@ -613,6 +613,8 @@ class ProductCleanupPreviewIntegrationTest extends AbstractHttpIntegrationTest {
 
         confirmSalePayload(payload);
 
+        org.junit.jupiter.api.Assertions.assertNull(prepareSaleFixture(token, payload), "Synthetic cleanup sale must be durably prepared");
+
         MvcResult result = mockMvc.perform(post("/api/v1/sales")
                         .header(HttpHeaders.AUTHORIZATION, bearer(token))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -782,7 +784,11 @@ class ProductCleanupPreviewIntegrationTest extends AbstractHttpIntegrationTest {
             jdbcTemplate.update("delete from sales where id = ?", fixture.saleId);
         }
         if (fixture.cashSessionId != null) {
-            jdbcTemplate.update("delete from cash_register_sessions where id = ?", fixture.cashSessionId);
+            // Durable identities retain their original cash session even after the synthetic sale is removed.
+            jdbcTemplate.update("""
+                    delete from cash_register_sessions c where c.id = ?
+                    and not exists(select 1 from sale_operations o where o.original_cash_session_id=c.id)
+                    """, fixture.cashSessionId);
         }
         if (fixture.productId != null) {
             jdbcTemplate.update("delete from products where id = ?", fixture.productId);

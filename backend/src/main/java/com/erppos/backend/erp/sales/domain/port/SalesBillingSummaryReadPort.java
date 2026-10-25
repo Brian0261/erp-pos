@@ -6,5 +6,6 @@ import java.util.Collection;
 import java.util.Map;
 
 public interface SalesBillingSummaryReadPort {
+    void lockDocumentsForSale(Long saleId);
     Map<Long, SaleBillingSummary> findLatestBySaleIds(Collection<Long> saleIds);
 }

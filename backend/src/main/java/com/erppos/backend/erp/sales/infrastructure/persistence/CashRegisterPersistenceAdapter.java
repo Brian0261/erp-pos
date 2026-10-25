@@ -5,6 +5,10 @@ import com.erppos.backend.erp.sales.domain.model.CashRegisterStatus;
 import com.erppos.backend.erp.sales.domain.port.CashRegisterRepositoryPort;
 import com.erppos.backend.erp.sales.infrastructure.mapper.CashRegisterMapper;
 import org.springframework.stereotype.Component;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -15,6 +19,7 @@ import java.util.UUID;
 public class CashRegisterPersistenceAdapter implements CashRegisterRepositoryPort {
 
     private final CashRegisterSessionJpaRepository repository;
+    @PersistenceContext private EntityManager entityManager;
 
     public CashRegisterPersistenceAdapter(CashRegisterSessionJpaRepository repository) {
         this.repository = repository;
@@ -35,6 +40,17 @@ public class CashRegisterPersistenceAdapter implements CashRegisterRepositoryPor
     @Override
     public Optional<CashRegisterSession> findById(Long id) {
         return repository.findById(id).map(CashRegisterMapper::toDomain);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Optional<CashRegisterSession> findByIdForUpdate(Long id) {
+        entityManager.createNativeQuery("set local lock_timeout = '3s'").executeUpdate();
+        return repository.findByIdForUpdate(id).map(entity -> {
+            // A prior lookup in this transaction must not retain OPEN after a concurrent close.
+            entityManager.refresh(entity);
+            return CashRegisterMapper.toDomain(entity);
+        });
     }
 
     @Override

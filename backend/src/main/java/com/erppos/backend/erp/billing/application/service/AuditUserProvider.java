@@ -8,6 +8,14 @@ import org.springframework.stereotype.Component;
 @Component("billingAuditUserProvider")
 public class AuditUserProvider {
 
+    public java.util.UUID currentUserId() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.getPrincipal() instanceof ErpUserDetails userDetails) {
+            return userDetails.getId();
+        }
+        return new java.util.UUID(0, 0);
+    }
+
     public String currentUsername() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || authentication.getPrincipal() == null) {

@@ -49,6 +49,7 @@ public class QuotePersistenceAdapter implements QuoteRepositoryPort {
     @Override
     @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
     public Optional<Quote> findByIdForUpdate(Long id) {
+        jdbc.execute("set local lock_timeout = '3s'");
         // Lock the header BEFORE loading its collection (avoids stale follow-on-lock snapshots).
         if (jdbc.queryForList("select id from quotes where id=? for update", Long.class, id).isEmpty()) return Optional.empty();
         return quoteJpaRepository.findById(id).map(entity -> {

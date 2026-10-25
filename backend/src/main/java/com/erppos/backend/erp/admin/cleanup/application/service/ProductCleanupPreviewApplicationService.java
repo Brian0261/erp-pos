@@ -397,6 +397,21 @@ public class ProductCleanupPreviewApplicationService implements ProductCleanupPr
                 .map(ProductCleanupPreviewResult.PurchaseReceiptImpact::purchaseReceiptId)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
 
+        executePort.lockCleanupTargets(productIds, pureSaleIds);
+        ProductCleanupPreviewResult lockedPreview = preview(new ProductCleanupPreviewCommand(command.productIds(), command.skus()));
+        Set<Long> lockedProducts = lockedPreview.foundProducts().stream()
+                .map(ProductCleanupPreviewResult.ProductImpact::productId).collect(Collectors.toSet());
+        Set<Long> lockedSales = lockedPreview.relatedSales().stream().filter(ProductCleanupPreviewResult.SaleImpact::pureSale)
+                .map(ProductCleanupPreviewResult.SaleImpact::saleId).collect(Collectors.toSet());
+        Set<Long> lockedOrders = lockedPreview.purchaseOrders().stream().filter(ProductCleanupPreviewResult.PurchaseOrderImpact::purePurchaseOrder)
+                .map(ProductCleanupPreviewResult.PurchaseOrderImpact::purchaseOrderId).collect(Collectors.toSet());
+        Set<Long> lockedReceipts = lockedPreview.purchaseReceipts().stream().filter(ProductCleanupPreviewResult.PurchaseReceiptImpact::purePurchaseReceipt)
+                .map(ProductCleanupPreviewResult.PurchaseReceiptImpact::purchaseReceiptId).collect(Collectors.toSet());
+        if (!lockedPreview.purgeable() || !productIds.equals(lockedProducts) || !pureSaleIds.equals(lockedSales)
+                || !purePurchaseOrderIds.equals(lockedOrders) || !purePurchaseReceiptIds.equals(lockedReceipts)) {
+            throw new CleanupBusinessRuleException("Cleanup candidates changed concurrently; preview again before deleting.");
+        }
+
         int deletedSaleItems = executePort.deleteSaleItemsBySaleIds(pureSaleIds);
         int deletedSalePayments = executePort.deleteSalePaymentsBySaleIds(pureSaleIds);
         int deletedQuoteItems = executePort.deleteQuoteItemsByProductIds(productIds);

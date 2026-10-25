@@ -162,6 +162,8 @@ class PosMoneyIntegrationTest extends AbstractHttpIntegrationTest {
             payment.put("reference", "QA-" + i);
         }
         confirmSalePayload(payload);
+        MvcResult preparationFailure = prepareSaleFixture(f.token(), payload);
+        if (preparationFailure != null) return preparationFailure;
         return mockMvc.perform(post("/api/v1/sales")
                         .header(HttpHeaders.AUTHORIZATION, bearer(f.token()))
                         .contentType(MediaType.APPLICATION_JSON).content(payload.toString())).andReturn();

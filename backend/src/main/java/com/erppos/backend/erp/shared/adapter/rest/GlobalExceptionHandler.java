@@ -99,7 +99,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(org.springframework.http.converter.HttpMessageNotReadableException.class)
     public ResponseEntity<?> handleCheckoutPayload(org.springframework.http.converter.HttpMessageNotReadableException ex, HttpServletRequest request) {
         String path = request.getRequestURI();
-        if (path.equals("/api/v1/sales") || path.matches("/api/v1/quotes/[^/]+/convert-to-sale")) {
+        if (path.equals("/api/v1/sales") || path.startsWith("/api/v1/sales/operations") || path.matches("/api/v1/quotes/[^/]+/convert-to-sale")) {
             return ResponseEntity.badRequest().body(errorResponseFactory.build(request, HttpStatus.BAD_REQUEST, "Invalid checkout request format"));
         }
         return handleGeneric(ex, request);
@@ -108,6 +108,30 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ConstraintViolationException.class)
     public ResponseEntity<ApiError> handleConstraintViolation(ConstraintViolationException ex, HttpServletRequest request) {
         return ResponseEntity.badRequest().body(errorResponseFactory.build(request, HttpStatus.BAD_REQUEST, ex.getMessage()));
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<?> handleRecoveryIdentifier(MethodArgumentTypeMismatchException ex,HttpServletRequest request) {
+        if(request.getRequestURI().startsWith("/api/v1/sales/operations"))
+            return ResponseEntity.badRequest().body(errorResponseFactory.build(request,HttpStatus.BAD_REQUEST,"Invalid operation identifier or query parameter"));
+        return handleGeneric(ex,request);
+    }
+
+    @ExceptionHandler({org.springframework.dao.PessimisticLockingFailureException.class,
+            org.springframework.dao.QueryTimeoutException.class,org.springframework.transaction.TransactionTimedOutException.class})
+    public ResponseEntity<?> handleCommercialLock(Exception ex,HttpServletRequest request) {
+        return handleSaleOperationConflict(new com.erppos.backend.erp.sales.domain.exception.SaleOperationConflictException(
+                "OPERATION_BUSY","The operation could not acquire its resources. Consult the same identity before retrying."),request);
+    }
+
+    @ExceptionHandler(org.springframework.jdbc.UncategorizedSQLException.class)
+    public ResponseEntity<?> handleCommercialSqlWait(org.springframework.jdbc.UncategorizedSQLException ex,HttpServletRequest request) {
+        String state=ex.getSQLException().getSQLState();
+        String path=request.getRequestURI();
+        if((path.startsWith("/api/v1/sales") || path.startsWith("/api/v1/quotes")
+                || path.startsWith("/api/v1/billing") || path.startsWith("/api/v1/admin"))
+                && java.util.Set.of("55P03","40P01","57014").contains(state)) return handleCommercialLock(ex,request);
+        return handleGeneric(ex,request);
     }
 
     @ExceptionHandler(ResponseStatusException.class)

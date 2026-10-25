@@ -1073,6 +1073,17 @@ const ROLES_ECOMMERCE_ADMIN: AppRole[] = ["ADMIN", "SUPERVISOR"];
         z-index: 1;
       }
 
+      /* Lift the workspace stacking context, not only its nested checkout backdrop. */
+      .layout-shell.has-checkout-modal .workspace {
+        z-index: 6;
+      }
+
+      /* Descendant overlays (e.g. full cart) also need to escape the workspace's base context.
+         Scope the deep selector to this layout host; keep each dialog's own layering unchanged. */
+      :host ::ng-deep .layout-shell:has(.workspace [aria-modal="true"]) > .workspace {
+        z-index: 6;
+      }
+
       .topbar {
         display: flex;
         align-items: center;

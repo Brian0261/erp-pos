@@ -1,4 +1,4 @@
-import { HttpClient, HttpParams } from "@angular/common/http";
+import { HttpClient, HttpContext, HttpParams } from "@angular/common/http";
 import { Injectable } from "@angular/core";
 import { Observable } from "rxjs";
 
@@ -71,10 +71,12 @@ export class QuoteService {
   convertToSale(
     id: number,
     payload: ConvertQuoteToSaleRequest,
+    context?: HttpContext,
   ): Observable<QuoteResponse> {
     return this.http.post<QuoteResponse>(
       `${this.endpoint}/${id}/convert-to-sale`,
       payload,
+      { context },
     );
   }
 

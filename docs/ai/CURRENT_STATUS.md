@@ -4,6 +4,22 @@
 
 Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones tecnicas/QA documentadas.
 
+### POS-RECOVERY-HARDENING-A — PASS local, pendiente de gate Git (2026-10-21)
+
+- Base `77c53fa3c4b33f3dff5271559409edd56a3f772a`, rama local
+  `feat/pos-recovery-hardening-a` en su worktree independiente.
+- Preparacion durable obligatoria POS/cotizaciones, descubrimiento paginado por propietario,
+  reanudacion explicita y cancelacion terminal sobre `sale_operations`. V28 aditiva;
+  hash checkout-v1 y tombstones preservados. Comprobantes, caja, anulacion y purga coordinados.
+- QA focal acreditada: 339 casos backend distintos entre ejecuciones pertinentes,
+  0 FAIL/ERROR/SKIPPED; ultimo `verify` de 110 casos PASS tras ajustes finales.
+  Angular: 158 PASS y build PASS. Evidencia y limites en
+  `docs/qa/POS_RECOVERY_HARDENING_A_QA.md`; contrato en `docs/api/SALE_OPERATION_RECOVERY_API.md`.
+- `PASS — POS_RECOVERY_A_LOCAL_QA`, `READY_FOR_A_COMMIT_APPROVAL`.
+  A no esta CLOSED. Sin commit, publicacion, PR, CI remoto ni despliegue de A.
+  B y nuevas fases fiscales continúan fuera de alcance. El futuro despliegue requiere
+  corte coordinado de clientes y backend para impedir escritores antiguos sin preparacion.
+
 ## Estado ecommerce SEO-first
 
 - Fase 0 documental ecommerce cerrada a nivel de decisiones: ECOM-ADR-001 al ECOM-ADR-019 existen y estan aprobados para la futura tienda online SEO-first.
