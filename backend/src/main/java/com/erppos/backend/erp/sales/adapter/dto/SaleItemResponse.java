@@ -11,7 +11,10 @@ public record SaleItemResponse(
         BigDecimal quantity,
         BigDecimal unitPrice,
         BigDecimal discountAmount,
-        BigDecimal lineTotal
+        BigDecimal lineTotal,
+        String productNameSnapshot,
+        String skuSnapshot,
+        String quantityText
 ) {
 }
 

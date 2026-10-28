@@ -170,7 +170,10 @@ public class SalesController {
                 item.quantity(),
                 item.unitPrice(),
                 item.discountAmount(),
-                item.lineTotal()
+                item.lineTotal(),
+                item.productNameSnapshot(),
+                item.skuSnapshot(),
+                item.quantity().toPlainString()
         );
     }
 

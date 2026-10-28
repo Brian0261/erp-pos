@@ -48,7 +48,9 @@ public final class SaleMapper {
                 entity.getQuantity(),
                 entity.getUnitPrice(),
                 entity.getDiscountAmount(),
-                entity.getLineTotal()
+                entity.getLineTotal(),
+                entity.getProductNameSnapshot(),
+                entity.getSkuSnapshot()
         );
     }
 
@@ -89,6 +91,9 @@ public final class SaleMapper {
     public static SaleItemEntity toItemEntity(SaleItem item, SaleEntity saleEntity) {
         SaleItemEntity entity = new SaleItemEntity();
         mergeItem(entity, item, saleEntity);
+        // Captured once on insertion; mergeItem deliberately preserves existing/legacy snapshots.
+        entity.setProductNameSnapshot(item.productNameSnapshot());
+        entity.setSkuSnapshot(item.skuSnapshot());
         return entity;
     }
 
