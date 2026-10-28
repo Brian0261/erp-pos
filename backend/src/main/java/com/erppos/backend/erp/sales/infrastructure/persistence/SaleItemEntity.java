@@ -25,6 +25,12 @@ public class SaleItemEntity {
     @Column(name = "product_id", nullable = false)
     private Long productId;
 
+    @Column(name = "product_name_snapshot", length = 180, updatable = false)
+    private String productNameSnapshot;
+
+    @Column(name = "sku_snapshot", length = 60, updatable = false)
+    private String skuSnapshot;
+
     @Column(name = "quantity", nullable = false, precision = 16, scale = 3)
     private BigDecimal quantity;
 
@@ -42,6 +48,10 @@ public class SaleItemEntity {
     public void setSale(SaleEntity sale) { this.sale = sale; }
     public Long getProductId() { return productId; }
     public void setProductId(Long productId) { this.productId = productId; }
+    public String getProductNameSnapshot() { return productNameSnapshot; }
+    public void setProductNameSnapshot(String productNameSnapshot) { this.productNameSnapshot = productNameSnapshot; }
+    public String getSkuSnapshot() { return skuSnapshot; }
+    public void setSkuSnapshot(String skuSnapshot) { this.skuSnapshot = skuSnapshot; }
     public BigDecimal getQuantity() { return quantity; }
     public void setQuantity(BigDecimal quantity) { this.quantity = quantity; }
     public BigDecimal getUnitPrice() { return unitPrice; }

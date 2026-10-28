@@ -170,7 +170,8 @@ public class SalesApplicationService implements SalesUseCase {
             }
 
             BigDecimal lineTotal = line.net();
-            items.add(new SaleItem(null, null, product.id(), quantity, unitPrice, itemDiscount, lineTotal));
+            items.add(new SaleItem(null, null, product.id(), quantity, unitPrice, itemDiscount, lineTotal,
+                    product.name(), product.sku()));
 
             subtotal = subtotal.add(itemSubtotal);
             discountTotal = discountTotal.add(itemDiscount);
