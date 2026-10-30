@@ -25,6 +25,7 @@ import { PaymentLine, PosCartItem, PosReceiptType } from "./data/pos-ui.models";
 import { SalesService } from "./data/sales.service";
 import { isSalePreparationRejected, SaleOperation, SaleOperationsService } from "./data/sale-operations.service";
 import { SaleOperationRecoveryComponent } from "./components/sale-operation-recovery.component";
+import { PosSaleNoteComponent } from "./internal-note/pos-sale-note.component";
 import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.service";
 import {
   BillingSeriesResponse,
@@ -70,6 +71,7 @@ import { availableQuantity, decimalText, isQuantityPolicy, moneyCents, quantityH
         PosSearchPanelComponent,
         PosSearchResultsComponent,
         SaleOperationRecoveryComponent,
+        PosSaleNoteComponent,
     ],
     template: `
     <section class="ui-card pos-page">
@@ -106,6 +108,9 @@ import { availableQuantity, decimalText, isQuantityPolicy, moneyCents, quantityH
 
       <div class="pos-shell">
         <main class="pos-workspace">
+          <ng-container *ngIf="!pendingSaleRequest">
+            <app-pos-sale-note *ngIf="lastSaleId as confirmedSaleId" [saleId]="confirmedSaleId" (newSale)="focusNewSale()"></app-pos-sale-note>
+          </ng-container>
           <app-pos-search-panel
             [saleForm]="saleForm"
             [warehouses]="warehouses"
@@ -612,6 +617,8 @@ export class PosPageComponent implements OnInit, OnDestroy {
   discountAdjustmentMessage = "";
   successMessage = "";
   lastSaleId: number | null = null;
+  @ViewChild(PosSearchPanelComponent) private noteSearchPanel?: PosSearchPanelComponent;
+  focusNewSale(): void { this.noteSearchPanel?.focusSearch(); }
   showGoToBillingAction = false;
   draftReviewMessage = "";
   priceReviewRequired = false;

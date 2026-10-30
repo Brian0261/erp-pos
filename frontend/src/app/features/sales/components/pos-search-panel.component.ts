@@ -1,5 +1,5 @@
 import { CommonModule } from "@angular/common";
-import { Component, EventEmitter, Input, Output } from "@angular/core";
+import { Component, ElementRef, EventEmitter, Input, Output, ViewChild } from "@angular/core";
 import { FormGroup, ReactiveFormsModule } from "@angular/forms";
 
 import { WarehouseResponse } from "../../inventory/data/inventory.models";
@@ -357,6 +357,8 @@ import { WarehouseResponse } from "../../inventory/data/inventory.models";
     ]
 })
 export class PosSearchPanelComponent {
+  @ViewChild("searchInput") private searchInput?: ElementRef<HTMLInputElement>;
+  focusSearch(): void { this.searchInput?.nativeElement.focus(); }
   @Input({ required: true }) saleForm!: FormGroup;
   @Input({ required: true }) warehouses: WarehouseResponse[] = [];
   @Input({ required: true }) selectedWarehouseLabel = "Selecciona almacén";

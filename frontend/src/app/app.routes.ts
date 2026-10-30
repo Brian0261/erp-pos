@@ -100,6 +100,11 @@ export const routes: Routes = [
         data: { allowedRoles: ROLES_SALES_VOID },
       },
       {
+        path: "ventas/:id/nota",
+        loadComponent: () => import("./features/sales/internal-note/internal-note-page.component").then(m => m.InternalNotePageComponent),
+        data: { allowedRoles: ROLES_SALES },
+      },
+      {
         path: "ventas/:id",
         component: SaleDetailPageComponent,
         data: { allowedRoles: ROLES_SALES },

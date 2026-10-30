@@ -273,6 +273,7 @@ import { SaleResponse } from "./data/sales.models";
         </article>
 
         <footer class="actions">
+          <a class="ui-button ui-button--secondary" [routerLink]="['/ventas', sale.id, 'nota']">Ver nota interna</a>
           <a
             *ngIf="canVoidSale() && !hasBlockingBillingDocument()"
             class="ui-button ui-button--danger"

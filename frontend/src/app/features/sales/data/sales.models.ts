@@ -64,6 +64,10 @@ export interface SaleItemResponse {
   unitPrice: number;
   discountAmount: number;
   lineTotal: number;
+  // Additive NOTE-1A fields; documents reject an absent quantityText instead of rounding quantity.
+  productNameSnapshot?: string | null;
+  skuSnapshot?: string | null;
+  quantityText?: string;
 }
 
 export interface SalePaymentResponse {
