@@ -59,6 +59,9 @@ jobs:
       - name: Run billing series concurrency E2E
         run: npm run e2e:billing-series:ci
 
+      - name: Run internal note no-write smoke
+        run: npm run e2e:internal-note:ci
+
   e2e-auth:
     runs-on: ubuntu-latest
     timeout-minutes: 30

@@ -81,8 +81,8 @@ export class SalesService {
     });
   }
 
-  getById(id: number): Observable<SaleResponse> {
-    return this.http.get<SaleResponse>(`${this.endpoint}/${id}`);
+  getById(id: number, context?: HttpContext): Observable<SaleResponse> {
+    return this.http.get<SaleResponse>(`${this.endpoint}/${id}`, { context });
   }
 
   voidSale(id: number, payload: VoidSaleRequest): Observable<SaleResponse> {
