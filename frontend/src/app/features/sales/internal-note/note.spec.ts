@@ -1,5 +1,5 @@
 import { TestBed, fakeAsync, flushMicrotasks, tick } from "@angular/core/testing";
-import { provideZoneChangeDetection } from "@angular/core";
+import { NgZone, provideZoneChangeDetection } from "@angular/core";
 import { provideRouter } from "@angular/router";
 import { RouterTestingHarness } from "@angular/router/testing";
 import { Subject, of, throwError } from "rxjs";
@@ -169,6 +169,33 @@ describe("Internal note route invalidation", () => {
     harness = await RouterTestingHarness.create();
   });
   afterEach(() => { if (!harness.fixture.componentRef.hostView.destroyed) harness.fixture.destroy(); expect(activeUrls.size).toBe(0); });
+
+  routeTest("polls outside Angular and reenters only to visibly invalidate a changed credential", () => {
+    const page = navigate("81"), url = page.session.url()!;
+    const credential = spyOn(TestBed.inject(AuthService), "getToken").and.callThrough();
+    const reentry = spyOn(TestBed.inject(NgZone), "run").and.callThrough();
+    tick(600); expect(credential).toHaveBeenCalledTimes(3); expect(reentry).not.toHaveBeenCalled();
+    expect(page.ready).toBe(true);
+    token = "changed-monitor-credential"; tick(200);
+    expect(reentry).toHaveBeenCalled();
+    expectEmpty(page, "La sesión cambió. Vuelve a abrir la venta con la sesión actual.");
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith(url); expect(sales.getById).toHaveBeenCalledTimes(1);
+  });
+  routeTest("stops the monitor and removes its listeners and document URLs on destruction", () => {
+    const interval = spyOn(window, "setInterval").and.callThrough();
+    const page = navigate("81"), monitor = interval.calls.all().find(call => call.args[1] === 200)!.returnValue;
+    spyOn(window, "fetch").and.returnValue(Promise.resolve(viewerResponse()));
+    void page.session.output("open"); flushMicrotasks(); expect(activeUrls.size).toBe(2);
+    const credential = spyOn(TestBed.inject(AuthService), "getToken").and.callThrough();
+    const cleared = spyOn(window, "clearInterval").and.callThrough();
+    const removed = spyOn(window, "removeEventListener").and.callThrough();
+    harness.fixture.destroy();
+    expect(cleared).toHaveBeenCalledWith(monitor);
+    expect(removed).toHaveBeenCalledWith("storage", jasmine.any(Function)); expect(removed).toHaveBeenCalledWith("focus", jasmine.any(Function));
+    token = "changed-after-destroy"; tick(600); window.dispatchEvent(new Event("storage")); window.dispatchEvent(new Event("focus"));
+    expect(credential).not.toHaveBeenCalled(); expect(popupClosed).toHaveBeenCalled();
+    expect(activeUrls.size).toBe(0); expect(page.session.note()).toBeNull(); expect(page.session.url()).toBeNull();
+  });
 
   routeTest("clears a ready PDF and accessible HTML on an invalid ID in the same instance, then loads B normally", () => {
     const page = navigate("81"), oldUrl = page.session.url()!;

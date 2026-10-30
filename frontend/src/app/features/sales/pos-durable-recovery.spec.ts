@@ -1,6 +1,6 @@
 import { HttpContext, HttpErrorResponse, provideHttpClient } from "@angular/common/http";
 import { HttpTestingController, provideHttpClientTesting } from "@angular/common/http/testing";
-import { provideZoneChangeDetection } from "@angular/core";
+import { NgZone, provideZoneChangeDetection } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 import { provideRouter } from "@angular/router";
 import { of, Subject, throwError } from "rxjs";
@@ -40,8 +40,9 @@ describe("A durable POS recovery", () => {
     sessionStorage.clear(); token = "synthetic-owner-token";
     auth = jasmine.createSpyObj<AuthService>("Auth", ["me", "getToken"]);
     auth.getToken.and.callFake(() => token); auth.me.and.returnValue(of(owner));
-    operations = createOperationDouble(); sales = jasmine.createSpyObj<SalesService>("Sales", ["create"]);
+    operations = createOperationDouble(); sales = jasmine.createSpyObj<SalesService>("Sales", ["create", "getById"]);
     sales.create.and.returnValue(of(result()));
+    sales.getById.and.returnValue(of(result()));
     documents = jasmine.createSpyObj<ElectronicDocumentService>("Documents", ["createFromSale", "listBySaleId", "generateXml", "sign", "send"]);
     confirm = jasmine.createSpyObj<ConfirmDialogService>("Confirm", ["confirm"]); confirm.confirm.and.returnValue(Promise.resolve(true));
     await TestBed.configureTestingModule({ imports: [PosPageComponent], providers: [provideZoneChangeDetection(), provideRouter([]), provideHttpClient(), provideHttpClientTesting(),
@@ -58,6 +59,20 @@ describe("A durable POS recovery", () => {
     page.payments = [{ paymentMethod: "CASH", amount: 10, reference: "" }];
   });
   afterEach(() => { http.verify(); fixture.destroy(); sessionStorage.clear(); });
+
+  it("becomes stable with the confirmed note mounted and its credential monitor active", async () => {
+    const interval = spyOn(window, "setInterval").and.callThrough();
+    page.finalizeSale(); await settle();
+    // The final render mounts the note; also await its authorized read before asserting its DOM.
+    await settle();
+    expect(fixture.nativeElement.querySelector('app-pos-sale-note [aria-label="Última venta confirmada"]')?.textContent).toContain("Venta S-QA registrada.");
+    expect(interval.calls.allArgs().some(args => args[1] === 200)).toBeTrue();
+    expect(fixture.isStable()).toBeTrue(); expect(TestBed.inject(NgZone).hasPendingMacrotasks).toBeFalse();
+    expect(sales.getById).toHaveBeenCalledOnceWith(77, jasmine.any(HttpContext));
+    expect(sales.getById.calls.first().args[1]!.get(BOUND_AUTH_CREDENTIALS)?.token).toBe("synthetic-owner-token");
+    expect(operations.prepare).toHaveBeenCalledTimes(1); expect(sales.create).toHaveBeenCalledTimes(1);
+    expect(documents.createFromSale).not.toHaveBeenCalled();
+  });
 
   const rejectDefinitively = () => operations.prepare.and.callFake(body => rejected(422, {
     protocolVersion: 1, operationId: body.operationId, actorUserId: owner.id, origin: "POS",

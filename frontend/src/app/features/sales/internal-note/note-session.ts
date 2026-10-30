@@ -1,4 +1,4 @@
-import { Injectable, InjectionToken, OnDestroy, inject, signal } from "@angular/core";
+import { Injectable, InjectionToken, NgZone, OnDestroy, inject, signal } from "@angular/core";
 import { firstValueFrom, timeout } from "rxjs";
 import { AuthService } from "../../../core/auth/auth.service";
 import { createBoundAuthContext } from "../../../core/auth/bound-auth-context";
@@ -21,16 +21,20 @@ export class NoteSession implements OnDestroy {
   private documentSaleId: number | null = null;
   private readonly generate = inject(NOTE_GENERATOR);
   private readonly windows = new Map<Window, string | null>();
-  private readonly watch = setInterval(() => this.checkSession(), 200);
+  private readonly zone = inject(NgZone);
+  private readonly watch = this.zone.runOutsideAngular(() => setInterval(() => this.checkSession(), 200));
   private readonly storageListener = () => this.checkSession();
   constructor(private readonly sales: SalesService, private readonly auth: AuthService) {
     window.addEventListener("storage", this.storageListener);
     window.addEventListener("focus", this.storageListener);
   }
   private checkSession(): void {
+    if (this.destroyed) return;
     if (this.credential !== this.auth.getToken()) {
-      this.version++; this.clear(); this.credential = this.auth.getToken();
-      this.error.set("La sesión cambió. Vuelve a abrir la venta con la sesión actual."); this.phase.set("error");
+      this.zone.run(() => {
+        this.version++; this.clear(); this.credential = this.auth.getToken();
+        this.error.set("La sesión cambió. Vuelve a abrir la venta con la sesión actual."); this.phase.set("error");
+      });
     }
     for (const [win, url] of this.windows) if (win.closed) { if (url) URL.revokeObjectURL(url); this.windows.delete(win); }
   }

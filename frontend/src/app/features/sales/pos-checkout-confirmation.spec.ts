@@ -5,6 +5,7 @@ import { TestBed } from "@angular/core/testing";
 import { provideRouter } from "@angular/router";
 import { of, Subject, throwError } from "rxjs";
 import { AuthService } from "../../core/auth/auth.service";
+import { BOUND_AUTH_CREDENTIALS } from "../../core/auth/bound-auth-context";
 import { jwtInterceptor } from "../../core/interceptors/jwt.interceptor";
 import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.service";
 import { BillingSeriesService } from "../billing/data/billing-series.service";
@@ -68,8 +69,9 @@ describe("P1-B immutable checkout and recovery", () => {
 
   beforeEach(async () => {
     sessionStorage.removeItem("erp_pos_sales_draft_v1");
-    sales = jasmine.createSpyObj<SalesService>("Sales", ["create"]);
+    sales = jasmine.createSpyObj<SalesService>("Sales", ["create", "getById"]);
     sales.create.and.returnValue(rejection(422));
+    sales.getById.and.returnValue(of(sale()));
     pos = jasmine.createSpyObj<PosService>("Pos", ["snapshot", "search", "lookup"]);
     pos.snapshot.and.returnValue(of([live()]));
     pos.search.and.returnValue(of([]));
@@ -206,6 +208,8 @@ describe("P1-B immutable checkout and recovery", () => {
     expect(sales.create.calls.mostRecent().args[0].confirmedTotal).toBe(12);
   });
   it("replaces an open checkout with a visible price review action and safe focus after 409", async () => {
+    // Render the re-enabled launcher before the deferred focus, as the application does.
+    fixture.autoDetectChanges();
     sales.create.and.returnValue(rejection(409, { code: "PRICE_CONFIRMATION_REQUIRED", confirmedTotal: 10,
       proposedTotal: 12, changes: [{ productId: 101, confirmedUnitPrice: 10, currentUnitPrice: 12 }] }));
     page.openCheckoutModal(); await settle();
@@ -641,6 +645,17 @@ describe("P1-B POS authentication binding with the real HTTP interceptor", () =>
     saleId: 77, documentId: located ? 901 : null, documentStatus: located ? "DRAFT" : null, receiptState: located ? "LOCATED" : "PENDING" });
   const resume = async () => { page.confirmPreparedResume(); await settle(); me().flush(owner); return salePost(); };
   const noPost = () => http.expectNone(r => r.method === "POST");
+  const settleConfirmedNote = async (expectedToken: string, denied = false) => {
+    fixture.detectChanges();
+    const read = http.expectOne(r => r.method === "GET" && r.url.endsWith("/sales/77"));
+    expect(read.request.headers.get("Authorization")).toBe(`Bearer ${expectedToken}`);
+    expect(read.request.context.get(BOUND_AUTH_CREDENTIALS)?.token).toBe(expectedToken);
+    if (denied) read.flush({}, { status: 403, statusText: "Synthetic note access denied" });
+    else read.flush(sale());
+    await settle();
+    const note = fixture.nativeElement.querySelector('app-pos-sale-note [aria-label="Última venta confirmada"]');
+    if (denied) expect(note).toBeNull(); else expect(note?.textContent).toContain("Venta S-QA registrada.");
+  };
   const rawDraft = () => sessionStorage.getItem("erp_pos_sales_draft_v1");
   const invoice = () => {
     page.billingSeriesRows = [{ id: 21, version: 0, documentType: "INVOICE", series: "F001", currentNumber: 1,
@@ -697,7 +712,7 @@ describe("P1-B POS authentication binding with the real HTTP interceptor", () =>
     lookup.flush(preparedOperation(preparation)); await settle(); noPost(); const replay = await resume(); expect(replay.request.body).toEqual(request);
     expect(replay.request.body.operationId).toBe(request.operationId);
     expect(replay.request.headers.get("Authorization")).toBe(renewed.request.headers.get("Authorization"));
-    replay.flush(sale()); await settle(); expect(page.pendingSaleRequest).toBeNull(); expect(page.cart).toEqual([]);
+    replay.flush(sale()); await settleConfirmedNote(renewedToken); expect(page.pendingSaleRequest).toBeNull(); expect(page.cart).toEqual([]);
   });
   it("blocks a session substitution at the verification-to-dispatch boundary without losing the operation", async () => {
     page.finalizeSale(); await settle(); const verification = me(); const pending = rawDraft();
@@ -731,7 +746,7 @@ describe("P1-B POS authentication binding with the real HTTP interceptor", () =>
       const creation = http.expectOne(r => r.url.endsWith("/billing/documents/from-sale/77"));
       expect(creation.request.headers.get("Authorization")).toBe(docVerification.request.headers.get("Authorization"));
       expect(creation.request.context).toBe(docVerification.request.context);
-      creation.flush(document()); await settle(); expect(page.receiptRecovery).toBeNull(); noPost();
+      creation.flush(document()); await settleConfirmedNote(renewedToken); expect(page.receiptRecovery).toBeNull(); noPost();
     });
   }
   it("blocks a missing credential before verification or any POST without losing a pending sale", async () => {
@@ -741,7 +756,7 @@ describe("P1-B POS authentication binding with the real HTTP interceptor", () =>
   });
   it("verifies the original owner again before the first electronic POST and accurately labels a DRAFT", async () => {
     invoice(); const first = await startSale(); first.flush(sale());
-    const wrongOwner = me(); token = otherToken; wrongOwner.flush(other); await settle(); noPost();
+    const wrongOwner = me(); token = otherToken; wrongOwner.flush(other); await settleConfirmedNote(otherToken, true); noPost();
     expect(page.receiptRecovery!.creationState).toBe("NOT_STARTED"); expect(page.lastSaleId).toBe(77);
     expect(page.checkoutButtonLabel).toBe("CREAR COMPROBANTE");
     token = renewedToken; page.finalizeSale(); await settle(); me().flush(owner);
@@ -767,7 +782,7 @@ describe("P1-B POS authentication binding with the real HTTP interceptor", () =>
     expect(lookup.request.method).toBe("GET"); expect(lookup.request.url).toContain(preparation.operationId);
     expect(lookup.request.context).toBe(verification.request.context);
     expect(lookup.request.headers.get("Authorization")).toBe(verification.request.headers.get("Authorization"));
-    lookup.flush(serverResult()); await settle(); const pending = rawDraft();
+    lookup.flush(serverResult()); await settleConfirmedNote(firstToken); const pending = rawDraft();
     expect(page.receiptRecovery!.creationState).toBe("POSSIBLY_SENT"); expect(page.successMessage).toBe("");
     token = otherToken; page.finalizeSale(); await settle(); me().flush(other); await settle();
     http.expectNone(() => true); expect(rawDraft()).toBe(pending);
