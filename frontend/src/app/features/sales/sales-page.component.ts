@@ -1,655 +1,111 @@
 import { CommonModule } from "@angular/common";
-import { Component, DestroyRef, OnInit, inject } from "@angular/core";
+import { Component, DoCheck, HostListener, OnDestroy, OnInit } from "@angular/core";
 import { FormBuilder, ReactiveFormsModule } from "@angular/forms";
-import { RouterLink } from "@angular/router";
-import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
-
-import { toHttpErrorMessage } from "./data/http-error-message";
+import { ActivatedRoute, Params, Router, RouterLink } from "@angular/router";
+import { Subscription } from "rxjs";
+import { AuthService } from "../../core/auth/auth.service";
+import { createBoundAuthContext } from "../../core/auth/bound-auth-context";
+import { SalesFilters, SalesListItem } from "./data/sales.models";
 import { SalesService } from "./data/sales.service";
-import {
-  BillingDocumentStatus,
-  BillingEnvironment,
-  BillingSummary,
-  SalesListItem,
-  SaleStatus,
-} from "./data/sales.models";
+import { documentView, filtersFromContext, salesContext, saleStatusLabel } from "./sales-presentation";
 
 @Component({
-    selector: "app-sales-page",
-    imports: [CommonModule, ReactiveFormsModule, RouterLink],
-    template: `
-    <section class="ui-card sales-page">
-      <header class="ui-page-head">
-        <div>
-          <h1 class="ui-page-title">Ventas</h1>
-          <p class="ui-page-description">
-            Consulta ventas por rango de fechas, estado, caja o usuario y accede
-            al detalle para seguimiento operativo.
-          </p>
-        </div>
-
-        <span class="ui-badge">{{ sales.length }} registros</span>
-      </header>
-
-      <form
-        [formGroup]="filterForm"
-        (ngSubmit)="applyFilters()"
-        class="filters"
-      >
-        <label class="field">
-          <span>Desde</span>
-          <input type="date" formControlName="from" />
-        </label>
-
-        <label class="field">
-          <span>Hasta</span>
-          <input type="date" formControlName="to" />
-        </label>
-
-        <label class="field">
-          <span>Estado</span>
-          <select formControlName="status">
-            <option value="">Todos</option>
-            <option *ngFor="let status of statuses" [value]="status">
-              {{ saleStatusLabel(status) }}
-            </option>
-          </select>
-        </label>
-
-        <label class="field">
-          <span>Caja</span>
-          <input
-            type="text"
-            inputmode="numeric"
-            pattern="[0-9]*"
-            formControlName="cashRegisterSessionId"
-            (keydown)="onCashRegisterKeydown($event)"
-            (input)="sanitizeCashRegisterInput($event)"
-          />
-        </label>
-
-        <label class="field">
-          <span>Usuario</span>
-          <input
-            type="text"
-            formControlName="createdBy"
-            placeholder="admin, cajero..."
-          />
-        </label>
-
-        <div class="filter-actions">
-          <button type="submit" class="ui-button ui-button--primary">
-            Filtrar
-          </button>
-          <button
-            type="button"
-            class="ui-button ui-button--secondary"
-            (click)="resetFilters()"
-          >
-            Limpiar
-          </button>
-        </div>
-      </form>
-
-      <p class="ui-alert ui-alert--error" *ngIf="errorMessage">
-        {{ errorMessage }}
-      </p>
-      <p class="ui-alert ui-alert--info" *ngIf="loading">Cargando ventas...</p>
-
-      <div class="ui-table-wrapper" *ngIf="!loading">
-        <table class="ui-table sales-table">
-          <thead>
-            <tr>
-              <th>Venta</th>
-              <th>Fecha</th>
-              <th>Estado</th>
-              <th>Comprobante</th>
-              <th class="cell-number">Total</th>
-              <th>Usuario</th>
-              <th>Caja</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let sale of sales">
-              <td class="cell-code">
-                <strong>{{ sale.saleNumber }}</strong>
-                <span class="cell-code__secondary">
-                  ID interno #{{ sale.id }}
-                </span>
-              </td>
-              <td>{{ formatDate(sale.soldAt) }}</td>
-              <td>
-                <span
-                  class="ui-badge"
-                  [class.ui-badge--danger]="sale.status === 'VOIDED'"
-                  [class.ui-badge--success]="sale.status !== 'VOIDED'"
-                >
-                  {{ saleStatusLabel(sale.status) }}
-                </span>
-              </td>
-              <td>
-                <div class="cell-billing">
-                  <span
-                    class="billing-token"
-                    [ngClass]="billingBadgeClass(sale.billingSummary)"
-                  >
-                    {{ billingPrimaryLabel(sale.billingSummary) }}
-                  </span>
-                  <span
-                    class="billing-secondary"
-                    *ngIf="billingSecondaryLabel(sale.billingSummary) as secondary"
-                  >
-                    {{ secondary }}
-                  </span>
-                </div>
-              </td>
-              <td class="cell-number">
-                {{ formatCurrency(sale.totalAmount) }}
-              </td>
-              <td>{{ sale.createdBy }}</td>
-              <td>#{{ sale.cashRegisterSessionId }}</td>
-              <td>
-                <a
-                  class="ui-button ui-button--secondary"
-                  [routerLink]="['/ventas', sale.id]"
-                  >Ver detalle</a
-                >
-              </td>
-            </tr>
-            <tr *ngIf="sales.length === 0">
-              <td colspan="8" class="ui-table__empty">
-                <div class="ui-empty-state">
-                  No hay ventas para los filtros aplicados.
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-  `,
-    styles: [
-        `
-      .sales-page {
-        padding: var(--space-5);
-        display: grid;
-        gap: var(--space-4);
-      }
-
-      h1 {
-        margin: 0;
-      }
-
-      .filters {
-        display: grid;
-        gap: var(--space-3);
-        grid-template-columns: repeat(6, minmax(130px, 1fr));
-        align-items: end;
-        border: 1px solid var(--color-border-default);
-        border-radius: var(--radius-md);
-        background: var(--color-bg-soft);
-        padding: var(--space-3);
-      }
-
-      .field {
-        display: grid;
-        gap: var(--space-1);
-      }
-
-      .field span {
-        font-size: var(--font-size-sm);
-        color: var(--color-text-secondary);
-        font-weight: 700;
-      }
-
-      input,
-      select {
-        padding: 0.6rem 0.7rem;
-        border-radius: var(--radius-sm);
-        border: 1px solid var(--color-border-strong);
-        background: var(--color-bg-surface);
-      }
-
-      .filter-actions {
-        display: flex;
-        gap: var(--space-2);
-        flex-wrap: wrap;
-      }
-
-      .sales-table {
-        min-width: 980px;
-      }
-
-      .cell-id,
-      .cell-code,
-      .cell-number {
-        white-space: nowrap;
-      }
-
-      .cell-code {
-        display: grid;
-        gap: 0.12rem;
-      }
-
-      .cell-billing {
-        display: grid;
-        gap: 0.22rem;
-        min-width: 0;
-      }
-
-      .cell-code__secondary {
-        color: var(--color-text-secondary);
-        font-size: var(--font-size-xs);
-        line-height: 1.2;
-      }
-
-      .cell-number {
-        text-align: right;
-      }
-
-      .billing-token {
-        width: fit-content;
-        font-weight: 700;
-        font-size: 0.75rem;
-        line-height: 1.1;
-        border-radius: 999px;
-        padding: 0.3rem 0.55rem;
-        border: 1px solid transparent;
-        max-width: 100%;
-      }
-
-      .billing-secondary {
-        color: var(--color-text-secondary);
-        font-size: var(--font-size-xs);
-        line-height: 1.2;
-      }
-
-      .billing-badge--pending {
-        background: rgba(107, 114, 128, 0.08);
-        color: #6b7280;
-        border-color: rgba(107, 114, 128, 0.18);
-      }
-
-      .billing-badge--draft {
-        background: rgba(59, 130, 246, 0.08);
-        color: #375a91;
-        border-color: rgba(59, 130, 246, 0.18);
-      }
-
-      .billing-badge--generated {
-        background: rgba(109, 40, 217, 0.08);
-        color: #6b46c1;
-        border-color: rgba(109, 40, 217, 0.18);
-      }
-
-      .billing-badge--signed {
-        background: rgba(14, 116, 144, 0.09);
-        color: #155e75;
-        border-color: rgba(14, 116, 144, 0.18);
-      }
-
-      .billing-badge--sent {
-        background: rgba(245, 158, 11, 0.1);
-        color: #9a6700;
-        border-color: rgba(245, 158, 11, 0.18);
-      }
-
-      .billing-badge--accepted {
-        background: rgba(34, 197, 94, 0.09);
-        color: #166534;
-        border-color: rgba(34, 197, 94, 0.18);
-      }
-
-      .billing-badge--rejected,
-      .billing-badge--error {
-        background: rgba(220, 38, 38, 0.1);
-        color: #991b1b;
-        border-color: rgba(220, 38, 38, 0.18);
-      }
-
-      .billing-badge--cancelled {
-        background: rgba(107, 114, 128, 0.1);
-        color: #4b5563;
-        border-color: rgba(107, 114, 128, 0.2);
-      }
-
-      :host-context(body[data-theme="dark"]) .billing-token {
-        color: rgba(226, 232, 240, 0.9);
-      }
-
-      :host-context(body[data-theme="dark"]) .billing-secondary {
-        color: rgba(226, 232, 240, 0.7);
-      }
-
-      .ui-button {
-        white-space: nowrap;
-      }
-
-      .ui-button[disabled] {
-        opacity: 0.55;
-        cursor: not-allowed;
-      }
-
-      @media (max-width: 1100px) {
-        .sales-page {
-          padding: var(--space-4);
-        }
-
-        .filters {
-          grid-template-columns: repeat(2, minmax(160px, 1fr));
-        }
-      }
-
-      @media (max-width: 700px) {
-        .filters {
-          grid-template-columns: 1fr;
-        }
-
-        .filter-actions {
-          justify-content: flex-start;
-        }
-      }
-    `,
-    ]
+  selector: "app-sales-page",
+  imports: [CommonModule, ReactiveFormsModule, RouterLink],
+  templateUrl: "./sales-page.component.html",
+  styleUrl: "./sales-page.component.css",
 })
-export class SalesPageComponent implements OnInit {
-  private readonly destroyRef = inject(DestroyRef);
-
-  private readonly currencyFormatter = new Intl.NumberFormat("es-PE", {
-    style: "currency",
-    currency: "PEN",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-
-  private readonly dateFormatter = new Intl.DateTimeFormat("es-PE", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
-
-  readonly filterForm = this.formBuilder.group({
-    from: [""],
-    to: [""],
-    status: [""],
-    cashRegisterSessionId: [null as number | null],
-    createdBy: [""],
-  });
-
-  readonly statuses: SaleStatus[] = ["COMPLETED", "VOIDED"];
-
+export class SalesPageComponent implements OnInit, OnDestroy, DoCheck {
+  readonly filterForm = this.formBuilder.group({ from: [""], to: [""], status: [""],
+    cashRegisterSessionId: [null as number | null], createdBy: [""] });
+  readonly documentView = documentView;
+  readonly saleStatusLabel = saleStatusLabel;
   sales: SalesListItem[] = [];
   loading = false;
   errorMessage = "";
+  cashier = false;
+  listContext: Params = {};
+  private request = new Subscription();
+  private profile = new Subscription();
+  private generation = 0;
+  private credential: string | null = null;
+  private destroyed = false;
+  private readonly currency = new Intl.NumberFormat("es-PE", { style: "currency", currency: "PEN" });
+  private readonly date = new Intl.DateTimeFormat("es-PE", { day: "2-digit", month: "2-digit", year: "numeric",
+    hour: "2-digit", minute: "2-digit", hour12: false });
 
-  constructor(
-    private readonly formBuilder: FormBuilder,
-    private readonly salesService: SalesService,
-  ) {}
+  constructor(private readonly formBuilder: FormBuilder, private readonly salesService: SalesService,
+    private readonly auth: AuthService, private readonly route: ActivatedRoute, private readonly router: Router) {}
 
   ngOnInit(): void {
-    this.filterForm.controls.status.valueChanges
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe(() => {
-        this.applyFilters();
-      });
-
-    this.loadSales();
+    this.credential = this.auth.getToken();
+    const filters = filtersFromContext(this.route.snapshot.queryParamMap);
+    this.filterForm.patchValue({ from: filters.from ?? "", to: filters.to ?? "", status: filters.status ?? "",
+      cashRegisterSessionId: filters.cashRegisterSessionId ?? null, createdBy: filters.createdBy ?? "" });
+    if (this.credential) this.profile = this.auth.me(createBoundAuthContext(this.credential)).subscribe({
+      next: actor => { if (this.current()) this.cashier = actor.roles.includes("CAJERO"); },
+      error: () => {},
+    });
+    this.applyFilters();
   }
-
-  saleStatusLabel(status: SaleStatus | string): string {
-    switch (status) {
-      case "COMPLETED":
-        return "Completada";
-      case "VOIDED":
-        return "Anulada";
-      case "PENDING":
-        return "Pendiente";
-      case "CANCELLED":
-        return "Cancelada";
-      default:
-        return status;
-    }
+  ngDoCheck(): void { this.checkSession(); }
+  @HostListener("window:storage")
+  @HostListener("window:focus")
+  checkSession(): void {
+    if (this.credential === this.auth.getToken()) return;
+    this.generation++; this.request.unsubscribe(); this.profile.unsubscribe(); this.sales = [];
+    this.loading = false; this.cashier = false;
+    this.errorMessage = "La sesión cambió. Vuelve a abrir Ventas con la sesión actual.";
   }
-
-  billingPrimaryLabel(summary: BillingSummary | null | undefined): string {
-    if (!summary?.hasElectronicDocument) {
-      return "Pendiente";
-    }
-
-    return summary.fullNumber || this.billingStatusLabel(summary.status);
-  }
-
-  billingSecondaryLabel(summary: BillingSummary | null | undefined): string {
-    if (!summary?.hasElectronicDocument) {
-      return "Sin comprobante";
-    }
-
-    const parts = [
-      this.billingStatusLabel(summary.status),
-      this.billingEnvironmentLabel(summary.environment),
-    ].filter(Boolean);
-
-    return parts.join(" · ");
-  }
-
-  billingBadgeClass(summary: BillingSummary | null | undefined): string {
-    if (!summary?.hasElectronicDocument) {
-      return "billing-badge--pending";
-    }
-
-    switch (summary.status) {
-      case "DRAFT":
-        return "billing-badge--draft";
-      case "GENERATED":
-        return "billing-badge--generated";
-      case "SIGNED":
-        return "billing-badge--signed";
-      case "SENT":
-        return "billing-badge--sent";
-      case "ACCEPTED":
-        return "billing-badge--accepted";
-      case "REJECTED":
-        return "billing-badge--rejected";
-      case "ERROR":
-        return "billing-badge--error";
-      case "CANCELLED":
-        return "billing-badge--cancelled";
-      default:
-        return "billing-badge--pending";
-    }
-  }
-
-  billingStatusLabel(status: BillingDocumentStatus | null | undefined): string {
-    switch (status) {
-      case "DRAFT":
-        return "BORRADOR";
-      case "GENERATED":
-        return "XML GENERADO";
-      case "SIGNED":
-        return "FIRMADO";
-      case "SENT":
-        return "ENVIADO";
-      case "ACCEPTED":
-        return "ACEPTADO";
-      case "REJECTED":
-        return "RECHAZADO";
-      case "ERROR":
-        return "ERROR";
-      case "CANCELLED":
-        return "ANULADO";
-      default:
-        return "-";
-    }
-  }
-
-  billingEnvironmentLabel(environment: BillingEnvironment | null | undefined): string {
-    switch (environment) {
-      case "LOCAL":
-        return "Local";
-      case "BETA":
-        return "Beta";
-      case "PROD":
-        return "Producción";
-      default:
-        return "";
-    }
-  }
-
-  formatCurrency(value: number | null | undefined): string {
-    return this.currencyFormatter.format(value ?? 0);
-  }
-
-  formatDate(value: string | null | undefined): string {
-    if (!value) {
-      return "-";
-    }
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) {
-      return "-";
-    }
-    return this.dateFormatter.format(date);
-  }
-
+  private current(): boolean { return !this.destroyed && !!this.credential && this.credential === this.auth.getToken(); }
   applyFilters(): void {
-    const { from, to, cashRegisterSessionId } = this.filterForm.getRawValue();
-
-    if (from && to && from > to) {
-      this.errorMessage =
-        "La fecha Desde no puede ser mayor que la fecha Hasta.";
-      return;
-    }
-
-    if (
-      cashRegisterSessionId !== null &&
-      this.normalizeCashRegisterSessionId(cashRegisterSessionId) === undefined
-    ) {
-      this.errorMessage = "Ingresa un número de caja válido.";
-      return;
-    }
-
-    this.loadSales();
-  }
-
-  resetFilters(): void {
-    this.filterForm.reset({
-      from: "",
-      to: "",
-      status: "",
-      cashRegisterSessionId: null,
-      createdBy: "",
-    }, { emitEvent: false });
-    this.loadSales();
-  }
-
-  onCashRegisterKeydown(event: KeyboardEvent): void {
-    if (
-      event.ctrlKey ||
-      event.metaKey ||
-      event.altKey ||
-      ["Backspace", "Delete", "Tab", "Enter", "Escape", "ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)
-    ) {
-      return;
-    }
-
-    if (/^[0-9]$/.test(event.key)) {
-      return;
-    }
-
-    event.preventDefault();
-  }
-
-  sanitizeCashRegisterInput(event: Event): void {
-    const input = event.target as HTMLInputElement | null;
-    if (!input) {
-      return;
-    }
-
-    const sanitized = input.value.match(/^\d*/)?.[0] ?? "";
-    if (input.value !== sanitized) {
-      input.value = sanitized;
-    }
-
-    this.filterForm.controls.cashRegisterSessionId.setValue(
-      sanitized ? Number(sanitized) : null,
-      { emitEvent: false },
-    );
-  }
-
-  private loadSales(): void {
+    if (!this.current()) { this.sales = []; this.errorMessage = "Inicia sesión para consultar ventas."; return; }
     const value = this.filterForm.getRawValue();
-    const cashRegisterSessionId = this.normalizeCashRegisterSessionId(value.cashRegisterSessionId);
-    const from = value.from || undefined;
-    const to = value.to || undefined;
-
-    this.loading = true;
-    this.errorMessage = "";
-
-    this.salesService
-      .listItems({
-        from,
-        to,
-        status: (value.status as SaleStatus | "") || undefined,
-        cashRegisterSessionId,
-        createdBy: value.createdBy?.trim() ? value.createdBy.trim() : undefined,
-      })
-      .subscribe({
-        next: (sales) => {
-          this.loading = false;
-          this.sales = this.applyDateRangeFilter(sales, from, to);
-        },
-        error: (error: unknown) => {
-          this.loading = false;
-          this.errorMessage = toHttpErrorMessage(
-            error,
-            "No se pudo cargar el listado de ventas.",
-          );
-        },
-      });
-  }
-
-  private normalizeCashRegisterSessionId(value: unknown): number | undefined {
-    if (value === null || value === undefined || value === "") {
-      return undefined;
+    if (value.from && value.to && value.from > value.to) {
+      this.errorMessage = "La fecha Desde no puede ser mayor que la fecha Hasta."; return;
     }
-
-    const normalized = typeof value === "number" ? value : Number(value);
-    if (!Number.isInteger(normalized) || normalized <= 0) {
-      return undefined;
+    const cash = value.cashRegisterSessionId;
+    if (cash != null && (!Number.isSafeInteger(Number(cash)) || Number(cash) <= 0)) {
+      this.errorMessage = "Ingresa una sesión de caja válida."; return;
     }
-
-    return normalized;
-  }
-
-  private applyDateRangeFilter(
-    sales: SalesListItem[],
-    from?: string,
-    to?: string,
-  ): SalesListItem[] {
-    if (!from && !to) {
-      return sales;
-    }
-
-    const fromBoundary = from ? new Date(`${from}T00:00:00.000`) : null;
-    const toBoundary = to ? new Date(`${to}T23:59:59.999`) : null;
-
-    return sales.filter((sale) => {
-      const soldDate = new Date(sale.soldAt);
-      if (Number.isNaN(soldDate.getTime())) {
-        return false;
-      }
-
-      if (fromBoundary && soldDate < fromBoundary) {
-        return false;
-      }
-      if (toBoundary && soldDate > toBoundary) {
-        return false;
-      }
-      return true;
+    const filters: SalesFilters = { from: value.from || undefined, to: value.to || undefined,
+      status: value.status === "COMPLETED" || value.status === "VOIDED" ? value.status : undefined,
+      cashRegisterSessionId: cash == null ? undefined : Number(cash), createdBy: value.createdBy?.trim() || undefined };
+    this.listContext = salesContext(filters);
+    void this.router.navigate([], { relativeTo: this.route, queryParams: this.listContext, replaceUrl: true });
+    this.request.unsubscribe();
+    const generation = ++this.generation;
+    this.sales = []; this.loading = true; this.errorMessage = "";
+    this.request = this.salesService.listItems(filters, createBoundAuthContext(this.credential)).subscribe({
+      next: rows => {
+        if (!this.current() || generation !== this.generation) return;
+        this.loading = false;
+        if (!Array.isArray(rows) || rows.some(row => !row || !Number.isSafeInteger(row.id) || row.id <= 0)) {
+          this.errorMessage = "No se pudo verificar el listado recibido."; return;
+        }
+        // Preserve the existing date behavior. UTC/Lima alignment is a separate contract gate.
+        const from = filters.from ? new Date(filters.from + "T00:00:00.000") : null;
+        const to = filters.to ? new Date(filters.to + "T23:59:59.999") : null;
+        this.sales = rows.filter(sale => {
+          if (!from && !to) return true;
+          const sold = new Date(sale.soldAt);
+          return !Number.isNaN(sold.getTime()) && (!from || sold >= from) && (!to || sold <= to);
+        });
+      },
+      error: error => {
+        if (!this.current() || generation !== this.generation) return;
+        this.loading = false; this.sales = [];
+        this.errorMessage = error?.status === 401 ? "Sesión vencida. Inicia sesión para consultar ventas."
+          : error?.status === 403 || error?.status === 422 ? "No tienes permiso para consultar estas ventas."
+          : "No se pudo cargar el listado de ventas. Reintenta la consulta.";
+      },
     });
   }
+  resetFilters(): void {
+    this.filterForm.reset({ from: "", to: "", status: "", cashRegisterSessionId: null, createdBy: "" });
+    this.applyFilters();
+  }
+  formatCurrency(value: number): string { return Number.isFinite(value) ? this.currency.format(value) : "No disponible"; }
+  formatDate(value: string): string { const date = new Date(value); return Number.isNaN(date.getTime()) ? "No disponible" : this.date.format(date); }
+  ngOnDestroy(): void { this.destroyed = true; this.generation++; this.request.unsubscribe(); this.profile.unsubscribe(); }
 }

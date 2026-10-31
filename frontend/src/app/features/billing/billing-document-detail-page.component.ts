@@ -1,6 +1,7 @@
 import { CommonModule } from "@angular/common";
 import { Component, OnInit } from "@angular/core";
 import { ActivatedRoute, RouterLink } from "@angular/router";
+import { filtersFromContext, salesContext } from "../sales/sales-presentation";
 import { catchError, forkJoin, of } from "rxjs";
 
 import { AuthService } from "../../core/auth/auth.service";
@@ -77,6 +78,7 @@ import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.servic
               <a
                 class="inline-link"
                 [routerLink]="['/ventas', document.saleId]"
+                [queryParams]="salesReturnContext"
               >
                 #{{ document.saleId }}
               </a>
@@ -514,6 +516,7 @@ export class BillingDocumentDetailPageComponent implements OnInit {
   permissionMessage = "";
 
   private documentId = 0;
+  get salesReturnContext() { return salesContext(filtersFromContext(this.route.snapshot.queryParamMap)); }
 
   constructor(
     private readonly route: ActivatedRoute,

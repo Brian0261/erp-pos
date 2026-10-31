@@ -4,6 +4,7 @@ import { ActivatedRoute, RouterLink } from "@angular/router";
 import { DomSanitizer } from "@angular/platform-browser";
 import { NOTE_CONFIG, NOTE_PROFILES, NoteFormat } from "./note-model";
 import { NoteSession } from "./note-session";
+import { filtersFromContext, salesContext } from "../sales-presentation";
 
 @Component({
   selector: "app-internal-note-page", standalone: true, imports: [CommonModule, RouterLink], providers: [NoteSession],
@@ -12,7 +13,7 @@ import { NoteSession } from "./note-session";
     <header class="ui-page-head">
       <div><p class="eyebrow">VENTAS</p><h1 #noteTitle tabindex="-1" class="ui-page-title">{{ config.heading }}</h1>
         <p class="ui-page-description">{{ session.note() ? session.note()!.number + ' · ' + session.note()!.date : 'Consulta autorizada de la venta' }}</p></div>
-      <a class="ui-button ui-button--secondary" [routerLink]="backLink">{{ fromPos ? 'Volver al POS' : 'Volver al detalle' }}</a>
+      <a class="ui-button ui-button--secondary" [routerLink]="backLink" [queryParams]="listContext">{{ fromPos ? 'Volver al POS' : 'Volver al detalle' }}</a>
     </header>
     <div class="note-status" *ngIf="session.note() as note" [class.cancelled]="note.status === 'VOIDED'">
       <strong>{{ note.status === 'VOIDED' ? 'ANULADA' : 'Venta registrada' }}</strong>
@@ -80,6 +81,7 @@ export class InternalNotePageComponent implements AfterViewInit, OnDestroy {
   });
   constructor(readonly session: NoteSession, private readonly route: ActivatedRoute, private readonly sanitizer: DomSanitizer) {}
   get backLink(): (string | number)[] { return this.fromPos ? ["/pos"] : ["/ventas", this.id]; }
+  get listContext() { return this.fromPos ? {} : salesContext(filtersFromContext(this.route.snapshot.queryParamMap)); }
   get busy(): boolean { return ["reading", "generating", "slow"].includes(this.session.phase()); }
   get ready(): boolean { return this.session.isReadyFor(this.id); }
   get isTicket(): boolean { return this.session.format !== "a4"; }

@@ -64,8 +64,16 @@ export class ElectronicDocumentService {
   }
 
   listBySaleId(saleId: number, context?: HttpContext): Observable<ElectronicDocumentResponse[]> {
-    return this.list({ saleId }, context).pipe(
-      map((rows) => this.filterBySaleId(rows, saleId)),
+    const params = new HttpParams().set("saleId", String(saleId));
+    return this.http.get<unknown>(this.endpoint, { params, context }).pipe(
+      map(payload => this.normalizeListResponse(payload, true)),
+      map(rows => {
+        if (rows.some(row => !row || !Number.isSafeInteger(row.id) || row.id <= 0
+          || !Number.isSafeInteger(row.saleId) || row.saleId <= 0)) throw new Error("Invalid document response");
+        const matched = this.filterBySaleId(rows, saleId);
+        if (rows.length && !matched.length) throw new Error("Document response does not match sale");
+        return matched;
+      }),
     );
   }
 
@@ -104,12 +112,13 @@ export class ElectronicDocumentService {
     );
   }
 
-  private normalizeListResponse(payload: unknown): ElectronicDocumentResponse[] {
+  private normalizeListResponse(payload: unknown, strict = false): ElectronicDocumentResponse[] {
     if (Array.isArray(payload)) {
       return payload as ElectronicDocumentResponse[];
     }
 
     if (!payload || typeof payload !== "object") {
+      if (strict) throw new Error("Invalid document list");
       return [];
     }
 
@@ -118,6 +127,11 @@ export class ElectronicDocumentService {
       items?: unknown;
       data?: unknown;
     };
+
+    if (strict) {
+      const keys = (["content", "items", "data"] as const).filter(key => Object.hasOwn(wrapper, key));
+      if (keys.length !== 1 || !Array.isArray(wrapper[keys[0]])) throw new Error("Ambiguous document list");
+    }
 
     if (Array.isArray(wrapper.content)) {
       return wrapper.content as ElectronicDocumentResponse[];
@@ -131,6 +145,7 @@ export class ElectronicDocumentService {
       return wrapper.data as ElectronicDocumentResponse[];
     }
 
+    if (strict) throw new Error("Invalid document list");
     return [];
   }
 

@@ -1,0 +1,35 @@
+<section class="ui-card sales-page" aria-labelledby="sales-title">
+  <header class="ui-page-head">
+    <div><p class="eyebrow">CONSULTA COMERCIAL</p><h1 id="sales-title" class="ui-page-title">{{ cashier ? 'Mis ventas' : 'Ventas' }}</h1>
+      <p class="ui-page-description">Ventas registradas y anuladas. La documentación electrónica tiene su propio estado.</p></div>
+    <span class="ui-badge" *ngIf="!loading && !errorMessage">{{ sales.length }} registros</span>
+  </header>
+  <form [formGroup]="filterForm" (ngSubmit)="applyFilters()" class="filters" aria-label="Filtros de ventas">
+    <label>Desde<input type="date" formControlName="from"></label>
+    <label>Hasta<input type="date" formControlName="to"></label>
+    <label><span>Estado comercial</span><select aria-label="Estado comercial" formControlName="status"><option value="">Todos</option><option value="COMPLETED">Registrada</option><option value="VOIDED">Anulada</option></select></label>
+    <label>Sesión de caja<input type="number" min="1" step="1" inputmode="numeric" formControlName="cashRegisterSessionId"></label>
+    <label *ngIf="!cashier">Usuario<input type="text" formControlName="createdBy" placeholder="Nombre de usuario exacto"></label>
+    <div class="filter-actions"><button type="submit" class="ui-button ui-button--primary">Filtrar</button><button type="button" class="ui-button ui-button--secondary" (click)="resetFilters()">Limpiar</button></div>
+  </form>
+  <p class="date-limit">Fechas: el filtro actual combina límites del servidor en UTC con fechas locales. Las ventas próximas a medianoche pueden quedar fuera del día esperado.</p>
+  <p role="alert" class="ui-alert ui-alert--error" *ngIf="errorMessage">{{ errorMessage }}</p>
+  <p role="status" *ngIf="loading">Consultando ventas…</p>
+  <div class="ui-table-wrapper" *ngIf="!loading && !errorMessage" tabindex="0" role="region" aria-label="Resultados de ventas; desplaza horizontalmente si es necesario">
+    <table class="ui-table sales-table"><caption class="visually-hidden">Ventas en orden de fecha descendente. Las notas internas no son documentos electrónicos.</caption>
+      <thead><tr><th scope="col">Venta</th><th scope="col">Fecha y hora</th><th scope="col">Estado comercial</th><th scope="col">Documento electrónico</th><th scope="col">Estado documental / ambiente</th><th scope="col" class="cell-number">Total</th><th scope="col">Acciones</th></tr></thead>
+      <tbody><tr *ngFor="let sale of sales">
+        <td><strong class="sale-reference">Venta #{{ sale.id }}</strong>
+          <details class="operational"><summary>Referencia y operación</summary><span class="full-reference">{{ sale.saleNumber }}</span><span>Usuario: {{ sale.createdBy }}</span><span>Sesión de caja: #{{ sale.cashRegisterSessionId }}</span></details></td>
+        <td class="date-cell">{{ formatDate(sale.soldAt) }}</td>
+        <td><span class="ui-badge" [class.ui-badge--danger]="sale.status === 'VOIDED'" [class.ui-badge--success]="sale.status === 'COMPLETED'">{{ saleStatusLabel(sale.status) }}</span></td>
+        <ng-container *ngIf="documentView(sale.billingSummary) as doc">
+          <td><span>{{ doc.type }}</span><span class="document-number" *ngIf="doc.number">{{ doc.number }}</span></td>
+          <td><span class="document-state" [attr.data-tone]="doc.tone">{{ doc.status || 'Sin documento asociado' }}</span><span class="secondary" *ngIf="doc.environment">{{ doc.environment }}</span></td>
+        </ng-container>
+        <td class="cell-number">{{ formatCurrency(sale.totalAmount) }}</td>
+        <td><a class="ui-button ui-button--secondary" [routerLink]="['/ventas',sale.id]" [queryParams]="listContext" [attr.aria-label]="'Ver detalle de venta #' + sale.id">Ver detalle</a></td>
+      </tr><tr *ngIf="sales.length === 0"><td colspan="7"><p class="ui-empty-state" role="status">No hay ventas para los filtros aplicados.</p></td></tr></tbody>
+    </table>
+  </div>
+</section>

@@ -50,7 +50,7 @@ export class SalesService {
     return this.http.get<SaleResponse[]>(this.endpoint, { params });
   }
 
-  listItems(filters?: SalesFilters): Observable<SalesListItem[]> {
+  listItems(filters?: SalesFilters, context?: HttpContext): Observable<SalesListItem[]> {
     let params = new HttpParams();
 
     if (filters?.from) {
@@ -78,6 +78,7 @@ export class SalesService {
 
     return this.http.get<SalesListItem[]>(`${this.endpoint}/list-items`, {
       params,
+      context,
     });
   }
 
