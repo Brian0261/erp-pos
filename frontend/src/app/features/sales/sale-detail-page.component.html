@@ -1,0 +1,55 @@
+<section class="ui-card sale-detail-page" aria-label="Detalle de venta">
+  <header class="ui-page-head">
+    <div><p class="eyebrow">VENTAS / DETALLE</p><h1 #saleTitle tabindex="-1" class="ui-page-title">{{ sale ? 'Venta #' + sale.id : 'Detalle de venta' }}</h1>
+      <div class="sale-head-meta" *ngIf="sale"><span class="ui-badge" [class.ui-badge--success]="sale.status === 'COMPLETED'" [class.ui-badge--danger]="sale.status === 'VOIDED'">{{ saleStatusLabel(sale.status) }}</span><span>{{ formatDateTime(sale.soldAt) }}</span></div></div>
+    <div class="header-end"><span *ngIf="sale" class="sale-total"><small>Total de la venta</small>{{ formatCurrency(sale.totalAmount) }}</span>
+      <a class="ui-button ui-button--secondary" [routerLink]="['/ventas']" [queryParams]="listContext">Volver al listado</a></div>
+  </header>
+  <p role="status" *ngIf="loading">Consultando venta…</p>
+  <p role="alert" class="ui-alert ui-alert--error" *ngIf="errorMessage">{{ errorMessage }}</p>
+  <p role="status" class="ui-alert ui-alert--success" *ngIf="successMessage && sale">{{ successMessage }}</p>
+  <ng-container *ngIf="sale">
+    <nav class="consult-actions" aria-label="Consulta de la venta">
+      <a class="ui-button ui-button--primary" [routerLink]="['/ventas',sale.id,'nota']" [queryParams]="listContext">Ver nota interna</a>
+      <a *ngIf="documentPhase === 'present' && billingDocument" class="ui-button ui-button--secondary" [routerLink]="['/facturacion/comprobantes',billingDocument.id]" [queryParams]="listContext">Ver documento electrónico</a>
+      <a class="section-link" [routerLink]="[]" [queryParams]="listContext" fragment="sale-documents" (click)="focusDocumentSection($event)">Estado documental</a>
+    </nav>
+    <p class="note-distinction">La nota interna es un documento no fiscal. Consultarla o imprimirla no cambia la venta.</p>
+    <article class="panel" aria-labelledby="items-title">
+      <header class="panel-head"><h2 id="items-title">Artículos</h2><span>{{ sale.items.length }} {{ sale.items.length === 1 ? 'línea' : 'líneas' }}</span></header>
+      <div class="ui-table-wrapper" tabindex="0" role="region" aria-label="Artículos e importes persistidos">
+        <table class="ui-table items-table"><caption>Importes registrados en la venta</caption><thead><tr><th scope="col">Producto</th><th scope="col" class="cell-number">Cantidad</th><th scope="col" class="cell-number">Precio unitario</th><th scope="col" class="cell-number">Descuento</th><th scope="col" class="cell-number">Importe</th></tr></thead>
+          <tbody><tr *ngFor="let item of sale.items"><td><strong>{{ productName(item) }}</strong><small>{{ productSource(item) }}</small><small *ngIf="productSku(item)">SKU {{ productSku(item) }}</small><details class="catalog-data"><summary>Datos de catálogo</summary><small>Producto #{{ item.productId }}</small><small *ngIf="item.sku">SKU actual: {{ item.sku }}</small><small *ngIf="item.barcode">Barcode actual: {{ item.barcode }}</small></details></td><td class="cell-number">{{ formatQuantity(item) }}</td><td class="cell-number">{{ formatCurrency(item.unitPrice) }}</td><td class="cell-number">{{ formatCurrency(item.discountAmount) }}</td><td class="cell-number">{{ formatCurrency(item.lineTotal) }}</td></tr></tbody>
+        </table>
+      </div>
+      <dl class="sale-totals"><div><dt>Subtotal</dt><dd>{{ formatCurrency(sale.subtotalAmount) }}</dd></div><div><dt>Descuento</dt><dd>{{ formatCurrency(sale.discountAmount) }}</dd></div><div><dt>Total</dt><dd>{{ formatCurrency(sale.totalAmount) }}</dd></div></dl>
+    </article>
+    <article class="panel" aria-labelledby="payments-title">
+      <header class="panel-head"><h2 id="payments-title">Pagos</h2><span>{{ sale.payments.length }} {{ sale.payments.length === 1 ? 'movimiento' : 'movimientos' }}</span></header>
+      <div class="ui-table-wrapper" tabindex="0" role="region" aria-label="Pagos registrados">
+        <table class="ui-table payments-table"><thead><tr><th scope="col">Método</th><th scope="col" class="cell-number">Monto</th><th scope="col">Referencia</th><th scope="col">Fecha</th></tr></thead>
+          <tbody><tr *ngFor="let payment of sale.payments"><td>{{ paymentMethodLabel(payment.paymentMethod) }}</td><td class="cell-number">{{ formatCurrency(payment.amount) }}</td><td class="payment-reference">{{ payment.reference || '—' }}</td><td>{{ formatDateTime(payment.createdAt) }}</td></tr></tbody>
+        </table>
+      </div>
+      <dl class="sale-totals"><div><dt>Pagado</dt><dd>{{ formatCurrency(sale.paidAmount) }}</dd></div><div><dt>{{ settlementLabel(sale) }}</dt><dd>{{ settlementDisplayAmount(sale) !== null ? formatCurrency(settlementDisplayAmount(sale)!) : 'No aplica' }}</dd></div></dl>
+    </article>
+    <article #documentSection id="sale-documents" class="panel documents-panel" aria-labelledby="documents-title" [attr.aria-busy]="documentPhase === 'loading'">
+      <header class="panel-head"><h2 #documentTitle id="documents-title" tabindex="-1">Documento electrónico</h2><span class="secondary">Independiente de la nota interna</span></header>
+      <p role="status" *ngIf="documentPhase === 'loading'">Consultando documento electrónico…</p>
+      <ng-container *ngIf="documentPhase === 'absent'"><p role="status">Sin documento electrónico registrado</p>
+        <a *ngIf="canIssue()" class="ui-button ui-button--secondary" [routerLink]="['/facturacion/emitir',sale.id]">Crear documento electrónico</a><p class="secondary">El flujo existente crea un borrador; la aceptación fiscal se verifica por separado.</p></ng-container>
+      <div *ngIf="documentPhase === 'error'" role="alert" class="document-error"><p>{{ billingErrorMessage }}</p><button class="ui-button ui-button--secondary" type="button" (click)="retryDocument()">Reintentar consulta documental</button></div>
+      <ng-container *ngIf="documentPhase === 'present' && documentPresentation as doc">
+        <dl class="document-grid"><div><dt>Tipo</dt><dd>{{ doc.type }}</dd></div><div><dt>Número</dt><dd>{{ doc.number }}</dd></div><div><dt>Estado</dt><dd class="document-state" [attr.data-tone]="doc.tone">{{ doc.status }}</dd></div><div><dt>Ambiente</dt><dd>{{ doc.environment }}</dd></div></dl>
+        <p class="secondary" *ngIf="hasBlockingBillingDocument()">La documentación electrónica activa impide la anulación interna. Gestiona el caso desde Facturación.</p>
+      </ng-container>
+    </article>
+    <details class="panel operational"><summary>Información operativa y referencias</summary><dl class="operation-grid"><div><dt>Número completo de venta</dt><dd>{{ sale.saleNumber }}</dd></div><div><dt>ID interno</dt><dd>#{{ sale.id }}</dd></div><div><dt>Usuario</dt><dd>{{ sale.createdBy }}</dd></div><div><dt>Sesión de caja</dt><dd>#{{ sale.cashRegisterSessionId }}</dd></div><div><dt>Almacén</dt><dd>#{{ sale.warehouseId }}</dd></div></dl></details>
+    <article class="panel annulled" *ngIf="sale.status === 'VOIDED'"><h2>Venta anulada</h2><p>Fecha: {{ formatDateTime(sale.voidedAt) }}</p><p>Motivo: {{ sale.voidReason || 'No disponible' }}</p><p>Los importes originales se conservan.</p></article>
+    <footer class="void-actions" *ngIf="voidRole()">
+      <a class="ui-button ui-button--danger" *ngIf="canVoidSale()" [routerLink]="['/ventas',sale.id,'anular']" [queryParams]="listContext">Anular venta</a>
+      <button class="ui-button ui-button--secondary" *ngIf="!canVoidSale()" disabled [attr.aria-describedby]="'void-hint'">Anular venta</button>
+      <p id="void-hint" class="secondary">{{ canVoidSale() ? 'La venta solo puede anularse si su sesión de caja sigue abierta. Se verificará al confirmar.' : voidHint }}</p>
+    </footer>
+  </ng-container>
+</section>

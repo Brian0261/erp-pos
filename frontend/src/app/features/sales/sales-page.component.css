@@ -1,0 +1,21 @@
+:host{display:block;min-width:0}
+.ui-table-wrapper{min-width:0}
+.sales-page{display:grid;gap:var(--space-4);padding:var(--space-5)}
+.eyebrow{font-size:var(--font-size-xs);color:var(--color-text-secondary);letter-spacing:.06em}
+.filters{display:grid;grid-template-columns:repeat(5,minmax(120px,1fr)) auto;gap:var(--space-3);align-items:end;padding:var(--space-3);border:1px solid var(--color-border-default);border-radius:var(--radius-md);background:var(--color-bg-soft)}
+label{display:grid;gap:.4rem;font-size:var(--font-size-sm);font-weight:600}
+input,select{min-width:0;width:100%;min-height:44px;padding:.55rem .7rem;border:1px solid var(--color-border-strong);border-radius:var(--radius-sm);background:var(--color-bg-surface);color:var(--color-text-primary)}
+.filter-actions{display:flex;gap:.5rem;flex-wrap:wrap}.ui-button{min-height:44px;white-space:nowrap}
+.sales-table{min-width:980px}.sales-table th{font-size:.78rem}.sales-table td{padding-block:1rem}
+.sale-reference{display:block;font-size:1rem}.cell-number{text-align:right!important;font-variant-numeric:tabular-nums;white-space:nowrap}
+.date-cell{min-width:135px}.document-number,.secondary{display:block;margin-top:.3rem;font-size:var(--font-size-xs);color:var(--color-text-secondary)}
+.document-number{font-size:var(--font-size-sm);color:var(--color-text-primary)}
+.document-state{display:inline-block;font-size:var(--font-size-sm);border-left:3px solid var(--color-border-strong);padding-left:.5rem}
+[data-tone=warning]{border-color:var(--color-warning)!important}[data-tone=danger]{border-color:var(--color-danger)!important}[data-tone=success]{border-color:var(--color-success)!important}
+.operational{margin-top:.35rem;font-size:var(--font-size-xs);color:var(--color-text-secondary)}
+summary{cursor:pointer;padding-block:.25rem;min-height:28px}.operational span{display:block;margin-top:.3rem}.full-reference{overflow-wrap:anywhere;max-width:240px}
+.date-limit{font-size:var(--font-size-xs);color:var(--color-text-secondary);max-width:95ch}
+.visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+@media(max-width:1200px){.filters{grid-template-columns:repeat(3,minmax(130px,1fr))}}
+@media(max-width:700px){.sales-page{padding:var(--space-3)}.filters{grid-template-columns:repeat(2,minmax(0,1fr))}.filter-actions{grid-column:1/-1}.sales-table{min-width:900px}}
+@media(max-width:420px){.filters{grid-template-columns:1fr}}

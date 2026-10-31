@@ -18,6 +18,21 @@ describe('ElectronicDocumentService optional bound HTTP context', () => {
     service = TestBed.inject(ElectronicDocumentService); http = TestBed.inject(HttpTestingController);
   });
   afterEach(() => http.verify());
+  for (const payload of [null, {}, { content: null }, { content: [], items: [{ id: 9, saleId: 77 }] }, [{ id: 9 }], [{ id: 9, saleId: 78 }]]) {
+    it('rejects an unverified sale-document response: ' + JSON.stringify(payload), () => {
+      let failed = false;
+      service.listBySaleId(77, createBoundAuthContext(token)).subscribe({ next: () => fail('Must not certify absence'), error: () => failed = true });
+      const request = http.expectOne(r => r.url.endsWith('/billing/documents'));
+      expect(request.request.method).toBe('GET'); request.flush(payload); expect(failed).toBeTrue();
+    });
+  }
+  for (const payload of [[], { content: [] }, { items: [] }, { data: [] }]) {
+    it('accepts a successful supported empty list: ' + JSON.stringify(payload), () => {
+      let result: unknown;
+      service.listBySaleId(77).subscribe(rows => result = rows);
+      http.expectOne(r => r.url.endsWith('/billing/documents')).flush(payload); expect(result).toEqual([]);
+    });
+  }
   for (const bound of [false, true]) {
     it('preserves document creation without changing its contract, bound=' + bound, () => {
       const context = bound ? createBoundAuthContext(token) : undefined;
