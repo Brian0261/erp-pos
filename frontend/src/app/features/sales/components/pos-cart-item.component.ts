@@ -70,7 +70,7 @@ export interface PosCartItemQuantityChange extends PosCartItemValueChange {
           </div>
         </label>
         <label class="mini-field mini-field--discount">
-          <span>Dscto.</span>
+          <span title="Importe total descontado de esta línea">Descuento (S/)</span>
           <input
             type="number"
             min="0"
@@ -82,7 +82,7 @@ export interface PosCartItemQuantityChange extends PosCartItemValueChange {
         </label>
 
         <div class="cart-item__subtotal">
-          <span>Subtotal</span>
+          <span>Importe</span>
           <strong>S/ {{ (lineTotal | number: "1.2-2") ?? '—' }}</strong>
         </div>
         <button
@@ -95,208 +95,12 @@ export interface PosCartItemQuantityChange extends PosCartItemValueChange {
       </div>
     </article>
   `,
-    styles: [
-        `
-      .cart-item {
-        border: 1px solid color-mix(in srgb, var(--color-border-default) 78%, transparent);
-        border-radius: var(--radius-lg);
-        background: var(--color-bg-surface);
-        padding: 0.58rem 0.62rem;
-        display: grid;
-        grid-template-columns: minmax(0, 1fr);
-        gap: 0.48rem;
-        align-items: start;
-      }
+    styles: [`
+:host{display:block;min-width:0;container-type:inline-size}.cart-item{border:1px solid var(--color-border-default);border-radius:var(--radius-md);padding:.6rem;display:grid;gap:.5rem;min-width:0}.cart-item h3{font-size:.95rem;line-height:1.25;margin:0;overflow-wrap:anywhere}.cart-item__main{min-width:0}.cart-item__meta-row{display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.2rem;color:var(--color-text-secondary);font-size:.75rem}.cart-item__meta-row p{margin:0}.cart-item__footer{display:grid;grid-template-columns:minmax(140px,1.35fr) minmax(84px,.9fr) minmax(60px,.7fr) auto;gap:.45rem;align-items:end;min-width:0}.mini-field{display:grid;gap:.2rem;min-width:0}.mini-field>span,.cart-item__subtotal>span{font-size:.75rem;color:var(--color-text-secondary)}.mini-field input{width:100%;min-width:0;min-height:44px;padding:.45rem .3rem;border:1px solid var(--color-border-default);border-radius:var(--radius-md);background:var(--color-bg-canvas);color:var(--color-text-primary);box-sizing:border-box;font-size:.95rem;font-variant-numeric:tabular-nums}.quantity-tools{display:grid;grid-template-columns:36px minmax(48px,1fr) 36px;gap:.2rem}.quantity-tools input{text-align:center}.quantity-stepper{min-height:44px;min-width:36px;padding:0;background:var(--color-bg-soft);color:var(--color-text-primary);border:1px solid var(--color-border-default);border-radius:var(--radius-sm);font-size:1rem}.cart-item__subtotal{display:grid;gap:.2rem;text-align:right;align-self:end;min-height:60px;align-content:end}.cart-item__subtotal strong{font-size:.98rem;white-space:nowrap;font-variant-numeric:tabular-nums;padding-block:.7rem}.cart-item__remove{min-height:44px;padding:.4rem .5rem;font-size:.8rem;background:transparent;border:1px solid var(--color-border-default);color:var(--color-text-primary)}
+@container(max-width:380px){.cart-item__footer{grid-template-columns:minmax(140px,1fr) minmax(84px,1fr)}.cart-item__subtotal{text-align:left;min-height:0;display:flex;gap:.5rem;align-items:center}.cart-item__subtotal strong{padding:0}.cart-item__remove{justify-self:end;min-width:72px}}
 
-      .cart-item__main {
-        display: grid;
-        gap: 0.18rem;
-        grid-template-columns: minmax(0, 1fr);
-        align-items: start;
-        align-content: start;
-        min-width: 0;
-      }
-
-      .cart-item__meta-row {
-        display: flex;
-        align-items: center;
-        gap: 0.28rem;
-        min-width: 0;
-        flex-wrap: wrap;
-      }
-
-      .cart-item__sku {
-        margin: 0;
-        width: fit-content;
-        border-radius: 0;
-        background: transparent;
-        color: var(--color-text-secondary);
-        padding: 0;
-        font-size: 0.68rem;
-        font-weight: 600;
-        letter-spacing: 0.03em;
-      }
-
-      .cart-item__meta-separator {
-        color: var(--color-text-secondary);
-        font-size: 0.62rem;
-        font-weight: 600;
-        line-height: 1;
-      }
-
-      .cart-item__main h3 {
-        margin: 0;
-        font-size: 0.98rem;
-        line-height: 1.15;
-        font-weight: 700;
-      }
-
-      .cart-item__stock {
-        margin: 0;
-        font-size: 0.68rem;
-        color: var(--color-text-secondary);
-        font-weight: 600;
-        letter-spacing: 0.03em;
-      }
-
-      .cart-item__footer {
-        display: grid;
-        grid-template-columns: minmax(0, 1.45fr) minmax(0, 0.9fr) auto auto;
-        gap: 0.5rem 0.75rem;
-        align-items: center;
-      }
-
-      .cart-item__subtotal {
-        display: grid;
-        justify-items: center;
-        align-self: center;
-        align-content: center;
-        gap: 0.08rem;
-        min-height: 2.1rem;
-        min-width: 0;
-      }
-
-      .cart-item__subtotal span {
-        color: var(--color-text-secondary);
-        font-size: 0.62rem;
-        font-weight: 600;
-        letter-spacing: 0.04em;
-        text-transform: uppercase;
-        line-height: 1.05;
-      }
-
-      .cart-item__subtotal strong {
-        font-size: 1rem;
-        font-weight: 800;
-        line-height: 1.08;
-        font-variant-numeric: tabular-nums;
-      }
-
-      .cart-item__remove {
-        min-height: 2.1rem;
-        padding-inline: 0.8rem;
-        border-color: color-mix(in srgb, var(--color-danger) 22%, var(--color-border-default));
-        color: var(--color-danger);
-        background: color-mix(in srgb, var(--color-danger) 6%, var(--color-bg-surface));
-        box-shadow: none;
-        opacity: 0.88;
-        line-height: 1.1;
-        align-self: center;
-      }
-
-      .mini-field {
-        display: grid;
-        gap: 0.32rem;
-        min-width: 0;
-        align-self: center;
-      }
-
-      .mini-field > span {
-        font-size: 0.68rem;
-        font-weight: 700;
-        color: var(--color-text-secondary);
-        line-height: 1.05;
-      }
-
-      .mini-field input {
-        width: 100%;
-        min-height: 2.2rem;
-        padding: 0.58rem 0.72rem;
-        border-radius: var(--radius-md);
-        border: 1px solid var(--color-border-default);
-        background: var(--color-bg-surface);
-        color: var(--color-text-primary);
-        font-weight: 700;
-      }
-
-      .cart-item .mini-field input {
-        min-height: 2.1rem;
-        padding: 0.34rem 0.5rem;
-      }
-
-      .mini-field--quantity {
-        min-width: 0;
-      }
-
-      .mini-field--discount {
-        width: min(7rem, 100%);
-      }
-
-      .quantity-tools {
-        display: grid;
-        grid-template-columns: 2.2rem minmax(3.2rem, 1fr) 2.2rem;
-        gap: 0.35rem;
-        align-items: center;
-      }
-
-      .quantity-tools input {
-        text-align: center;
-      }
-
-      .quantity-stepper {
-        min-height: 2.1rem;
-        padding: 0;
-        border-radius: var(--radius-sm);
-        background: var(--color-bg-soft);
-        border: 1px solid var(--color-border-default);
-        color: var(--color-text-primary);
-        font-weight: 700;
-      }
-
-      @media (max-width: 760px) {
-        .cart-item__footer {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          align-items: start;
-        }
-
-        .mini-field--discount,
-        .cart-item__remove {
-          width: 100%;
-        }
-
-        .cart-item__subtotal {
-          justify-items: start;
-          align-self: end;
-        }
-      }
-
-      @media (max-width: 520px) {
-        .cart-item__footer {
-          grid-template-columns: 1fr;
-          gap: 0.45rem;
-        }
-
-        .mini-field--discount {
-          width: 100%;
-        }
-
-        .cart-item__subtotal,
-        .cart-item__remove {
-          justify-items: start;
-        }
-      }
-    `,
-    ]
+@container(max-width:260px){.cart-item__footer{grid-template-columns:minmax(114px,1.3fr) minmax(80px,1fr)}.quantity-tools{grid-template-columns:32px minmax(0,1fr) 32px}.quantity-tools input{appearance:textfield}.quantity-tools input::-webkit-inner-spin-button,.quantity-tools input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}}
+    `],
 })
 export class PosCartItemComponent {
   readonly quantityStep = quantityStep;

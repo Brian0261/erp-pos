@@ -1,4 +1,4 @@
-import { HttpClient, HttpParams } from "@angular/common/http";
+import { HttpClient, HttpContext, HttpParams } from "@angular/common/http";
 import { Injectable } from "@angular/core";
 import { Observable, forkJoin, map, of } from "rxjs";
 
@@ -11,13 +11,13 @@ export class PosService {
 
   constructor(private readonly http: HttpClient) {}
 
-  snapshot(productIds: number[], warehouseId: number): Observable<PosProductResponse[]> {
+  snapshot(productIds: number[], warehouseId: number, context?: HttpContext): Observable<PosProductResponse[]> {
     const ids = [...new Set(productIds)];
     if (!ids.length) return of([]);
     const batches: Observable<PosProductResponse[]>[] = [];
     for (let offset = 0; offset < ids.length; offset += 200) {
       const params = new HttpParams().set("productIds", ids.slice(offset, offset + 200).join(",")).set("warehouseId", warehouseId);
-      batches.push(this.http.get<PosProductResponse[]>(`${this.endpoint}/snapshot`, { params }));
+      batches.push(this.http.get<PosProductResponse[]>(`${this.endpoint}/snapshot`, { params, context }));
     }
     return forkJoin(batches).pipe(map(results => results.flat()));
   }

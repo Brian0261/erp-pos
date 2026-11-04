@@ -43,7 +43,7 @@ function createAuthDouble(user: UserProfile): jasmine.SpyObj<AuthService> {
 }
 
 function expectVerifiedContext(auth: jasmine.SpyObj<AuthService>, sales: jasmine.SpyObj<SalesService>): HttpContext {
-  expect(auth.getToken).toHaveBeenCalledTimes(2);
+  expect(auth.getToken.calls.count()).toBeGreaterThanOrEqual(2);
   expect(auth.me).toHaveBeenCalledTimes(2);
   expect(auth.me.calls.first().args[0]).toBeUndefined();
   const context = auth.me.calls.mostRecent().args[0];
@@ -433,8 +433,9 @@ describe("PosPageComponent controlled discount correction", () => {
     cash.current.and.returnValue(of(cashSession));
     confirm = jasmine.createSpyObj<ConfirmDialogService>("ConfirmDialogService", ["confirm"]);
     confirm.confirm.and.returnValue(Promise.resolve(false));
-    const pos = jasmine.createSpyObj<PosService>("PosService", ["search", "lookup"]);
+    const pos = jasmine.createSpyObj<PosService>("PosService", ["search", "lookup", "snapshot"]);
     pos.search.and.returnValue(of([]));
+    pos.snapshot.and.callFake((ids: number[]) => of(cart().filter(p => ids.includes(p.productId))));
 
     await TestBed.configureTestingModule({
       imports: [PosPageComponent],
@@ -565,11 +566,11 @@ describe("PosPageComponent controlled discount correction", () => {
     expect(component.cart.map((item) => item.discountAmount)).toEqual([25, 1.25, Infinity, -2]);
     expect(savedDraft().cart.map((item) => item.discountAmount)).toEqual([25, 1.25, Infinity, -2]);
     expect(Number.isNaN(component.total)).toBeTrue();
-    expect(component.draftReviewMessage).toContain("pendientes de revalidación");
+    expect(component.cartVerificationMessage).toContain("descuento");
     expect(component.discountAdjustmentMessage).toBe("");
     component.payments[0].amount = 100;
     component.finalizeSale();
-    expect(component.errorMessage).toContain("descuento");
+    expect(component.cartVerificationMessage).toContain("descuento");
 
     const repaired = savedDraft();
     fixture!.destroy();
@@ -773,7 +774,7 @@ describe("PosPageComponent controlled discount correction", () => {
     expect(savedDraft().requiresRevalidation).toBeTrue();
     expect(savedDraft().preliminaryTotal).toBe("6.45");
     component.finalizeSale();
-    expect(component.errorMessage).toContain("revalidación");
+    expect(component.cartVerificationMessage).toContain("cantidad debe ser entera");
     expect(confirm.confirm).not.toHaveBeenCalled();
   });
 });

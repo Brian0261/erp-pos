@@ -72,8 +72,10 @@ export async function posCart(page:Page,f:CaseFixture,quantity=1){
   const warehouse=page.getByRole("combobox",{name:/^Almacén de salida/});
   await expect(warehouse.locator("option")).toHaveCount(2);
   await expect(warehouse).toHaveValue(new RegExp(`: ${f.warehouse_id}$`));
-  await expect(page.getByText("Caja abierta",{exact:true})).toBeVisible();
-  const search=page.getByLabel("Buscar o escanear producto");await search.fill(f.product_name);
+  const cashStatus=page.locator('.pos-utility-header .pos-context > strong');
+  await expect(cashStatus).toBeVisible();await expect(cashStatus).toHaveAttribute('data-state','open');
+  await expect(cashStatus).toContainText('Caja abierta');await expect(cashStatus).toContainText(`Sesión #${f.cash_id}`);
+  const search=page.getByLabel("Buscar producto por nombre, SKU o código");await search.fill(f.product_name);
   const response=page.waitForResponse(r=>new URL(r.url()).pathname==="/api/v1/pos/products/search");
   await page.getByRole("button",{name:"Buscar",exact:true}).click();expect((await response).status()).toBe(200);
   const product=page.getByRole("article").filter({has:page.getByRole("heading",{name:f.product_name,exact:true})});
@@ -85,20 +87,24 @@ export async function posCart(page:Page,f:CaseFixture,quantity=1){
   await modal.getByLabel("Monto *",{exact:true}).fill(String(quantity*10));return modal;
 }
 export async function confirmSale(page:Page,modal:Locator,double=false){
-  await modal.getByRole("button",{name:/^COBRAR(?: Y EMITIR)?$/}).click();const confirm=page.getByRole("alertdialog",{name:"Confirmar venta",exact:true});
-  await expect(confirm).toBeVisible();
-  const extended=confirm.getByRole("region",{name:"Detalles de la confirmación",exact:true});
-  if(await extended.count())await expect(confirm.getByRole("heading",{name:"Confirmar venta",exact:true})).toBeFocused();
-  else await expect(confirm.getByRole("button",{name:"Cancelar",exact:true})).toBeFocused();
-  if(double)await confirm.getByRole("button",{name:"Cobrar",exact:true}).dblclick();else await confirm.getByRole("button",{name:"Cobrar",exact:true}).click();
+  const action=modal.getByRole('button',{name:'Confirmar venta',exact:true});await expect(action).toBeEnabled();
+  await expect(page.getByRole('dialog',{name:'Confirmar venta',exact:true})).toHaveCount(0);
+  if(double)await action.dblclick();else await action.click();
 }
 export async function closeCheckoutIfOpen(page:Page){const modal=page.getByRole("dialog",{name:"Cobrar venta",exact:true});if(await modal.isVisible())await modal.getByRole("button",{name:"Cerrar",exact:true}).click();}
 export async function openRecovery(page:Page){
-  const toggle=page.getByRole("button",{name:/^(Recuperar operaciones|Ocultar operaciones)$/});
+  const toggle=page.locator('app-sale-operation-recovery > button');
   await expect(toggle).toBeVisible();if(await toggle.getAttribute("aria-expanded")==="false")await toggle.click();
-  const panel=page.getByRole("region",{name:"Mis operaciones comerciales"});await expect(panel).toBeVisible();return panel;
+  const panel=page.getByRole("region",{name:"Mis operaciones comerciales"});await expect(panel).toBeVisible();
+  const back=panel.getByRole('button',{name:'Volver a operaciones',exact:true});if(await back.count())await back.click();
+  if(await panel.getByLabel('Filtrar operaciones',{exact:true}).inputValue()!=='')await panel.getByLabel('Filtrar operaciones',{exact:true}).selectOption('');
+  else if(await panel.getByRole('button',{name:'Actualizar',exact:true}).count())await panel.getByRole('button',{name:'Actualizar',exact:true}).click();
+  return panel;
 }
-export async function selectOperation(page:Page,id:string){const panel=await openRecovery(page);await panel.getByRole("button",{name:new RegExp(id.slice(0,8))}).click();await expect(panel.getByText(`Operación ${id}`,{exact:true})).toBeVisible();return panel;}
+export async function selectOperation(page:Page,id:string){const panel=await openRecovery(page);
+  await panel.locator(`.recovery-list li[data-operation-id="${id}"]`).getByRole('button').click();
+  const detail=panel.locator(`.recovery-detail[data-operation-id="${id}"]`);await expect(detail).toBeVisible();
+  await detail.getByText(/^(Detalles técnicos|Referencias para soporte)$/).click();await expect(detail.getByText(`Operación: ${id}`,{exact:true})).toBeVisible();return panel;}
 export async function screenshot(page:Page,name:string,fullPage=true){if(page.url().includes("/login"))throw Error("QA_LOGIN_SCREENSHOT_FORBIDDEN");await page.screenshot({path:`/qa-run/screenshots/${name}.png`,fullPage});}
 export async function usable(locator:Locator){await expect(locator).toBeVisible();await expect(locator).toBeEnabled();await locator.scrollIntoViewIfNeeded();
   expect(await locator.evaluate(element=>{const r=element.getBoundingClientRect();const hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return r.width>0&&r.height>0&&!!hit&&(hit===element||element.contains(hit));})).toBe(true);}

@@ -17,7 +17,6 @@ import { BillingSeriesResponse } from "../../billing/data/billing.models";
 import { PaymentLine, PosReceiptType } from "../data/pos-ui.models";
 import { PosCheckoutPaymentSectionComponent } from "./pos-checkout-payment-section.component";
 import { PosCheckoutReceiptSectionComponent } from "./pos-checkout-receipt-section.component";
-import { PosTotalsSummaryComponent } from "./pos-totals-summary.component";
 import { ConfirmDialogService } from "../../../shared/dialogs/confirm-dialog.service";
 
 @Component({
@@ -26,7 +25,6 @@ import { ConfirmDialogService } from "../../../shared/dialogs/confirm-dialog.ser
         CommonModule,
         PosCheckoutPaymentSectionComponent,
         PosCheckoutReceiptSectionComponent,
-        PosTotalsSummaryComponent,
     ],
     template: `
     <section
@@ -37,12 +35,12 @@ import { ConfirmDialogService } from "../../../shared/dialogs/confirm-dialog.ser
       aria-labelledby="checkout-modal-title"
       (click)="handleClose()"
     >
-      <article #checkoutPanel class="checkout-modal" (click)="$event.stopPropagation()">
+      <article #checkoutPanel class="checkout-modal" [class.checkout-modal--internal]="receiptType === 'TICKET'" (click)="$event.stopPropagation()">
         <header class="checkout-modal__header">
           <div class="checkout-modal__header-copy">
             <h2 id="checkout-modal-title">Cobrar venta</h2>
             <p class="checkout-modal__summary">
-              {{ cartItemsCountLabel }} · Total S/ {{ (total | number: "1.2-2") ?? '—' }}
+              {{ cartItemsCountLabel }} · Revisa el documento y los pagos
             </p>
           </div>
           <button
@@ -55,11 +53,12 @@ import { ConfirmDialogService } from "../../../shared/dialogs/confirm-dialog.ser
         </header>
 
         <div class="checkout-modal__body">
-          <div #operationNotice class="checkout-modal__notice" tabindex="-1" *ngIf="errorMessage || recoveryMessage">
+          <div #operationNotice class="checkout-modal__notice" tabindex="-1" *ngIf="errorMessage || recoveryMessage || verificationMessage">
             <p class="ui-alert ui-alert--error" role="alert" *ngIf="errorMessage">{{ errorMessage }}</p>
             <p class="ui-alert ui-alert--warning" role="status" *ngIf="recoveryMessage">{{ recoveryMessage }}</p>
+            <p class="ui-alert ui-alert--info" role="status" *ngIf="verificationMessage">{{ verificationMessage }}</p>
           </div>
-          <div class="checkout-modal__content-grid">
+          <fieldset class="checkout-modal__content-grid" [class.checkout-modal__content-grid--internal]="receiptType === 'TICKET'" [disabled]="submitting || recoveryActive">
             <div class="checkout-modal__receipt-column">
               <app-pos-checkout-receipt-section
                 [receiptType]="receiptType"
@@ -90,6 +89,7 @@ import { ConfirmDialogService } from "../../../shared/dialogs/confirm-dialog.ser
             <div class="checkout-modal__payment-column">
               <app-pos-checkout-payment-section
                 [payments]="payments"
+                [amountErrors]="paymentAmountErrors"
                 [total]="total"
                 [paidTotal]="paidTotal"
                 [change]="change"
@@ -100,21 +100,13 @@ import { ConfirmDialogService } from "../../../shared/dialogs/confirm-dialog.ser
                 (updatePaymentReference)="updatePaymentReference.emit($event)"
               ></app-pos-checkout-payment-section>
 
-              <app-pos-totals-summary
-                [total]="total"
-                [subtotal]="subtotal"
-                [discountTotal]="discountTotal"
-                [paidTotal]="paidTotal"
-                [change]="change"
-              ></app-pos-totals-summary>
             </div>
-          </div>
+          </fieldset>
         </div>
 
         <footer class="checkout-modal__actions">
-          <small class="checkout-modal__warning" *ngIf="submitAttempted && receiptValidationSummary">
-            {{ receiptValidationSummary }}
-          </small>
+          <p class="checkout-review" *ngIf="!recoveryActive && !recoveryMessage">Al confirmar se registrarán la venta y sus pagos.</p>
+          <p id="checkout-block-reason" class="checkout-block-reason" role="status" *ngIf="reviewBlockedReason || receiptValidationSummary">{{ reviewBlockedReason || receiptValidationSummary }}</p>
           <button
             type="button"
             class="ui-button ui-button--secondary checkout-modal__action"
@@ -125,10 +117,11 @@ import { ConfirmDialogService } from "../../../shared/dialogs/confirm-dialog.ser
           <button
             type="button"
             class="ui-button ui-button--primary checkout-modal__action checkout-modal__action--primary"
-            [disabled]="submitting"
+            [disabled]="finalizeBlocked"
+            [attr.aria-describedby]="reviewBlockedReason || receiptValidationSummary ? 'checkout-block-reason' : null"
             (click)="handleFinalize()"
           >
-            {{ submitting ? "Cobrando..." : checkoutButtonLabel }}
+            {{ submitting ? "Procesando…" : recoveryActive || recoveryMessage ? checkoutButtonLabel : 'Confirmar venta' }}
           </button>
         </footer>
       </article>
@@ -223,11 +216,16 @@ import { ConfirmDialogService } from "../../../shared/dialogs/confirm-dialog.ser
       .checkout-modal__notice p { margin: 0 0 var(--space-2); }
 
       .checkout-modal__content-grid {
+        border:0;margin:0;padding:0;min-width:0;
         display: grid;
         grid-template-columns: minmax(0, 1.05fr) minmax(19rem, 0.95fr);
         gap: var(--space-2);
         align-items: start;
       }
+
+      .checkout-modal--internal{width:min(100%,56rem)}.checkout-modal__content-grid--internal{grid-template-columns:minmax(0,1fr)}
+      .checkout-review,.checkout-block-reason{flex:1 1 100%;margin:0;font-size:.875rem;line-height:1.45;overflow-wrap:anywhere}.checkout-review{color:var(--color-text-secondary)}.checkout-block-reason{color:var(--color-danger)}
+      .checkout-modal__close{flex-shrink:0;min-height:44px}.checkout-modal__content-grid:disabled{opacity:1}
 
       .checkout-modal__receipt-column,
       .checkout-modal__payment-column {
@@ -289,11 +287,13 @@ import { ConfirmDialogService } from "../../../shared/dialogs/confirm-dialog.ser
           padding: var(--space-2);
         }
 
-        .checkout-modal__header,
         .checkout-modal__actions {
           align-items: flex-start;
           display: grid;
+          grid-template-columns:minmax(0,1fr);
         }
+
+        .checkout-modal__header{align-items:center}.checkout-modal__header h2{font-size:1.3rem}.checkout-modal__summary{font-size:.8rem}.checkout-modal__actions{gap:.4rem}.checkout-modal__action{min-height:44px}
 
         .checkout-modal__action {
           width: 100%;
@@ -351,6 +351,7 @@ export class PosCheckoutModalComponent implements OnChanges, OnDestroy {
   set operationNotice(ref: ElementRef<HTMLElement> | undefined) { this.notice = ref?.nativeElement; }
   @Input({ required: true }) isOpen = false;
   @Input({ required: true }) payments: PaymentLine[] = [];
+  @Input() paymentAmountErrors: string[] = [];
   @Input({ required: true }) receiptType: PosReceiptType = "TICKET";
   @Input({ required: true }) receiptSeriesId = "";
   @Input({ required: true }) receiptCustomerDocument = "";
@@ -375,6 +376,10 @@ export class PosCheckoutModalComponent implements OnChanges, OnDestroy {
   @Input({ required: true }) receiptValidationError = "";
   @Input() errorMessage = "";
   @Input() recoveryMessage = "";
+  @Input() verificationMessage = "";
+  @Input() verificationPending = false;
+  @Input() reviewBlockedReason = "";
+  @Input() recoveryActive = false;
 
   submitAttempted = false;
 
@@ -406,7 +411,7 @@ export class PosCheckoutModalComponent implements OnChanges, OnDestroy {
     if (changes["isOpen"] && !this.isOpen) {
       this.submitAttempted = false;
     }
-    if (this.isOpen && (changes["errorMessage"] || changes["recoveryMessage"])) {
+    if (this.isOpen && (changes["errorMessage"] || changes["recoveryMessage"] || changes["verificationMessage"])) {
       const generation = this.dialogGeneration;
       queueMicrotask(() => { if (this.dialogGeneration === generation && this.notice) this.focusNoticeOrClose(); });
     }
@@ -477,13 +482,13 @@ export class PosCheckoutModalComponent implements OnChanges, OnDestroy {
         this.invoiceBusinessNameInvalid ||
         this.receiptSeriesInvalid
       ) {
-        return "Completa los datos requeridos para emitir factura.";
+        return "Completa los datos requeridos de la factura.";
       }
     }
 
     if (this.receiptType === "RECEIPT") {
       if (this.boletaDniInvalid || this.receiptSeriesInvalid) {
-        return "Revisa los datos del comprobante antes de emitir.";
+        return "Revisa los datos de la boleta antes de confirmar.";
       }
     }
 
@@ -497,7 +502,12 @@ export class PosCheckoutModalComponent implements OnChanges, OnDestroy {
 
   handleFinalize(): void {
     this.submitAttempted = true;
+    if (this.finalizeBlocked) return;
     this.finalize.emit();
+  }
+  get finalizeBlocked(): boolean {
+    return this.submitting || this.verificationPending || !!this.reviewBlockedReason
+      || (!this.recoveryActive && !this.recoveryMessage && !!this.receiptValidationError);
   }
 
   handleReceiptTypeChange(type: PosReceiptType): void {

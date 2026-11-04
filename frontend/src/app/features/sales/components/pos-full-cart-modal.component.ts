@@ -1,3 +1,4 @@
+import { PosDialogFocusDirective } from "./pos-dialog-focus.directive";
 import { CommonModule } from "@angular/common";
 import { Component, EventEmitter, Input, Output } from "@angular/core";
 
@@ -11,13 +12,14 @@ import { canPosStep, posUnitPriceText } from "../utils/pos-calculations";
 
 @Component({
     selector: "app-pos-full-cart-modal",
-    imports: [CommonModule],
+    imports: [CommonModule, PosDialogFocusDirective],
     template: `
     <section
       class="full-cart-backdrop"
       *ngIf="isOpen"
       role="dialog"
       aria-modal="true"
+      appPosDialogFocus (posDialogClose)="close.emit()"
       aria-labelledby="full-cart-title"
     >
       <article class="full-cart-modal">
@@ -56,26 +58,22 @@ import { canPosStep, posUnitPriceText } from "../utils/pos-calculations";
         <div class="full-cart-list" *ngIf="cart.length > 0">
           <article
             class="full-cart-row"
-            *ngFor="let item of cart; let index = index"
+            *ngFor="let item of cart; let index = index; trackBy: trackProduct"
           >
             <div class="full-cart-product">
               <h3>{{ item.name }}</h3>
               <div class="full-cart-product-meta-row">
-                <p class="full-cart-sku">{{ item.sku }}</p>
-                <span class="full-cart-meta-separator" aria-hidden="true">·</span>
+                <p *ngIf="(item.sku || '').trim()" class="full-cart-sku">SKU {{ item.sku }}</p>
                 <span class="full-cart-product-price">
                   P.U. S/ {{ unitPriceText(item) }}
                 </span>
-                <span *ngIf="item.barcode" class="full-cart-barcode-note">
-                  {{ item.barcode }}
-                </span>
-                <span *ngIf="!item.barcode" class="full-cart-barcode-note">
-                  Sin código
+                <span *ngIf="item.barcode?.trim() && item.barcode?.trim() !== (item.sku || '').trim()" class="full-cart-barcode-note">
+                  Código de barras: {{ item.barcode }}
                 </span>
               </div>
             </div>
 
-            <div class="full-cart-actions">
+            <fieldset class="full-cart-actions" [disabled]="editingBlocked">
               <label class="mini-field full-cart-quantity">
                 <span>Cant.</span>
                 <div class="quantity-tools">
@@ -118,7 +116,7 @@ import { canPosStep, posUnitPriceText } from "../utils/pos-calculations";
               </label>
 
               <label class="mini-field full-cart-discount">
-                <span>Dscto.</span>
+                <span title="Importe total descontado de esta línea">Descuento (S/)</span>
                 <input
                   type="number"
                   min="0"
@@ -135,7 +133,7 @@ import { canPosStep, posUnitPriceText } from "../utils/pos-calculations";
               </label>
 
               <div class="full-cart-line">
-                <span>Subtotal</span>
+                <span>Importe</span>
                 <strong>S/ {{ (lineTotals[index] | number: "1.2-2") ?? '—' }}</strong>
               </div>
 
@@ -146,7 +144,7 @@ import { canPosStep, posUnitPriceText } from "../utils/pos-calculations";
               >
                 Quitar
               </button>
-            </div>
+            </fieldset>
           </article>
         </div>
       </article>
@@ -154,6 +152,7 @@ import { canPosStep, posUnitPriceText } from "../utils/pos-calculations";
   `,
     styles: [
         `
+      .full-cart-modal{display:flex!important;flex-direction:column}.full-cart-list{flex:1;min-height:0}.full-cart-actions input,.quantity-stepper,.full-cart-remove{min-height:44px!important}
       .full-cart-backdrop {
         position: fixed;
         inset: 0;
@@ -255,8 +254,8 @@ import { canPosStep, posUnitPriceText } from "../utils/pos-calculations";
 
       .full-cart-row {
         display: grid;
-        grid-template-columns: minmax(0, 1fr);
-        gap: 0.52rem;
+        grid-template-columns: minmax(0, 1fr) minmax(440px, 1.2fr);
+        gap: var(--space-3);
         align-items: start;
         border: 1px solid color-mix(in srgb, var(--color-border-default) 86%, transparent);
         border-radius: var(--radius-lg);
@@ -279,8 +278,8 @@ import { canPosStep, posUnitPriceText } from "../utils/pos-calculations";
         gap: 0.22rem 0.32rem;
         min-width: 0;
         color: var(--color-text-secondary);
-        font-size: 0.68rem;
-        opacity: 0.8;
+        font-size: var(--font-size-xs);
+        opacity: 1;
       }
 
       .full-cart-sku {
@@ -298,11 +297,8 @@ import { canPosStep, posUnitPriceText } from "../utils/pos-calculations";
 
       .full-cart-product h3 {
         margin: 0;
-        overflow: hidden;
-        display: -webkit-box;
-        -webkit-box-orient: vertical;
-        -webkit-line-clamp: 2;
-        text-overflow: ellipsis;
+        overflow-wrap: anywhere;
+        display: block;
         white-space: normal;
         font-size: 0.98rem;
         font-weight: 700;
@@ -310,6 +306,7 @@ import { canPosStep, posUnitPriceText } from "../utils/pos-calculations";
       }
 
       .full-cart-actions {
+        border:0;margin:0;padding:0;min-width:0;
         display: grid;
         grid-template-columns: minmax(0, 1.5fr) minmax(0, 0.9fr) auto auto;
         gap: 0.5rem 0.75rem;
@@ -432,7 +429,7 @@ import { canPosStep, posUnitPriceText } from "../utils/pos-calculations";
           var(--color-bg-surface)
         );
         box-shadow: none;
-        opacity: 0.88;
+        opacity: 1;
         align-self: center;
       }
 
@@ -468,34 +465,22 @@ import { canPosStep, posUnitPriceText } from "../utils/pos-calculations";
         border-radius: var(--radius-pill);
       }
 
-      @media (max-width: 760px) {
-        .full-cart-header,
-        .full-cart-row,
-        .full-cart-actions {
-          grid-template-columns: 1fr;
-        }
-
-        .full-cart-summary {
-          text-align: left;
-        }
-
-        .full-cart-line {
-          justify-items: start;
-        }
-
-        .full-cart-discount,
-        .full-cart-remove {
-          width: 100%;
-        }
-
-        .pos-button {
-          width: 100%;
-        }
+      .full-cart-product-meta-row .full-cart-sku,.full-cart-barcode-note{font-size:var(--font-size-xs);line-height:1.4}
+      .full-cart-summary{min-width:0;display:flex;gap:var(--space-3);padding:.5rem .75rem}
+      .full-cart-actions input{min-width:0;padding:.5rem}.full-cart-line{justify-items:end}.full-cart-discount{width:100%}
+      @media(max-width:960px){.full-cart-row{grid-template-columns:minmax(0,1fr)}}
+      @media(max-width:600px){
+        .full-cart-modal{padding:var(--space-3);width:calc(100vw - 1rem);max-height:calc(100dvh - 1rem)}.full-cart-backdrop{padding:.5rem}
+        .full-cart-header{grid-template-columns:minmax(0,1fr) auto}.full-cart-header>button{grid-column:2;grid-row:1}.full-cart-summary{grid-column:1/-1;justify-content:space-between}
+        .full-cart-actions{grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:.5rem}.quantity-tools{grid-template-columns:2.2rem minmax(0,1fr) 2.2rem;gap:.25rem}
+        .full-cart-line{justify-items:start}.full-cart-remove{justify-self:end}.full-cart-row{padding:.65rem}.full-cart-list{padding-right:.15rem}
       }
     `,
     ]
 })
 export class PosFullCartModalComponent {
+  trackProduct(_index: number, item: PosCartItem): number { return item.productId; }
+  @Input() editingBlocked = false;
   readonly quantityStep = quantityStep;
   readonly canStep = canPosStep;
   readonly unitPriceText = posUnitPriceText;

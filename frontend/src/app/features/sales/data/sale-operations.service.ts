@@ -69,8 +69,9 @@ export class SaleOperationsService {
   prepare(body: PrepareSaleOperationRequest, context: HttpContext): Observable<SaleOperation> {
     return this.http.post<SaleOperation>(this.endpoint, body, { context });
   }
-  list(page: number, context: HttpContext, state?: string): Observable<SaleOperationPage> {
+  list(page: number, context: HttpContext, state?: string, attention = false): Observable<SaleOperationPage> {
     let params = new HttpParams().set("page", page).set("size", 10);
+    if (attention) params = params.set("attention", true);
     if (state) params = params.set("state", state);
     return this.http.get<SaleOperationPage>(this.endpoint, { context, params });
   }

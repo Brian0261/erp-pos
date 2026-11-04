@@ -25,6 +25,7 @@ describe("A durable POS recovery", () => {
   let auth: jasmine.SpyObj<AuthService>, documents: jasmine.SpyObj<ElectronicDocumentService>;
   let confirm: jasmine.SpyObj<ConfirmDialogService>, http: HttpTestingController;
   let token: string | null;
+  let interval: jasmine.Spy;
   const owner = { id: "synthetic-owner", username: "qa", email: "qa@example.test", roles: ["CAJERO"] };
   const result = (): SaleResponse => ({ id: 77, saleNumber: "S-QA", cashRegisterSessionId: 7, warehouseId: 1,
     status: "COMPLETED", subtotalAmount: 10, discountAmount: 0, totalAmount: 10, paidAmount: 10, changeAmount: 0,
@@ -53,6 +54,7 @@ describe("A durable POS recovery", () => {
       { provide: ConfirmDialogService, useValue: confirm }, { provide: BillingSeriesService, useValue: { list: () => of([]) } },
       { provide: ElectronicDocumentService, useValue: documents },
     ] }).compileComponents();
+    interval = spyOn(window, "setInterval").and.callThrough();
     fixture = TestBed.createComponent(PosPageComponent); page = fixture.componentInstance; http = TestBed.inject(HttpTestingController);
     await settle(); page.saleForm.controls.warehouseId.setValue(1); page.cart = [{ productId: 101, sku: "QA", barcode: null, name: "Synthetic", salePrice: 10,
       quantity: 1, discountAmount: 0, stockAvailable: 10, quantityPolicy: "WHOLE" }];
@@ -60,18 +62,141 @@ describe("A durable POS recovery", () => {
   });
   afterEach(() => { http.verify(); fixture.destroy(); sessionStorage.clear(); });
 
+  const anotherPurchase = () => {
+    page.cart = [
+      { productId: 201, sku: "B-1", name: "Synthetic B notebook", barcode: null, salePrice: 6, quantity: 2, discountAmount: 1, stockAvailable: 50, quantityPolicy: "WHOLE" },
+      { productId: 202, sku: "B-2", name: "Synthetic B by measure", barcode: null, salePrice: 2.5, quantity: 1.25, discountAmount: .25, stockAvailable: 50, quantityPolicy: "DECIMAL_2" },
+    ];
+    page.payments = [{ paymentMethod: "CASH", amount: 10, reference: "B cash" }, { paymentMethod: "CARD", amount: 3.88, reference: "B card" }];
+    return structuredClone({ cart: page.cart, payments: page.payments, warehouse: page.saleForm.value.warehouseId });
+  };
+  const expectPurchase = (before: ReturnType<typeof anotherPurchase>) => {
+    expect(page.cart).toEqual(before.cart); expect(page.payments).toEqual(before.payments);
+    expect(page.saleForm.value.warehouseId).toBe(before.warehouse);
+  };
+
+  it("P1 keeps completed historical consultation and its leave action separate from purchase B", async () => {
+    const before = anotherPurchase(); page.lastSaleId = 88;
+    const historical = { ...existing("COMPLETED"), command: null };
+    operations.get.and.returnValue(of(historical)); page.selectServerOperation(historical, false); await settle();
+    expect(page.receiptRecovery).toBeNull(); expect(page.pendingSaleRequest).toBeNull(); expect(page.lastSaleId).toBe(88);
+    page.leaveOperationInServer(); await settle(); expectPurchase(before);
+    expect(sales.create).not.toHaveBeenCalled(); expect(operations.prepare).not.toHaveBeenCalled(); expect(documents.createFromSale).not.toHaveBeenCalled();
+  });
+
+  it("P1 does not replace B when adoption of PREPARED A is declined", async () => {
+    const before = anotherPurchase(); const operation = existing(); operations.get.and.returnValue(of(operation));
+    confirm.confirm.and.returnValue(Promise.resolve(false)); page.selectServerOperation(operation, true); await settle();
+    expect(fixture.nativeElement.textContent).toContain("Tienes otra compra en curso");
+    const back = Array.from(fixture.nativeElement.querySelectorAll('button')).find((button: any) => button.textContent.trim() === "Volver a mi compra") as HTMLButtonElement;
+    back.click(); await settle();
+    expectPurchase(before); expect(page.pendingSaleRequest).toBeNull(); expect(page.receiptRecovery).toBeNull();
+    expect(sales.create).not.toHaveBeenCalled(); expect(operations.prepare).not.toHaveBeenCalled();
+  });
+
+  it("P1 treats payments without products as purchase B when considering another preparation", async () => {
+    page.cart = []; const payments = structuredClone(page.payments); const operation = existing();
+    operations.get.and.returnValue(of(operation)); confirm.confirm.and.returnValue(Promise.resolve(false));
+    page.selectServerOperation(operation, true); await settle();
+    expect(page.cart).toEqual([]); expect(page.payments).toEqual(payments); expect(page.receiptRecovery).toBeNull();
+    expect(fixture.nativeElement.textContent).toContain("Tienes otra compra en curso"); expect(sales.create).not.toHaveBeenCalled();
+  });
+
+  it("P1 cannot finalize or abandon A after its bound purchase is replaced by B", async () => {
+    sales.create.and.returnValue(rejected(0)); page.finalizeSale(); await settle();
+    const operationId = page.pendingSaleRequest!.operationId;
+    operations.get.and.returnValue(of({ ...existing("COMPLETED"), operationId, command: null }));
+    page.finalizeSale(); await settle(); expect(page.receiptRecovery?.operationId).toBe(operationId);
+    const before = anotherPurchase(); page.finalizeSale(); await settle(); page.leaveOperationInServer(); await settle();
+    expectPurchase(before); expect(page.receiptRecovery?.operationId).toBe(operationId);
+    expect(sales.create).toHaveBeenCalledTimes(1); expect(operations.prepare).toHaveBeenCalledTimes(1); expect(documents.createFromSale).not.toHaveBeenCalled();
+  });
+
+  it("P1 discards only the unchanged B after explicit consent and a second verified preparation read", async () => {
+    anotherPurchase(); const operation = existing(); operations.get.and.returnValue(of(operation));
+    confirm.confirm.and.returnValue(Promise.resolve(false)); page.selectServerOperation(operation, true); await settle();
+    expect(operations.get).toHaveBeenCalledTimes(1); expect(page.pendingSaleRequest).toBeNull();
+    page.confirmRecoveryAdoption(); await settle();
+    expect(operations.get).toHaveBeenCalledTimes(2); expect(page.pendingSaleRequest).toEqual(operation.command);
+    expect(page.receiptRecovery?.operationId).toBe(operation.operationId); expect(page.preparedOnServer).toBeTrue();
+    expect(page.cart.map(line=>line.productId)).toEqual([101]); expect(page.payments[0].amount).toBe(10);
+    expect(confirm.confirm.calls.mostRecent().args[0].title).toBe("Reanudar preparación");
+    expect(sales.create).not.toHaveBeenCalled(); expect(operations.prepare).not.toHaveBeenCalled();
+  });
+
+  for (const change of ["quantity", "token", "cash", "warehouse"] as const) {
+    it("P1 refuses a stale discard decision after a change to " + change, async () => {
+      anotherPurchase(); const operation = existing(); operations.get.and.returnValue(of(operation));
+      page.selectServerOperation(operation, true); await settle();
+      if(change==="quantity")page.cart[0].quantity=3;
+      if(change==="token")token="other-session";
+      if(change==="cash")page.currentCashSession={...page.currentCashSession!,id:8};
+      if(change==="warehouse")page.saleForm.controls.warehouseId.setValue(2);
+      const before=structuredClone({cart:page.cart,payments:page.payments,warehouse:page.saleForm.value.warehouseId});
+      page.confirmRecoveryAdoption(); await settle();expectPurchase(before);
+      expect(page.receiptRecovery).toBeNull();expect(operations.get).toHaveBeenCalledTimes(1);expect(sales.create).not.toHaveBeenCalled();
+    });
+  }
+
+  it("P1 preserves B when the required second preparation read fails or changes identity", async () => {
+    const before=anotherPurchase(),operation=existing();operations.get.and.returnValue(of(operation));
+    page.selectServerOperation(operation,true);await settle();operations.get.and.returnValue(rejected(503));
+    page.confirmRecoveryAdoption();await settle();expectPurchase(before);expect(page.receiptRecovery).toBeNull();
+    operations.get.and.returnValue(of({...operation,operationId:"00000000-0000-4000-8000-000000000099"}));
+    page.confirmRecoveryAdoption();await settle();expectPurchase(before);expect(page.receiptRecovery).toBeNull();expect(sales.create).not.toHaveBeenCalled();
+  });
+
+  it("P1 invalidates selection reads when its panel selection is closed or replaced", async () => {
+    const before=anotherPurchase(),response=new Subject<SaleOperation>();operations.get.and.returnValue(response);
+    page.selectServerOperation(existing(),true);page.cancelRecoverySelection();response.next(existing());response.complete();await settle();
+    expectPurchase(before);expect(page.recoveryAdoption).toBeNull();expect(page.receiptRecovery).toBeNull();expect(sales.create).not.toHaveBeenCalled();
+  });
+
+  it("P1 keeps a different active recovery, its UUID and its frozen purchase", async () => {
+    sales.create.and.returnValue(rejected(0));page.finalizeSale();await settle();
+    const id=page.receiptRecovery!.operationId,before=structuredClone({cart:page.cart,payments:page.payments,warehouse:page.saleForm.value.warehouseId});
+    page.selectServerOperation(existing(),true);await settle();expectPurchase(before);
+    expect(page.receiptRecovery!.operationId).toBe(id);expect(operations.get).not.toHaveBeenCalled();expect(sales.create).toHaveBeenCalledTimes(1);
+  });
+
+  for(const action of ["finalize","leave"] as const){
+    it("P1 rejects late "+action+" verification after B replaces the bound context",async()=>{
+      sales.create.and.returnValue(rejected(0));page.finalizeSale();await settle();const id=page.pendingSaleRequest!.operationId;
+      const completed={...existing("COMPLETED"),operationId:id,command:null};operations.get.and.returnValue(of(completed));page.finalizeSale();await settle();
+      const response=new Subject<SaleOperation>();operations.get.and.returnValue(response);
+      if(action==="finalize")page.finalizeSale();else page.leaveOperationInServer();
+      const before=anotherPurchase();response.next(completed);response.complete();await settle();expectPurchase(before);
+      expect(page.receiptRecovery?.operationId).toBe(id);expect(sales.create).toHaveBeenCalledTimes(1);expect(documents.createFromSale).not.toHaveBeenCalled();
+    });
+  }
+
   it("becomes stable with the confirmed note mounted and its credential monitor active", async () => {
-    const interval = spyOn(window, "setInterval").and.callThrough();
     page.finalizeSale(); await settle();
-    // The final render mounts the note; also await its authorized read before asserting its DOM.
+    // The session stays mounted; only a confirmed event displays its delivery and starts the authorized read.
     await settle();
-    expect(fixture.nativeElement.querySelector('app-pos-sale-note [aria-label="Última venta confirmada"]')?.textContent).toContain("Venta S-QA registrada.");
+    expect(fixture.nativeElement.querySelector('app-pos-sale-note [role="dialog"]')?.textContent).toMatch(/Venta #77 · Registrada/);
+    expect(fixture.nativeElement.textContent).toMatch(/Total confirmado: S\/\s*10\.00/);
     expect(interval.calls.allArgs().some(args => args[1] === 200)).toBeTrue();
     expect(fixture.isStable()).toBeTrue(); expect(TestBed.inject(NgZone).hasPendingMacrotasks).toBeFalse();
     expect(sales.getById).toHaveBeenCalledOnceWith(77, jasmine.any(HttpContext));
     expect(sales.getById.calls.first().args[1]!.get(BOUND_AUTH_CREDENTIALS)?.token).toBe("synthetic-owner-token");
     expect(operations.prepare).toHaveBeenCalledTimes(1); expect(sales.create).toHaveBeenCalledTimes(1);
     expect(documents.createFromSale).not.toHaveBeenCalled();
+  });
+
+  it("opens delivery only for a normal confirmed checkout and never restores it from the saved sale reference",async()=>{
+    page.finalizeSale();await settle();expect(page.confirmedDelivery?.saleId).toBe(77);expect(page.confirmedDelivery?.totalAmount).toBe(10);
+    expect(page.confirmedDelivery?.operationId).toBe(sales.create.calls.first().args[0].operationId);
+    const beforeReads=sales.getById.calls.count();fixture.destroy();fixture=TestBed.createComponent(PosPageComponent);page=fixture.componentInstance;await settle();
+    expect(page.lastSaleId).toBe(77);expect(page.confirmedDelivery).toBeNull();expect(fixture.nativeElement.querySelector('app-pos-sale-note [role="dialog"]')).toBeNull();
+    expect(sales.getById.calls.count()).toBe(beforeReads);expect(sales.create).toHaveBeenCalledTimes(1);
+  });
+  it("does not present a recovered completed result as a new normal checkout event",async()=>{
+    sales.create.and.returnValue(rejected(0));page.finalizeSale();await settle();expect(page.pendingPreparedVerified).toBeFalse();
+    expect(page.checkoutButtonLabel).toBe('COMPROBAR RESULTADO');const id=page.pendingSaleRequest!.operationId;
+    operations.get.and.returnValue(of({...existing('COMPLETED'),operationId:id,command:null}));page.finalizeSale();await settle();
+    expect(page.confirmedDelivery).toBeNull();page.finalizeSale();await settle();expect(page.cart).toEqual([]);
+    expect(page.confirmedDelivery).toBeNull();expect(sales.create).toHaveBeenCalledTimes(1);
   });
 
   const rejectDefinitively = () => operations.prepare.and.callFake(body => rejected(422, {
@@ -179,6 +304,7 @@ describe("A durable POS recovery", () => {
   });
   it("recovers without any browser storage and resumes only after explicit selection and confirmation", async () => {
     sessionStorage.clear(); const operation = existing(); operations.get.and.returnValue(of(operation));
+    page.cart = []; page.payments = [{ paymentMethod: "CASH", amount: 0, reference: "" }];
     page.selectServerOperation(operation, false); await settle();
     expect(page.pendingSaleRequest).toEqual(operation.command); expect(sales.create).not.toHaveBeenCalled();
     expect(page.preparedOnServer).toBeTrue();
@@ -223,9 +349,11 @@ describe("A durable POS recovery", () => {
     expect(sales.create).not.toHaveBeenCalled(); expect(operations.prepare).not.toHaveBeenCalled(); expect(page.errorMessage).toContain("no repitas");
   });
   it("uses owner operation detail instead of the general billing listing during receipt recovery", async () => {
+    sales.create.and.returnValue(rejected(0)); page.finalizeSale(); await settle();
+    const operationId = page.pendingSaleRequest!.operationId;
     const operation: SaleOperation = { ...existing("COMPLETED"), receiptIntent: { receiptType: "INVOICE", payload: null },
-      receiptState: "LOCATED", documentId: 901, documentStatus: "DRAFT" };
-    operations.get.and.returnValue(of(operation)); page.selectServerOperation(operation, false); await settle();
+      operationId, command: null, receiptState: "LOCATED", documentId: 901, documentStatus: "DRAFT" };
+    operations.get.and.returnValue(of(operation)); page.finalizeSale(); await settle();
     expect(documents.listBySaleId).not.toHaveBeenCalled(); expect(documents.createFromSale).not.toHaveBeenCalled();
     expect(page.lastSaleId).toBe(77); expect(page.successMessage).toContain("DRAFT");
   });
@@ -238,6 +366,7 @@ describe("A durable POS recovery", () => {
       const intent = { receiptType: "INVOICE" as const, payload: { documentType: "INVOICE" as const,
         billingSeriesId: 21, customerName: "Synthetic customer", customerDocument: "20123456789" } };
       const operation: SaleOperation = { ...existing("COMPLETED"), receiptIntent: intent, receiptState: "PENDING" };
+      page.cart = []; page.payments = [{ paymentMethod: "CASH", amount: 0, reference: "" }];
       operations.get.and.returnValue(of(operation)); page.selectServerOperation(operation, false); await settle();
       expect(documents.createFromSale).not.toHaveBeenCalled();
       operations.get.and.returnValue(of({ ...operation, receiptState: state, receiptIntent: {

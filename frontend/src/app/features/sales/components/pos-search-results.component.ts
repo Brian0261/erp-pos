@@ -12,7 +12,7 @@ import { PosProductResponse } from "../data/sales.models";
         <div>
           <h2>Resultados de búsqueda</h2>
         </div>
-        <span class="results-count">{{ searchResults.length }} resultados</span>
+        <span class="results-count">{{ loading ? "Buscando…" : failed ? "Consulta no disponible" : searchResults.length + " resultados" }}</span>
       </header>
 
       <p class="result-hint" *ngIf="searchResults.length > 1">
@@ -20,37 +20,18 @@ import { PosProductResponse } from "../data/sales.models";
         tocar Agregar.
       </p>
 
-      <div class="empty-results" *ngIf="searchResults.length === 0">
-        <strong>Sin resultados activos</strong>
-        <span>Busca por nombre para elegir el producto antes de agregar.</span>
+      <div class="empty-results" [attr.role]="loading || searched || failed ? 'status' : null" *ngIf="loading || failed || searchResults.length === 0">
+        <strong>{{ loading ? "Buscando productos" : failed ? "No se pudo consultar" : searched ? "Sin coincidencias para la búsqueda" : "Busca o agrega un producto" }}</strong>
+        <span>{{ failed ? "Reintenta la búsqueda; no se ha agregado ningún producto." : "Enter busca por nombre. Agregar por código usa el SKU o barcode exacto." }}</span>
       </div>
 
-      <div class="results-grid" *ngIf="searchResults.length > 0">
+      <div class="results-grid" *ngIf="!loading && !failed && searchResults.length > 0">
         <article class="result-card" *ngFor="let result of searchResults">
           <div class="result-card__body">
-            <div class="result-card__meta-row">
-              <p class="result-card__sku">{{ result.sku }}</p>
-              <span class="result-card__meta-separator" aria-hidden="true">·</span>
-              <div class="result-meta">
-                 <span *ngIf="result.barcode" class="result-meta__code">
-                   Cod. {{ result.barcode }}
-                 </span>
-                 <span
-                   *ngIf="!result.barcode"
-                   class="barcode-badge barcode-badge--missing"
-                 >
-                   Cod. no disponible
-                 </span>
-                <span class="result-meta__stock">
-                  <span class="result-meta__label">Stock</span>
-                  <span class="result-meta__value">{{
-                    result.stockAvailable | number: "1.0-3"
-                  }}</span>
-                </span>
-              </div>
-            </div>
             <h3>{{ result.name }}</h3>
+            <p class="result-card__sku">{{ result.sku }}<span *ngIf="result.barcode"> · Cód. {{ result.barcode }}</span></p>
           </div>
+          <span class="result-meta__stock">Stock: {{ result.stockAvailable | number:'1.0-3' }}</span>
           <div class="result-card__action">
             <p class="result-price">
               S/ {{ result.salePrice | number: "1.2-2" }}
@@ -59,302 +40,33 @@ import { PosProductResponse } from "../data/sales.models";
               type="button"
               class="ui-button ui-button--primary pos-button pos-button--add result-add-button"
               (click)="addProduct.emit(result)"
+              [disabled]="result.stockAvailable <= 0"
+
             >
-              Agregar
+              {{ result.stockAvailable <= 0 ? "Sin stock" : "Agregar" }}
             </button>
           </div>
         </article>
       </div>
     </section>
   `,
-    styles: [
-        `
-      :host {
-        display: grid;
-        min-height: 0;
-        min-width: 0;
-      }
+    styles: [`
+:host{display:block;min-width:0}.results-panel{border:1px solid var(--color-border-default);border-radius:var(--radius-lg);padding:.65rem;background:var(--color-bg-surface);min-width:0}.panel-head{display:flex;gap:.5rem;align-items:center;justify-content:space-between;margin-bottom:.55rem;flex-wrap:wrap}.panel-head h2{font-size:1rem;margin:0}.results-count{font-size:.8rem;color:var(--color-text-secondary)}.result-hint{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+.results-grid{display:grid;gap:.35rem;max-height:55dvh;overflow:auto;scrollbar-gutter:stable;padding:.2rem;min-width:0}.result-card{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:.65rem;padding:.4rem .5rem;border:1px solid var(--color-border-default);border-radius:var(--radius-md);background:var(--color-bg-surface);min-height:60px;box-sizing:border-box}.result-card__body{min-width:0}.result-card h3{margin:0 0 .2rem;font-size:.95rem;line-height:1.25;overflow-wrap:anywhere}.result-card__sku{margin:0;color:var(--color-text-secondary);font-size:.75rem;line-height:1.25;overflow-wrap:anywhere}.result-meta__stock{font-size:.8rem;white-space:nowrap;color:var(--color-text-secondary)}.result-card__action{display:flex;align-items:center;gap:.6rem}.result-price{margin:0;font-size:1.05rem;font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums}.result-add-button{min-height:44px;min-width:88px;padding:.5rem .75rem;background:#B45A2D;color:#FFFFFF;font-size:.875rem}.result-add-button:disabled{background:var(--color-bg-soft);color:var(--color-text-secondary);opacity:1;border:1px solid var(--color-border-default)}.empty-results{min-height:8rem;display:grid;place-content:center;gap:.5rem;text-align:center;color:var(--color-text-secondary);padding:1rem}.empty-results strong{color:var(--color-text-primary)}
+.result-add-button:enabled{filter:none;scroll-margin-block:5px}
+.result-add-button:enabled:hover{background:#BC5925}
+.result-add-button:enabled:active{background:#B05725}
+.result-add-button:enabled:focus-visible{outline:3px solid #FFE3B4;outline-offset:2px}
+:host-context(body[data-theme="light"]) .result-add-button:enabled:focus-visible{outline-color:#17335C}
+@media(max-width:1150px) and (min-width:901px){.result-card{grid-template-columns:minmax(0,1fr) auto}.result-meta__stock{grid-column:1;grid-row:2}.result-card__action{grid-column:2;grid-row:1 / span 2}.result-card{row-gap:.2rem}}
+@media(max-width:520px){.result-card{grid-template-columns:minmax(0,1fr) auto;gap:.25rem .6rem;padding:.5rem}.result-card__body{grid-column:1;grid-row:1}.result-meta__stock{grid-column:1;grid-row:2}.result-card__action{grid-column:2;grid-row:1 / span 2;display:grid;justify-items:end;gap:.35rem}.result-add-button{min-width:88px}.results-grid{max-height:50dvh}}
 
-      .results-panel {
-        grid-template-rows: auto minmax(0, 1fr);
-        border: 1px solid var(--color-border-default);
-        border-radius: var(--radius-lg);
-        background: var(--color-bg-surface);
-        padding: var(--space-2);
-        display: grid;
-        gap: var(--space-2);
-        min-height: 0;
-        overflow: hidden;
-      }
-
-      .panel-head {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        gap: var(--space-2);
-        flex-wrap: wrap;
-      }
-
-      .panel-head h2 {
-        font-size: 1.05rem;
-        line-height: 1.1;
-      }
-
-      .results-count {
-        color: var(--color-text-secondary);
-        font-size: var(--font-size-sm);
-        font-weight: 600;
-      }
-
-      .results-panel .result-hint {
-        display: none;
-      }
-
-      .result-hint {
-        margin: 0;
-        color: var(--color-text-secondary);
-        font-weight: 600;
-        font-size: var(--font-size-xs);
-      }
-
-      .results-grid {
-        grid-row: 2;
-        display: grid;
-        grid-template-columns: 1fr;
-        align-content: start;
-        gap: 0.25rem;
-        min-height: 0;
-        overflow: auto;
-        padding-right: var(--space-1);
-      }
-
-      .empty-results {
-        grid-row: 2;
-        display: grid;
-        place-items: center;
-        gap: 0.28rem;
-        align-content: center;
-        min-height: 0;
-        border: 1px dashed var(--color-border-default);
-        border-radius: var(--radius-lg);
-        background: var(--color-bg-soft);
-        color: var(--color-text-secondary);
-        text-align: center;
-        padding: 0.95rem var(--space-4);
-      }
-
-      .empty-results strong {
-        line-height: 1.15;
-      }
-
-      .empty-results strong,
-      .empty-results span {
-        max-width: 32rem;
-      }
-
-      .empty-results span {
-        line-height: 1.35;
-        white-space: nowrap;
-      }
-
-      .result-card {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(198px, auto);
-        gap: 0.75rem;
-        align-items: center;
-        border: 1px solid var(--color-border-default);
-        border-radius: var(--radius-lg);
-        background: var(--color-bg-surface);
-        padding: 0.6rem 0.7rem;
-      }
-
-      .result-card__body,
-      .result-card__action {
-        display: grid;
-        gap: 0.2rem;
-      }
-
-      .result-card__body {
-        min-width: 0;
-      }
-
-      .result-card__meta-row {
-        display: flex;
-        justify-content: flex-start;
-        align-items: center;
-        gap: 0.38rem;
-        min-width: 0;
-        flex-wrap: wrap;
-        opacity: 0.88;
-      }
-
-      .result-card h3 {
-        overflow: hidden;
-        display: -webkit-box;
-        -webkit-box-orient: vertical;
-        -webkit-line-clamp: 2;
-        font-size: 1.02rem;
-        font-weight: 700;
-        line-height: 1.18;
-        color: var(--color-text-primary);
-      }
-
-      .result-card__action {
-        grid-template-columns: minmax(84px, auto) minmax(8rem, 1fr);
-        align-items: center;
-        align-content: center;
-        gap: 0.5rem;
-      }
-
-      .result-add-button {
-        width: 100%;
-        min-width: 7.5rem;
-        justify-self: stretch;
-      }
-
-      .result-card__sku {
-        margin: 0;
-        width: fit-content;
-        border-radius: 0;
-        background: transparent;
-        color: var(--color-text-secondary);
-        padding: 0;
-        font-size: 0.68rem;
-        font-weight: 600;
-        letter-spacing: 0.03em;
-      }
-
-      .result-meta {
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: flex-start;
-        gap: 0.4rem;
-        min-width: 0;
-        margin: 0;
-      }
-
-      .result-card__meta-separator {
-        color: var(--color-text-secondary);
-        font-weight: 700;
-        font-size: 0.62rem;
-        line-height: 1;
-      }
-
-      .result-meta__code,
-      .result-meta__stock {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.22rem;
-        border-radius: 0;
-        background: transparent;
-        padding: 0;
-        white-space: nowrap;
-        color: var(--color-text-secondary);
-        font-size: 0.68rem;
-        font-weight: 600;
-      }
-
-      .result-meta__label {
-        color: var(--color-text-secondary);
-        font-size: 0.62rem;
-        font-weight: 600;
-        letter-spacing: 0.04em;
-        text-transform: uppercase;
-      }
-
-      .result-meta__value {
-        margin: 0;
-        font-weight: 600;
-      }
-
-      .barcode-badge {
-        display: inline-flex;
-        width: fit-content;
-        border-radius: 0;
-        background: transparent;
-        color: var(--color-text-secondary);
-        padding: 0;
-        font-size: 0.68rem;
-        font-weight: 600;
-      }
-
-      .barcode-badge--missing {
-        color: var(--color-text-secondary);
-      }
-
-      .result-price {
-        margin: 0;
-        color: var(--color-brand-primary);
-        font-size: clamp(0.98rem, 1.35vw, 1.18rem);
-        font-weight: 800;
-        text-align: right;
-        line-height: 1;
-      }
-
-      .pos-button {
-        min-height: 2.55rem;
-        border-radius: var(--radius-md);
-        padding: 0.58rem var(--space-4);
-        font-size: var(--font-size-md);
-      }
-
-      .pos-button--add {
-        width: 100%;
-        min-height: 2.65rem;
-        background: var(--color-brand-accent);
-        font-size: var(--font-size-md);
-      }
-
-      :host-context(body[data-theme="dark"]) .result-card {
-        border-color: rgba(148, 163, 184, 0.22);
-      }
-
-      .results-grid::-webkit-scrollbar {
-        width: 8px;
-      }
-
-      .results-grid::-webkit-scrollbar-track {
-        background: var(--color-bg-soft);
-        border-radius: var(--radius-pill);
-      }
-
-      .results-grid::-webkit-scrollbar-thumb {
-        background: linear-gradient(
-          180deg,
-          var(--color-brand-highlight),
-          var(--color-brand-accent)
-        );
-        border-radius: var(--radius-pill);
-      }
-
-      @media (max-width: 980px) {
-        .results-grid {
-          max-height: 18rem;
-        }
-
-        .empty-results span {
-          white-space: normal;
-        }
-
-        .empty-results strong,
-        .empty-results span {
-          max-width: 18rem;
-        }
-      }
-
-      @media (max-width: 760px) {
-        .result-card {
-          grid-template-columns: 1fr;
-        }
-
-        .result-price {
-          text-align: left;
-        }
-      }
-    `,
-    ]
+    `],
 })
 export class PosSearchResultsComponent {
+  @Input() loading = false;
+  @Input() searched = false;
+  @Input() failed = false;
   @Input({ required: true }) searchResults: PosProductResponse[] = [];
 
   @Output() readonly addProduct = new EventEmitter<PosProductResponse>();

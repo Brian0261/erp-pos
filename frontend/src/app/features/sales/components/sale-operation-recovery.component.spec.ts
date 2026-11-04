@@ -79,4 +79,132 @@ describe("A owner operation discovery", () => {
     expect(host.querySelector('a[href="/cotizaciones/9/convertir"]')).not.toBeNull();
     expect(Array.from(host.querySelectorAll("button")).some(button => button.textContent?.includes("Revisar y reanudar"))).toBeFalse();
   });
+  it("shows only a verified attention total and clears it on failed reads or changed session",async()=>{
+    operations.list.and.returnValue(of({items:[row()],page:0,size:10,totalItems:12,totalPages:2}));
+    panel.contextual=true;panel.open=true;panel.changeFilter("attention");await settle();
+    expect(operations.list.calls.mostRecent().args[3]).toBeTrue();expect(panel.attentionCount).toBe(12);
+    panel.toggle();await settle();expect(panel.attentionCount).toBe(12);
+    token="changed-token";await settle();expect(panel.attentionCount).toBeNull();
+    operations.list.and.returnValue(throwError(()=>new Error("Synthetic offline")));panel.load(0);await settle();
+    expect(panel.attentionCount).toBeNull();expect(panel.error).not.toBe("");
+  });
+
+  it("prioritizes the real attention filter in contextual POS and treats a verified empty page explicitly",async()=>{
+    panel.contextual=true;panel.toggle();await settle();
+    expect(operations.list).not.toHaveBeenCalled();expect(panel.attentionCount).toBeNull();
+    expect(fixture.nativeElement.textContent).toContain('Aún no hemos comprobado tus pendientes');
+    expect(fixture.nativeElement.textContent).not.toContain('No se encontraron operaciones por atender');
+    panel.load(0);await settle();
+    expect(operations.list.calls.mostRecent().args).toEqual([0,jasmine.anything(),undefined,true]);
+    expect(panel.attentionCount).toBe(0);expect(fixture.nativeElement.textContent).toContain('No se encontraron operaciones por atender');
+    expect(fixture.nativeElement.textContent).toContain('no es monitoreo en tiempo real');
+  });
+
+  it("retains the verified attention count through secondary filters without representing their totals as pending",async()=>{
+    panel.contextual=true;panel.toggle();
+    operations.list.and.returnValue(of({items:[row()],page:0,size:10,totalItems:12,totalPages:2}));panel.load(0);await settle();
+    operations.list.and.returnValue(of({items:[],page:0,size:10,totalItems:0,totalPages:0}));
+    for(const filter of ['PREPARED','','COMPLETED','CANCELLED']){
+      panel.changeFilter(filter);await settle();expect(operations.list.calls.mostRecent().args.slice(2)).toEqual([filter||undefined,false]);
+      expect(panel.attentionCount).toBe(12);expect(panel.pendingLabel).toContain('12 en la última consulta');
+    }
+    panel.toggle();await settle();expect(panel.attentionCount).toBe(12);expect(fixture.nativeElement.querySelector('.pending-count').textContent).toContain('12');
+  });
+  it("keeps owner isolation even if a refreshed actor response changes without a token event",async()=>{
+    panel.contextual=true;panel.toggle();operations.list.and.returnValue(of({items:[row()],page:0,size:10,totalItems:3,totalPages:1}));panel.load(0);await settle();
+    expect(panel.attentionCount).toBe(3);
+    auth.me.and.returnValue(of({id:'different-owner',username:'other',email:'other@example.test',roles:['CAJERO']}));
+    operations.list.and.returnValue(of({items:[],page:0,size:10,totalItems:0,totalPages:0}));panel.changeFilter('COMPLETED');await settle();
+    expect(panel.rows).toEqual([]);expect(panel.attentionCount).toBeNull();expect(panel.selected).toBeNull();
+  });
+  it("paginates the same attention query without replacing its total with page length",async()=>{
+    panel.contextual=true;panel.toggle();operations.list.and.returnValue(of({items:[row()],page:1,size:10,totalItems:21,totalPages:3}));panel.load(1);await settle();
+    expect(operations.list.calls.mostRecent().args).toEqual([1,jasmine.anything(),undefined,true]);expect(panel.page).toBe(1);expect(panel.totalPages).toBe(3);expect(panel.attentionCount).toBe(21);
+    expect(fixture.nativeElement.textContent).toContain('Página 2 de 3');expect(operations.prepare).not.toHaveBeenCalled();
+  });
+  it("does not expose server details or claim zero on an error and retries the same owner-scoped query",async()=>{
+    panel.contextual=true;panel.toggle();operations.list.and.returnValue(throwError(()=>new Error('SQL synthetic internal detail')));panel.load(0);await settle();
+    expect(panel.attentionCount).toBeNull();expect(panel.hasListResult).toBeFalse();
+    const host:HTMLElement=fixture.nativeElement;expect(host.textContent).toContain('No pudimos consultar las operaciones');
+    expect(host.textContent).not.toContain('SQL');expect(host.textContent).not.toContain('No se encontraron operaciones por atender');
+    expect(host.querySelector('.pending-count')).toBeNull();expect(panel.pendingLabel).toContain('no se pudo comprobar');
+    operations.list.and.returnValue(of({items:[],page:0,size:10,totalItems:0,totalPages:0}));
+    Array.from(host.querySelectorAll('button')).find(b=>b.textContent?.trim()==='Reintentar')!.click();await settle();
+    expect(panel.error).toBe('');expect(panel.attentionCount).toBe(0);expect(operations.list.calls.mostRecent().args[3]).toBeTrue();
+  });
+  it("keeps PREPARED inspection passive, cancels only on confirmation and omits nonexistent document references",async()=>{
+    panel.contextual=true;panel.toggle();operations.get.and.returnValue(of(row()));
+    const resume=spyOn(panel.resume,'emit'),recover=spyOn(panel.recover,'emit');panel.select(row().operationId);await settle();
+    expect(resume).not.toHaveBeenCalled();expect(recover).not.toHaveBeenCalled();expect(operations.prepare).not.toHaveBeenCalled();expect(operations.cancel).not.toHaveBeenCalled();
+    const host:HTMLElement=fixture.nativeElement;expect(host.textContent).toContain('Detalles técnicos');expect(host.textContent).not.toContain('Documento #');
+    panel.closeSelection();await settle();expect(panel.selected).toBeNull();expect(operations.cancel).not.toHaveBeenCalled();
+  });
+  it("drops in-flight detail and list responses after closing, and invalidates counts on owner changes",async()=>{
+    panel.contextual=true;panel.toggle();const pending=new Subject<SaleOperation>();operations.get.and.returnValue(pending);panel.select(row().operationId);panel.toggle();
+    pending.next(row());await settle();expect(panel.selected).toBeNull();expect(panel.rows).toEqual([]);
+    panel.toggle();const list=new Subject<SaleOperationPage>();operations.list.and.returnValue(list);panel.load(0);token='changed';await settle();
+    list.next({items:[row()],page:0,size:10,totalItems:1,totalPages:1});await settle();expect(panel.rows).toEqual([]);expect(panel.attentionCount).toBeNull();
+  });
+  it("offers a resolved COMPLETED only as historical navigation without a recovery event",async()=>{
+    panel.contextual=true;panel.open=true;const resolved={...row(),state:'COMPLETED' as const,saleId:77,command:null};
+    operations.get.and.returnValue(of(resolved));const recover=spyOn(panel.recover,'emit'),resume=spyOn(panel.resume,'emit');
+    panel.select(resolved.operationId);await settle();expect(panel.selected?.operationId).toBe(resolved.operationId);
+    const host:HTMLElement=fixture.nativeElement;expect(host.querySelector('a[href="/ventas/77"]')).not.toBeNull();
+    expect(host.textContent).not.toContain('Continuar documento');expect(host.textContent).not.toContain('Consultar esta venta');
+    expect(recover).not.toHaveBeenCalled();expect(resume).not.toHaveBeenCalled();expect(operations.prepare).not.toHaveBeenCalled();
+  });
+  it("keeps COMPLETED pending documents actionable without treating a linked rejection as a missing document",async()=>{
+    panel.contextual=true;panel.open=true;panel.selected={...row(),state:'COMPLETED',saleId:77,command:null,
+      receiptIntent:{receiptType:'INVOICE',payload:null},receiptState:'PENDING'};await settle();
+    expect(fixture.nativeElement.textContent).toContain('Continuar documento');
+    panel.selected={...panel.selected!,documentId:901,documentStatus:'REJECTED',receiptState:'LOCATED'};await settle();
+    expect(fixture.nativeElement.textContent).not.toContain('Continuar documento');expect(fixture.nativeElement.querySelector('a[href="/ventas/77"]')).not.toBeNull();
+  });
+
+  it("uses one direct selector, contextual empty states and always reopens Pendientes on attention",async()=>{
+    panel.contextual=true;panel.toggle();await settle();const host:HTMLElement=fixture.nativeElement;
+    expect(host.querySelector('#operations-title')?.textContent).toBe('Operaciones');
+    expect(host.querySelectorAll('select').length).toBe(1);expect(host.textContent).not.toContain('Consultar otras operaciones');expect(host.textContent).not.toContain('Filtro:');
+    const cases=[['attention','No se encontraron operaciones por atender'],['','No se encontraron operaciones recientes'],['PREPARED','No se encontraron compras preparadas'],['COMPLETED','No se encontraron operaciones registradas'],['CANCELLED','No se encontraron operaciones canceladas']];
+    for(const [filter,message] of cases){panel.changeFilter(filter);await settle();expect(host.textContent).toContain(message);
+      expect(operations.list.calls.mostRecent().args.slice(2)).toEqual([filter==='attention'?undefined:filter||undefined,filter==='attention']);
+      if(filter!=='attention')expect(host.querySelector('.query-caption')).toBeNull();
+    }
+    panel.toggle();panel.toggle();await settle();expect(panel.filter).toBe('attention');expect(panel.hasListResult).toBeFalse();
+  });
+  it("classifies completed TICKET only with unambiguous evidence and never asserts PDF generation",async()=>{
+    const ticket={...row(),state:'COMPLETED' as const,saleId:77,command:null};
+    expect(panel.documentLabel(ticket)).toBe('Nota de venta · No fiscal');
+    for(const invalid of [{...ticket,receiptIntent:null},{...ticket,protocolVersion:0},{...ticket,documentId:9},{...ticket,receiptState:'REVIEW_REQUIRED' as const},
+      {...ticket,receiptIntent:{receiptType:'TICKET' as const,payload:{documentType:'INVOICE' as const,billingSeriesId:1}}}])expect(panel.documentLabel(invalid)).toBe('Documento no verificado');
+    panel.contextual=true;panel.open=true;panel.rows=[ticket];await settle();
+    const host:HTMLElement=fixture.nativeElement;expect(host.textContent).toContain('Nota de venta');expect(host.textContent).not.toMatch(/PDF disponible|Nota de venta emitida|Sin solicitud|Sin comprobante/);
+    expect(host.querySelector('.recovery-list button')).toBeNull();expect(host.querySelector('.recovery-list a')?.getAttribute('href')).toBe('/ventas/77');
+    expect(operations.get).not.toHaveBeenCalled();expect(operations.prepare).not.toHaveBeenCalled();
+  });
+  for(const type of ['RECEIPT','INVOICE'] as const)it("distinguishes requested "+type+" from verified commercial completion",()=>{
+    const electronic={...row(),state:'COMPLETED' as const,saleId:77,command:null,receiptIntent:{receiptType:type,payload:null},receiptState:'PENDING' as const};
+    expect(panel.documentLabel(electronic)).toBe((type==='RECEIPT'?'Boleta electrónica':'Factura electrónica')+' · Solicitada');
+    expect(panel.needsDocumentRecovery(electronic)).toBeTrue();
+    expect(panel.documentLabel({...electronic,receiptState:'REVIEW_REQUIRED'})).toContain('En revisión');
+    expect(panel.documentLabel({...electronic,receiptState:'LOCATED',documentId:9,documentStatus:null})).toContain('Estado no verificado');
+  });
+  for(const [status,label] of [['DRAFT','Borrador'],['GENERATED','Generada'],['SIGNED','Firmada'],['SENT','Enviada'],['ACCEPTED','Aceptación registrada; validez fiscal no verificada'],['REJECTED','Rechazada'],['ERROR','En revisión'],['CANCELLED','Cancelada']])it("uses the recorded document status "+status+" without inventing its environment",()=>{
+    const document={...row(),state:'COMPLETED' as const,saleId:77,command:null,receiptIntent:{receiptType:'INVOICE' as const,payload:null},receiptState:'LOCATED' as const,documentId:9,documentStatus:status};
+    expect(panel.documentLabel(document)).toBe('Factura electrónica · '+label+' · Ambiente no verificado');
+    expect(panel.needsDocumentRecovery(document)).toBeFalse();expect(panel.documentLabel(document)).not.toContain('SUNAT');
+  });
+  it("does not infer a document type or acceptance from an unrecognized status",()=>{
+    const completed={...row(),state:'COMPLETED' as const,saleId:77,command:null};
+    expect(panel.documentLabel({...completed,receiptIntent:null,documentId:9,documentStatus:'ACCEPTED'})).toBe('Documento no verificado');
+    expect(panel.documentLabel({...completed,receiptIntent:{receiptType:'INVOICE',payload:null},receiptState:'LOCATED',documentId:9,documentStatus:'UNKNOWN'})).toBe('Factura electrónica · Estado no verificado');
+  });
+  it("keeps resolved histories direct and confines original-cash instructions to recoverable contexts",async()=>{
+    panel.contextual=true;panel.open=true;const completed={...row(),state:'COMPLETED' as const,saleId:77,command:null};panel.rows=[completed];await settle();
+    const host:HTMLElement=fixture.nativeElement;expect(host.querySelector('.recovery-list a')?.textContent).toBe('Ver venta');expect(host.querySelector('.recovery-list button')).toBeNull();
+    panel.selected=completed;await settle();expect(host.textContent).not.toContain('Conserva esta compra en su caja y almacén originales');
+    panel.selected=row();await settle();expect(host.textContent).toContain('Conserva esta compra en su caja y almacén originales');
+    expect(operations.get).not.toHaveBeenCalled();expect(operations.cancel).not.toHaveBeenCalled();
+  });
+
 });

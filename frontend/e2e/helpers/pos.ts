@@ -6,16 +6,17 @@ export async function goToPos(page: Page): Promise<void> {
 }
 
 export async function expectPosShellVisible(page: Page): Promise<void> {
-  await expect(page.getByLabel("Buscar o escanear producto")).toBeVisible();
+  await expect(page.getByLabel("Buscar producto por nombre, SKU o código")).toBeVisible();
   await expect(page.getByLabel("Carrito y cobro")).toBeVisible();
   await expect(page.getByRole("button", { name: /Cobrar|Cobrando/i })).toBeVisible();
   await expect(page.getByText(/Caja abierta|Caja cerrada/)).toBeVisible();
 }
 
 export async function clearVisibleCart(page: Page): Promise<void> {
-    const cancelSale = page.getByRole("button", { name: "Cancelar venta" });
+    const cancelSale = page.getByRole("button", { name: "Descartar carrito", exact: true });
     if (await cancelSale.isEnabled()) {
       await cancelSale.click();
+      await page.getByRole("alertdialog", {name:"Descartar carrito",exact:true}).getByRole("button",{name:"Descartar carrito",exact:true}).click();
       await expect(page.getByText("Carrito vacío")).toBeVisible();
     }
   }
@@ -23,7 +24,7 @@ export async function clearVisibleCart(page: Page): Promise<void> {
 export async function searchForFirstVisibleProduct(page: Page): Promise<boolean> {
   const runId = process.env["QA_RUN_ID"];
   if (!runId) throw new Error("QA_RUN_REQUIRED");
-  const searchInput = page.getByLabel("Buscar o escanear producto");
+  const searchInput = page.getByLabel("Buscar producto por nombre, SKU o código");
   await searchInput.fill("Cartulina QA " + runId);
   const response = page.waitForResponse(r => new URL(r.url()).pathname === "/api/v1/pos/products/search");
   await page.getByRole("button", { name: "Buscar", exact: true }).click();
@@ -67,13 +68,13 @@ export async function openCheckoutAndValidateNoWritePaymentControls(page: Page):
   await expect(checkout.getByRole("heading", { name: "Cobrar venta" })).toBeVisible();
   await expect(checkout.getByRole("button", { name: "Cerrar" })).toBeVisible();
   await expect(checkout.getByRole("button", { name: "Seguir editando" })).toBeVisible();
-  await expect(checkout.getByRole("button", { name: /^COBRAR$/ })).toBeVisible();
+  await expect(checkout.getByRole("button", { name: "Confirmar venta", exact:true })).toBeVisible();
   await expect(checkout.getByLabel("Pagos de la venta")).toBeVisible();
   await checkout.getByLabel("Método *").selectOption("CARD");
   await checkout.getByLabel("Monto *").fill("0.01");
   await expect(checkout.getByLabel("Método *")).toHaveValue("CARD");
   await expect(checkout.getByLabel("Monto *")).toHaveValue("0.01");
-  await expect(checkout.getByText(/Pagado:\s*S\/\s*0\.01/)).toBeVisible();
+  await expect(checkout.getByText(/Pagos ingresados\s*S\/\s*0\.01/)).toBeVisible();
   await checkout.getByRole("button", { name: "Seguir editando" }).click();
   await expect(checkout).toBeHidden();
 }

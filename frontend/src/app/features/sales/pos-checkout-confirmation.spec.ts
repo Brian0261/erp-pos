@@ -97,6 +97,40 @@ describe("P1-B immutable checkout and recovery", () => {
   });
   afterEach(() => { http.verify(); fixture.destroy(); sessionStorage.removeItem("erp_pos_sales_draft_v1"); });
 
+  it("never dispatches invalid payment input and does not cache its error after correction",async()=>{
+    page.isCheckoutModalOpen=true;page.setPaymentAmount(0,'');page.finalizeSale(true);await settle();
+    expect(page.checkoutReviewBlockedReason).not.toBe('');expect(page.errorMessage).toBe('');expect(page.payments[0].amountInput).toBe('');
+    expect(operations.prepare).not.toHaveBeenCalled();expect(sales.create).not.toHaveBeenCalled();
+    page.setPaymentAmount(0,'10');expect(page.checkoutReviewBlockedReason).toBe('');expect(page.errorMessage).toBe('');
+    page.finalizeSale(true);page.finalizeSale(true);await settle();
+    expect(operations.prepare).toHaveBeenCalledTimes(1);expect(sales.create).toHaveBeenCalledTimes(1);
+    expect(sales.create.calls.first().args[0].payments).toEqual([{paymentMethod:'CASH',amount:10,reference:'QA'}]);
+  });
+  it("rechecks a payment invalidated while awaiting confirmation without caching a stale field error",async()=>{
+    let accept!:(value:boolean)=>void;confirm.confirm.and.returnValue(new Promise<boolean>(resolve=>accept=resolve));
+    page.isCheckoutModalOpen=true;page.finalizeSale();page.setPaymentAmount(0,'0.001');accept(true);await settle();
+    expect(operations.prepare).not.toHaveBeenCalled();expect(sales.create).not.toHaveBeenCalled();expect(page.errorMessage).toBe('');
+    page.setPaymentAmount(0,'10');await settle();expect(page.checkoutReviewBlockedReason).toBe('');expect(page.errorMessage).toBe('');
+  });
+
+  it("uses one explicit integrated review action and preserves the frozen durable request under double invocation",async()=>{
+    page.isCheckoutModalOpen=true;expect(page.checkoutReviewBlockedReason).toBe('');page.finalizeSale(true);page.finalizeSale(true);await settle();
+    expect(confirm.confirm).not.toHaveBeenCalled();expect(operations.prepare).toHaveBeenCalledTimes(1);expect(sales.create).toHaveBeenCalledTimes(1);
+    const body=sales.create.calls.first().args[0];expect(Object.isFrozen(body)).toBeTrue();expect(Object.isFrozen(body.items[0])).toBeTrue();
+    expect(body).toEqual(operations.prepare.calls.first().args[0].command!);expect(page.pendingSaleRequest?.operationId).toBe(body.operationId);
+  });
+  it("rejects integrated review without an open checkout and keeps failed validations outside the write protocol",async()=>{
+    page.finalizeSale(true);await settle();expect(operations.prepare).not.toHaveBeenCalled();
+    page.isCheckoutModalOpen=true;page.payments[0].amount=0;expect(page.checkoutReviewBlockedReason).toContain('pago');page.finalizeSale(true);await settle();
+    expect(sales.create).not.toHaveBeenCalled();expect(operations.prepare).not.toHaveBeenCalled();
+    page.payments[0].amount=10;receipt('INVOICE');page.receiptCustomerName='';expect(page.checkoutReviewBlockedReason).toContain('razón social');page.finalizeSale(true);await settle();expect(operations.prepare).not.toHaveBeenCalled();
+  });
+  it("rechecks the fingerprint and modal lifetime before dispatching the integrated review",async()=>{
+    page.isCheckoutModalOpen=true;page.finalizeSale(true);page.cart[0].quantity=2;page.payments[0].amount=20;await settle();
+    expect(operations.prepare).not.toHaveBeenCalled();expect(page.errorMessage).toContain('confirma nuevamente');
+    page.finalizeSale(true);page.closeCheckoutModal();await settle();expect(operations.prepare).not.toHaveBeenCalled();expect(sales.create).not.toHaveBeenCalled();
+  });
+
   it("sends the exact frozen snapshot with required confirmation fields", async () => {
     page.cart[0].salePrice = .1; page.cart[0].quantity = 3; page.payments[0].amount = .3;
     page.finalizeSale(); await settle();
@@ -218,9 +252,9 @@ describe("P1-B immutable checkout and recovery", () => {
     const originalCart = structuredClone(page.cart), originalPayments = structuredClone(page.payments);
     page.finalizeSale(); await settle();
     page.cancelPendingPreparation(); await settle();
-    const review = Array.from(host.querySelectorAll<HTMLButtonElement>('button')).find(b => b.textContent?.trim() === 'Revisar precios')!;
+    const review = Array.from(host.querySelectorAll<HTMLButtonElement>('button')).find(b => b.textContent?.trim() === 'Comprobar condiciones')!;
     expect(host.querySelector('.checkout-modal-backdrop')).toBeNull();
-    expect(host.querySelector('[role="alert"]')?.textContent).toContain('Los precios de esta venta cambiaron');
+    expect(host.querySelector('[aria-label="Condiciones de la compra"]')?.textContent).toContain('Comprueba las condiciones');
     expect(review.getBoundingClientRect().height).toBeGreaterThan(0);
     expect(document.activeElement).toBe(review);
     expect(page.cart.map(({ requiresRevalidation, ...item }) => item)).toEqual(originalCart);
@@ -231,10 +265,10 @@ describe("P1-B immutable checkout and recovery", () => {
     confirm.confirm.and.returnValue(Promise.resolve(false));
     review.click(); await settle();
     const options = confirm.confirm.calls.mostRecent().args[0];
-    expect(options.title).toBe('Los precios de esta venta cambiaron');
-    expect(options.cancelText).toBe('Mantener carrito');
-    expect(options.confirmText).toBe('Aceptar nuevos precios');
-    expect(options.description).toContain('Si mantienes el carrito, no podrás cobrar hasta revisar los precios actualizados');
+    expect(options.title).toBe('Se actualizaron condiciones de tu compra');
+    expect(options.cancelText).toBe('Volver al carrito sin aplicar cambios');
+    expect(options.confirmText).toBe('Actualizar carrito con condiciones vigentes');
+    expect(options.description).toContain('el cobro seguirá pendiente de verificación');
     expect(document.activeElement).toBe(review);
     expect(page.cart[0].salePrice).toBe(10); expect(page.needsRevalidation).toBeTrue();
     page.finalizeSale(); await settle();
@@ -255,7 +289,7 @@ describe("P1-B immutable checkout and recovery", () => {
     expect(confirm.confirm.calls.mostRecent().args[0].confirmText).toBe('Cobrar');
     expect(page.priceReviewRequired).toBeTrue(); expect(page.needsRevalidation).toBeTrue();
     expect(page.isCheckoutModalOpen).toBeFalse();
-    expect(document.activeElement?.textContent?.trim()).toBe('RECUPERAR COBRO');
+    expect(document.activeElement?.textContent?.trim()).toBe('REVISAR PREPARACIÓN');
   });
 
   it("compares multiple products without changing the approved draft until accepted", async () => {
@@ -270,8 +304,8 @@ describe("P1-B immutable checkout and recovery", () => {
     pos.snapshot.and.returnValue(of([live(12), { ...live(13), productId: 102 }]));
     confirm.confirm.and.returnValue(Promise.resolve(false)); page.openCheckoutModal(); await settle();
     const options = confirm.confirm.calls.mostRecent().args[0];
-    expect(options.description).toContain('Synthetic: precio 10 → 12');
-    expect(options.description).toContain('Synthetic second: precio 10 → 13');
+    expect(options.description).toContain('Synthetic: precio S/ 10.00 → S/ 12.00');
+    expect(options.description).toContain('Synthetic second: precio S/ 10.00 → S/ 13.00');
     expect(options.description).toContain('Total propuesto: S/ 37.00');
     expect(page.cart).toEqual(original); expect(page.payments).toEqual(payments);
     expect(page.isCheckoutModalOpen).toBeFalse(); expect(sales.create).toHaveBeenCalledTimes(1);
@@ -292,7 +326,8 @@ describe("P1-B immutable checkout and recovery", () => {
     page.cart[0].salePrice = 8; page.cart[0].quantity = 2; page.cart[0].discountAmount = 1;
     page.cart[0].quantityPolicy = undefined; page.cart[0].requiresRevalidation = true;
     page.revalidateCart(); await settle();
-    expect(pos.snapshot).toHaveBeenCalledOnceWith([101], 1);
+    expect(pos.snapshot).toHaveBeenCalledOnceWith([101], 1, jasmine.any(HttpContext));
+    expect(pos.snapshot.calls.mostRecent().args[2]!.get(BOUND_AUTH_CREDENTIALS)?.token).toBe("synthetic-session");
     expect(page.cart[0].quantity).toBe(2); expect(page.cart[0].discountAmount).toBe(1);
     expect(page.cart[0].salePrice).toBe(10); expect(String(page.cart[0].quantityPolicy)).toBe("WHOLE");
     expect(page.total).toBe(19); expect(page.needsRevalidation).toBeFalse();
@@ -322,7 +357,7 @@ describe("P1-B immutable checkout and recovery", () => {
   it("leaves the draft unchanged if a product is missing from the live snapshot", async () => {
     page.cart[0].requiresRevalidation = true; const original = structuredClone(page.cart);
     pos.snapshot.and.returnValue(of([])); page.revalidateCart(); await settle();
-    expect(page.cart).toEqual(original); expect(page.errorMessage).toContain("no está disponible");
+    expect(page.cart).toEqual(original); expect(page.cartVerificationMessage).toContain("no está disponible");
   });
 
   it("recovers a pending ticket with the same request and no electronic creation", async () => {
@@ -647,14 +682,21 @@ describe("P1-B POS authentication binding with the real HTTP interceptor", () =>
   const noPost = () => http.expectNone(r => r.method === "POST");
   const settleConfirmedNote = async (expectedToken: string, denied = false) => {
     fixture.detectChanges();
+    if (!page.confirmedDelivery || page.confirmedDelivery.credential !== expectedToken) {
+      http.expectNone(r => r.method === "GET" && r.url.endsWith("/sales/77"));
+      expect(fixture.nativeElement.querySelector('app-pos-sale-note [role="dialog"]')).toBeNull();
+      await settle(); return;
+    }
     const read = http.expectOne(r => r.method === "GET" && r.url.endsWith("/sales/77"));
     expect(read.request.headers.get("Authorization")).toBe(`Bearer ${expectedToken}`);
     expect(read.request.context.get(BOUND_AUTH_CREDENTIALS)?.token).toBe(expectedToken);
     if (denied) read.flush({}, { status: 403, statusText: "Synthetic note access denied" });
     else read.flush(sale());
     await settle();
-    const note = fixture.nativeElement.querySelector('app-pos-sale-note [aria-label="Última venta confirmada"]');
-    if (denied) expect(note).toBeNull(); else expect(note?.textContent).toContain("Venta S-QA registrada.");
+    const note = fixture.nativeElement.querySelector('app-pos-sale-note [role="dialog"]');
+    expect(note?.textContent).toMatch(/Venta #77 · Registrada/);
+    expect(note?.textContent).toMatch(/Total confirmado: S\/\s*10\.00/);
+    if (denied) expect(note?.textContent).toContain("No tienes permiso");
   };
   const rawDraft = () => sessionStorage.getItem("erp_pos_sales_draft_v1");
   const invoice = () => {
@@ -684,6 +726,10 @@ describe("P1-B POS authentication binding with the real HTTP interceptor", () =>
   });
   afterEach(() => { http.verify(); fixture.destroy(); sessionStorage.removeItem("erp_pos_sales_draft_v1"); });
 
+  it("blocks a changed actor at integrated-review verification without dispatching preparation or checkout",async()=>{
+    page.isCheckoutModalOpen=true;page.finalizeSale(true);await settle();me().flush(other);await settle();noPost();expect(page.pendingSaleRequest?.operationId).toBeTruthy();
+    expect(rawDraft()).not.toContain(firstToken);expect(page.errorMessage).not.toBe('');
+  });
   it("dispatches verification and checkout with the same credential without persisting it", async () => {
     const localWrite = spyOn(localStorage, "setItem").and.callThrough();
     page.finalizeSale(); await settle(); const verification = me();
