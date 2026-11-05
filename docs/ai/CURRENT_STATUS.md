@@ -4,6 +4,29 @@
 
 Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones tecnicas/QA documentadas.
 
+### UX-POS-2 — CLOSED técnico tras integración y CI postmerge (2026-11-05)
+
+- PR [#11](https://github.com/Brian0261/erp-pos/pull/11) integrada mediante squash en `master`:
+  `870a26798325e87b0ce240b35ad5680216f20100`. La rama local `master` quedó
+  sincronizada con `origin/master` en ese SHA; la rama feature se conservó.
+- Alcance integrado: reorganización responsive del POS (búsqueda, resultados,
+  carrito y cabecera), checkout/pagos, entrega posventa, operaciones pendientes,
+  accesibilidad/foco y validación de precios. Se preservaron recuperación durable,
+  idempotencia, pagos/descuentos/vuelto, stock, caja/almacén y actor; se corrigió
+  la pérdida de contexto entre compras A/B y se mantuvo separada la confirmación
+  comercial del estado fiscal.
+- P2-A permite revalidar precios conservando pagos inválidos y bloquea el cobro
+  hasta corregirlos; P2-B muestra confirmación y enlace tras recuperación verificada,
+  sin repetir el cobro ni reemplazar una compra posterior. Ambas conversaciones
+  de revisión quedaron resueltas.
+- Validación: CI de PR #11 [run 42045385692](https://github.com/Brian0261/erp-pos/actions/runs/42045385692)
+  y Qodana #19 PASS; CI postmerge [run 42056943272](https://github.com/Brian0261/erp-pos/actions/runs/42056943272)
+  PASS para backend, frontend, e2e-auth y e2e-commercial. QA local focal y E2E
+  comerciales/responsive acreditados en la PR; no se repitieron para este registro.
+- Estado: implementación integrada y validada técnicamente; **no implica despliegue
+  productivo**. No se acredita emisión fiscal productiva ni validación física de
+  impresión térmica 58/80 mm. UX-POS-2 no habilita ni inicia otra fase.
+
 ### POS-RECOVERY-HARDENING-A — PASS local, pendiente de gate Git (2026-10-21)
 
 - Base `77c53fa3c4b33f3dff5271559409edd56a3f772a`, rama local
