@@ -1,4 +1,4 @@
-import { HttpClient, HttpParams } from "@angular/common/http";
+import { HttpClient, HttpContext, HttpParams } from "@angular/common/http";
 import { Injectable } from "@angular/core";
 import { Observable } from "rxjs";
 
@@ -25,10 +25,10 @@ export class ReportsService {
 
   constructor(private readonly http: HttpClient) {}
 
-  sales(filters?: DateRangeFilters): Observable<SalesReportResponse> {
+  sales(filters?: DateRangeFilters, context?: HttpContext): Observable<SalesReportResponse> {
     const params = this.withDateRange(filters);
     return this.http.get<SalesReportResponse>(`${this.endpoint}/sales`, {
-      params,
+      params, context,
     });
   }
 
@@ -82,7 +82,7 @@ export class ReportsService {
   }
 
   topProducts(
-    filters?: TopProductsFilters,
+    filters?: TopProductsFilters, context?: HttpContext,
   ): Observable<TopProductReportItemResponse[]> {
     let params = this.withDateRange(filters);
 
@@ -93,7 +93,7 @@ export class ReportsService {
     return this.http.get<TopProductReportItemResponse[]>(
       `${this.endpoint}/top-products`,
       {
-        params,
+        params, context,
       },
     );
   }

@@ -8,6 +8,7 @@ import {
   SaleResponse,
   SalesListItem,
   SalesFilters,
+  TodaySalesResponse,
   VoidSaleRequest,
 } from "./sales.models";
 
@@ -21,7 +22,7 @@ export class SalesService {
     return this.http.post<SaleResponse>(this.endpoint, payload, { context });
   }
 
-  list(filters?: SalesFilters): Observable<SaleResponse[]> {
+  list(filters?: SalesFilters, context?: HttpContext): Observable<SaleResponse[]> {
     let params = new HttpParams();
 
     if (filters?.from) {
@@ -47,7 +48,7 @@ export class SalesService {
       params = params.set("createdBy", filters.createdBy);
     }
 
-    return this.http.get<SaleResponse[]>(this.endpoint, { params });
+    return this.http.get<SaleResponse[]>(this.endpoint, { params, context });
   }
 
   listItems(filters?: SalesFilters, context?: HttpContext): Observable<SalesListItem[]> {
@@ -80,6 +81,10 @@ export class SalesService {
       params,
       context,
     });
+  }
+
+  today(context?: HttpContext): Observable<TodaySalesResponse> {
+    return this.http.get<TodaySalesResponse>(`${this.endpoint}/today`, { context });
   }
 
   getById(id: number, context?: HttpContext): Observable<SaleResponse> {

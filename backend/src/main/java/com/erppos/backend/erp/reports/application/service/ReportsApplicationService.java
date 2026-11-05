@@ -1,5 +1,6 @@
 package com.erppos.backend.erp.reports.application.service;
 
+import com.erppos.backend.erp.shared.domain.policy.CommercialDates;
 import com.erppos.backend.erp.billing.domain.model.ElectronicDocumentStatus;
 import com.erppos.backend.erp.reports.application.usecase.ReportsUseCase;
 import com.erppos.backend.erp.reports.domain.exception.ReportBusinessRuleException;
@@ -15,6 +16,7 @@ import com.erppos.backend.erp.reports.domain.port.ReportsQueryPort;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.time.Clock;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -30,14 +32,21 @@ public class ReportsApplicationService implements ReportsUseCase {
     private static final int MAX_INVENTORY_MOVEMENTS_LIMIT = 2000;
 
     private final ReportsQueryPort reportsQueryPort;
+    private final Clock clock;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public ReportsApplicationService(ReportsQueryPort reportsQueryPort) {
+        this(reportsQueryPort, Clock.systemUTC());
+    }
+
+    public ReportsApplicationService(ReportsQueryPort reportsQueryPort, Clock clock) {
         this.reportsQueryPort = reportsQueryPort;
+        this.clock = clock;
     }
 
     @Override
     public SalesReport sales(LocalDate from, LocalDate to) {
-        DateRange range = resolveSafeDateRange(from, to);
+        DateRange range = resolveSafeDateRange(from, to, CommercialDates.today(clock));
         return reportsQueryPort.sales(range.from(), range.to());
     }
 
@@ -73,7 +82,7 @@ public class ReportsApplicationService implements ReportsUseCase {
 
     @Override
     public List<TopProductReportItem> topProducts(LocalDate from, LocalDate to, Integer limit) {
-        DateRange range = resolveSafeDateRange(from, to);
+        DateRange range = resolveSafeDateRange(from, to, CommercialDates.today(clock));
         int safeLimit = limit == null ? 10 : limit;
         if (safeLimit <= 0 || safeLimit > 100) {
             throw new ReportBusinessRuleException("limit must be between 1 and 100");
@@ -94,10 +103,14 @@ public class ReportsApplicationService implements ReportsUseCase {
     }
 
     private DateRange resolveSafeDateRange(LocalDate from, LocalDate to) {
+        return resolveSafeDateRange(from, to, LocalDate.now(ZoneOffset.UTC));
+    }
+
+    private DateRange resolveSafeDateRange(LocalDate from, LocalDate to, LocalDate defaultEnd) {
         LocalDate resolvedFrom = from;
         LocalDate resolvedTo = to;
         if (resolvedFrom == null && resolvedTo == null) {
-            resolvedTo = LocalDate.now(ZoneOffset.UTC);
+            resolvedTo = defaultEnd;
             resolvedFrom = resolvedTo.minusDays(DEFAULT_RANGE_DAYS - 1L);
         } else if (resolvedFrom != null && resolvedTo == null) {
             resolvedTo = resolvedFrom.plusDays(DEFAULT_RANGE_DAYS - 1L);

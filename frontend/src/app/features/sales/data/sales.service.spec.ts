@@ -40,4 +40,16 @@ describe('SalesService optional bound HTTP context', () => {
       expect(JSON.stringify(request.request.body)).not.toContain(token); request.flush({ id: 1 });
     });
   }
+  it('keeps explicit range consumers unchanged with their bound credential', () => {
+    const context=createBoundAuthContext(token);service.list({from:'2032-12-31',to:'2032-12-31'},context).subscribe();
+    const request=http.expectOne(r=>r.url.endsWith('/sales'));
+    expect(request.request.method).toBe('GET');expect(request.request.context).toBe(context);expect(request.request.params.get('from')).toBe('2032-12-31');
+    expect(request.request.headers.get('Authorization')).toBe('Bearer '+token);request.flush([]);
+  });
+  it('reads today without client dates and with bound credentials', () => {
+    const context=createBoundAuthContext(token);service.today(context).subscribe();
+    const req=http.expectOne(r=>r.url.endsWith('/sales/today'));
+    expect(req.request.method).toBe('GET');expect(req.request.params.keys()).toEqual([]);expect(req.request.context).toBe(context);
+    expect(req.request.headers.get('Authorization')).toBe('Bearer '+token);req.flush({});
+  });
 });

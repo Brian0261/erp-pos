@@ -135,6 +135,19 @@ class ReportsApplicationServiceTest {
         assertEquals(1L, report.purchaseOrderCount());
     }
 
+    @Test
+    void selectedDefaultsUseLimaAndKeepOtherReportDefaults() {
+        var clock=java.time.Clock.fixed(Instant.parse("2033-01-01T03:00:00Z"),java.time.ZoneId.of("Asia/Tokyo"));
+        var port=org.mockito.Mockito.mock(ReportsQueryPort.class);
+        var selected=new ReportsApplicationService(port,clock);
+        selected.sales(null,null); selected.topProducts(null,null,null);
+        org.mockito.Mockito.verify(port).sales(LocalDate.of(2032,12,2),LocalDate.of(2032,12,31));
+        org.mockito.Mockito.verify(port).topProducts(LocalDate.of(2032,12,2),LocalDate.of(2032,12,31),10);
+        selected.purchases(null,null,null);
+        var end=LocalDate.now(java.time.ZoneOffset.UTC);
+        org.mockito.Mockito.verify(port).purchases(end.minusDays(29),end,null);
+    }
+
     private static class StubReportsQueryPort implements ReportsQueryPort {
         private LocalDate lastSalesFrom;
         private LocalDate lastSalesTo;

@@ -157,3 +157,11 @@ export interface SalesFilters {
   status?: SaleStatus;
   createdBy?: string;
 }
+
+export interface TodaySalesResponse {
+  businessDate: string;
+  timeZone: string;
+  referenceInstant: string;
+  nextDayStartsAt: string;
+  sales: SaleResponse[];
+}

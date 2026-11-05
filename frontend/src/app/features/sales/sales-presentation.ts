@@ -59,7 +59,8 @@ export function salesContext(filters: SalesFilters): Params {
 export function filtersFromContext(params: ParamMap): SalesFilters {
   const date = (name: string) => {
     const value = params.get(name);
-    return value && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value)) ? value : undefined;
+    // Preserve invalid input so the list can explain it instead of issuing an unbounded query.
+    return value || undefined;
   };
   const status = params.get("salesStatus");
   const cash = Number(params.get("salesCash"));

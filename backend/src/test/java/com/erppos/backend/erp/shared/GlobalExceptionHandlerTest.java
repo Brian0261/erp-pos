@@ -122,5 +122,13 @@ class GlobalExceptionHandlerTest {
                 residual.getBody().message()
         );
     }
+    @Test
+    void malformedDateMappingIsLimitedToSelectedGetQueries() {
+        var ex=new org.springframework.web.method.annotation.MethodArgumentTypeMismatchException("bad",java.time.LocalDate.class,"from",null,new IllegalArgumentException());
+        for(String path:java.util.List.of("/api/v1/sales","/api/v1/sales/list-items","/api/v1/reports/sales","/api/v1/reports/top-products"))
+            assertEquals(HttpStatus.BAD_REQUEST,exceptionHandler.handleRecoveryIdentifier(ex,new MockHttpServletRequest("GET",path)).getStatusCode());
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR,exceptionHandler.handleRecoveryIdentifier(ex,new MockHttpServletRequest("GET","/api/v1/reports/inventory-movements")).getStatusCode());
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR,exceptionHandler.handleRecoveryIdentifier(ex,new MockHttpServletRequest("POST","/api/v1/sales")).getStatusCode());
+    }
 }
 

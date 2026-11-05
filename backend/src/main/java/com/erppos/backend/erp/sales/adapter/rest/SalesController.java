@@ -6,6 +6,7 @@ import com.erppos.backend.erp.sales.adapter.dto.CreateSaleRequest;
 import com.erppos.backend.erp.sales.adapter.dto.SaleItemResponse;
 import com.erppos.backend.erp.sales.adapter.dto.SalePaymentResponse;
 import com.erppos.backend.erp.sales.adapter.dto.SaleResponse;
+import com.erppos.backend.erp.sales.adapter.dto.TodaySalesResponse;
 import com.erppos.backend.erp.sales.adapter.dto.BillingSummaryResponse;
 import com.erppos.backend.erp.sales.adapter.dto.SalesListItemResponse;
 import com.erppos.backend.erp.sales.adapter.dto.VoidSaleRequest;
@@ -88,6 +89,15 @@ public class SalesController {
                         .map(this::toListItemResponse)
                         .toList()
         );
+    }
+
+    @GetMapping("/today")
+    @PreAuthorize("hasAnyRole('CAJERO','ADMIN','SUPERVISOR')")
+    public ResponseEntity<TodaySalesResponse> today() {
+        var result = salesUseCase.today();
+        return ResponseEntity.ok().cacheControl(org.springframework.http.CacheControl.noStore())
+                .body(new TodaySalesResponse(result.businessDate(), result.timeZone(), result.referenceInstant(),
+                        result.nextDayStartsAt(), result.sales().stream().map(sale -> toResponse(sale, false)).toList()));
     }
 
     @GetMapping("/{id}")

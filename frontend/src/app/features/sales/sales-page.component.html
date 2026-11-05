@@ -12,7 +12,7 @@
     <label *ngIf="!cashier">Usuario<input type="text" formControlName="createdBy" placeholder="Nombre de usuario exacto"></label>
     <div class="filter-actions"><button type="submit" class="ui-button ui-button--primary">Filtrar</button><button type="button" class="ui-button ui-button--secondary" (click)="resetFilters()">Limpiar</button></div>
   </form>
-  <p class="date-limit">Fechas: el filtro actual combina límites del servidor en UTC con fechas locales. Las ventas próximas a medianoche pueden quedar fuera del día esperado.</p>
+  <p class="date-limit">Fechas y horas de venta según America/Lima. Desde y Hasta incluyen los días seleccionados.</p>
   <p role="alert" class="ui-alert ui-alert--error" *ngIf="errorMessage">{{ errorMessage }}</p>
   <p role="status" *ngIf="loading">Consultando ventas…</p>
   <div class="ui-table-wrapper" *ngIf="!loading && !errorMessage" tabindex="0" role="region" aria-label="Resultados de ventas; desplaza horizontalmente si es necesario">

@@ -4,6 +4,34 @@
 
 Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones tecnicas/QA documentadas.
 
+### Fase 3 — fechas comerciales: PASS local, pendiente de gate Git (2026-11-05)
+
+- Base `1fa09913476f5382e90807b3e750a2fc69d69e10`; rama local autorizada
+  `feat/fase3-fechas-comerciales`. Sin staging, commit, publicación ni CI remoto de esta fase.
+  Commit, push, PR, CI remoto, revisión y merge siguen pendientes de sus gates;
+  las operaciones Git de escritura requieren autorización independiente.
+- Consultas de Ventas, reporte comercial y ranking interpretan fechas en
+  America/Lima con inicio inclusivo/fin exclusivo; conservan instantes originales,
+  permisos, filtros y contratos monetarios. Se elimina el filtrado temporal del
+  navegador y se alinean presentación y KPI de hoy, preservando actividad reciente.
+- QA focal: backend 77/77, Angular 77/77, E2E sintético GET-only 6/6, build y
+  typecheck PASS. Los mismos siete casos temporales pasaron también en JVM UTC
+  y Tokio, sin sumarlos como casos distintos. Detalle y contrato en
+  `docs/qa/FASE3_COMMERCIAL_DATES_QA.md`.
+- **PASS — FASE3_LOCAL_VALIDATED**, no CLOSED ni despliegue. Sin migraciones,
+  reescritura de históricos, nuevas dependencias o cambios fiscales.
+- Ampliación KPI autorizada: GET `/api/v1/sales/today` expone día Lima, referencia
+  y vigencia del servidor junto a las ventas permitidas, con no-store. El KPI ya
+  no selecciona el día con el reloj del cliente; revalida al vencer, retomar foco
+  o reintentar y descarta respuestas tardías. Actividad reciente preservada.
+  QA incremental: backend 51/51, Angular 19/19, E2E 6/6, build/typecheck PASS,
+  sin sumar estos conteos a las suites anteriores. Antes de producción se requiere
+  sincronización y supervisión operativa del reloj autoritativo del backend,
+  requisito pendiente de acreditación operativa. La conectividad es necesaria
+  para confirmar datos actuales; sin referencia válida no muestra cero ni se
+  promete actualización exacta de medianoche sin conexión.
+  UX-POS-2 y las demás fases mantienen sus estados históricos.
+
 ### UX-POS-2 — CLOSED técnico tras integración y CI postmerge (2026-11-05)
 
 - PR [#11](https://github.com/Brian0261/erp-pos/pull/11) integrada mediante squash en `master`:

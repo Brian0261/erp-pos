@@ -86,4 +86,14 @@ describe("Sales list query and trusted document presentation", () => {
     token = "different-synthetic-token"; harness.detectChanges(); pending.next([row]); harness.detectChanges();
     expect(page.sales).toEqual([]); expect(text()).toContain("La sesión cambió");
   });
+  it("trusts backend membership at the last microfraction and displays Lima", () => {
+    const boundary={...row,soldAt:"2033-01-01T04:59:59.999999Z"};
+    sales.listItems.and.returnValue(of([boundary]));page.filterForm.patchValue({from:"2032-12-31",to:"2032-12-31"});page.applyFilters();
+    expect(page.sales).toEqual([boundary]);expect(page.formatDate(boundary.soldAt)).toContain("31/12/2032");
+  });
+  it("rejects invalid restored query dates instead of silently requesting all sales", async () => {
+    await harness.navigateByUrl("/");sales.listItems.calls.reset();
+    page=await harness.navigateByUrl("/ventas?salesFrom=2032-02-30",SalesPageComponent);harness.detectChanges();
+    expect(sales.listItems).not.toHaveBeenCalled();expect(page.errorMessage).toContain("fechas válidas");expect(page.sales).toEqual([]);
+  });
 });

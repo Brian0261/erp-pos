@@ -112,6 +112,10 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<?> handleRecoveryIdentifier(MethodArgumentTypeMismatchException ex,HttpServletRequest request) {
+        if ("GET".equals(request.getMethod()) && java.time.LocalDate.class.equals(ex.getRequiredType())
+                && java.util.Set.of("from", "to").contains(ex.getName())
+                && java.util.Set.of("/api/v1/sales", "/api/v1/sales/list-items", "/api/v1/reports/sales", "/api/v1/reports/top-products").contains(request.getRequestURI()))
+            return ResponseEntity.badRequest().body(errorResponseFactory.build(request, HttpStatus.BAD_REQUEST, "Invalid date; use YYYY-MM-DD"));
         if(request.getRequestURI().startsWith("/api/v1/sales/operations"))
             return ResponseEntity.badRequest().body(errorResponseFactory.build(request,HttpStatus.BAD_REQUEST,"Invalid operation identifier or query parameter"));
         return handleGeneric(ex,request);

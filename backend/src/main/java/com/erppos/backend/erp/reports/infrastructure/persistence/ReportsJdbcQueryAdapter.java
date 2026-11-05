@@ -1,5 +1,6 @@
 package com.erppos.backend.erp.reports.infrastructure.persistence;
 
+import com.erppos.backend.erp.shared.domain.policy.CommercialDates;
 import com.erppos.backend.erp.billing.domain.model.ElectronicDocumentStatus;
 import com.erppos.backend.erp.reports.domain.exception.ReportNotFoundException;
 import com.erppos.backend.erp.reports.domain.model.CashRegisterReport;
@@ -43,18 +44,18 @@ public class ReportsJdbcQueryAdapter implements ReportsQueryPort {
 
     @Override
     public SalesReport sales(LocalDate from, LocalDate to) {
-        Instant fromInstant = toFromInstant(from);
-        Instant toInstant = toToInstant(to);
+        Instant fromInstant = CommercialDates.start(from);
+        Instant toInstant = CommercialDates.endExclusive(to);
 
         BigDecimal totalSalesAmount = nz(jdbcTemplate.queryForObject(
                 """
                         select coalesce(sum(s.total_amount), 0)
                         from sales s
                         where s.status = 'COMPLETED'
-                          and s.sold_at >= ? and s.sold_at <= ?
+                          and s.sold_at >= ? and s.sold_at < ?
                         """,
                 BigDecimal.class,
-                Timestamp.from(fromInstant), Timestamp.from(toInstant)
+                fromInstant.atOffset(ZoneOffset.UTC), toInstant.atOffset(ZoneOffset.UTC)
         ));
 
         Long totalSalesCount = nzLong(jdbcTemplate.queryForObject(
@@ -62,10 +63,10 @@ public class ReportsJdbcQueryAdapter implements ReportsQueryPort {
                         select count(*)
                         from sales s
                         where s.status = 'COMPLETED'
-                          and s.sold_at >= ? and s.sold_at <= ?
+                          and s.sold_at >= ? and s.sold_at < ?
                         """,
                 Long.class,
-                Timestamp.from(fromInstant), Timestamp.from(toInstant)
+                fromInstant.atOffset(ZoneOffset.UTC), toInstant.atOffset(ZoneOffset.UTC)
         ));
 
         Long voidedSalesCount = nzLong(jdbcTemplate.queryForObject(
@@ -73,10 +74,10 @@ public class ReportsJdbcQueryAdapter implements ReportsQueryPort {
                         select count(*)
                         from sales s
                         where s.status = 'VOIDED'
-                          and s.sold_at >= ? and s.sold_at <= ?
+                          and s.sold_at >= ? and s.sold_at < ?
                         """,
                 Long.class,
-                Timestamp.from(fromInstant), Timestamp.from(toInstant)
+                fromInstant.atOffset(ZoneOffset.UTC), toInstant.atOffset(ZoneOffset.UTC)
         ));
 
         List<PaymentMethodAmount> byPayment = jdbcTemplate.query(
@@ -85,29 +86,29 @@ public class ReportsJdbcQueryAdapter implements ReportsQueryPort {
                         from sale_payments sp
                         join sales s on s.id = sp.sale_id
                         where s.status = 'COMPLETED'
-                          and s.sold_at >= ? and s.sold_at <= ?
+                          and s.sold_at >= ? and s.sold_at < ?
                         group by sp.payment_method
                         order by sp.payment_method
                         """,
                 (rs, rowNum) -> new PaymentMethodAmount(rs.getString("payment_method"), nz(rs.getBigDecimal("amount"))),
-                Timestamp.from(fromInstant), Timestamp.from(toInstant)
+                fromInstant.atOffset(ZoneOffset.UTC), toInstant.atOffset(ZoneOffset.UTC)
         );
 
         List<SalesByDay> byDay = jdbcTemplate.query(
                 """
-                        select date(s.sold_at) as sold_day, count(*) sales_count, coalesce(sum(s.total_amount), 0) total_amount
+                        select date(s.sold_at at time zone ?) as sold_day, count(*) sales_count, coalesce(sum(s.total_amount), 0) total_amount
                         from sales s
                         where s.status = 'COMPLETED'
-                          and s.sold_at >= ? and s.sold_at <= ?
-                        group by date(s.sold_at)
+                          and s.sold_at >= ? and s.sold_at < ?
+                        group by sold_day
                         order by sold_day
                         """,
                 (rs, rowNum) -> new SalesByDay(
-                        rs.getDate("sold_day").toLocalDate(),
+                        rs.getObject("sold_day", LocalDate.class),
                         nz(rs.getBigDecimal("total_amount")),
                         rs.getLong("sales_count")
                 ),
-                Timestamp.from(fromInstant), Timestamp.from(toInstant)
+                CommercialDates.ZONE.getId(), fromInstant.atOffset(ZoneOffset.UTC), toInstant.atOffset(ZoneOffset.UTC)
         );
 
         BigDecimal averageTicket = totalSalesCount == 0
@@ -301,8 +302,8 @@ public class ReportsJdbcQueryAdapter implements ReportsQueryPort {
 
     @Override
     public List<TopProductReportItem> topProducts(LocalDate from, LocalDate to, int limit) {
-        Instant fromInstant = toFromInstant(from);
-        Instant toInstant = toToInstant(to);
+        Instant fromInstant = CommercialDates.start(from);
+        Instant toInstant = CommercialDates.endExclusive(to);
 
         return jdbcTemplate.query(
                 """
@@ -313,7 +314,7 @@ public class ReportsJdbcQueryAdapter implements ReportsQueryPort {
                         join sales s on s.id = si.sale_id
                         join products p on p.id = si.product_id
                         where s.status = 'COMPLETED'
-                          and s.sold_at >= ? and s.sold_at <= ?
+                          and s.sold_at >= ? and s.sold_at < ?
                         group by si.product_id, p.sku, p.barcode, p.name
                         order by quantity_sold desc
                         limit ?
@@ -326,7 +327,7 @@ public class ReportsJdbcQueryAdapter implements ReportsQueryPort {
                         nz(rs.getBigDecimal("quantity_sold")),
                         nz(rs.getBigDecimal("total_amount"))
                 ),
-                Timestamp.from(fromInstant), Timestamp.from(toInstant), limit
+                fromInstant.atOffset(ZoneOffset.UTC), toInstant.atOffset(ZoneOffset.UTC), limit
         );
     }
 
