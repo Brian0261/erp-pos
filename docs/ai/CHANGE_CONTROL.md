@@ -2992,3 +2992,29 @@ Solo crear tag cuando se cumpla todo:
 - MONEY-CHECKOUT-P1 no iniciada; MONEY-FISCAL-P1 y 4D-2C fuera de alcance.
   Sin cambios a dependencias/lockfiles, workflows, Auth/JWT/RBAC productivos,
   Storefront, infraestructura, secretos o configuracion persistente.
+
+### UX-POS-2 — cierre técnico postmerge (2026-11-05)
+
+- PR [#11](https://github.com/Brian0261/erp-pos/pull/11), base `master`, integrada
+  mediante squash `870a26798325e87b0ce240b35ad5680216f20100` (parent
+  `76478d65ea0cc00cc9ada0848b548229e54a6b70`). La rama local `master` se verificó
+  sincronizada con `origin/master`; la rama feature se preservó.
+- Alcance: experiencia responsive de Punto de venta, búsqueda y carrito, checkout
+  y pagos, entrega posventa, operaciones pendientes, accesibilidad y revalidación
+  de precios; protección de recuperación durable y contextos A/B. Sin cambios a
+  reglas backend/contratos fiscales ni afirmación de despliegue productivo.
+- P2-A: importes de pago inválidos se conservan durante la revisión de precios y
+  el cobro permanece bloqueado hasta corregirlos. P2-B: recuperación completada
+  muestra confirmación/enlace ligado a operación, venta, actor y credencial, sin
+  segundo cobro; la compra posterior se conserva. Ambos hilos quedaron resueltos.
+- Evidencia: CI de PR #11 run [42045385692](https://github.com/Brian0261/erp-pos/actions/runs/42045385692)
+  y Qodana #19 SUCCESS; CI postmerge run
+  [42056943272](https://github.com/Brian0261/erp-pos/actions/runs/42056943272),
+  backend/frontend/e2e-auth/e2e-commercial SUCCESS. Validaciones locales previas
+  reutilizadas según el registro de PR; esta actualización documental no ejecutó QA.
+- Gates Git realizados con autorización específica: commits locales en feature,
+  push de esa rama, creación de PR #11, squash merge y sincronización local
+  fast-forward de `master`. No se crearon tags ni se eliminó la rama feature.
+- Limitaciones: impresión física térmica 58/80 mm no validada; no se acredita
+  emisión fiscal productiva mediante proveedor mock. La integración técnica no
+  equivale a despliegue. Referencia de estado: `docs/ai/CURRENT_STATUS.md`.
