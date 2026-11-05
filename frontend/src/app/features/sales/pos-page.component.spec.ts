@@ -134,7 +134,13 @@ describe("PosPageComponent cash and electronic payment policy", () => {
       expect(component.change).toBeLessThanOrEqual(scenario.payments
         .filter(p => p.paymentMethod === "CASH").reduce((sum, p) => sum + p.amount, 0));
       const metrics = fixture.nativeElement.querySelector('[aria-label="Resumen de pagos"]');
-      expect(metrics.textContent).toContain(`Vuelto: S/ ${scenario.change.toFixed(2)}`);
+      const changeMetric = Array.from(metrics.querySelectorAll("span"))
+        .find((row: any) => row.textContent.includes("Vuelto")) as HTMLElement | undefined;
+      if (scenario.change > 0) {
+        expect(changeMetric?.querySelector("strong")?.textContent?.trim()).toBe(`S/ ${scenario.change.toFixed(2)}`);
+      } else {
+        expect(changeMetric).toBeUndefined();
+      }
       component.finalizeSale();
       await fixture.whenStable();
       if (scenario.accepted) {
@@ -624,7 +630,10 @@ describe("PosPageComponent controlled discount correction", () => {
     component.cart[0].discountAmount = 10;
     component.payments[0].amount = Infinity;
     component.finalizeSale();
-    expect(component.errorMessage).toContain("finito");
+    expect(component.paymentAmountErrors[0]).toContain("finito");
+    component.openCheckoutModal(); await render();
+    expect(element<HTMLInputElement>(host(), '[aria-label="Monto *"]').getAttribute("aria-invalid")).toBe("true");
+    expect(host().textContent).toContain("Ingresa un monto válido.");
     expect(confirm.confirm).not.toHaveBeenCalled();
 
     component.payments[0].amount = 100;
@@ -753,7 +762,9 @@ describe("PosPageComponent controlled discount correction", () => {
     expect(confirm.confirm).not.toHaveBeenCalled();
     expect(component.errorMessage).toContain("total pagado");
     component.openCheckoutModal(); await render();
-    expect(host().querySelector('[aria-label="Resumen de pagos"]')!.textContent).toContain("Pendiente: S/ 0.01");
+    const remaining = Array.from(host().querySelectorAll('[aria-label="Resumen de pagos"] span'))
+      .find(row => row.textContent?.includes("Pendiente"));
+    expect(remaining?.querySelector("strong")?.textContent?.trim()).toBe("S/ 0.01");
     component.setPaymentAmount(0, "0.30"); component.finalizeSale(); await render();
     expect(component.total).toBe(0.30);
     expect(component.errorMessage).toBe("");

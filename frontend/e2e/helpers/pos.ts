@@ -9,7 +9,11 @@ export async function expectPosShellVisible(page: Page): Promise<void> {
   await expect(page.getByLabel("Buscar producto por nombre, SKU o código")).toBeVisible();
   await expect(page.getByLabel("Carrito y cobro")).toBeVisible();
   await expect(page.getByRole("button", { name: /Cobrar|Cobrando/i })).toBeVisible();
-  await expect(page.getByText(/Caja abierta|Caja cerrada/)).toBeVisible();
+  const cashStatus = page.locator(".pos-utility-header .pos-context > strong");
+  await expect(cashStatus).toHaveCount(1);
+  await expect(cashStatus).toBeVisible();
+  await expect(cashStatus).toHaveAttribute("data-state", /^(open|closed)$/);
+  await expect(cashStatus).toContainText(/Caja abierta|Caja cerrada/);
 }
 
 export async function clearVisibleCart(page: Page): Promise<void> {
@@ -62,8 +66,19 @@ export async function openAndCloseFullCart(page: Page): Promise<void> {
 }
 
 export async function openCheckoutAndValidateNoWritePaymentControls(page: Page): Promise<void> {
-  await page.getByRole("button", { name: /^COBRAR$/ }).click();
   const checkout = page.getByRole("dialog", { name: "Cobrar venta" });
+  const charge = page.getByRole("button", { name: /^COBRAR$/ });
+  const cashStatus = page.locator(".pos-utility-header .pos-context > strong");
+  if (await cashStatus.getAttribute("data-state") === "closed") {
+    // The isolated fixture deliberately has no cash session or commercial rows.
+    // A closed register must prevent checkout; payment editing is covered with synthetic open-register fixtures.
+    await expect(charge).toBeDisabled();
+    await expect(checkout).toHaveCount(0);
+    return;
+  }
+  await expect(cashStatus).toHaveAttribute("data-state", "open");
+  await expect(charge).toBeEnabled();
+  await charge.click();
   await expect(checkout).toBeVisible();
   await expect(checkout.getByRole("heading", { name: "Cobrar venta" })).toBeVisible();
   await expect(checkout.getByRole("button", { name: "Cerrar" })).toBeVisible();

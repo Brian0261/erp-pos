@@ -189,6 +189,7 @@ describe("A durable POS recovery", () => {
     expect(page.confirmedDelivery?.operationId).toBe(sales.create.calls.first().args[0].operationId);
     const beforeReads=sales.getById.calls.count();fixture.destroy();fixture=TestBed.createComponent(PosPageComponent);page=fixture.componentInstance;await settle();
     expect(page.lastSaleId).toBe(77);expect(page.confirmedDelivery).toBeNull();expect(fixture.nativeElement.querySelector('app-pos-sale-note [role="dialog"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[aria-label="Resultado de recuperación"]')).toBeNull();
     expect(sales.getById.calls.count()).toBe(beforeReads);expect(sales.create).toHaveBeenCalledTimes(1);
   });
   it("does not present a recovered completed result as a new normal checkout event",async()=>{
@@ -197,6 +198,64 @@ describe("A durable POS recovery", () => {
     operations.get.and.returnValue(of({...existing('COMPLETED'),operationId:id,command:null}));page.finalizeSale();await settle();
     expect(page.confirmedDelivery).toBeNull();page.finalizeSale();await settle();expect(page.cart).toEqual([]);
     expect(page.confirmedDelivery).toBeNull();expect(sales.create).toHaveBeenCalledTimes(1);
+  });
+  it("P2-B shows the verified lost-checkout result and its sale link without repeating checkout", async () => {
+    sales.create.and.returnValue(rejected(0)); page.finalizeSale(); await settle();
+    const operationId = page.pendingSaleRequest!.operationId;
+    operations.get.and.returnValue(of({ ...existing("COMPLETED"), operationId, command: null }));
+    page.finalizeSale(); await settle();
+    fixture.nativeElement.querySelector('.checkout-button').click(); await settle();
+    const notice: HTMLElement | null = fixture.nativeElement.querySelector('[aria-label="Resultado de recuperación"]');
+    expect(notice).not.toBeNull();
+    expect(notice?.textContent).toContain("Venta #77 recuperada y confirmada");
+    expect(notice?.querySelector("a")?.getAttribute("href")).toBe("/ventas/77");
+    expect(document.activeElement).toBe(notice);
+    expect(page.confirmedDelivery).toBeNull(); expect(page.cart).toEqual([]);
+    expect(sales.create).toHaveBeenCalledTimes(1); expect(operations.prepare).toHaveBeenCalledTimes(1);
+    const before = anotherPurchase();
+    notice?.querySelector("button")?.click(); await settle();
+    expectPurchase(before); expect(fixture.nativeElement.querySelector('[aria-label="Resultado de recuperación"]')).toBeNull();
+  });
+  it("P2-B shows a resumed prepared sale only after its verified checkout succeeds", async () => {
+    page.cart = []; page.payments = [{ paymentMethod: "CASH", amount: 0, reference: "" }];
+    const operation = existing(); operations.get.and.returnValue(of(operation));
+    page.selectServerOperation(operation, false); await settle();
+    expect(fixture.nativeElement.querySelector('[aria-label="Resultado de recuperación"]')).toBeNull();
+    page.confirmPreparedResume(); await settle();
+    const notice: HTMLElement | null = fixture.nativeElement.querySelector('[aria-label="Resultado de recuperación"]');
+    expect(notice?.textContent).toContain("Venta #77 recuperada y confirmada");
+    expect(notice?.querySelector("a")?.getAttribute("href")).toBe("/ventas/77");
+    expect(sales.create).toHaveBeenCalledOnceWith(operation.command!, jasmine.any(HttpContext));
+    expect(operations.prepare).not.toHaveBeenCalled(); expect(page.confirmedDelivery).toBeNull();
+    token = "synthetic-renewed-credential"; await settle();
+    expect(fixture.nativeElement.querySelector('[aria-label="Resultado de recuperación"]')).toBeNull();
+  });
+  for (const status of ["DRAFT", "REJECTED"] as const) {
+    it("P2-B separates the recovered sale from its located " + status + " document", async () => {
+      sales.create.and.returnValue(rejected(0)); page.finalizeSale(); await settle();
+      const operationId = page.pendingSaleRequest!.operationId;
+      operations.get.and.returnValue(of({ ...existing("COMPLETED"), operationId, command: null,
+        receiptIntent: { receiptType: "INVOICE", payload: null }, receiptState: "LOCATED", documentId: 901, documentStatus: status }));
+      page.finalizeSale(); await settle(); page.finalizeSale(); await settle();
+      const notice: HTMLElement | null = fixture.nativeElement.querySelector('[aria-label="Resultado de recuperación"]');
+      expect(notice?.textContent).toContain("Venta #77 recuperada y confirmada");
+      expect(notice?.textContent).toContain(status);
+      expect(notice?.textContent).toContain(status === "DRAFT" ? "pendiente de procesamiento fiscal" : "no confirma aceptación fiscal");
+      expect(page.receiptRecovery).toBeNull(); expect(sales.create).toHaveBeenCalledTimes(1);
+      expect(documents.createFromSale).not.toHaveBeenCalled();
+    });
+  }
+  it("P2-B cannot show a late result from another credential or passive history", async () => {
+    page.selectServerOperation({ ...existing("COMPLETED"), command: null }, false); await settle();
+    expect(page.visibleRecoveryResult).toBeNull(); expect(operations.get).not.toHaveBeenCalled();
+    sales.create.and.returnValue(rejected(0)); page.finalizeSale(); await settle();
+    expect(page.visibleRecoveryResult).toBeNull();
+    const operationId = page.pendingSaleRequest!.operationId, response = new Subject<SaleOperation>();
+    operations.get.and.returnValue(response); page.finalizeSale();
+    token = "synthetic-other-credential";
+    response.next({ ...existing("COMPLETED"), operationId, command: null }); response.complete(); await settle();
+    expect(page.visibleRecoveryResult).toBeNull(); expect(page.pendingSaleRequest?.operationId).toBe(operationId);
+    expect(sales.create).toHaveBeenCalledTimes(1);
   });
 
   const rejectDefinitively = () => operations.prepare.and.callFake(body => rejected(422, {

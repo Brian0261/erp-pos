@@ -48,6 +48,27 @@ async function values(page:Page){return page.evaluate(()=>{const d=JSON.parse(se
 const review=(page:Page)=>page.getByRole('dialog',{name:'Se actualizaron condiciones de tu compra',exact:true});
 const cart=(page:Page)=>page.locator('app-pos-cart-panel');
 const checkout=(page:Page)=>page.getByRole('dialog',{name:'Cobrar venta',exact:true});
+for (const width of [1440, 390, 320]) test('PR11 P2-A invalid preserved payment can review prices and return to checkout '+width, async ({page}) => {
+  await page.setViewportSize({width,height:width===1440?900:844});
+  const s=await setup(page); await page.goto('/pos'); await ready(page);
+  await page.getByRole('button',{name:'COBRAR',exact:true}).click();
+  await checkout(page).getByLabel('Monto *',{exact:true}).nth(0).fill('');
+  await checkout(page).getByRole('button',{name:'Cerrar',exact:true}).click();
+  const before=await values(page); s.state.mode='price'; await page.reload();
+  await expect(review(page)).toBeVisible(); await expect(review(page)).toContainText('Revisa los montos de pago en el cobro');
+  expect((await values(page)).payments).toEqual(before.payments);
+  await page.keyboard.press('Escape'); expect(await values(page)).toEqual(before);
+  await page.getByRole('button',{name:'Revisar cambios',exact:true}).last().click();
+  await review(page).getByRole('button',{name:'Actualizar carrito con condiciones vigentes',exact:true}).click();
+  await expect(checkout(page)).toBeVisible();
+  const amount=checkout(page).getByLabel('Monto *',{exact:true}).nth(0), confirm=checkout(page).getByRole('button',{name:'Confirmar venta',exact:true});
+  await expect(amount).toHaveValue(''); await expect(amount).toHaveAttribute('aria-invalid','true'); await expect(confirm).toBeDisabled();
+  expect((await values(page)).payments).toEqual(before.payments); expect((await values(page)).lines).toEqual([[101,'2','1','12']]);
+  const evidence=path.join(os.tmpdir(),'inktoy-ux-pos-2-pr11-fix');await mkdir(evidence,{recursive:true});
+  await page.screenshot({path:path.join(evidence,'p2-a-'+width+'.png')});
+  await amount.fill('14'); await expect(confirm).toBeEnabled(); await expect(amount).not.toHaveAttribute('aria-invalid','true');
+  expect(s.writes).toEqual([]);clean(s);
+});
 async function ready(page:Page){await expect(page.locator('[aria-label="Condiciones de la compra"]')).toHaveCount(0);await expect(page.getByRole('button',{name:'COBRAR',exact:true})).toBeEnabled();}
 async function returnToPOS(page:Page){await page.getByRole('link',{name:'Ventas',exact:true}).click();await page.getByRole('link',{name:'Punto de venta',exact:true}).click();}
 function clean(s:Awaited<ReturnType<typeof setup>>,writes=0){expect(s.unexpected).toEqual([]);expect(s.errors).toEqual([]);expect(s.writes.length).toBe(writes);}
@@ -106,7 +127,9 @@ test('RV-19/22 new warehouse inside checkout explains the block and preserves pa
  const s=await setup(page);await page.goto('/pos');await ready(page);await page.getByRole('button',{name:'COBRAR',exact:true}).click();await expect(checkout(page)).toBeVisible();const before=await values(page);await shot(page,[19,22],'initial','checkout-valid');
  // The real guarded reactive control receives the same change event as an external context update while checkout owns focus.
  await page.getByRole('combobox',{name:'Almacén de salida',exact:true}).evaluate((el:HTMLSelectElement)=>{el.value=Array.from(el.options).find(o=>o.textContent?.includes('Depósito'))!.value;el.dispatchEvent(new Event('change',{bubbles:true}));});
- await expect(checkout(page)).toContainText('almacén');s.state.mode='blocked';await checkout(page).getByRole('button',{name:'Verificar compra',exact:true}).click();await expect(checkout(page)).toContainText('stock disponible 0');
+ await expect(checkout(page)).toContainText('almacén');await expect(checkout(page).getByRole('button',{name:'Confirmar venta',exact:true})).toBeDisabled();
+ s.state.mode='blocked';await checkout(page).getByRole('button',{name:'Cerrar',exact:true}).click();
+ await page.getByRole('button',{name:'Verificar compra',exact:true}).click();await expect(page.getByRole('alert')).toContainText('stock disponible 0');await expect(checkout(page)).toHaveCount(0);
  expect((await values(page)).payments).toEqual(before.payments);await shot(page,[19,22],'final','checkout-blocked');clean(s);
 });
 test('RV-20 close checkout has no duplicated verification notices',async({page})=>{

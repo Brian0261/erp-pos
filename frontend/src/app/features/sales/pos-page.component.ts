@@ -58,7 +58,7 @@ import {
   posTotalCents,
   posPaidCents,
 } from "./utils/pos-calculations";
-import { availableQuantity, decimalText, isQuantityPolicy, moneyCents, quantityHundredths,
+import { availableQuantity, decimalText, isQuantityPolicy, moneyCents, PosDecimalError, quantityHundredths,
   quantityStep, scaledNumber, stockMillis } from "./utils/pos-decimal";
 
 @Component({
@@ -125,6 +125,13 @@ import { availableQuantity, decimalText, isQuantityPolicy, moneyCents, quantityH
             (quickSearch)="applyQuickSearch($event)"
             (clearSearch)="clearSearch($event)"
           ></app-pos-search-panel>
+
+          <section #recoveryResultNotice class="ui-alert ui-alert--info" *ngIf="visibleRecoveryResult as result" aria-label="Resultado de recuperación" tabindex="-1">
+            <p role="status" aria-live="polite">Venta #{{ result.saleId }} recuperada y confirmada.</p>
+            <p>{{ result.detail }}</p>
+            <a class="ui-button ui-button--secondary" [routerLink]="['/ventas', result.saleId]">Ver venta #{{ result.saleId }}</a>
+            <button type="button" class="ui-button ui-button--secondary" aria-label="Cerrar confirmación de recuperación" (click)="dismissRecoveryResult()">Cerrar aviso</button>
+          </section>
 
           <div
             class="message-stack"
@@ -409,8 +416,10 @@ export class PosPageComponent implements OnInit, OnDestroy, DoCheck {
   successMessage = "";
   lastSaleId: number | null = null;
   confirmedDelivery: PosConfirmedDelivery | null = null;
+  private recoveredResult: Readonly<{ operationId: string; saleId: number; owner: string; credential: string; detail: string }> | null = null;
   private deliveryCandidate: { operationId: string; token: string } | null = null;
   @ViewChild(PosSearchPanelComponent) private noteSearchPanel?: PosSearchPanelComponent;
+  @ViewChild("recoveryResultNotice") private recoveryResultNotice?: ElementRef<HTMLElement>;
   focusNewSale(): void { this.noteSearchPanel?.focusSearch(); }
   showGoToBillingAction = false;
   draftReviewMessage = "";
@@ -476,6 +485,8 @@ export class PosPageComponent implements OnInit, OnDestroy, DoCheck {
   }
 
   ngDoCheck(): void {
+    if (this.recoveredResult && (this.recoveredResult.credential !== this.authService.getToken()
+        || this.recoveredResult.owner !== this.currentUserId)) this.dismissRecoveryResult();
     if (this.pendingSaleRequest || this.receiptRecovery || this.pendingOwnerBlocked) return;
     if ((this.cartCheckFingerprint && this.cartCheckFingerprint !== this.cartVerificationFingerprint())
         || (this.cart.length && this.verifiedCartContext && this.verifiedCartContext !== this.cartVerificationContext())) {
@@ -1613,6 +1624,7 @@ export class PosPageComponent implements OnInit, OnDestroy, DoCheck {
     this.lastSaleId = null;
     this.deliveryCandidate = null;
     this.confirmedDelivery = null;
+    this.dismissRecoveryResult();
     this.showGoToBillingAction = false;
 
     const validationError = this.validateSaleBeforeSubmit();
@@ -1731,6 +1743,8 @@ export class PosPageComponent implements OnInit, OnDestroy, DoCheck {
             this.confirmedDelivery = Object.freeze({ operationId: payload.operationId, saleId: sale.id, totalAmount: sale.totalAmount,
               credential: this.deliveryCandidate.token, receiptType: this.receiptRecovery.receiptType });
             this.isCheckoutModalOpen = false; this.isFullCartOpen = false;
+          } else if (prepared && sale.status === "COMPLETED") {
+            this.rememberRecoveryResult(sale.id, payload.operationId, this.receiptRecoveryMessage);
           }
           this.deliveryCandidate = null;
           this.persistDraftState();
@@ -1988,6 +2002,9 @@ export class PosPageComponent implements OnInit, OnDestroy, DoCheck {
       this.warningMessage = operation.receiptState === "LOCATED" ? "Comprobante localizado. Su estado fiscal se muestra por separado; no se creó otro documento." : this.receiptRecoveryMessage;
     }
     this.bindRecovery(operation.cashRegisterSessionId);
+    if (operation.state === "COMPLETED" && operation.saleId) {
+      this.rememberRecoveryResult(operation.saleId, operation.operationId, this.receiptRecoveryMessage);
+    }
     this.persistDraftState();
     return true;
   }
@@ -2222,9 +2239,16 @@ export class PosPageComponent implements OnInit, OnDestroy, DoCheck {
           if (!review.differences.length) { apply(); return; }
           this.cartCheckPhase = "changes"; this.cartCheckMessage = "Hay cambios pendientes. Revisa las condiciones antes de cobrar.";
           let oldTotal = "no verificable"; try { oldTotal = "S/ " + decimalText(posTotalCents(original)); } catch {}
-          const total = review.total!, paid = posPaidCents(this.payments), electronic = posPaidCents(this.payments, true);
-          const paymentMessage = electronic > total ? "Los pagos electrónicos superan el nuevo total. Corrígelos antes de cobrar."
-            : paid < total ? "Saldo pendiente: S/ " + decimalText(total - paid) : "Vuelto previsto: S/ " + decimalText(paid - total);
+          const total = review.total!;
+          let paymentMessage: string;
+          try {
+            const paid = posPaidCents(this.payments), electronic = posPaidCents(this.payments, true);
+            paymentMessage = electronic > total ? "Los pagos electrónicos superan el nuevo total. Corrígelos antes de cobrar."
+              : paid < total ? "Saldo pendiente: S/ " + decimalText(total - paid) : "Vuelto previsto: S/ " + decimalText(paid - total);
+          } catch (error) {
+            if (!(error instanceof PosDecimalError)) throw error;
+            paymentMessage = "Revisa los montos de pago en el cobro. No se pudo calcular el saldo ni el vuelto; los valores ingresados se conservan.";
+          }
           this.reviewDialogOpen = true;
           void this.confirmDialog.confirm({ title: "Se actualizaron condiciones de tu compra",
             description: review.differences.join("\n") + "\nTotal anterior: " + oldTotal + ". Total propuesto: S/ " + decimalText(total)
@@ -2320,8 +2344,39 @@ export class PosPageComponent implements OnInit, OnDestroy, DoCheck {
     this.persistDraftState();
     this.warningMessage = "";
     this.successMessage = message;
+    if (this.visibleRecoveryResult && this.receiptRecovery?.saleId) {
+      this.rememberRecoveryResult(this.receiptRecovery.saleId, this.receiptRecovery.operationId!, message);
+    }
     this.showGoToBillingAction = false;
     this.resetDraftAfterCheckout(true);
+    const result = this.visibleRecoveryResult, fingerprint = this.recoveryDraftFingerprint();
+    if (result) {
+      clearTimeout(this.cartFocusTimer);
+      this.cartFocusTimer = setTimeout(() => {
+        if (this.visibleRecoveryResult === result && fingerprint === this.recoveryDraftFingerprint()
+            && !this.isCheckoutModalOpen && !this.isFullCartOpen) {
+          const notice = this.recoveryResultNotice?.nativeElement;
+          notice?.focus({ preventScroll: true });
+          notice?.scrollIntoView({ block: "center" });
+        }
+      }, 0);
+    }
+  }
+
+  get visibleRecoveryResult(): typeof this.recoveredResult {
+    const result = this.recoveredResult, activeId = this.receiptRecovery?.operationId ?? this.pendingSaleRequest?.operationId;
+    return result && !this.destroyed && result.credential === this.authService.getToken() && result.owner === this.currentUserId
+      && (!activeId || activeId === result.operationId) ? result : null;
+  }
+
+  dismissRecoveryResult(): void { this.recoveredResult = null; }
+
+  private rememberRecoveryResult(saleId: number, operationId: string, detail: string): void {
+    const credential = this.authService.getToken();
+    if (!Number.isSafeInteger(saleId) || saleId <= 0 || !credential || !this.currentUserId
+        || this.receiptRecovery?.saleId !== saleId || this.receiptRecovery.operationId !== operationId
+        || !this.requireRecoveryBinding()) return;
+    this.recoveredResult = Object.freeze({ saleId, operationId, owner: this.currentUserId, credential, detail });
   }
 
   private issueElectronicDocumentFromSale(): void {

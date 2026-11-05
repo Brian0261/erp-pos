@@ -103,6 +103,51 @@ describe("RV cart verification", () => {
     expect(confirm.confirm).not.toHaveBeenCalled(); expect(page.needsRevalidation).toBeFalse();
     expect(page.payments).toEqual(payments); expect(sales.create).not.toHaveBeenCalled();
   });
+  it("P2-A reviews changed prices with a preserved invalid payment and permits correcting it only in checkout", async () => {
+    page.openCheckoutModal(); page.setPaymentAmount(0, ""); page.closeCheckoutModal();
+    const payments = structuredClone(page.payments);
+    page.cart[0].requiresRevalidation = true;
+    pos.snapshot.and.returnValue(of([live(12)]));
+    page.openCheckoutModal(); await settle();
+    expect(confirm.confirm).toHaveBeenCalledTimes(1);
+    expect(confirm.confirm.calls.mostRecent().args[0].description).toContain("Revisa los montos de pago en el cobro");
+    expect(page.cart[0].salePrice).toBe(12); expect(page.needsRevalidation).toBeFalse();
+    expect(page.payments).toEqual(payments); expect(page.isCheckoutModalOpen).toBeTrue();
+    expect(fixture.nativeElement.querySelector('[aria-label="Monto *"]').getAttribute("aria-invalid")).toBe("true");
+    page.finalizeSale(true); await settle();
+    expect(operations.prepare).not.toHaveBeenCalled(); expect(sales.create).not.toHaveBeenCalled();
+    page.setPaymentAmount(0, "12.00"); await settle();
+    expect(page.paymentAmountErrors).toEqual([""]);
+    expect(page.checkoutReviewBlockedReason).toBe("");
+    expect(page.payments[0].amount).toBe(12); expect(page.payments[0].amountInput).toBeUndefined();
+  });
+  it("P2-A declining changed prices preserves the invalid payment and original purchase", async () => {
+    page.setPaymentAmount(0, "1.001"); page.cart[0].requiresRevalidation = true;
+    const before = structuredClone({ cart: page.cart, payments: page.payments });
+    confirm.confirm.and.returnValue(Promise.resolve(false)); pos.snapshot.and.returnValue(of([live(12)]));
+    page.openCheckoutModal(); await settle();
+    expect(confirm.confirm).toHaveBeenCalledTimes(1);
+    expect(page.cart).toEqual(before.cart); expect(page.payments).toEqual(before.payments);
+    expect(page.needsRevalidation).toBeTrue(); expect(page.isCheckoutModalOpen).toBeFalse();
+    expect(page.cartCheckPhase).toBe("changes");
+    expect(operations.prepare).not.toHaveBeenCalled(); expect(sales.create).not.toHaveBeenCalled();
+  });
+  it("P2-A restores mixed payments unchanged and never accepts a stale price decision", async () => {
+    page.payments.push({ paymentMethod: "CARD", amount: 2, reference: "preserved card" });
+    page.setPaymentAmount(0, ""); (page as any).persistDraftState();
+    const savedPayments = state.load()!.payments;
+    let resolve!: (accepted: boolean) => void;
+    confirm.confirm.and.returnValue(new Promise<boolean>(r => resolve = r));
+    pos.snapshot.and.returnValue(of([live(12)])); await remount();
+    expect(confirm.confirm).toHaveBeenCalledTimes(1); expect(page.payments[0].amountInput).toBe("");
+    expect(state.load()!.payments).toEqual(savedPayments);
+    spyOn(TestBed.inject(AuthService), "getToken").and.returnValue("synthetic-another-session");
+    const before = structuredClone({ cart: page.cart, payments: page.payments });
+    resolve(true); await settle();
+    expect(page.cart).toEqual(before.cart); expect(page.payments).toEqual(before.payments);
+    expect(page.needsRevalidation).toBeTrue(); expect(page.isCheckoutModalOpen).toBeFalse();
+    expect(operations.prepare).not.toHaveBeenCalled(); expect(sales.create).not.toHaveBeenCalled();
+  });
   it("RV-15 checks a pending draft before opening checkout", async()=>{
     const response=new Subject<PosProductResponse[]>(); pos.snapshot.and.returnValue(response);
     page.cart[0].requiresRevalidation=true; page.openCheckoutModal(); await settle();

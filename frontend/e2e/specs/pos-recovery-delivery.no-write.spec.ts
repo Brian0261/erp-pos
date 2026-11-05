@@ -84,6 +84,29 @@ async function capture(page:Page,name:string){await mkdir(evidence,{recursive:tr
   else await page.locator('app-pos-page').screenshot({path:path.join(evidence,name+'.png')});}
 function clean(s:Awaited<ReturnType<typeof setup>>){expect(s.unexpected).toEqual([]);expect(s.errors).toEqual([]);}
 const cart=(page:Page)=>page.locator('app-pos-cart-panel');
+for (const width of [1440,390,320]) test('PR11 P2-B recovered result stays visible and closing preserves the next purchase '+width,async({page})=>{
+  await page.setViewportSize({width,height:width===1440?900:844});const s=await setup(page);s.state.allowCheckout=true;s.state.checkoutLost=true;
+  await page.goto('/pos');await purchaseB(page);await completeCheckout(page);
+  await expect(page.getByRole('dialog',{name:'Cobrar venta',exact:true}).getByRole('alert')).toBeVisible();
+  const original=await draft(page);expect(original.pending).not.toBeNull();
+  await page.reload();await page.getByRole('button',{name:'COMPROBAR RESULTADO',exact:true}).click();
+  await expect(page.getByRole('button',{name:'FINALIZAR RECUPERACIÓN',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'FINALIZAR RECUPERACIÓN',exact:true}).click();
+  await expect.poll(async()=>{const d=await draft(page);return [d.pending,d.recovery,d.lines.length];}).toEqual([null,null,0]);
+  const result=page.getByRole('region',{name:'Resultado de recuperación',exact:true});
+  await expect(result).toContainText('Venta #81 recuperada y confirmada');
+  await expect(result.getByRole('link',{name:'Ver venta #81',exact:true})).toHaveAttribute('href','/ventas/81');
+  await expect(result).toBeFocused(); await expect(result).toBeInViewport();
+  await expect(result.getByRole('status')).toBeInViewport({ratio:1});
+  await expect(page.locator('app-pos-sale-note [role="dialog"]')).toHaveCount(0);
+  expect(s.writes).toEqual(['POST /api/v1/sales/operations','POST /api/v1/sales']);
+  const evidence=path.join(os.tmpdir(),'inktoy-ux-pos-2-pr11-fix');await mkdir(evidence,{recursive:true});
+  await page.screenshot({path:path.join(evidence,'p2-b-'+width+'.png')});
+  await purchaseB(page);const before=await draft(page);
+  await result.getByRole('button',{name:'Cerrar confirmación de recuperación',exact:true}).click();
+  await expect(result).toHaveCount(0);expect(await draft(page)).toEqual(before);
+  expect(s.writes).toEqual(['POST /api/v1/sales/operations','POST /api/v1/sales']);clean(s);
+});
 async function purchaseB(page:Page){
   const search=page.getByLabel('Buscar producto por nombre, SKU o código',{exact:true});await search.fill('sintético');await search.press('Enter');
   const adds=page.locator('app-pos-search-results').getByRole('button',{name:'Agregar',exact:true});await adds.first().click();await adds.nth(1).click();
