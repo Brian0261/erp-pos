@@ -422,9 +422,13 @@ class EcommerceAdminProfilesIntegrationTest extends AbstractHttpIntegrationTest 
                 .andExpect(status().isOk());
 
         mockMvc.perform(get("/api/v1/ecommerce-admin/products/online-profiles?page=0&size=50")
+                        .param("q", "profile-enriched-" + suffix)
                         .header(HttpHeaders.AUTHORIZATION, bearer(adminToken)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items").isArray())
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.totalItems").value(1))
+                .andExpect(jsonPath("$.items[0].productId").value(productId))
                 .andExpect(jsonPath("$.items[?(@.productId == " + productId + ")].productSku", org.hamcrest.Matchers.hasItem(productSku)))
                 .andExpect(jsonPath("$.items[?(@.productId == " + productId + ")].productName", org.hamcrest.Matchers.hasItem(productName)))
                 .andExpect(jsonPath("$.items[?(@.productId == " + productId + ")].productActive", org.hamcrest.Matchers.hasItem(true)))
