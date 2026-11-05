@@ -37,7 +37,8 @@ describe("MONEY-QA-0 POS decimal precision reproduction", () => {
       imports: [PosPageComponent],
       providers: [
         provideZoneChangeDetection(), provideRouter([]), provideHttpClient(), provideHttpClientTesting(),
-        { provide: AuthService, useValue: { me: () => of({ id: "qa-money-precision", roles: ["CAJERO"] }) } },
+        { provide: AuthService, useValue: { getToken: () => "synthetic-money-precision-credential",
+          me: () => of({ id: "qa-money-precision", roles: ["CAJERO"] }) } },
         { provide: WarehouseService, useValue: { list: () => of([
           { id: 1, code: "QA", name: "Synthetic warehouse", type: "STORE", active: true },
         ]) } },

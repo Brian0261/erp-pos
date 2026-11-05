@@ -104,15 +104,44 @@ async function noDocument(page:Page) {
   expect(await page.evaluate(()=>(window as unknown as {noteUrls:Set<string>}).noteUrls.size)).toBe(0);
 }
 
-test("confirmed POS reference, immediate next sale focus and detail reprint use GET only",ciCase('pos'),async({page})=>{
+test("restored POS reference never confirms a sale and detail reprint uses GET only",ciCase('pos'),async({page})=>{
   const {methods,errors,requests}=await setup(page); await page.goto("/pos");
-  await expect(page.getByText("Venta V-SYN-0081 registrada.",{exact:true})).toBeVisible();
+  const search=page.getByLabel("Buscar producto por nombre, SKU o código",{exact:true});
+  await expect(page.locator('.pos-utility-header .pos-context > strong')).toHaveAttribute('data-state','open');
+  await expect(search).toBeVisible();
+  await expect(page.locator('app-pos-sale-note [role="dialog"]')).toHaveCount(0);
+  await expect(page.getByRole('region',{name:'Resultado de recuperación',exact:true})).toHaveCount(0);
+  await expect(page.getByText("Venta V-SYN-0081 registrada.",{exact:true})).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'Nueva venta',exact:true})).toHaveCount(0);
+  expect(methods.some(method=>method==='GET /api/v1/sales/81')).toBe(false);
   expect(requests.some(r=>/pdfmake|vfs_fonts/.test(r))).toBe(false);
+  await search.fill('Compra sintética preservada');
+  const draft=await page.evaluate(()=>JSON.parse(sessionStorage.getItem('erp_pos_sales_draft_v1')!));
+  expect(draft.lastSaleId).toBe(81);expect(draft.code).toBe('Compra sintética preservada');
+  await page.evaluate(()=>Object.assign(window,{noteSmokeDocument:'same-document'}));
   await page.screenshot({path:path.join(evidence,"01-pos-desktop.png"),fullPage:true});
-  await page.getByRole("button",{name:"Nueva venta",exact:true}).click(); await expect(page.locator(".scan-input")).toBeFocused();
+  // Navigate in the mounted app so setup cannot reseed the draft and hide a context loss.
+  await page.evaluate(()=>{
+    history.pushState(history.state,'','/ventas/81');
+    window.dispatchEvent(new PopStateEvent('popstate',{state:history.state}));
+  });
+  await expect(page).toHaveURL(/\/ventas\/81$/);
   await page.getByRole("link",{name:"Ver nota interna",exact:true}).click(); await ready(page);
-  await page.getByRole("link",{name:"Volver al POS",exact:true}).click();
-  await page.goto("/ventas/81"); await page.getByRole("link",{name:"Ver nota interna",exact:true}).click(); await ready(page);
+  await expect(page).toHaveURL(/\/ventas\/81\/nota$/);
+  await page.getByRole("link",{name:"Volver al detalle",exact:true}).click();
+  await expect(page).toHaveURL(/\/ventas\/81$/);
+  const saleReads=methods.filter(method=>method==='GET /api/v1/sales/81').length;
+  expect(saleReads).toBeGreaterThan(0);
+  await page.getByRole('link',{name:'Punto de venta',exact:true}).click();
+  await expect(page).toHaveURL(/\/pos$/);await expect(search).toHaveValue(draft.code);
+  // Restoring persisted decimal text materializes amountInput without changing the payment.
+  const hydratedDraft={...draft,payments:draft.payments.map((payment:{amount:string;amountInput?:string})=>
+    ({...payment,amountInput:payment.amountInput??payment.amount}))};
+  expect(await page.evaluate(()=>JSON.parse(sessionStorage.getItem('erp_pos_sales_draft_v1')!))).toEqual(hydratedDraft);
+  expect(await page.evaluate(()=>(window as unknown as {noteSmokeDocument:string}).noteSmokeDocument)).toBe('same-document');
+  await expect(page.locator('app-pos-sale-note [role="dialog"]')).toHaveCount(0);
+  await expect(page.getByRole('region',{name:'Resultado de recuperación',exact:true})).toHaveCount(0);
+  expect(methods.filter(method=>method==='GET /api/v1/sales/81').length).toBe(saleReads);
   expect(methods.every(m=>m.startsWith("GET "))).toBe(true); expect(errors).toEqual([]);
 });
 

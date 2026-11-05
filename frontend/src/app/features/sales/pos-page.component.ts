@@ -1,9 +1,10 @@
 import { CommonModule } from "@angular/common";
-import { Component, ElementRef, HostListener, OnDestroy, OnInit, ViewChild } from "@angular/core";
-import { FormBuilder, Validators } from "@angular/forms";
+import { Component, DoCheck, ElementRef, HostListener, OnDestroy, OnInit, ViewChild } from "@angular/core";
+import { FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
 import { RouterLink } from "@angular/router";
-import { catchError, defer, EMPTY, map, Observable, Subscription, switchMap, throwError } from "rxjs";
+import { catchError, defer, EMPTY, map, Observable, Subscription, switchMap, throwError, timeout } from "rxjs";
 import { HttpContext, HttpErrorResponse } from "@angular/common/http";
+import { reviewCartConditions } from "./utils/cart-revalidation";
 import { immutableRequest } from "./utils/checkout-confirmation";
 
 import { AuthService } from "../../core/auth/auth.service";
@@ -25,7 +26,8 @@ import { PaymentLine, PosCartItem, PosReceiptType } from "./data/pos-ui.models";
 import { SalesService } from "./data/sales.service";
 import { isSalePreparationRejected, SaleOperation, SaleOperationsService } from "./data/sale-operations.service";
 import { SaleOperationRecoveryComponent } from "./components/sale-operation-recovery.component";
-import { PosSaleNoteComponent } from "./internal-note/pos-sale-note.component";
+import { PosDialogFocusDirective } from "./components/pos-dialog-focus.directive";
+import { PosConfirmedDelivery, PosSaleNoteComponent } from "./internal-note/pos-sale-note.component";
 import { ConfirmDialogService } from "../../shared/dialogs/confirm-dialog.service";
 import {
   BillingSeriesResponse,
@@ -56,13 +58,14 @@ import {
   posTotalCents,
   posPaidCents,
 } from "./utils/pos-calculations";
-import { availableQuantity, decimalText, isQuantityPolicy, moneyCents, quantityHundredths,
+import { availableQuantity, decimalText, isQuantityPolicy, moneyCents, PosDecimalError, quantityHundredths,
   quantityStep, scaledNumber, stockMillis } from "./utils/pos-decimal";
 
 @Component({
     selector: "app-pos-page",
     imports: [
         CommonModule,
+        ReactiveFormsModule,
         RouterLink,
         PosTotalsSummaryComponent,
         PosCartPanelComponent,
@@ -71,46 +74,44 @@ import { availableQuantity, decimalText, isQuantityPolicy, moneyCents, quantityH
         PosSearchPanelComponent,
         PosSearchResultsComponent,
         SaleOperationRecoveryComponent,
+        PosDialogFocusDirective,
         PosSaleNoteComponent,
     ],
     template: `
     <section class="ui-card pos-page">
-      <div class="pos-utility-header">
-        <app-sale-operation-recovery origin="POS" (resume)="selectServerOperation($event, true)"
-          (recover)="selectServerOperation($event, false)" (cancelled)="onServerOperationCancelled($event)"></app-sale-operation-recovery>
-        <div class="pos-hero__actions">
-          <div
-            class="pos-cash-status"
-            [class.pos-cash-status--open]="currentCashSession"
-            [class.pos-cash-status--closed]="!currentCashSession"
-          >
-            <span class="pos-cash-dot" aria-hidden="true"></span>
-            <span class="pos-cash-status__copy">
-              <strong class="pos-cash-status__state">{{
-                currentCashSession ? "Caja abierta" : "Caja cerrada"
-              }}</strong>
-              <span class="pos-cash-status__detail" *ngIf="currentCashSession">
-                · Sesión #{{ currentCashSession.id }} · desde
-                {{ currentCashSession.openedAt | date: "HH:mm" }}
-              </span>
-              <span class="pos-cash-status__detail" *ngIf="!currentCashSession"
-                >· Abre caja antes de vender</span
-              >
-            </span>
-          </div>
-          <a
-            class="ui-button ui-button--secondary pos-button pos-button--quiet pos-button--compact"
-            [routerLink]="['/caja']"
-            >Ir a Caja</a
-          >
+      <header class="pos-utility-header">
+        <div class="pos-context" aria-live="polite">
+          <span class="pos-verification-status" aria-atomic="true">{{ cartVerificationAnnouncement }}</span>
+          <strong [attr.data-state]="cashPhase">{{ cashStatusLabel }}<span *ngIf="currentCashSession"> · Sesión #{{ currentCashSession.id }}</span></strong>
+          <label class="pos-warehouse" [formGroup]="saleForm"><span>Almacén de salida:</span>
+            <select formControlName="warehouseId" aria-label="Almacén de salida" [title]="selectedWarehouseLabel" [attr.disabled]="submitting || pendingSaleRequest || receiptRecovery ? '' : null">
+              <option [ngValue]="null">Selecciona almacén</option>
+              <option *ngFor="let warehouse of warehouses" [ngValue]="warehouse.id">{{ warehouse.name || warehouse.code }}</option>
+            </select>
+          </label>
+          <details class="pos-cash-details" #cashDetails (keydown.escape)="cashDetails.open = false; cashSummary.focus(); $event.stopPropagation()">
+            <summary #cashSummary>Ver caja</summary>
+            <div class="pos-cash-card">
+              <strong>{{ cashStatusLabel }}</strong>
+              <ng-container *ngIf="currentCashSession as session">
+                <span>Sesión #{{ session.id }}</span>
+                <span *ngIf="session.openedAt">Apertura: {{ session.openedAt | date:'short' }}</span>
+              </ng-container>
+              <button *ngIf="cashPhase === 'error'" type="button" class="ui-button ui-button--secondary" (click)="refreshCashSession()">Reintentar caja</button>
+              <a class="ui-button ui-button--secondary" [routerLink]="['/caja']">Abrir Caja</a>
+            </div>
+          </details>
         </div>
-      </div>
-
+        <app-sale-operation-recovery origin="POS" [contextual]="true" (resume)="selectServerOperation($event, true)"
+          (recover)="selectServerOperation($event, false)" (selectionChange)="cancelRecoverySelection()"
+          (cancelled)="onServerOperationCancelled($event)"></app-sale-operation-recovery>
+      </header>
+      <nav class="compact-cart-jump" aria-label="Accesos a la compra actual">
+        <button type="button" class="ui-button ui-button--secondary" (click)="focusNewSale()">Buscar productos</button>
+        <button type="button" class="ui-button ui-button--secondary" (click)="focusCart()">Compra · {{ cart.length }} · S/ {{ total | number:'1.2-2' }}</button>
+      </nav>
       <div class="pos-shell">
         <main class="pos-workspace">
-          <ng-container *ngIf="!pendingSaleRequest">
-            <app-pos-sale-note *ngIf="lastSaleId as confirmedSaleId" [saleId]="confirmedSaleId" (newSale)="focusNewSale()"></app-pos-sale-note>
-          </ng-container>
           <app-pos-search-panel
             [saleForm]="saleForm"
             [warehouses]="warehouses"
@@ -125,39 +126,45 @@ import { availableQuantity, decimalText, isQuantityPolicy, moneyCents, quantityH
             (clearSearch)="clearSearch($event)"
           ></app-pos-search-panel>
 
+          <section #recoveryResultNotice class="ui-alert ui-alert--info" *ngIf="visibleRecoveryResult as result" aria-label="Resultado de recuperación" tabindex="-1">
+            <p role="status" aria-live="polite">Venta #{{ result.saleId }} recuperada y confirmada.</p>
+            <p>{{ result.detail }}</p>
+            <a class="ui-button ui-button--secondary" [routerLink]="['/ventas', result.saleId]">Ver venta #{{ result.saleId }}</a>
+            <button type="button" class="ui-button ui-button--secondary" aria-label="Cerrar confirmación de recuperación" (click)="dismissRecoveryResult()">Cerrar aviso</button>
+          </section>
+
           <div
             class="message-stack"
-            *ngIf="activeErrorMessage || warningMessage || successMessage || draftReviewMessage || pendingSaleRequest || receiptRecovery || (discountAdjustmentMessage && !isFullCartOpen)"
+            *ngIf="activeErrorMessage || warningMessage || draftReviewMessage || showCartVerificationNotice || pendingSaleRequest || receiptRecovery || (discountAdjustmentMessage && !isFullCartOpen)"
           >
-            <p class="ui-alert ui-alert--error" *ngIf="activeErrorMessage">
+            <p class="ui-alert ui-alert--error" [attr.role]="priceReviewRequired ? null : 'alert'" *ngIf="activeErrorMessage && !isCheckoutModalOpen">
               {{ activeErrorMessage }}
             </p>
-            <p class="ui-alert ui-alert--info" *ngIf="warningMessage">
+            <p class="ui-alert ui-alert--info" *ngIf="warningMessage && (!receiptRecovery || warningMessage !== receiptRecoveryMessage)">
               {{ warningMessage }}
             </p>
-            <div class="ui-alert ui-alert--warning" *ngIf="priceReviewRequired && needsRevalidation" role="alert">
+            <div class="ui-alert ui-alert--warning" *ngIf="priceReviewRequired && needsRevalidation && (pendingSaleRequest || receiptRecovery)" role="alert">
               <strong>Los precios de esta venta cambiaron</strong>
               <p id="price-review-instruction">Si mantienes el carrito, no podrás cobrar hasta revisar los precios actualizados</p>
             </div>
-            <p class="ui-alert ui-alert--info" *ngIf="draftReviewMessage">{{ draftReviewMessage }}</p>
-            <button #priceReviewButton class="ui-button ui-button--secondary" type="button" *ngIf="needsRevalidation && !pendingSaleRequest && !receiptRecovery"
-              [attr.aria-describedby]="priceReviewRequired ? 'price-review-instruction' : null"
-              [disabled]="revalidating" (click)="revalidateCart()">{{ revalidating ? 'Revalidando…' : priceReviewRequired ? 'Revisar precios' : 'Revalidar borrador y revisar precios' }}</button>
-            <p class="ui-alert ui-alert--warning" *ngIf="pendingSaleRequest && !preparationRejected">Operación conservada. Consulta su estado en el servidor antes de reanudar o cancelar esta preparación.</p>
+            <section class="cart-verification ui-alert ui-alert--info" *ngIf="showCartVerificationNotice && !isCheckoutModalOpen" aria-label="Condiciones de la compra">
+              <p [attr.role]="cartCheckPhase === 'error' || cartCheckPhase === 'blocked' ? 'alert' : 'status'" style="white-space:pre-line">{{ cartVerificationMessage }}</p>
+              <button #priceReviewButton class="ui-button ui-button--secondary" type="button" [disabled]="revalidating" (click)="revalidateCart()">{{ revalidating ? 'Verificando compra…' : cartCheckPhase === 'error' ? 'Reintentar verificación' : cartCheckPhase === 'changes' ? 'Revisar cambios' : 'Comprobar condiciones' }}</button>
+            </section>
+            <p class="ui-alert ui-alert--warning" role="alert" *ngIf="pendingSaleRequest && !preparationRejected">{{ pendingPreparedVerified ? "Compra preparada, aún no confirmada. Reanuda o cancela explícitamente con su caja original." : "No se pudo confirmar el resultado de esta compra. No repitas el cobro. Comprueba la misma operación antes de reanudar o cancelar la preparación." }}</p>
             <p class="ui-alert ui-alert--warning" role="alert" *ngIf="pendingSaleRequest && preparationRejected">El servidor rechazó la preparación antes de guardarla. No se registró una venta. Puedes descartarla explícitamente para corregir el carrito.</p>
             <button *ngIf="pendingSaleRequest && preparationRejected" type="button" class="ui-button ui-button--secondary"
               [disabled]="submitting" (click)="discardRejectedPreparation()">Descartar preparación rechazada y editar</button>
             <p class="ui-alert ui-alert--warning" role="status" *ngIf="receiptRecovery && !pendingSaleRequest">{{ receiptRecoveryMessage }}</p>
-            <button class="ui-button ui-button--secondary" type="button" *ngIf="pendingSaleRequest || receiptRecovery"
-              [disabled]="submitting" (click)="finalizeSale()">{{ pendingSaleRequest ? 'Consultar operación en servidor' : receiptRecoveryActionLabel }}</button>
+
             <button *ngIf="pendingSaleRequest && preparationMissing" type="button" class="ui-button ui-button--secondary"
               [disabled]="submitting" (click)="retryMissingPreparation()">Preparar la misma operación</button>
-            <button *ngIf="pendingSaleRequest && preparedOnServer" type="button" class="ui-button ui-button--secondary"
+            <button *ngIf="pendingSaleRequest && preparedOnServer && pendingPreparedVerified" type="button" class="ui-button ui-button--secondary"
               [disabled]="submitting" (click)="confirmPreparedResume()">Reanudar preparación conservada</button>
-            <button *ngIf="pendingSaleRequest && preparedOnServer" type="button" class="ui-button ui-button--secondary"
+            <button *ngIf="pendingSaleRequest && preparedOnServer && pendingPreparedVerified" type="button" class="ui-button ui-button--secondary"
               [disabled]="submitting" (click)="cancelPendingPreparation()">Cancelar preparación para revisar el carrito</button>
             <button *ngIf="pendingSaleRequest || receiptRecovery" type="button" class="ui-button ui-button--secondary"
-              [disabled]="submitting" (click)="leaveOperationInServer()">Conservar en servidor y preparar otra compra</button>
+              [disabled]="submitting" (click)="leaveOperationInServer()">Dejar pendiente y empezar otra venta</button>
             <p
               class="ui-alert ui-alert--info"
               *ngIf="discountAdjustmentMessage && !isFullCartOpen"
@@ -166,24 +173,26 @@ import { availableQuantity, decimalText, isQuantityPolicy, moneyCents, quantityH
             >
               {{ discountAdjustmentMessage }}
             </p>
-            <p class="ui-alert ui-alert--success" *ngIf="successMessage">
-              {{ successMessage }}
-            </p>
+
           </div>
 
           <app-pos-search-results
             [searchResults]="searchResults"
+            [loading]="loadingSearch || loadingLookup"
+            [searched]="hasSearched"
+            [failed]="searchFailed"
             (addProduct)="addToCart($event)"
           ></app-pos-search-results>
         </main>
 
-        <aside class="checkout-panel" aria-label="Carrito y cobro">
+        <aside #purchasePanel class="checkout-panel" aria-label="Carrito y cobro" tabindex="-1">
           <app-pos-cart-panel
+            [editingBlocked]="submitting || !!pendingSaleRequest || !!receiptRecovery"
             [cart]="cart"
             [cartTitle]="cartTitle"
             [lineTotals]="cartLineTotals"
             (openFullCart)="openFullCart()"
-            (cancelSale)="cancelSale()"
+            (cancelSale)="confirmDiscardCart()"
             (decrease)="decreaseQuantity($event)"
             (increase)="increaseQuantity($event)"
             (remove)="removeFromCart($event)"
@@ -198,6 +207,7 @@ import { availableQuantity, decimalText, isQuantityPolicy, moneyCents, quantityH
             [discountTotal]="discountTotal"
             [paidTotal]="paidTotal"
             [change]="change"
+            [showSettlement]="paidTotal > 0"
           ></app-pos-totals-summary>
 
           <footer class="checkout-actions">
@@ -205,18 +215,11 @@ import { availableQuantity, decimalText, isQuantityPolicy, moneyCents, quantityH
               #checkoutLauncher
               type="button"
               class="ui-button ui-button--primary checkout-button"
-              (click)="openCheckoutModal()"
-              [disabled]="submitting"
+              (click)="pendingSaleRequest || receiptRecovery ? finalizeSale() : openCheckoutModal()"
+              [disabled]="checkoutDisabled"
             >
               {{ submitting ? "Cobrando..." : checkoutButtonLabel }}
             </button>
-            <a
-              *ngIf="lastSaleId"
-              class="ui-button ui-button--secondary pos-button sale-link"
-              [routerLink]="['/ventas', lastSaleId]"
-            >
-              Ver venta #{{ lastSaleId }}
-            </a>
             <a
               *ngIf="showGoToBillingAction"
               class="ui-button ui-button--secondary pos-button sale-link"
@@ -231,6 +234,7 @@ import { availableQuantity, decimalText, isQuantityPolicy, moneyCents, quantityH
       <app-pos-checkout-modal
         [isOpen]="isCheckoutModalOpen"
         [payments]="payments"
+        [paymentAmountErrors]="paymentAmountErrors"
         [receiptType]="receiptType"
         [receiptSeriesId]="receiptSeriesId"
         [receiptCustomerDocument]="receiptCustomerDocument"
@@ -251,15 +255,19 @@ import { availableQuantity, decimalText, isQuantityPolicy, moneyCents, quantityH
         [change]="change"
         [cartItemsCount]="cart.length"
         [checkoutButtonLabel]="checkoutButtonLabel"
-        [submitting]="submitting"
+        [submitting]="checkoutProcessing"
+        [reviewBlockedReason]="checkoutReviewBlockedReason"
+        [recoveryActive]="!!pendingSaleRequest || !!receiptRecovery"
         [receiptValidationError]="receiptValidationError"
+        [verificationMessage]="cartVerificationMessage"
+        [verificationPending]="revalidating"
         [errorMessage]="activeErrorMessage"
         [recoveryMessage]="!submitting && pendingSaleRequest
           ? preparationRejected ? 'Preparación rechazada sin venta registrada. Cierra esta ventana para descartar explícitamente la preparación y corregir el carrito.'
-          : 'Este cobro no tiene un resultado confirmado en pantalla. Conserva la operación y usa RECUPERAR COBRO para consultar su estado; no inicies otra venta para el mismo cobro.'
+          : 'Este cobro no tiene un resultado confirmado en pantalla. Conserva la operación y usa COMPROBAR RESULTADO para consultar su estado; no inicies otra venta para el mismo cobro.'
           : receiptRecovery?.saleId ? receiptRecoveryMessage : ''"
         (close)="closeCheckoutModal()"
-        (finalize)="finalizeSale()"
+        (finalize)="finalizeSale(true)"
         (addPayment)="addPaymentLine()"
         (removePayment)="removePaymentLine($event)"
         (updatePaymentMethod)="setPaymentMethod($event.index, $event.value)"
@@ -275,6 +283,7 @@ import { availableQuantity, decimalText, isQuantityPolicy, moneyCents, quantityH
       ></app-pos-checkout-modal>
 
       <app-pos-full-cart-modal
+        [editingBlocked]="submitting || !!pendingSaleRequest || !!receiptRecovery"
         [isOpen]="isFullCartOpen"
         [cart]="cart"
         [cartCountLabel]="cartCountLabel"
@@ -290,274 +299,24 @@ import { availableQuantity, decimalText, isQuantityPolicy, moneyCents, quantityH
         (setQuantity)="setQuantity($event.index, $event.value, $event.input)"
         (setDiscount)="setDiscount($event.index, $event.value)"
       ></app-pos-full-cart-modal>
+      <app-pos-sale-note [delivery]="confirmedDelivery" (newSale)="focusNewSale()" (closed)="focusNewSale()"></app-pos-sale-note>
+      <div *ngIf="recoveryAdoption" class="recovery-decision-backdrop" role="alertdialog" aria-modal="true"
+        aria-labelledby="recovery-decision-title" aria-describedby="recovery-decision-description"
+        appPosDialogFocus (posDialogClose)="cancelRecoverySelection()">
+        <section class="ui-card recovery-decision">
+          <h2 id="recovery-decision-title">Tienes otra compra en curso</h2>
+          <p id="recovery-decision-description">{{ recoveryAdoption.operation.state === 'PREPARED' ? 'Para recuperar esta preparación necesitas resolver primero la compra actual. No se guardará automáticamente.' : 'Para continuar este documento necesitas resolver primero la compra actual. No se guardará automáticamente.' }}</p>
+          <p role="alert" *ngIf="recoverySelectionError">{{ recoverySelectionError }}</p>
+          <p role="status" *ngIf="!submitting && !canConfirmRecoveryAdoption">La compra o la sesión cambió. Vuelve a tu compra y consulta la preparación nuevamente.</p>
+          <button type="button" class="ui-button ui-button--primary" (click)="cancelRecoverySelection()">Volver a mi compra</button>
+          <button type="button" class="ui-button ui-button--danger" [disabled]="submitting || !canConfirmRecoveryAdoption" (click)="confirmRecoveryAdoption()">{{ recoveryAdoption.operation.state === 'PREPARED' ? 'Descartar mi borrador y recuperar esta preparación' : 'Descartar mi borrador y continuar este documento' }}</button>
+        </section>
+      </div>
     </section>
   `,
-    styles: [
-        `
-      :host {
-        display: block;
-        height: 100%;
-        min-height: 0;
-      }
-
-      .pos-page {
-        --pos-gap: 0.625rem;
-        height: calc(100dvh - 7.5rem);
-        max-height: calc(100dvh - 7.5rem);
-        min-height: 0;
-        padding: var(--space-3);
-        display: grid;
-        grid-template-rows: auto minmax(0, 1fr);
-        gap: var(--pos-gap);
-        overflow: hidden;
-      }
-
-      h1 {
-        margin: 0;
-      }
-
-      .pos-utility-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        gap: .5rem;
-        flex-wrap: wrap;
-        min-height: 0;
-        margin-bottom: 0.4rem;
-      }
-
-      .pos-hero__actions {
-        display: inline-flex;
-        align-items: flex-start;
-        justify-content: flex-end;
-        gap: var(--space-2);
-        flex-wrap: wrap;
-        margin-left: auto;
-      }
-
-      .pos-hero__actions .pos-button {
-        min-height: 2rem;
-        padding: 0.34rem 0.68rem;
-        font-size: var(--font-size-sm);
-      }
-
-      .pos-cash-status {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.55rem;
-        min-height: 2rem;
-        max-width: min(36rem, 100%);
-        border: 1px solid var(--color-border-soft);
-        border-radius: var(--radius-md);
-        background: var(--color-bg-surface);
-        color: var(--color-text-primary);
-        padding: 0.45rem 0.7rem;
-        font-size: var(--font-size-sm);
-        line-height: 1.15;
-        overflow: hidden;
-        white-space: nowrap;
-        box-shadow: var(--shadow-xs, 0 1px 2px rgba(16, 17, 20, 0.06));
-      }
-
-      .pos-cash-status__copy {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.18rem;
-        min-width: 0;
-        overflow: hidden;
-      }
-
-      .pos-cash-status__state,
-      .pos-cash-status__detail {
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-
-      .pos-cash-status__state {
-        flex: 0 0 auto;
-        font-weight: 700;
-      }
-
-      .pos-cash-status__detail {
-        min-width: 0;
-        color: var(--color-text-secondary);
-        white-space: nowrap;
-      }
-
-      .pos-cash-dot {
-        width: 0.58rem;
-        height: 0.58rem;
-        flex: 0 0 auto;
-        border-radius: 999px;
-        background: var(--color-success);
-        box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.16);
-        margin-top: 0.28rem;
-      }
-
-      .pos-cash-status--closed .pos-cash-dot {
-        background: var(--color-danger);
-        box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.16);
-      }
-
-      .pos-button--compact {
-        min-width: auto;
-      }
-
-      .pos-button--quiet {
-        border-color: var(--color-border-soft);
-        background: transparent;
-        color: var(--color-text-secondary);
-      }
-
-      .pos-button--quiet:hover,
-      .pos-button--quiet:focus-visible {
-        background: var(--color-bg-soft);
-        color: var(--color-text-primary);
-      }
-
-      .pos-shell {
-        display: grid;
-        grid-template-columns: minmax(0, 0.94fr) minmax(420px, 0.74fr);
-        gap: var(--pos-gap);
-        align-items: stretch;
-        min-height: 0;
-        overflow: hidden;
-      }
-
-      .pos-workspace,
-      .checkout-panel {
-        display: grid;
-        gap: var(--pos-gap);
-        min-height: 0;
-        overflow: hidden;
-      }
-
-      .pos-workspace {
-        grid-template-rows: auto auto minmax(0, 1fr);
-      }
-
-      .checkout-panel {
-        position: static;
-        height: 100%;
-        grid-template-rows: minmax(16rem, 1.35fr) minmax(4.8rem, auto) auto;
-      }
-
-      .pos-button,
-      .checkout-button {
-        min-height: 2.55rem;
-        border-radius: var(--radius-md);
-        padding: 0.58rem var(--space-4);
-        font-size: var(--font-size-md);
-      }
-
-      .ui-button[disabled] {
-        opacity: 0.55;
-        cursor: not-allowed;
-      }
-
-      .message-stack {
-        display: grid;
-        gap: var(--space-2);
-      }
-
-      .checkout-actions {
-        display: grid;
-        gap: var(--space-2);
-      }
-
-      .checkout-button {
-        min-height: 2.65rem;
-        border-radius: var(--radius-lg);
-        background: var(--color-brand-accent);
-        font-size: clamp(1.05rem, 1.7vw, 1.35rem);
-        font-weight: 800;
-        letter-spacing: 0.04em;
-      }
-
-      .sale-link {
-        width: 100%;
-      }
-
-      @media (max-height: 820px) and (min-width: 981px) {
-        .pos-page {
-          height: calc(100dvh - 7rem);
-          max-height: calc(100dvh - 7rem);
-          padding: var(--space-2);
-        }
-
-        .pos-utility-header {
-          margin-bottom: 0.32rem;
-        }
-
-      }
-
-      @media (max-width: 980px) {
-        :host {
-          height: auto;
-        }
-
-        .pos-page {
-          height: auto;
-          max-height: none;
-          min-height: 0;
-          overflow: visible;
-        }
-
-        .pos-shell {
-          grid-template-columns: 1fr;
-          overflow: visible;
-        }
-
-        .pos-workspace,
-        .checkout-panel {
-          overflow: visible;
-          height: auto;
-        }
-
-        .checkout-panel {
-          grid-template-rows: auto;
-        }
-      }
-
-      @media (max-width: 760px) {
-        .pos-page {
-          padding: var(--space-3);
-        }
-
-        .pos-utility-header {
-          margin-bottom: 0.4rem;
-        }
-
-        .pos-hero__actions {
-          width: 100%;
-          margin-left: 0;
-        }
-
-        .pos-cash-status {
-          width: 100%;
-          max-width: none;
-          align-items: flex-start;
-          white-space: normal;
-        }
-
-        .pos-cash-status__copy {
-          display: grid;
-          gap: 0.1rem;
-        }
-
-        .pos-cash-status__detail {
-          white-space: normal;
-        }
-
-        .pos-button,
-        .checkout-button {
-          width: 100%;
-        }
-      }
-    `,
-    ]
+    styleUrl: "./pos-page.component.css",
 })
-export class PosPageComponent implements OnInit, OnDestroy {
+export class PosPageComponent implements OnInit, OnDestroy, DoCheck {
   readonly quickSearchTerms = [
     "Cartulina",
     "Papelógrafo",
@@ -577,6 +336,27 @@ export class PosPageComponent implements OnInit, OnDestroy {
 
   warehouses: WarehouseResponse[] = [];
   currentCashSession: CashRegisterResponse | null = null;
+  cashPhase: "loading" | "open" | "closed" | "error" = "loading";
+  hasSearched = false;
+  searchFailed = false;
+  get cashStatusLabel(): string {
+    return this.cashPhase === "loading" ? "Verificando caja" : this.cashPhase === "error" ? "No se pudo verificar la caja" : this.cashPhase === "open" ? "Caja abierta" : "Caja cerrada";
+  }
+  get checkoutDisabled(): boolean {
+    if (this.submitting) return true;
+    if (this.pendingSaleRequest || this.receiptRecovery) return false;
+    if (this.revalidating) return true;
+    if (this.needsRevalidation && this.cart.length && this.currentCashSession && this.cashPhase === "open") return false;
+    if (!this.cart.length || !this.currentCashSession || this.cashPhase !== "open" || !this.saleForm.value.warehouseId) return true;
+    try { for (const item of this.cart) posLineCents(item); } catch { return true; }
+    return false;
+  }
+  async confirmDiscardCart(): Promise<void> {
+    if (!this.cart.length || this.preventPendingEdit()) return;
+    const fingerprint = this.checkoutFingerprint(), token = this.authService.getToken();
+    const confirmed = await this.confirmDialog.confirm({ title: "Descartar carrito", description: "Se quitarán los productos y pagos de este borrador editable. ¿Deseas continuar?", confirmText: "Descartar carrito", cancelText: "Conservar carrito", variant: "warning" });
+    if (confirmed && !this.destroyed && !this.submitting && !this.confirmingSale && token === this.authService.getToken() && fingerprint === this.checkoutFingerprint()) this.cancelSale();
+  }
   currentUserId: string | null = null;
   searchResults: PosProductResponse[] = [];
   cart: PosCartItem[] = [];
@@ -595,14 +375,32 @@ export class PosPageComponent implements OnInit, OnDestroy {
   loadingSearch = false;
   submitting = false;
   revalidating = false;
+  cartCheckPhase: "idle" | "checking" | "changes" | "blocked" | "error" | "stale" = "idle";
+  cartCheckMessage = "";
+  private cartCheckGeneration = 0;
+  private cartCheckRead = new Subscription();
+  private cartCheckFingerprint: string | null = null;
+  private cartCheckContext: string | null = null;
+  private cartFocusTimer: ReturnType<typeof setTimeout> | undefined;
+  private verifiedCartContext: string | null = null;
+  private reviewDialogOpen = false;
+  private checkoutAfterVerification = false;
   pendingSaleRequest: CreateSaleRequest | null = null;
   preparationMissing = false;
   preparedOnServer = false;
+  pendingPreparedVerified = false;
   // In-memory certificate only: a reload must recover conservatively, never infer absence from local storage.
   preparationRejected = false;
   private rejectedPreparationToken: string | null = null;
   private durableReceiptChecked = false;
   receiptRecovery: PosReceiptRecovery | null = null;
+  // Ephemeral ownership of the displayed draft; never changes the durable command or REST payload.
+  private recoveryBinding: { operationId: string; owner: string; token: string; fingerprint: string; cashId: number | null; originalCashId: number | null } | null = null;
+  recoveryAdoption: { operation: SaleOperation; resume: boolean; token: string; owner: string; fingerprint: string; generation: number } | null = null;
+  recoverySelectionError = "";
+  private selectionGeneration = 0;
+  private selectionReads = new Subscription();
+  private selectionBusy = false;
   private confirmingSale = false;
   private pendingOwnerBlocked = false;
   private foreignDraftPreserved = false;
@@ -617,11 +415,20 @@ export class PosPageComponent implements OnInit, OnDestroy {
   discountAdjustmentMessage = "";
   successMessage = "";
   lastSaleId: number | null = null;
+  confirmedDelivery: PosConfirmedDelivery | null = null;
+  private recoveredResult: Readonly<{ operationId: string; saleId: number; owner: string; credential: string; detail: string }> | null = null;
+  private deliveryCandidate: { operationId: string; token: string } | null = null;
   @ViewChild(PosSearchPanelComponent) private noteSearchPanel?: PosSearchPanelComponent;
+  @ViewChild("recoveryResultNotice") private recoveryResultNotice?: ElementRef<HTMLElement>;
   focusNewSale(): void { this.noteSearchPanel?.focusSearch(); }
   showGoToBillingAction = false;
   draftReviewMessage = "";
   priceReviewRequired = false;
+  @ViewChild("purchasePanel") private purchasePanel?: ElementRef<HTMLElement>;
+  focusCart(): void {
+    const panel = this.purchasePanel?.nativeElement;
+    if (panel?.isConnected) { panel.focus({ preventScroll: true }); panel.scrollIntoView({ block: "start", behavior: "auto" }); }
+  }
   @ViewChild("checkoutLauncher") private checkoutLauncher?: ElementRef<HTMLButtonElement>;
   private priceReviewButtonRef?: ElementRef<HTMLButtonElement>;
   @ViewChild("priceReviewButton")
@@ -671,7 +478,28 @@ export class PosPageComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.destroyed = true;
+    clearTimeout(this.cartFocusTimer);
+    this.cancelCartVerification();
+    this.cancelRecoverySelection();
     this.subscriptions.unsubscribe();
+  }
+
+  ngDoCheck(): void {
+    if (this.recoveredResult && (this.recoveredResult.credential !== this.authService.getToken()
+        || this.recoveredResult.owner !== this.currentUserId)) this.dismissRecoveryResult();
+    if (this.pendingSaleRequest || this.receiptRecovery || this.pendingOwnerBlocked) return;
+    if ((this.cartCheckFingerprint && this.cartCheckFingerprint !== this.cartVerificationFingerprint())
+        || (this.cart.length && this.verifiedCartContext && this.verifiedCartContext !== this.cartVerificationContext())) {
+      const previous = JSON.parse(this.cartCheckContext ?? this.verifiedCartContext ?? "[]"), current = JSON.parse(this.cartVerificationContext());
+      const reason = previous[4] !== current[4] ? "El almacén cambió" : previous[2] !== current[2] || previous[3] !== current[3] ? "La caja cambió"
+        : previous[0] !== current[0] || previous[1] !== current[1] ? "La sesión o el usuario cambió" : "Los productos, descuentos o pagos cambiaron";
+      this.cancelCartVerification();
+      this.cart = this.cart.map(item => ({ ...item, requiresRevalidation: true }));
+      this.cartCheckPhase = "stale";
+      this.cartCheckMessage = reason + ". Comprueba las condiciones actuales antes de cobrar.";
+      this.verifiedCartContext = null; this.persistDraftState();
+    }
+    if (!this.cart.length && this.cartCheckPhase !== "idle") { this.cancelCartVerification(); this.cartCheckPhase = "idle"; this.cartCheckMessage = ""; }
   }
 
   private bindDraftPersistence(): void {
@@ -708,7 +536,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
             return;
           }
           this.cart = this.cart.map(item => ({ ...item, requiresRevalidation: true }));
-          if (this.cart.length) this.draftReviewMessage = "El almacén cambió: revalida disponibilidad antes de cobrar.";
+          if (this.cart.length) { this.cartCheckPhase = "stale"; this.cartCheckMessage = "El almacén cambió. Comprueba la disponibilidad antes de cobrar."; }
           this.clearStockMessage();
           this.persistDraftState();
         }
@@ -823,10 +651,8 @@ export class PosPageComponent implements OnInit, OnDestroy {
     this.restoredDraftTotal = draft.preliminaryTotal ?? null;
     this.draftSourceFormatVersion = draft.sourceFormatVersion ?? draft.formatVersion ?? 0;
     this.draftValidationIssues = draft.validationIssues ?? [];
-    this.draftReviewMessage = this.cart.length
-      ? "Borrador restaurado: precios, políticas y stock pendientes de revalidación. Los importes originales se conservarán hasta tu aceptación."
-      : "";
-    if (draft.validationIssues?.length) this.draftReviewMessage += ` ${draft.validationIssues.join(" ")}`;
+    this.draftReviewMessage = "";
+
     if (this.receiptRecovery?.saleId) this.draftReviewMessage = "";
     this.payments =
       draft.payments.length > 0
@@ -854,7 +680,9 @@ export class PosPageComponent implements OnInit, OnDestroy {
     this.stockMessage = "";
     this.isHydratingDraft = false;
 
+    if (this.receiptRecovery) this.bindRecovery(draft.cashRegisterSessionId);
     this.persistDraftState();
+    if (!this.pendingSaleRequest && !this.receiptRecovery && this.cart.length) this.revalidateCart();
   }
 
   private initializeEmptyDraft(
@@ -950,6 +778,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
   }
 
   private resetDraftAfterCheckout(preserveLastSaleId: boolean): void {
+    if (this.receiptRecovery && !this.requireRecoveryBinding()) return;
     if (this.pendingSaleRequest || (this.receiptRecovery && this.receiptRecovery.creationState !== "CONFIRMED"
         && !(this.receiptRecovery.receiptType === "TICKET" && this.receiptRecovery.saleId
           && this.receiptRecovery.creationState === "NOT_STARTED"))) {
@@ -957,6 +786,8 @@ export class PosPageComponent implements OnInit, OnDestroy {
       return;
     }
     this.receiptRecovery = null;
+    this.recoveryBinding = null;
+    this.pendingPreparedVerified = false;
     this.durableReceiptChecked = false;
     const warehouseId = this.saleForm.value.warehouseId ?? null;
 
@@ -1091,7 +922,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
           ];
 
     return [
-      "Estas a punto de registrar una venta real.",
+      "Revisa el documento, los productos y los pagos antes de confirmar.",
       "",
       this.receiptType === "TICKET"
         ? "Se registrará una venta interna."
@@ -1137,6 +968,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
         this.saleForm.patchValue({ code: "" });
         this.clearSearchState({ clearInput: false });
         this.persistDraftState();
+        this.noteSearchPanel?.focusSearch();
       },
       error: (error: unknown) => {
         if (!this.isCurrentSearchRequest(requestVersion)) {
@@ -1180,6 +1012,8 @@ export class PosPageComponent implements OnInit, OnDestroy {
 
     const requestVersion = this.bumpSearchRequestVersion();
     this.loadingSearch = true;
+    this.hasSearched = true;
+    this.searchFailed = false;
     this.searchErrorMessage = "";
     this.clearStockMessage();
     this.successMessage = "";
@@ -1203,6 +1037,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
         }
 
         this.loadingSearch = false;
+        this.searchFailed = true;
         this.searchErrorMessage = toHttpErrorMessage(
           error,
           "No se pudo realizar la búsqueda por nombre.",
@@ -1245,6 +1080,8 @@ export class PosPageComponent implements OnInit, OnDestroy {
     this.loadingLookup = false;
     this.loadingSearch = false;
     this.searchResults = [];
+    this.hasSearched = false;
+    this.searchFailed = false;
     this.searchErrorMessage = "";
     this.stockMessage = "";
 
@@ -1306,14 +1143,15 @@ export class PosPageComponent implements OnInit, OnDestroy {
       this.finalizeSale();
       return;
     }
-    if (this.priceReviewRequired && this.needsRevalidation) {
-      this.revalidateCart();
+    if (!this.pendingSaleRequest && !this.receiptRecovery && this.needsRevalidation) {
+      this.revalidateCart(true);
       return;
     }
     this.isCheckoutModalOpen = true;
   }
 
   closeCheckoutModal(): void {
+    this.checkoutAfterVerification = false;
     this.isCheckoutModalOpen = false;
   }
 
@@ -1328,10 +1166,6 @@ export class PosPageComponent implements OnInit, OnDestroy {
       this.errorMessage =
         "Selecciona un almacén antes de agregar productos al carrito.";
       return;
-    }
-
-    if (this.cart.length === 0 && this.lastSaleId !== null) {
-      this.lastSaleId = null;
     }
 
     const existing = this.cart.find(
@@ -1556,11 +1390,17 @@ export class PosPageComponent implements OnInit, OnDestroy {
     try {
       payment.amount = scaledNumber(moneyCents(rawValue, "El pago"));
       delete payment.amountInput;
-    } catch (error) {
+    } catch {
       payment.amountInput = rawValue;
-      this.errorMessage = error instanceof Error ? error.message : "Pago no válido.";
     }
     this.persistDraftState();
+  }
+
+  get paymentAmountErrors(): string[] {
+    return this.payments.map(payment => {
+      try { moneyCents(payment.amountInput ?? payment.amount, "El pago"); return ""; }
+      catch (error) { return error instanceof Error ? error.message : "Pago no válido."; }
+    });
   }
 
   setPaymentReference(index: number, rawValue: string): void {
@@ -1624,11 +1464,11 @@ export class PosPageComponent implements OnInit, OnDestroy {
     if (this.receiptRecovery?.receiptType === "UNKNOWN") return "Comprobante original desconocido";
     switch (this.receiptType) {
       case "RECEIPT":
-        return "Boleta";
+        return "Boleta electrónica";
       case "INVOICE":
-        return "Factura";
+        return "Factura electrónica";
       default:
-        return "Ticket interno";
+        return "Nota de venta";
     }
   }
 
@@ -1638,9 +1478,22 @@ export class PosPageComponent implements OnInit, OnDestroy {
       if (this.receiptRecovery.payload) return this.receiptRecovery.creationState === "NOT_STARTED" ? "CREAR COMPROBANTE" : "CONSULTAR COMPROBANTE";
       return "REVISAR COMPROBANTE";
     }
-    if (this.pendingSaleRequest) return "RECUPERAR COBRO";
-    return this.receiptType === "TICKET" ? "COBRAR" : "COBRAR Y EMITIR";
+    if (this.pendingSaleRequest) return this.pendingPreparedVerified ? "REVISAR PREPARACIÓN" : "COMPROBAR RESULTADO";
+    if (this.revalidating) return "Verificando compra…";
+    if (this.needsRevalidation) return this.cartCheckPhase === "changes" ? "Revisar cambios" : this.cartCheckPhase === "blocked" ? "Revisar carrito" : this.cartCheckPhase === "error" ? "Reintentar verificación" : "Verificar compra";
+    return "COBRAR";
   }
+
+  get checkoutReviewBlockedReason(): string {
+    if (this.submitting || this.confirmingSale) return "Procesando la operación…";
+    if (this.pendingOwnerBlocked) return "La operación pertenece a otra identidad. Conserva el contexto y verifica la sesión.";
+    if (this.pendingSaleRequest || this.receiptRecovery) return "";
+    if (this.revalidating) return "Verificando las condiciones de la compra…";
+    if (this.needsRevalidation) return this.cartVerificationMessage || "Debes verificar las condiciones de la compra antes de confirmar.";
+    const error = this.validateSaleBeforeSubmit();
+    return error && this.paymentAmountErrors.includes(error) ? "Revisa los montos de pago indicados." : error;
+  }
+  get checkoutProcessing(): boolean { return this.submitting || this.confirmingSale; }
 
   get receiptRecoveryActionLabel(): string {
     const context = this.receiptRecovery;
@@ -1727,23 +1580,31 @@ export class PosPageComponent implements OnInit, OnDestroy {
   }
 
   refreshCashSession(): void {
-    this.cashRegisterService.current().subscribe({
+    this.cashPhase = "loading";
+    this.currentCashSession = null;
+    this.subscriptions.add(this.cashRegisterService.current().subscribe({
       next: (session) => {
-        this.currentCashSession = session;
+        const open = session?.status === "OPEN" && Number.isSafeInteger(session.id) && session.id > 0;
+        this.currentCashSession = open ? session : null;
+        this.cashPhase = open ? "open" : "error";
         this.cashSessionLoaded = true;
         this.maybeRestoreDraft();
       },
-      error: () => {
+      error: (error: unknown) => {
         this.currentCashSession = null;
+        this.cashPhase = error instanceof HttpErrorResponse && error.status === 404 && error.error?.message === "No OPEN cash register session for current user" ? "closed" : "error";
         this.cashSessionLoaded = true;
         this.maybeRestoreDraft();
       },
-    });
+    }));
   }
 
-  finalizeSale(): void {
+  finalizeSale(fromCheckoutReview = false): void {
+    // Only the explicit action in the mounted checkout can supply the integrated review decision.
+    if (fromCheckoutReview && !this.isCheckoutModalOpen) return;
     if (this.pendingOwnerBlocked) { this.preventPendingEdit(); return; }
     if (this.submitting || this.confirmingSale || this.revalidating) return;
+    if ((this.pendingSaleRequest || this.receiptRecovery) && !this.requireRecoveryBinding()) return;
     if (this.receiptRecovery && !this.receiptRecoveryOwnerMatches()) {
       this.errorMessage = "El comprobante pendiente pertenece a otra identidad o contiene datos incompatibles. Conserva la operación para revisión.";
       return;
@@ -1756,15 +1617,20 @@ export class PosPageComponent implements OnInit, OnDestroy {
       this.queryPendingOperation();
       return;
     }
+    if (this.needsRevalidation) { this.revalidateCart(true); return; }
     this.errorMessage = "";
     this.warningMessage = "";
     this.successMessage = "";
     this.lastSaleId = null;
+    this.deliveryCandidate = null;
+    this.confirmedDelivery = null;
+    this.dismissRecoveryResult();
     this.showGoToBillingAction = false;
 
     const validationError = this.validateSaleBeforeSubmit();
     if (validationError) {
-      this.errorMessage = validationError;
+      // Amount errors belong to their current fields, including a validation at confirmation time.
+      if (!this.paymentAmountErrors.includes(validationError)) this.errorMessage = validationError;
       return;
     }
 
@@ -1774,21 +1640,23 @@ export class PosPageComponent implements OnInit, OnDestroy {
       saleId: null, documentId: null, creationState: "NOT_STARTED" });
     const fingerprint = this.checkoutFingerprint();
     this.confirmingSale = true;
-    void this.confirmDialog.confirm({
+    const decision = fromCheckoutReview ? Promise.resolve(true) : this.confirmDialog.confirm({
       title: "Confirmar venta",
       description: this.buildFinalizeConfirmationMessage(),
-      highlightText: "Venta real",
+      highlightText: "Confirmación del cobro",
       confirmText: "Cobrar",
       cancelText: "Cancelar",
-      variant: "warning",
-    }).then((confirmed) => {
+      variant: "info",
+    });
+    void decision.then((confirmed) => {
       if (!confirmed) {
         return;
       }
+      if (fromCheckoutReview && (this.destroyed || !this.isCheckoutModalOpen)) return;
 
       const currentValidationError = this.validateSaleBeforeSubmit();
       if (currentValidationError) {
-        this.errorMessage = currentValidationError;
+        if (!this.paymentAmountErrors.includes(currentValidationError)) this.errorMessage = currentValidationError;
         return;
       }
       if (fingerprint !== this.checkoutFingerprint()) {
@@ -1797,6 +1665,8 @@ export class PosPageComponent implements OnInit, OnDestroy {
       }
 
       this.receiptRecovery = receipt;
+      this.bindRecovery(this.currentCashSession?.id ?? null);
+      this.deliveryCandidate = { operationId: payload.operationId, token: this.authService.getToken()! };
       this.submitConfirmedSale(payload);
     }).finally(() => this.confirmingSale = false);
   }
@@ -1827,6 +1697,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
       this.pendingSaleRequest = payload;
       this.persistDraftState();
       this.submitting = true;
+      this.pendingPreparedVerified = false;
       this.preparationRejected = false;
       this.rejectedPreparationToken = null;
       let preparationConfirmed = prepared;
@@ -1855,6 +1726,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
               }
               preparationConfirmed = true;
               this.preparedOnServer = true;
+              this.recoveryBinding!.originalCashId = operation.cashRegisterSessionId;
               if (this.authService.getToken() !== context.get(BOUND_AUTH_CREDENTIALS)?.token) throw new BoundAuthSessionError();
               return this.salesService.create(payload, context);
             }));
@@ -1865,11 +1737,23 @@ export class PosPageComponent implements OnInit, OnDestroy {
           this.pendingSaleRequest = null;
           this.lastSaleId = sale.id;
           this.receiptRecovery = immutableReceiptRecovery({ ...this.receiptRecovery!, saleId: sale.id });
+          this.bindRecovery(this.recoveryBinding?.originalCashId ?? null);
+          if (this.deliveryCandidate?.operationId === payload.operationId && this.deliveryCandidate.token === this.authService.getToken()
+              && sale.status === "COMPLETED" && Number.isSafeInteger(sale.id) && sale.id > 0 && Number.isFinite(sale.totalAmount)) {
+            this.confirmedDelivery = Object.freeze({ operationId: payload.operationId, saleId: sale.id, totalAmount: sale.totalAmount,
+              credential: this.deliveryCandidate.token, receiptType: this.receiptRecovery.receiptType });
+            this.isCheckoutModalOpen = false; this.isFullCartOpen = false;
+          } else if (prepared && sale.status === "COMPLETED") {
+            this.rememberRecoveryResult(sale.id, payload.operationId, this.receiptRecoveryMessage);
+          }
+          this.deliveryCandidate = null;
           this.persistDraftState();
           this.continueReceiptRecovery(sale.saleNumber);
         },
         error: (error: unknown) => {
           this.submitting = false;
+          this.deliveryCandidate = null;
+          if (!this.requireRecoveryBinding()) return;
           const response = error as HttpErrorResponse;
           const priceConflict = response.status === 409 && response.error?.code === "PRICE_CONFIRMATION_REQUIRED";
           // A confirmed preparation survives checkout rejection; only a separate NOT_STORED certificate proves absence.
@@ -1880,6 +1764,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
             this.isFullCartOpen = false;
           }
           if (priceConflict) {
+            this.pendingPreparedVerified = true;
             this.isCheckoutModalOpen = false;
             this.isFullCartOpen = false;
             this.priceReviewRequired = true;
@@ -1887,6 +1772,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
             this.draftReviewMessage = `Total confirmado S/ ${decimalText(moneyCents(response.error.confirmedTotal))}; total vigente ${response.error.proposedTotal === null ? 'requiere revisar descuentos' : 'S/ ' + decimalText(moneyCents(response.error.proposedTotal))}. ` +
               response.error.changes.map((c: { productId: number; confirmedUnitPrice: number; currentUnitPrice: number }) =>
                 `Producto #${c.productId}: S/ ${decimalText(moneyCents(c.confirmedUnitPrice))} → S/ ${decimalText(moneyCents(c.currentUnitPrice))}.`).join(" ");
+            this.bindRecovery(this.recoveryBinding?.originalCashId ?? null);
           }
           this.errorMessage = this.preparationRejected
             ? "La preparación fue rechazada antes de guardarse. No se registró una venta. Descártala para corregir el carrito."
@@ -1933,9 +1819,10 @@ export class PosPageComponent implements OnInit, OnDestroy {
     void this.confirmDialog.confirm({ title: "Descartar preparación rechazada",
       description: "El servidor confirmó que no la guardó. Se conservarán productos, importes y comprobante para corregirlos. No se ejecutará ningún cobro.",
       confirmText: "Descartar y editar", cancelText: "Conservar", variant: "warning" }).then(ok => {
-      if (!ok || this.destroyed || !this.preparationRejected || this.pendingSaleRequest !== payload
+      if (!ok || this.destroyed || !this.requireRecoveryBinding() || !this.preparationRejected || this.pendingSaleRequest !== payload
           || this.receiptRecovery !== recovery || this.authService.getToken() !== token || !this.receiptRecoveryOwnerMatches()) return;
       this.pendingSaleRequest = null; this.receiptRecovery = null; this.preparationRejected = false;
+      this.recoveryBinding = null;
       this.rejectedPreparationToken = null;
       this.preparedOnServer = false; this.preparationMissing = false;
       this.cart = this.cart.map(item => ({ ...item, requiresRevalidation: true }));
@@ -1946,47 +1833,151 @@ export class PosPageComponent implements OnInit, OnDestroy {
   }
 
   selectServerOperation(operation: SaleOperation, resume: boolean): void {
-    if (this.submitting || operation.origin !== "POS") return;
-    if ((this.pendingSaleRequest || this.receiptRecovery) && this.receiptRecovery?.operationId !== operation.operationId) {
-      this.warningMessage = "Conserva primero la operación actual en el servidor antes de seleccionar otra."; return;
-    }
-    if (!this.currentUserId) { this.errorMessage = "Verifica tu sesión antes de recuperar."; return; }
-    const operationId = operation.operationId;
-    this.submitting = true;
-    const expectedOwner = this.currentUserId;
-    this.subscriptions.add(defer(() => {
-      const token = this.authService.getToken(); const context = createBoundAuthContext(token);
-      return this.authService.me(context).pipe(switchMap(actor => {
-        if (actor.id !== expectedOwner) throw new BoundAuthSessionError();
-        return this.saleOperations.get(operationId, context).pipe(map(result => {
-          if (this.destroyed || this.authService.getToken() !== token) throw new BoundAuthSessionError();
-          return result;
-        }));
-      }));
-    }).subscribe({ next: result => { this.submitting = false; this.applyServerOperation(result);
-      if (resume && result.state === "PREPARED" && this.pendingSaleRequest) this.confirmPreparedResume(); },
-      error: error => { this.submitting = false; this.errorMessage = toHttpErrorMessage(error, "No se pudo recuperar esta operación."); } }));
+    if (this.submitting || this.confirmingSale || operation.origin !== "POS" || this.historicalOperation(operation)) return;
+    if (!this.compatibleRecoverySelection(operation)) return;
+    const token = this.authService.getToken(), owner = this.currentUserId;
+    if (!token || !owner) { this.errorMessage = "Verifica tu sesión antes de recuperar."; return; }
+    this.cancelRecoverySelection();
+    const selection = { operation: structuredClone(operation), resume, token, owner,
+      fingerprint: this.draftContextFingerprint(), generation: this.selectionGeneration };
+    this.readRecoverySelection(selection, result => {
+      if (!this.recoverableOperation(result)) return;
+      selection.operation = result;
+      if (this.hasEditablePurchase()) this.recoveryAdoption = selection;
+      else this.adoptVerifiedOperation(selection, result);
+    });
   }
 
-  private applyServerOperation(operation: SaleOperation): void {
-    this.preparationRejected = false;
-    this.rejectedPreparationToken = null;
+  cancelRecoverySelection(): void {
+    this.selectionGeneration++; this.selectionReads.unsubscribe(); this.selectionReads = new Subscription();
+    if (this.selectionBusy) this.submitting = false;
+    this.selectionBusy = false; this.recoveryAdoption = null; this.recoverySelectionError = "";
+  }
+
+  confirmRecoveryAdoption(): void {
+    const selection = this.recoveryAdoption;
+    if (!selection || this.submitting || !this.validRecoverySelection(selection) || !this.canDiscardForRecovery()) {
+      this.recoverySelectionError = "La compra o la sesión cambió. Vuelve a tu compra y consulta la preparación nuevamente."; return;
+    }
+    this.readRecoverySelection(selection, result => {
+      // No local discard occurs until the original decision and a fresh owner-bound server read both remain valid.
+      if (!this.canDiscardForRecovery() || !this.recoverableOperation(result)) return;
+      if (JSON.stringify(result) !== JSON.stringify(selection.operation)) {
+        this.recoverySelectionError = "La preparación cambió. No se descartó tu compra. Vuelve y consulta su estado actualizado."; return;
+      }
+      this.adoptVerifiedOperation(selection, result);
+    });
+  }
+
+  get canConfirmRecoveryAdoption(): boolean {
+    return !!this.recoveryAdoption && this.validRecoverySelection(this.recoveryAdoption) && this.canDiscardForRecovery();
+  }
+
+  private compatibleRecoverySelection(operation: SaleOperation): boolean {
+    const activeId = this.receiptRecovery?.operationId ?? this.pendingSaleRequest?.operationId;
+    if (this.pendingOwnerBlocked || (activeId && activeId !== operation.operationId)) {
+      this.warningMessage = "Conserva primero la operación actual en el servidor antes de seleccionar otra."; return false;
+    }
+    return !activeId || this.requireRecoveryBinding();
+  }
+
+  private historicalOperation(operation: SaleOperation): boolean {
+    return operation.state === "COMPLETED" && !!operation.saleId && ["NOT_REQUIRED", "LOCATED"].includes(operation.receiptState);
+  }
+
+  private recoverableOperation(operation: SaleOperation): boolean {
+    if (this.historicalOperation(operation)) {
+      this.warningMessage = "La venta ya está registrada. Usa Ver venta para consultar su detalle sin cambiar tu compra."; return false;
+    }
+    return this.validOperation(operation);
+  }
+
+  private validOperation(operation: SaleOperation): boolean {
+    if (!/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(operation.operationId)) {
+      this.errorMessage = "La operación no contiene una identidad válida. No se modificó la compra."; return false;
+    }
     if (operation.origin !== "POS" || operation.protocolVersion !== 1) {
-      this.warningMessage = "Operación histórica o de cotización: consulta su venta o abre su conversión original."; return;
+      this.warningMessage = "Operación histórica o de cotización: consulta su venta o abre su conversión original."; return false;
     }
     if (operation.state === "RESULT_UNAVAILABLE" || operation.state === "CANCELLED") {
       this.errorMessage = operation.state === "CANCELLED" ? "Esta operación está cancelada y no puede reactivarse." : "El resultado fue retirado. Conserva la referencia para revisión; no repitas el cobro.";
-      return;
+      return false;
     }
     if ((operation.state === "PREPARED" && (!operation.command || operation.command.operationId !== operation.operationId
-        || !operation.receiptIntent || !operation.cashRegisterSessionId)) || (operation.state === "COMPLETED" && !operation.saleId)) {
+        || !operation.receiptIntent || !operation.cashRegisterSessionId || !Number.isSafeInteger(operation.command.warehouseId)
+        || operation.command.warehouseId <= 0 || !Array.isArray(operation.command.items) || !operation.command.items.length
+        || !Array.isArray(operation.command.payments) || !operation.command.payments.length)) || (operation.state === "COMPLETED" && !operation.saleId)) {
       this.errorMessage = "La operación no contiene una identidad o intención recuperable completa. Conserva la referencia para revisión.";
-      return;
+      return false;
     }
+    return ["PREPARED", "COMPLETED"].includes(operation.state);
+  }
+
+  private draftContextFingerprint(): string {
+    return JSON.stringify([this.checkoutFingerprint(), this.currentUserId, this.currentCashSession?.id ?? null,
+      this.lastSaleId, this.pendingSaleRequest, this.receiptRecovery, this.pendingOwnerBlocked]);
+  }
+
+  private hasEditablePurchase(): boolean {
+    if (this.pendingSaleRequest || this.receiptRecovery) return false;
+    return !!this.cart.length || this.payments.length !== 1 || this.payments.some(payment =>
+      payment.paymentMethod !== "CASH" || String(payment.amountInput ?? payment.amount) !== "0" || !!payment.reference.trim())
+      || this.receiptType !== "TICKET" || !!this.receiptSeriesId || !!this.receiptCustomerDocument
+      || !!this.receiptCustomerName || !!this.receiptCustomerAddress;
+  }
+
+  private canDiscardForRecovery(): boolean {
+    return !this.destroyed && !this.pendingOwnerBlocked && !this.pendingSaleRequest && !this.receiptRecovery && !this.confirmingSale && !this.revalidating;
+  }
+
+  private validRecoverySelection(selection: NonNullable<PosPageComponent["recoveryAdoption"]>): boolean {
+    return !this.destroyed && selection.generation === this.selectionGeneration && selection.token === this.authService.getToken()
+      && selection.owner === this.currentUserId && selection.fingerprint === this.draftContextFingerprint();
+  }
+
+  private readRecoverySelection(selection: NonNullable<PosPageComponent["recoveryAdoption"]>, accept: (operation: SaleOperation) => void): void {
+    if (!this.validRecoverySelection(selection)) return;
+    this.submitting = true; this.selectionBusy = true;
+    this.selectionReads.add(defer(() => {
+      const context = createBoundAuthContext(selection.token);
+      return this.authService.me(context).pipe(switchMap(actor => {
+        if (actor.id !== selection.owner || !this.validRecoverySelection(selection)) throw new BoundAuthSessionError();
+        return this.saleOperations.get(selection.operation.operationId, context);
+      }), map(result => {
+        if (!this.validRecoverySelection(selection)) throw new BoundAuthSessionError();
+        if (result.operationId !== selection.operation.operationId) throw new Error("La respuesta no corresponde a la operación seleccionada.");
+        return result;
+      }));
+    }).subscribe({ next: result => {
+      this.selectionBusy = false; this.submitting = false;
+      if (this.validRecoverySelection(selection)) accept(result);
+    }, error: error => {
+      this.selectionBusy = false; this.submitting = false;
+      const message = toHttpErrorMessage(error, "No se pudo verificar esta preparación. Tu compra no se modificó.");
+      if (this.recoveryAdoption) this.recoverySelectionError = message; else this.errorMessage = message;
+    } }));
+  }
+
+  private adoptVerifiedOperation(selection: NonNullable<PosPageComponent["recoveryAdoption"]>, operation: SaleOperation): void {
+    if (!this.validRecoverySelection(selection) || !this.compatibleRecoverySelection(operation)) return;
+    this.recoveryAdoption = null;
+    this.deliveryCandidate = null;
+    if (!this.applyServerOperation(operation, true)) return;
+    if (selection.resume && operation.state === "PREPARED") this.confirmPreparedResume();
+  }
+
+  private applyServerOperation(operation: SaleOperation, adopting = false): boolean {
+    if (!this.validOperation(operation)) return false;
+    const activeId = this.receiptRecovery?.operationId ?? this.pendingSaleRequest?.operationId;
+    if (activeId ? activeId !== operation.operationId || !this.requireRecoveryBinding() : !adopting) return false;
+    if (activeId && !this.operationMatchesBinding(operation)) return false;
+    this.preparationRejected = false;
+    this.rejectedPreparationToken = null;
     this.pendingOwnerBlocked = false;
     this.durableReceiptChecked = false;
     this.preparationMissing = false;
     this.preparedOnServer = operation.state === "PREPARED";
+    this.pendingPreparedVerified = operation.state === "PREPARED";
     this.pendingSaleRequest = operation.state === "PREPARED" && operation.command ? immutableRequest(operation.command) : null;
     this.receiptRecovery = immutableReceiptRecovery({ version: 1, userId: this.currentUserId, operationId: operation.operationId,
       receiptType: operation.receiptIntent?.receiptType ?? "UNKNOWN", payload: operation.receiptIntent?.payload ?? null,
@@ -1997,26 +1988,67 @@ export class PosPageComponent implements OnInit, OnDestroy {
     this.receiptCustomerName = operation.receiptIntent?.payload?.customerName ?? "";
     this.receiptCustomerDocument = operation.receiptIntent?.payload?.customerDocument ?? "";
     const request = this.pendingSaleRequest;
+    if (adopting && !activeId) { this.cart = []; this.payments = [{ paymentMethod: "CASH", amount: 0, reference: "" }]; this.lastSaleId = null; }
     if (request) {
       this.saleForm.patchValue({ warehouseId: request.warehouseId }, { emitEvent: false });
       this.cart = request.items.map(item => ({ productId: item.productId, sku: `#${item.productId}`, name: `Producto #${item.productId}`,
         barcode: null, quantity: item.quantity, discountAmount: item.discountAmount ?? 0, salePrice: item.confirmedUnitPrice,
         stockAvailable: 0, requiresRevalidation: true }));
       this.payments = request.payments.map(payment => ({ ...payment, reference: payment.reference ?? "" }));
-      this.warningMessage = `Preparación recuperada en caja #${operation.cashRegisterSessionId}. Importe confirmado: S/ ${decimalText(moneyCents(request.confirmedTotal))}. Selecciona Reanudar en Mis operaciones o cancela para revisar precios.`;
+      this.warningMessage = `Preparación recuperada en caja #${operation.cashRegisterSessionId}. Importe confirmado: S/ ${decimalText(moneyCents(request.confirmedTotal))}. Reanuda explícitamente esta preparación o cancélala para revisar precios.`;
     } else {
       this.lastSaleId = operation.saleId;
       this.successMessage = `Venta #${operation.saleId} confirmada. Comprobante: ${operation.receiptState}${operation.documentStatus ? ' (' + operation.documentStatus + ')' : ''}.`;
       this.warningMessage = operation.receiptState === "LOCATED" ? "Comprobante localizado. Su estado fiscal se muestra por separado; no se creó otro documento." : this.receiptRecoveryMessage;
     }
+    this.bindRecovery(operation.cashRegisterSessionId);
+    if (operation.state === "COMPLETED" && operation.saleId) {
+      this.rememberRecoveryResult(operation.saleId, operation.operationId, this.receiptRecoveryMessage);
+    }
     this.persistDraftState();
+    return true;
+  }
+
+  private bindRecovery(originalCashId: number | null): void {
+    const recovery = this.receiptRecovery, token = this.authService.getToken();
+    this.recoveryBinding = recovery?.operationId && recovery.userId && token ? {
+      operationId: recovery.operationId, owner: recovery.userId, token, fingerprint: this.recoveryDraftFingerprint(),
+      cashId: this.currentCashSession?.id ?? null, originalCashId,
+    } : null;
+  }
+
+  private recoveryBindingMatches(): boolean {
+    const binding = this.recoveryBinding;
+    return !!binding && !this.destroyed && this.receiptRecoveryOwnerMatches() && this.receiptRecovery?.operationId === binding.operationId
+      && binding.owner === this.currentUserId
+      && binding.cashId === (this.currentCashSession?.id ?? null) && binding.fingerprint === this.recoveryDraftFingerprint();
+  }
+
+  private recoveryDraftFingerprint(): string {
+    // Fiscal fields are frozen in receiptRecovery; unconfirmed live fields never replace that intent.
+    return JSON.stringify([this.saleForm.value.warehouseId, this.cart, this.payments]);
+  }
+
+  private requireRecoveryBinding(): boolean {
+    if (this.recoveryBindingMatches()) return true;
+    this.errorMessage = "La compra o la sesión ya no corresponde a esta recuperación. No se modificó el carrito. Vuelve a consultar la operación con su usuario original.";
+    return false;
+  }
+
+  private operationMatchesBinding(operation: SaleOperation): boolean {
+    const binding = this.recoveryBinding, recovery = this.receiptRecovery;
+    const matches = !!binding && operation.operationId === binding.operationId && operation.origin === "POS" && operation.protocolVersion === 1
+      && (binding.originalCashId === null || operation.cashRegisterSessionId === binding.originalCashId)
+      && (!recovery?.saleId || operation.saleId === recovery.saleId);
+    if (!matches) this.errorMessage = "La respuesta no corresponde al contexto original. Conserva la compra y consulta nuevamente.";
+    return matches;
   }
 
   confirmPreparedResume(): void {
     const payload = this.pendingSaleRequest;
     if (!payload || !this.preparedOnServer || this.confirmingSale || this.submitting) return;
     this.confirmingSale = true;
-    void this.confirmDialog.confirm({ title: "Reanudar preparación", description: `Se ejecutará la operación ${payload.operationId} con su caja e importes originales. Total S/ ${decimalText(moneyCents(payload.confirmedTotal))}.`,
+    void this.confirmDialog.confirm({ title: "Reanudar preparación", description: `Se ejecutará esta preparación con su caja e importes originales. Total S/ ${decimalText(moneyCents(payload.confirmedTotal))}.`,
       confirmText: "Reanudar mismo cobro", cancelText: "Conservar", variant: "warning" }).then(ok => { if (ok && this.pendingSaleRequest === payload) this.submitConfirmedSale(payload, true); }).finally(() => this.confirmingSale = false);
   }
 
@@ -2036,22 +2068,29 @@ export class PosPageComponent implements OnInit, OnDestroy {
 
   onServerOperationCancelled(operation: SaleOperation): void {
     if (operation.state !== "CANCELLED" || this.receiptRecovery?.operationId !== operation.operationId) return;
+    if (!this.requireRecoveryBinding() || !this.operationMatchesBinding(operation)) return;
     this.pendingSaleRequest = null; this.receiptRecovery = null; this.preparedOnServer = false; this.preparationMissing = false;
+    this.recoveryBinding = null;
+    this.pendingPreparedVerified = false;
     this.cart = this.cart.map(item => ({ ...item, requiresRevalidation: true }));
     this.warningMessage = "Preparación cancelada. Revisa precios antes de confirmar otra compra."; this.persistDraftState();
   }
 
   leaveOperationInServer(): void {
     if (this.submitting || !this.receiptRecovery?.operationId) return;
+    if (!this.requireRecoveryBinding()) return;
     const recovery = this.receiptRecovery;
     this.submitting = true;
     this.subscriptions.add(this.withVerifiedIdentity(recovery, context => this.saleOperations.get(recovery.operationId!, context)).subscribe({
       next: operation => {
         this.submitting = false;
+        if (!this.requireRecoveryBinding() || !this.operationMatchesBinding(operation)) return;
         if (!["PREPARED", "COMPLETED", "CANCELLED", "RESULT_UNAVAILABLE"].includes(operation.state)) return;
         this.pendingSaleRequest = null; this.receiptRecovery = null; this.preparedOnServer = false; this.preparationMissing = false;
         this.cart = []; this.payments = [{ paymentMethod: "CASH", amount: 0, reference: "" }]; this.lastSaleId = null;
-        if (!this.foreignDraftPreserved) this.posStateService.clearAll(); this.warningMessage = "Operación conservada en Mis operaciones. Puedes preparar otra compra."; this.errorMessage = "";
+        this.recoveryBinding = null;
+        this.pendingPreparedVerified = false;
+        if (!this.foreignDraftPreserved) this.posStateService.clearAll(); this.warningMessage = "Operación conservada en Operaciones pendientes. Puedes preparar otra compra."; this.errorMessage = "";
       }, error: error => { this.submitting = false; this.errorMessage = toHttpErrorMessage(error, "Verifica primero que la operación está conservada en el servidor."); },
     }));
   }
@@ -2068,11 +2107,14 @@ export class PosPageComponent implements OnInit, OnDestroy {
       return this.authService.me(context).pipe(
         catchError(() => throwError(() => new BoundAuthSessionError())),
         switchMap(user => {
-          if (this.destroyed || this.receiptRecovery !== recovery || !recovery.userId || user.id !== recovery.userId) {
+          if (this.destroyed || this.receiptRecovery !== recovery || !recovery.userId || user.id !== recovery.userId || !this.requireRecoveryBinding()) {
             return throwError(() => new BoundAuthSessionError());
           }
+          if (!token || this.authService.getToken() !== token) return throwError(() => new BoundAuthSessionError());
+          // A renewed credential may resume only after the original actor was verified again.
+          const binding = this.recoveryBinding = { ...this.recoveryBinding!, token };
           return request(context).pipe(map(value => {
-            if (this.destroyed || this.authService.getToken() !== token) throw new BoundAuthSessionError();
+            if (this.destroyed || this.authService.getToken() !== token || this.recoveryBinding !== binding || !this.requireRecoveryBinding()) throw new BoundAuthSessionError();
             return value;
           }));
         }),
@@ -2114,60 +2156,122 @@ export class PosPageComponent implements OnInit, OnDestroy {
     return true;
   }
 
-  revalidateCart(): void {
-    if (this.revalidating || this.preventPendingEdit() || !this.cart.length) return;
-    const warehouseId = this.saleForm.value.warehouseId;
-    if (!warehouseId) { this.errorMessage = "Selecciona un almacén para revalidar."; return; }
-    const fingerprint = this.checkoutFingerprint();
-    const original = structuredClone(this.cart);
-    this.revalidating = true;
-    this.posService.snapshot(original.map(item => item.productId), warehouseId).subscribe({
+  get showCartVerificationNotice(): boolean {
+    return this.cartCheckPhase !== "checking" && !!this.cartVerificationMessage;
+  }
+
+  get cartVerificationAnnouncement(): string {
+    if (!this.cart.length || this.pendingSaleRequest || this.receiptRecovery || this.pendingOwnerBlocked) return "";
+    if (this.cartCheckPhase === "checking") return "Verificando condiciones de la compra…";
+    if (this.cartCheckPhase === "idle" && !this.needsRevalidation && !this.checkoutDisabled) return "Puedes revisar el cobro. La venta aún no está confirmada.";
+    // Errors and proposals already have their own alert or commercial dialog.
+    return "";
+  }
+
+  get cartVerificationMessage(): string {
+    if (this.pendingSaleRequest || this.receiptRecovery || !this.cart.length || !this.needsRevalidation) return "";
+    return this.cartCheckMessage || "Comprueba las condiciones de la compra antes de cobrar. Conservamos tus productos y pagos.";
+  }
+
+  private cartVerificationContext(): string {
+    return JSON.stringify([this.authService.getToken(), this.currentUserId, this.currentCashSession?.id, this.cashPhase, this.saleForm.value.warehouseId]);
+  }
+  private cartVerificationFingerprint(): string { return JSON.stringify([this.checkoutFingerprint(), this.cartVerificationContext()]); }
+  private cancelCartVerification(): void {
+    this.cartCheckGeneration++; this.cartCheckRead.unsubscribe(); this.cartCheckRead = new Subscription();
+    this.revalidating = false; this.cartCheckFingerprint = null; this.checkoutAfterVerification = false;
+    this.cartCheckContext = null;
+    if (this.reviewDialogOpen && this.confirmDialog.currentState?.title === "Se actualizaron condiciones de tu compra") this.confirmDialog.cancel();
+    this.reviewDialogOpen = false;
+  }
+
+  revalidateCart(continueToCheckout = false): void {
+    if (this.preventPendingEdit() || !this.cart.length || this.confirmingSale) return;
+    if (this.revalidating && this.cartCheckFingerprint === this.cartVerificationFingerprint()) {
+      this.checkoutAfterVerification ||= continueToCheckout; return;
+    }
+    this.cancelCartVerification();
+    const warehouseId = this.saleForm.value.warehouseId, token = this.authService.getToken(), owner = this.currentUserId;
+    if (!warehouseId || !token || !owner || !this.currentCashSession || this.cashPhase !== "open") {
+      this.cartCheckPhase = "blocked"; this.cartCheckMessage = "Verifica la sesión, la caja abierta y el almacén antes de comprobar la compra."; return;
+    }
+    this.cart = this.cart.map(item => ({ ...item, requiresRevalidation: true }));
+    const original = structuredClone(this.cart), fingerprint = this.cartVerificationFingerprint(), generation = this.cartCheckGeneration;
+    this.cartCheckFingerprint = fingerprint; this.checkoutAfterVerification = continueToCheckout;
+    this.cartCheckContext = this.cartVerificationContext();
+    this.cartCheckPhase = "checking"; this.cartCheckMessage = "Verificando condiciones de la compra…"; this.revalidating = true;
+    this.draftReviewMessage = "";
+    const valid = () => !this.destroyed && generation === this.cartCheckGeneration && fingerprint === this.cartVerificationFingerprint()
+      && !this.pendingSaleRequest && !this.receiptRecovery && !this.pendingOwnerBlocked;
+    const stale = () => {
+      if (generation !== this.cartCheckGeneration || this.destroyed) return;
+      this.cancelCartVerification(); this.cartCheckPhase = "stale";
+      this.cartCheckMessage = "La compra o la sesión cambió. La propuesta anterior no se aplicó; comprueba nuevamente.";
+    };
+    const context = createBoundAuthContext(token);
+    this.cartCheckRead.add(this.authService.me(context).pipe(switchMap(actor => {
+      if (!valid() || actor.id !== owner) throw new BoundAuthSessionError();
+      return this.posService.snapshot(original.map(item => item.productId), warehouseId, context);
+    }), timeout(15000)).subscribe({
       next: products => {
-        if (fingerprint !== this.checkoutFingerprint()) { this.errorMessage = "El borrador cambió. Revalídalo nuevamente."; this.revalidating = false; return; }
+        if (!valid()) { stale(); return; }
+        this.revalidating = false;
         try {
-          const proposed = original.map(item => {
-            const product = products.find(p => p.productId === item.productId);
-            if (!product || !isQuantityPolicy(product.quantityPolicy)) throw new Error(`${item.name}: no está disponible o no tiene política válida.`);
-            const updated: PosCartItem = { ...item, salePrice: product.salePrice, salePriceInput: undefined,
-              quantityPolicy: product.quantityPolicy, stockAvailable: product.stockAvailable, stockInput: undefined, requiresRevalidation: false };
-            posLineCents(updated);
-            if (quantityHundredths(updated.quantityInput ?? updated.quantity, updated.quantityPolicy) * 10n > stockMillis(product.stockAvailable))
-              throw new Error(`${item.name}: stock insuficiente. Conservamos tu cantidad y descuento; revísalos antes de continuar.`);
-            return updated;
-          });
-          const proposedTotal = decimalText(posTotalCents(proposed));
-          const differences = proposed.map((item, i) => `${item.name}: precio ${original[i].salePriceInput ?? original[i].salePrice} → ${item.salePrice}; política ${original[i].quantityPolicy ?? 'sin clasificar'} → ${item.quantityPolicy}; stock ${original[i].stockInput ?? original[i].stockAvailable} → ${item.stockAvailable}`).join("\n");
-          const priceReview = this.priceReviewRequired;
-          void this.confirmDialog.confirm({ title: priceReview ? "Los precios de esta venta cambiaron" : "Revisar borrador y precios vigentes",
-            description: `${differences}\nTotal guardado: ${this.restoredDraftTotal ?? this.total}. Total propuesto: S/ ${proposedTotal}.\nCantidades, descuentos y pagos no se modificarán.${priceReview ? '\nSi mantienes el carrito, no podrás cobrar hasta revisar los precios actualizados' : ''}`,
-            confirmText: priceReview ? "Aceptar nuevos precios" : "Aceptar propuesta", cancelText: priceReview ? "Mantener carrito" : "Conservar original", variant: "warning" }).then(accepted => {
-              if (!accepted) return;
-              if (fingerprint !== this.checkoutFingerprint()) { this.errorMessage = "El borrador cambió. Revalídalo nuevamente."; return; }
-              this.cart = proposed;
-              this.priceReviewRequired = false;
-              this.draftReviewMessage = "";
-              this.restoredDraftTotal = null;
-              this.draftValidationIssues = [];
-              this.errorMessage = "";
-              this.persistDraftState();
-              if (priceReview) queueMicrotask(() => this.checkoutLauncher?.nativeElement.focus());
-            }).finally(() => {
-              this.revalidating = false;
-              if (priceReview && this.needsRevalidation) {
-                // The review launcher is disabled until Angular renders this state change.
-                setTimeout(() => {
-                  const button = this.priceReviewButtonRef?.nativeElement;
-                  if (button?.isConnected && !this.revalidating && !this.isCheckoutModalOpen) button.focus();
-                });
-              }
-            });
-        } catch (error) {
-          this.errorMessage = error instanceof Error ? error.message : "No se pudo validar el borrador.";
-          this.revalidating = false;
-        }
+          const review = reviewCartConditions(original, products);
+          if (review.issues.length) {
+            this.cartCheckPhase = "blocked"; this.cartCheckMessage = review.issues.join("\n");
+            this.cartCheckFingerprint = null; this.checkoutAfterVerification = false; return;
+          }
+          const apply = () => {
+            if (!valid()) { stale(); return; }
+            const open = this.checkoutAfterVerification;
+            this.cart = review.proposed; this.priceReviewRequired = false; this.draftReviewMessage = "";
+            this.restoredDraftTotal = null; this.draftValidationIssues = []; this.errorMessage = "";
+            this.cartCheckPhase = "idle"; this.cartCheckMessage = ""; this.cartCheckFingerprint = null;
+            this.verifiedCartContext = this.cartVerificationContext(); this.checkoutAfterVerification = false;
+            this.persistDraftState();
+            if (open) this.isCheckoutModalOpen = true;
+            else if (this.reviewDialogOpen) {
+              clearTimeout(this.cartFocusTimer);
+              this.cartFocusTimer = setTimeout(() => { if (!this.destroyed && !this.isCheckoutModalOpen) this.checkoutLauncher?.nativeElement.focus(); }, 0);
+            }
+          };
+          if (!review.differences.length) { apply(); return; }
+          this.cartCheckPhase = "changes"; this.cartCheckMessage = "Hay cambios pendientes. Revisa las condiciones antes de cobrar.";
+          let oldTotal = "no verificable"; try { oldTotal = "S/ " + decimalText(posTotalCents(original)); } catch {}
+          const total = review.total!;
+          let paymentMessage: string;
+          try {
+            const paid = posPaidCents(this.payments), electronic = posPaidCents(this.payments, true);
+            paymentMessage = electronic > total ? "Los pagos electrónicos superan el nuevo total. Corrígelos antes de cobrar."
+              : paid < total ? "Saldo pendiente: S/ " + decimalText(total - paid) : "Vuelto previsto: S/ " + decimalText(paid - total);
+          } catch (error) {
+            if (!(error instanceof PosDecimalError)) throw error;
+            paymentMessage = "Revisa los montos de pago en el cobro. No se pudo calcular el saldo ni el vuelto; los valores ingresados se conservan.";
+          }
+          this.reviewDialogOpen = true;
+          void this.confirmDialog.confirm({ title: "Se actualizaron condiciones de tu compra",
+            description: review.differences.join("\n") + "\nTotal anterior: " + oldTotal + ". Total propuesto: S/ " + decimalText(total)
+              + ".\nCantidades, descuentos y pagos se conservan. " + paymentMessage + "\nSin aplicar los cambios, el cobro seguirá pendiente de verificación.",
+            confirmText: "Actualizar carrito con condiciones vigentes", cancelText: "Volver al carrito sin aplicar cambios", variant: "info"
+          }).then(accepted => {
+            if (!valid()) { stale(); return; }
+            if (accepted) apply();
+            else {
+              this.cartCheckFingerprint = null; this.checkoutAfterVerification = false;
+              clearTimeout(this.cartFocusTimer);
+              this.cartFocusTimer = setTimeout(() => { if (!this.destroyed && !this.isCheckoutModalOpen) this.priceReviewButtonRef?.nativeElement.focus(); }, 0);
+            }
+          })
+            .finally(() => { if (generation === this.cartCheckGeneration) this.reviewDialogOpen = false; });
+        } catch { this.cartCheckPhase = "error"; this.cartCheckMessage = "No pudimos verificar tu compra. Conservamos tus productos y pagos. Vuelve a comprobar las condiciones antes de cobrar"; this.cartCheckFingerprint = null; this.checkoutAfterVerification = false; }
       },
-      error: error => { this.errorMessage = toHttpErrorMessage(error, "No se pudo revalidar el borrador."); this.revalidating = false; },
-    });
+      error: () => {
+        if (!valid()) { stale(); return; }
+        this.revalidating = false; this.cartCheckPhase = "error"; this.cartCheckFingerprint = null; this.checkoutAfterVerification = false;
+        this.cartCheckMessage = "No pudimos verificar tu compra. Conservamos tus productos y pagos. Vuelve a comprobar las condiciones antes de cobrar";
+      }
+    }));
   }
 
   private loadBillingSeries(): void {
@@ -2203,10 +2307,22 @@ export class PosPageComponent implements OnInit, OnDestroy {
 
   private continueReceiptRecovery(saleNumber?: string): void {
     const context = this.receiptRecovery;
-    if (!context?.saleId || !this.receiptRecoveryOwnerMatches()) { this.submitting = false; return; }
+    if (!context?.saleId || !this.receiptRecoveryOwnerMatches() || !this.requireRecoveryBinding()) { this.submitting = false; return; }
     this.lastSaleId = context.saleId;
     if (context.receiptType === "TICKET" && context.creationState === "NOT_STARTED") {
-      this.completeReceiptRecovery(`Venta ${saleNumber ?? '#' + context.saleId} registrada correctamente.`);
+      if (saleNumber) this.completeReceiptRecovery(`Venta ${saleNumber} registrada correctamente.`);
+      else {
+        this.submitting = true;
+        this.subscriptions.add(this.withVerifiedIdentity(context, authContext => this.saleOperations.get(context.operationId!, authContext)).subscribe({
+          next: operation => {
+            this.submitting = false;
+            if (!this.operationMatchesBinding(operation) || operation.state !== "COMPLETED" || operation.receiptState !== "NOT_REQUIRED"
+                || operation.receiptIntent?.receiptType !== "TICKET") { this.errorMessage = "No se pudo verificar la finalización de esta operación. Consulta su estado."; return; }
+            this.completeReceiptRecovery(`Venta #${context.saleId} registrada correctamente.`);
+          },
+          error: error => { this.submitting = false; this.errorMessage = toHttpErrorMessage(error, "No se pudo comprobar la operación. La compra se conserva."); },
+        }));
+      }
     } else if (context.creationState === "CONFIRMED") {
       this.queryReceiptResult();
     } else if (context.creationState === "NOT_STARTED" && context.payload) {
@@ -2224,11 +2340,43 @@ export class PosPageComponent implements OnInit, OnDestroy {
 
   private completeReceiptRecovery(message: string): void {
     this.submitting = false;
+    if (!this.requireRecoveryBinding()) return;
     this.persistDraftState();
     this.warningMessage = "";
     this.successMessage = message;
+    if (this.visibleRecoveryResult && this.receiptRecovery?.saleId) {
+      this.rememberRecoveryResult(this.receiptRecovery.saleId, this.receiptRecovery.operationId!, message);
+    }
     this.showGoToBillingAction = false;
     this.resetDraftAfterCheckout(true);
+    const result = this.visibleRecoveryResult, fingerprint = this.recoveryDraftFingerprint();
+    if (result) {
+      clearTimeout(this.cartFocusTimer);
+      this.cartFocusTimer = setTimeout(() => {
+        if (this.visibleRecoveryResult === result && fingerprint === this.recoveryDraftFingerprint()
+            && !this.isCheckoutModalOpen && !this.isFullCartOpen) {
+          const notice = this.recoveryResultNotice?.nativeElement;
+          notice?.focus({ preventScroll: true });
+          notice?.scrollIntoView({ block: "center" });
+        }
+      }, 0);
+    }
+  }
+
+  get visibleRecoveryResult(): typeof this.recoveredResult {
+    const result = this.recoveredResult, activeId = this.receiptRecovery?.operationId ?? this.pendingSaleRequest?.operationId;
+    return result && !this.destroyed && result.credential === this.authService.getToken() && result.owner === this.currentUserId
+      && (!activeId || activeId === result.operationId) ? result : null;
+  }
+
+  dismissRecoveryResult(): void { this.recoveredResult = null; }
+
+  private rememberRecoveryResult(saleId: number, operationId: string, detail: string): void {
+    const credential = this.authService.getToken();
+    if (!Number.isSafeInteger(saleId) || saleId <= 0 || !credential || !this.currentUserId
+        || this.receiptRecovery?.saleId !== saleId || this.receiptRecovery.operationId !== operationId
+        || !this.requireRecoveryBinding()) return;
+    this.recoveredResult = Object.freeze({ saleId, operationId, owner: this.currentUserId, credential, detail });
   }
 
   private issueElectronicDocumentFromSale(): void {
@@ -2260,6 +2408,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
     this.subscriptions.add(this.withVerifiedIdentity(context, authContext =>
       this.saleOperations.get(context.operationId!, authContext)).subscribe({
       next: operation => {
+        if (!this.operationMatchesBinding(operation)) { this.submitting = false; return; }
         const sameOperation = operation.operationId === context.operationId && operation.saleId === context.saleId && operation.state === "COMPLETED";
         const serverIntent = operation.receiptIntent;
         const normalized = (value: string | null | undefined) => value?.trim() || null;

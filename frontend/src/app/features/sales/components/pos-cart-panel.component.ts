@@ -30,14 +30,14 @@ import { PosCartItem } from "../data/pos-ui.models";
             type="button"
             class="ui-button ui-button--secondary pos-button pos-button--quiet pos-button--danger-quiet"
             (click)="cancelSale.emit()"
-            [disabled]="cart.length === 0"
+            [disabled]="cart.length === 0 || editingBlocked"
           >
-            Cancelar venta
+            Descartar carrito
           </button>
         </div>
       </header>
 
-      <div class="cart-list" *ngIf="cart.length > 0; else emptyCart">
+      <div class="cart-list" *ngIf="cart.length > 0; else emptyCart"><fieldset class="cart-edit-group" [disabled]="editingBlocked">
         <app-pos-cart-item
           *ngFor="let item of cart; let index = index"
           [item]="item"
@@ -49,7 +49,7 @@ import { PosCartItem } from "../data/pos-ui.models";
           (quantityFocus)="quantityFocus.emit($event)"
           (setQuantity)="setQuantity.emit($event)"
           (setDiscount)="setDiscount.emit($event)"
-        ></app-pos-cart-item>
+        ></app-pos-cart-item></fieldset>
       </div>
 
       <ng-template #emptyCart>
@@ -60,166 +60,13 @@ import { PosCartItem } from "../data/pos-ui.models";
       </ng-template>
     </section>
   `,
-    styles: [
-        `
-      :host {
-        display: block;
-        height: 100%;
-        min-height: 0;
-      }
-
-      h2 {
-        margin: 0;
-      }
-
-      .cart-panel {
-        height: 100%;
-        box-sizing: border-box;
-        border: 1px solid color-mix(in srgb, var(--color-brand-primary) 12%, var(--color-border-default));
-        border-radius: var(--radius-lg);
-        background: var(--color-bg-surface);
-        padding: 0.7rem;
-        display: grid;
-        gap: var(--space-2);
-        min-height: 0;
-        overflow: hidden;
-        grid-template-rows: auto minmax(0, 1fr);
-      }
-
-      .panel-head {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        gap: var(--space-2);
-        flex-wrap: wrap;
-      }
-
-      .panel-head--compact {
-        align-items: center;
-      }
-
-      .panel-head h2 {
-        font-size: 1.1rem;
-        line-height: 1.1;
-        font-weight: 700;
-      }
-
-      .cart-head-actions {
-        display: flex;
-        justify-content: flex-end;
-        gap: 0.45rem;
-        flex-wrap: wrap;
-      }
-
-      .cart-panel .pos-button--quiet {
-        min-height: 2.2rem;
-        padding: 0.4rem 0.72rem;
-        font-size: 0.78rem;
-        border-color: var(--color-border-soft);
-        background: transparent;
-        color: var(--color-text-secondary);
-      }
-
-      .pos-button {
-        min-height: 2.55rem;
-        border-radius: var(--radius-md);
-        padding: 0.58rem var(--space-4);
-        font-size: var(--font-size-md);
-      }
-
-      .pos-button--quiet {
-        background: color-mix(in srgb, var(--color-text-primary) 8%, var(--color-bg-soft));
-        color: var(--color-text-primary);
-      }
-
-      .pos-button--danger-quiet {
-        border-color: color-mix(in srgb, var(--color-danger) 24%, var(--color-border-default));
-        color: color-mix(in srgb, var(--color-danger) 78%, var(--color-text-secondary));
-        background: color-mix(in srgb, var(--color-danger) 4%, var(--color-bg-surface));
-      }
-
-      .ui-button[disabled] {
-        opacity: 0.55;
-        cursor: not-allowed;
-      }
-
-      .cart-list {
-        display: grid;
-        align-content: start;
-        gap: 0.45rem;
-        min-height: 0;
-        overflow: auto;
-        padding-right: 0.22rem;
-      }
-
-      .empty-cart {
-        display: grid;
-        gap: 0.28rem;
-        place-items: center;
-        align-content: center;
-        min-height: 6.5rem;
-        border: 1px dashed var(--color-border-default);
-        border-radius: var(--radius-lg);
-        background: var(--color-bg-soft);
-        text-align: center;
-        padding: 0.9rem var(--space-3);
-      }
-
-      .empty-cart strong {
-        line-height: 1.15;
-      }
-
-      .empty-cart strong,
-      .empty-cart span {
-        max-width: 16rem;
-      }
-
-      .empty-cart span {
-        margin: 0;
-        color: var(--color-text-secondary);
-        line-height: 1.35;
-      }
-
-      .cart-list::-webkit-scrollbar {
-        width: 6px;
-      }
-
-      .cart-list::-webkit-scrollbar-track {
-        background: var(--color-bg-soft);
-        border-radius: var(--radius-pill);
-      }
-
-      .cart-list::-webkit-scrollbar-thumb {
-        background: color-mix(in srgb, var(--color-brand-primary) 28%, transparent);
-        border-radius: var(--radius-pill);
-      }
-
-      @media (max-width: 980px) {
-        .cart-list {
-          max-height: 22rem;
-        }
-      }
-
-      @media (max-width: 760px) {
-        .panel-head,
-        .panel-head--compact {
-          align-items: stretch;
-          flex-direction: column;
-        }
-
-        .panel-head,
-        .cart-head-actions {
-          width: 100%;
-        }
-
-        .pos-button {
-          width: 100%;
-        }
-      }
-    `,
-    ]
+    styles: [`
+:host{display:block;min-width:0}.cart-panel{border:1px solid var(--color-border-default);border-radius:var(--radius-lg);padding:.65rem;background:var(--color-bg-surface);display:grid;gap:.6rem;min-width:0}.panel-head{display:flex;align-items:center;justify-content:space-between;gap:.6rem;flex-wrap:wrap}.panel-head h2{font-size:1rem;margin:0}.cart-head-actions{display:flex;gap:.4rem;flex-wrap:wrap}.cart-head-actions .ui-button{min-height:44px;padding:.45rem .55rem;font-size:.75rem;box-shadow:none;background:transparent;color:var(--color-text-primary);border:1px solid var(--color-border-default)}.cart-list{max-height:50dvh;overflow:auto;scrollbar-gutter:stable;padding:.2rem;min-width:0}.cart-edit-group{border:0;margin:0;padding:0;min-width:0;display:grid;gap:.5rem}.empty-cart{display:grid;place-content:center;text-align:center;gap:.45rem;min-height:7rem;padding:1rem;background:var(--color-bg-soft);border-radius:var(--radius-md);color:var(--color-text-secondary)}.empty-cart strong{color:var(--color-text-primary)}
+@media(max-width:520px){.cart-head-actions{width:100%}.cart-head-actions .ui-button{flex:1;white-space:normal}.cart-list{max-height:50dvh}}
+    `],
 })
 export class PosCartPanelComponent {
+  @Input() editingBlocked = false;
   @Input({ required: true }) cart: PosCartItem[] = [];
   @Input({ required: true }) cartTitle = "Carrito";
   @Input({ required: true }) lineTotals: number[] = [];

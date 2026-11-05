@@ -27,27 +27,32 @@ import { PosReceiptType } from "../data/pos-ui.models";
           type="button"
           class="receipt-segment"
           [class.is-active]="receiptType === 'TICKET'"
+          [attr.aria-pressed]="receiptType === 'TICKET'"
           (click)="updateReceiptType.emit('TICKET')"
         >
-          Ticket interno
+          Nota de venta <small>No fiscal</small>
         </button>
         <button
           type="button"
           class="receipt-segment"
           [class.is-active]="receiptType === 'RECEIPT'"
+          [attr.aria-pressed]="receiptType === 'RECEIPT'"
           (click)="updateReceiptType.emit('RECEIPT')"
         >
-          Boleta
+          Boleta electrónica
         </button>
         <button
           type="button"
           class="receipt-segment"
           [class.is-active]="receiptType === 'INVOICE'"
+          [attr.aria-pressed]="receiptType === 'INVOICE'"
           (click)="updateReceiptType.emit('INVOICE')"
         >
-          Factura
+          Factura electrónica
         </button>
       </div>
+
+      <p class="receipt-explanation">{{ receiptType === 'TICKET' ? 'Documento comercial interno. La nota PDF es opcional.' : 'Se solicitará el documento electrónico después de registrar la venta. La aceptación fiscal se verifica por separado.' }}</p>
 
       <div class="receipt-customer-grid" *ngIf="receiptType !== 'TICKET'">
         <label class="mini-field mini-field--wide">
@@ -57,13 +62,13 @@ import { PosReceiptType } from "../data/pos-ui.models";
             (change)="updateReceiptSeriesId.emit($any($event.target).value)"
             (blur)="markTouched('series')"
           >
-            <option value="">Selecciona serie</option>
-            <option *ngFor="let row of filteredBillingSeries" [value]="row.id">
+            <option value="" [selected]="!receiptSeriesId">Selecciona serie</option>
+            <option *ngFor="let row of filteredBillingSeries" [value]="row.id" [selected]="receiptSeriesId === ('' + row.id)">
               {{ row.series }}
             </option>
           </select>
           <small class="field-inline-error" *ngIf="shouldShowSeriesError">
-            Debes seleccionar una serie para emitir el comprobante.
+            Debes seleccionar una serie para solicitar el documento.
           </small>
         </label>
       </div>
@@ -166,6 +171,7 @@ import { PosReceiptType } from "../data/pos-ui.models";
   `,
     styles: [
         `
+      .receipt-explanation{font-size:.875rem;color:var(--color-text-secondary);margin:0;line-height:1.45}.receipt-segment{min-height:52px;white-space:normal;min-width:0}.receipt-segment small{display:block;font-size:.75rem;font-weight:400}
       .receipt-panel {
         display: grid;
         gap: var(--space-2);
@@ -223,9 +229,11 @@ import { PosReceiptType } from "../data/pos-ui.models";
 
       .receipt-segment {
         display: flex;
+        flex-direction: column;
+        gap: .15rem;
         align-items: center;
         justify-content: center;
-        min-height: 2.6rem;
+        min-height: 52px;
         border: 1px solid var(--color-border-default);
         border-radius: var(--radius-md);
         background: color-mix(in srgb, var(--color-bg-soft) 84%, var(--color-bg-surface));
@@ -283,6 +291,7 @@ import { PosReceiptType } from "../data/pos-ui.models";
           display: grid;
         }
       }
+      @media(max-width:640px){.receipt-type-list{grid-template-columns:repeat(3,minmax(0,1fr));gap:.3rem}.receipt-segment{padding:.5rem .25rem;font-size:.8rem}.receipt-panel__header h3{font-size:1rem}}
     `,
     ]
 })

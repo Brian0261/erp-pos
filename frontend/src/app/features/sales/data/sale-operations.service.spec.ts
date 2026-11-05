@@ -21,4 +21,11 @@ describe("A recovery REST transport", () => {
     operations.get(body.operationId, context).subscribe(); const get = http.expectOne(`/api/v1/sales/operations/${body.operationId}`); expect(get.request.method).toBe("GET"); get.flush({});
     operations.cancel(body.operationId, context).subscribe(); const cancel = http.expectOne(`/api/v1/sales/operations/${body.operationId}/cancel`); expect(cancel.request.method).toBe("POST"); expect(cancel.request.context).toBe(context); cancel.flush({});
   });
+  it("uses the existing owner-only attention query with bound credentials",()=>{
+    operations.list(0,context,undefined,true).subscribe();
+    const req=http.expectOne(r=>r.url.endsWith("/sales/operations"));
+    expect(req.request.method).toBe("GET");expect(req.request.params.get("attention")).toBe("true");
+    expect(req.request.params.has("state")).toBeFalse();expect(req.request.context).toBe(context);req.flush({});
+  });
+
 });

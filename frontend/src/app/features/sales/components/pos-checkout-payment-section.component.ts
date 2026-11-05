@@ -22,6 +22,7 @@ import { calculatePosRemaining } from "../utils/pos-calculations";
         </button>
       </header>
 
+      <div class="payment-total"><span>Total de venta</span><strong>S/ {{ (total | number: "1.2-2") ?? '—' }}</strong></div>
       <div class="payment-list">
         <article
           class="payment-line"
@@ -49,6 +50,9 @@ import { calculatePosRemaining } from "../utils/pos-calculations";
               type="number"
               min="0"
               step="0.01"
+              aria-label="Monto *"
+              [attr.aria-invalid]="amountErrors[index] ? 'true' : null"
+              [attr.aria-describedby]="amountErrors[index] ? 'payment-amount-error-' + index : null"
               [value]="payment.amountInput ?? payment.amount"
               (input)="
                 updatePaymentAmount.emit({
@@ -57,6 +61,7 @@ import { calculatePosRemaining } from "../utils/pos-calculations";
                 })
               "
             />
+            <small class="payment-amount-error" *ngIf="amountErrors[index]" [id]="'payment-amount-error-' + index">Ingresa un monto válido.</small>
           </label>
           <label class="mini-field mini-field--wide">
             <span>Referencia</span>
@@ -85,9 +90,9 @@ import { calculatePosRemaining } from "../utils/pos-calculations";
       </div>
 
       <div class="payment-panel__metrics" aria-label="Resumen de pagos">
-        <span>Pagado: <strong>S/ {{ (paidTotal | number: "1.2-2") ?? '—' }}</strong></span>
-        <span>Vuelto: <strong>S/ {{ (change | number: "1.2-2") ?? '—' }}</strong></span>
-        <span>Pendiente: <strong>S/ {{ (pendingAmount | number: "1.2-2") ?? '—' }}</strong></span>
+        <span>Pagos ingresados <strong>S/ {{ (paidTotal | number: "1.2-2") ?? '—' }}</strong></span>
+        <span *ngIf="pendingAmount > 0">Pendiente <strong>S/ {{ (pendingAmount | number: "1.2-2") ?? '—' }}</strong></span>
+        <span *ngIf="change > 0">Vuelto <strong>S/ {{ (change | number: "1.2-2") ?? '—' }}</strong></span>
       </div>
     </section>
   `,
@@ -145,7 +150,7 @@ import { calculatePosRemaining } from "../utils/pos-calculations";
           minmax(136px, 0.95fr) minmax(98px, 0.58fr) minmax(140px, 1fr)
           minmax(76px, auto);
         gap: 0.65rem;
-        align-items: end;
+        align-items: start;
         border: 1px solid color-mix(in srgb, var(--color-border-default) 86%, transparent);
         border-radius: var(--radius-lg);
         background: color-mix(in srgb, var(--color-bg-soft) 84%, var(--color-bg-surface));
@@ -160,8 +165,12 @@ import { calculatePosRemaining } from "../utils/pos-calculations";
       .mini-field > span {
         color: var(--color-text-secondary);
         font-size: 0.72rem;
+        line-height: 1.5;
         font-weight: 700;
       }
+
+      .payment-amount-error { color: var(--color-danger); font-size: .8rem; line-height: 1.35; }
+      .payment-panel__remove-button { margin-top: calc(0.72rem * 1.5 + var(--space-1)); }
 
       .mini-field input,
       .mini-field select {
@@ -200,18 +209,9 @@ import { calculatePosRemaining } from "../utils/pos-calculations";
         text-transform: none;
       }
 
-      @media (max-width: 640px) {
-        .payment-panel__header,
-        .payment-line,
-        .payment-panel__metrics {
-          grid-template-columns: 1fr;
-        }
-
-        .payment-panel__header {
-          align-items: stretch;
-          display: grid;
-        }
-      }
+      .payment-total{display:flex;justify-content:space-between;align-items:center;gap:1rem;padding:.7rem .75rem;background:var(--color-bg-soft);border-radius:var(--radius-md);font-variant-numeric:tabular-nums}
+      .payment-total strong{font-size:1.5rem}.mini-field{min-width:0}.mini-field input,.mini-field select,.payment-panel__quiet-button,.payment-panel__remove-button{min-height:44px;min-width:0}
+      @media(max-width:640px){.payment-line{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:.5rem}.payment-list{max-height:none}.payment-panel__remove-button{justify-self:end}.payment-total{gap:.5rem;padding:.6rem}.payment-total strong{font-size:1.3rem}}
     `,
     ]
 })
@@ -219,6 +219,7 @@ export class PosCheckoutPaymentSectionComponent {
   @Input({ required: true }) total = 0;
   get pendingAmount(): number { return calculatePosRemaining(this.total, this.paidTotal); }
   @Input({ required: true }) payments: PaymentLine[] = [];
+  @Input() amountErrors: string[] = [];
   @Input({ required: true }) paidTotal = 0;
   @Input({ required: true }) change = 0;
 

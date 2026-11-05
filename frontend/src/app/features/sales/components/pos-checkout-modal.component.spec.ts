@@ -91,9 +91,20 @@ describe('POS checkout modal presentation and focus isolation', () => {
     await open(); const close = spyOn(fixture.componentInstance.close, 'emit'), finalize = spyOn(fixture.componentInstance.finalize, 'emit');
     fixture.componentRef.setInput('receiptType', 'INVOICE'); fixture.componentRef.setInput('invoiceRucInvalid', true);
     fixture.componentRef.setInput('receiptValidationError', 'RUC requerido'); fixture.detectChanges();
-    fixture.componentInstance.handleFinalize(); fixture.detectChanges(); expect(finalize).toHaveBeenCalledTimes(1);
-    expect(panel().textContent).toContain('Completa los datos requeridos para emitir factura.');
+    fixture.componentInstance.handleFinalize(); fixture.detectChanges(); expect(finalize).not.toHaveBeenCalled();
+    expect(panel().textContent).toContain('Completa los datos requeridos de la factura.');
+    fixture.componentRef.setInput('receiptValidationError','');fixture.componentRef.setInput('invoiceRucInvalid',false);fixture.detectChanges();fixture.componentInstance.handleFinalize();expect(finalize).toHaveBeenCalledTimes(1);
     fixture.componentInstance.handleClose(); expect(close).toHaveBeenCalledTimes(1);
+  });
+
+  it('explains a blocked review and never emits while payment or verification is invalid',async()=>{
+    await open();const finalize=spyOn(fixture.componentInstance.finalize,'emit');fixture.componentRef.setInput('reviewBlockedReason','Falta completar el pago');fixture.detectChanges();
+    expect(panel().querySelector<HTMLButtonElement>('.checkout-modal__action--primary')!.disabled).toBeTrue();expect(panel().textContent).toContain('Falta completar el pago');
+    fixture.componentInstance.handleFinalize();expect(finalize).not.toHaveBeenCalled();fixture.componentRef.setInput('reviewBlockedReason','');fixture.componentRef.setInput('verificationPending',true);fixture.detectChanges();fixture.componentInstance.handleFinalize();expect(finalize).not.toHaveBeenCalled();
+  });
+  it('keeps recovery reads available without applying new-sale field requirements to the saved operation',async()=>{
+    await open();const finalize=spyOn(fixture.componentInstance.finalize,'emit');fixture.componentRef.setInput('recoveryActive',true);fixture.componentRef.setInput('checkoutButtonLabel','COMPROBAR RESULTADO');fixture.componentRef.setInput('receiptValidationError','Intención original incompleta');fixture.detectChanges();
+    expect(panel().querySelector<HTMLFieldSetElement>('fieldset')!.disabled).toBeTrue();expect(panel().querySelector<HTMLButtonElement>('.checkout-modal__action--primary')!.disabled).toBeFalse();fixture.componentInstance.handleFinalize();expect(finalize).toHaveBeenCalledTimes(1);
   });
 
   it('releases presentation ownership on destruction without removing a pre-existing shell marker', async () => {

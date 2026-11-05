@@ -1,0 +1,22 @@
+:host{display:block;min-width:0}
+.pos-verification-status{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}
+.recovery-decision-backdrop{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.6);display:grid;place-items:center;padding:1rem}.recovery-decision{width:min(32rem,100%);max-height:calc(100dvh - 2rem);overflow:auto;padding:1rem;display:grid;gap:.75rem;box-sizing:border-box;overflow-wrap:anywhere}.recovery-decision h2,.recovery-decision p{margin:0}.recovery-decision .ui-button{white-space:normal;min-height:44px}
+.pos-page{padding:.85rem;display:grid;gap:.75rem;min-width:0}
+.pos-utility-header{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;padding-bottom:.65rem;border-bottom:1px solid var(--color-border-default)}
+.pos-context{display:flex;align-items:center;gap:.7rem;flex-wrap:wrap;flex:1;font-size:.875rem}.pos-context>span{color:var(--color-text-secondary)}
+.pos-context>strong{border-left:3px solid var(--color-border-default);padding-left:.6rem}.pos-context [data-state=open]{border-color:var(--color-success)}.pos-context [data-state=error]{border-color:var(--color-danger)}
+summary{cursor:pointer;min-height:44px;display:flex;align-items:center;text-decoration:underline}details span{display:block}
+.pos-shell{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(380px,1fr);gap:1rem;align-items:start;min-width:0}
+.pos-workspace,.checkout-panel{display:grid;gap:.8rem;min-width:0;align-content:start}
+.checkout-panel{position:sticky;top:0}.checkout-actions{display:grid;gap:.6rem}.checkout-button{min-height:52px;font-size:1.15rem;letter-spacing:.02em}
+.message-stack{display:grid;gap:.6rem}.message-stack p{margin:0}.message-stack .ui-button{justify-self:start}
+.ui-button{min-height:44px}.ui-button:disabled{opacity:.6;cursor:not-allowed}
+@media(max-width:900px){.pos-shell{grid-template-columns:minmax(0,1fr)}.checkout-panel{position:static}.pos-page{padding:.65rem}.pos-context{flex-basis:100%}.pos-utility-header{gap:.65rem}}
+
+.compact-cart-jump{display:none}.checkout-panel{scroll-margin-top:76px}
+@media(max-width:900px){.compact-cart-jump{display:flex;position:sticky;top:0;z-index:2;gap:.4rem;background:var(--color-bg-surface);padding:.4rem 0}.compact-cart-jump .ui-button{flex:1;min-width:0;padding:.5rem;font-size:.85rem}.pos-workspace{scroll-margin-top:76px}}
+
+.pos-warehouse{display:flex;gap:.35rem;align-items:center;min-width:0;font-size:.85rem}.pos-warehouse>span{color:var(--color-text-secondary);white-space:nowrap}.pos-warehouse select{min-height:44px;max-width:220px;min-width:0;width:auto;border:1px solid var(--color-border-default);border-radius:var(--radius-md);background:var(--color-bg-surface);color:var(--color-text-primary);padding:.45rem;font-size:.85rem}.pos-context details{font-size:.8rem}.pos-context{gap:.75rem}.pos-utility-header>.pos-context{flex:1 1 380px}.checkout-panel{gap:.65rem}.checkout-button{min-height:52px}
+.pos-cash-details{position:relative}.pos-cash-details>summary{padding:.35rem .6rem;border-radius:var(--radius-md);text-underline-offset:3px}.pos-cash-card{position:absolute;z-index:5;top:100%;right:0;width:260px;max-width:calc(100vw - 3rem);padding:.85rem;display:grid;gap:.5rem;background:var(--color-bg-surface);color:var(--color-text-primary);border:1px solid var(--color-border-default);border-radius:var(--radius-md);box-shadow:0 8px 24px #0003}.pos-cash-card strong{padding:0;border:0}.pos-cash-card .ui-button{white-space:normal}.pos-cash-details>summary:focus-visible{outline:2px solid var(--color-text-primary);outline-offset:2px}
+@media(max-width:900px){.pos-utility-header>.pos-context{flex:1 1 100%}.pos-warehouse{flex-wrap:wrap}.pos-warehouse select{max-width:min(240px,65vw)}}
+@media(max-width:520px){.pos-page{padding:.6rem}.pos-context{gap:.3rem .6rem}.pos-warehouse{flex:1 1 100%}.pos-warehouse select{flex:1;max-width:100%;width:0}.pos-warehouse>span{white-space:normal}.pos-utility-header{gap:.4rem}.pos-context details{display:block}.pos-cash-card{left:0;right:auto}.pos-utility-header .ui-button{padding:.5rem .65rem}}

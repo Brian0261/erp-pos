@@ -1085,6 +1085,9 @@ const ROLES_ECOMMERCE_ADMIN: AppRole[] = ["ADMIN", "SUPERVISOR"];
       }
 
       .topbar {
+        /* Keep header menus above page content and below page dialogs. */
+        position: relative;
+        z-index: 10;
         display: flex;
         align-items: center;
         justify-content: space-between;
