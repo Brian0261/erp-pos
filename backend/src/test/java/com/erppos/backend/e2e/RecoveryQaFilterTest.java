@@ -8,6 +8,29 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static org.junit.jupiter.api.Assertions.*;
 
 class RecoveryQaFilterTest {
+    @Test void exactTodayGetReachesApplicationWithoutDenial() throws Exception {
+        var id=new E2eQaConfiguration.Identity("synthetic","","","","","","","","");
+        var filter=new RecoveryQaFilter(id,null,new AtomicBoolean(true),new ObjectMapper());
+        var reached=new AtomicBoolean();var response=new MockHttpServletResponse();
+        filter.doFilterInternal(new MockHttpServletRequest("GET","/api/v1/sales/today"),response,(a,b)->reached.set(true));
+        assertTrue(reached.get());assertEquals(200,response.getStatus());assertTrue(filter.denialRecords().isEmpty());
+        assertEquals(0,((java.util.concurrent.atomic.AtomicInteger)org.springframework.test.util.ReflectionTestUtils.getField(filter,"denied")).get());
+    }
+    @Test void todayWritesAndNonexactRoutesRemainDenied() throws Exception {
+        var id=new E2eQaConfiguration.Identity("synthetic","","","","","","","","");
+        var filter=new RecoveryQaFilter(id,null,new AtomicBoolean(true),new ObjectMapper());
+        String[][] requests={{"POST","/api/v1/sales/today"},{"PUT","/api/v1/sales/today"},
+                {"PATCH","/api/v1/sales/today"},{"DELETE","/api/v1/sales/today"},
+                {"HEAD","/api/v1/sales/today"},{"OPTIONS","/api/v1/sales/today"},
+                {"GET","/api/v1/sales/today/"},{"GET","/api/v1/sales/today/1"},{"GET","/api/v1/sales/today-extra"}};
+        for(var request:requests){
+            var response=new MockHttpServletResponse();
+            filter.doFilterInternal(new MockHttpServletRequest(request[0],request[1]),response,(a,b)->fail("Unapproved route reached application"));
+            assertEquals(405,response.getStatus());
+        }
+        assertEquals(requests.length,filter.denialRecords().size());
+        assertEquals(requests.length,((java.util.concurrent.atomic.AtomicInteger)org.springframework.test.util.ReflectionTestUtils.getField(filter,"denied")).get());
+    }
     @Test void exactStockGetReachesTheApplicationWithoutRecordingADenial() throws Exception {
         var id = new E2eQaConfiguration.Identity("synthetic", "", "", "", "", "", "", "", "");
         var filter = new RecoveryQaFilter(id, null, new AtomicBoolean(true), new ObjectMapper());

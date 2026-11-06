@@ -8,7 +8,7 @@ export function assertNoWriteViolations(blocked: BlockedRequestRecord[]): void {
 export const QA_ORIGIN = "http://127.0.0.1:4201";
 export const READ_PATHS = new Set([
   "/api/v1/auth/me", "/api/v1/warehouses", "/api/v1/billing/series", "/api/v1/cash-registers/current",
-  "/api/v1/pos/products/search", "/api/v1/pos/products/lookup", "/api/v1/sales", "/api/v1/quotes",
+  "/api/v1/pos/products/search", "/api/v1/pos/products/lookup", "/api/v1/sales", "/api/v1/sales/today", "/api/v1/quotes",
   "/api/v1/billing/documents", "/api/v1/inventory/stocks", "/api/v2/inventory/stocks", "/api/v1/health/e2e-identity",
 ]);
 export function allowedQaRequest(method: string, address: string): boolean {

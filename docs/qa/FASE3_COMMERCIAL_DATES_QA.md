@@ -168,3 +168,115 @@ y supervisar el reloj autoritativo del backend. Sin conectividad o una
 respuesta válida no se confirma el día ni el importe actual; no se promete una
 actualización exacta de medianoche sin conexión. No se cambió infraestructura,
 históricos, dinero, stock, caja transaccional, fiscalidad o recuperación durable.
+
+## Corrección focal de CI PR #13 (2026-11-05)
+
+CI #46 [run 42119990632](https://github.com/Brian0261/erp-pos/actions/runs/42119990632),
+SHA remoto `d717517fa7e28f0cb07be9f87bcaa35018e543f7`: backend, e2e-auth y
+e2e-commercial FAILURE; frontend SUCCESS. Esta sección complementa la evidencia
+local anterior; no acredita un nuevo CI remoto ni el cierre de Fase 3.
+
+- Backend: el Testcontainer estático de `AbstractHttpIntegrationTest` se comparte
+  entre clases. Otros tests dejan ventas sintéticas del día y de usuarios seed;
+  `todayUsesServerDayWithNoStoreAndPreservesPermissions` suponía erróneamente
+  vacío global y cardinalidades globales 1/2. Ahora usa un CAJERO único, comprueba
+  vacío por propietario aun con ventas ajenas presentes y compara IDs exactos de
+  su propia caja/fixture para ADMIN y SUPERVISOR. Verifica límites Lima (inicio y
+  última microfracción), metadatos, no-store, filtros no vinculantes, 401/403 y
+  propiedad. Todos sus inserts siguen dentro de la transacción con rollback.
+- Auth: el dashboard pide GET `/api/v1/sales/today` al terminar el login. La
+  allowlist de Playwright lo rechazaba y el fixture automático registraba la
+  violación, haciendo fallar el setup y omitir sus dependientes. Se añadió solo
+  ese GET exacto y se extendió la prueba existente de origen/métodos/subrutas,
+  manteniendo los 12 casos de seguridad obligatorios. Se identificó además la
+  misma ausencia en `E2eQaReadOnlyFilter`; su cambio y prueba quedaron bloqueados
+  en el primer gate hasta recibir la ampliación explícita de 2026-11-06.
+- Comercial: el artifact sanitizado registra una denegación fiscal esperada y
+  dos GET adicionales `/api/v1/sales/{segment}`. `RecoveryQaFilter` denegaba el
+  nuevo GET; se permite exclusivamente esa ruta/método y se añaden regresiones
+  del filtro real para escrituras y rutas no exactas. La anonimización se
+  mantiene. `QA_FINAL_EVIDENCE_REQUIRED` deriva del resultado fallido del gate,
+  cuyo único error registrado fue `QA_UNEXPECTED_DENIED_REQUEST`; aislamiento y
+  limpieza del run CI fueron PASS. La correspondencia se contrasta también con
+  el gate local corregido, preservando sus diez escenarios y contador estricto.
+
+Primer gate, 2026-11-05 (evidencia histórica; sin sumar casos solapados):
+
+- `CommercialDatesIntegrationTest,RecoveryQaFilterTest`: 12/12 PASS.
+- `mvnw.cmd -B clean verify`, una ejecución: 846 tests, 3 failures, 0 errors/skips.
+  Fase 3 (6/6) y filtro comercial (6/6) PASS dentro de la suite compartida. Los
+  tres fallos adicionales pertenecen a `EcommerceBinaryImportWebpDerivativeIntegrationTest`:
+  sus códigos `UIT` + sufijo basado en `System.nanoTime()` exceden 20 caracteres
+  en este equipo y reciben 400 al crear unidades. En ese primer gate no se
+  modificaron esos fixtures ni la validación productiva de unidades.
+- `node e2e/qa/run-recovery.mjs`: 10/10 PASS, un intento por escenario, sin
+  skips/retries. Evidencia final, aislamiento y limpieza PASS; solo la denegación
+  fiscal esperada (total 1), sin GET adicionales. Run local
+  `3bd0e166f3641b62bdcb3ce0`; evidencia sanitizada en
+  `backend/target/recovery-e2e/3bd0e166f3641b62bdcb3ce0/evidence/` (efímera,
+  ignorada por Git y eliminada por el clean verify posterior). Se conserva el
+  log externo `commercial-gate.log`; este PASS acreditado se reutiliza.
+- Gate Auth: pendiente de la decisión sobre su segunda barrera QA en ese momento.
+
+Logs y artifact sanitizado en `%LOCALAPPDATA%/Temp/inktoy-fase3/ci-pr13/`:
+`backend-focal.log`, `backend-full.log`, `commercial-gate.log`, `ci-artifact/`.
+Estado al cierre del primer gate: BLOCKED, validación incompleta y NO-GO para
+commit correctivo. La continuación autorizada y su resultado constan abajo.
+El CI remoto del futuro SHA continúa pendiente; sin staging, commit o push.
+
+### Resolución final autorizada (2026-11-06)
+
+- Se preservaron los seis archivos pendientes del gate anterior. La ampliación
+  autoriza exclusivamente el filtro Auth, su prueba y el fixture sintético WebP.
+  HEAD local/remoto continúa en `d717517fa7e28f0cb07be9f87bcaa35018e543f7`.
+- `E2eQaReadOnlyFilter.READS` permite ahora únicamente GET sobre la ruta exacta
+  `/api/v1/sales/today`. `E2eQaSafetyTest` comprueba paso a la cadena real solo
+  tras readiness, identidad en cabeceras y cero violaciones para esa lectura;
+  escrituras, HEAD/OPTIONS/TRACE, subrutas y rutas desconocidas siguen denegadas
+  con 405 sin llegar a seguridad ni negocio. Se conservan las negativas de
+  identidad, datasource, marcador y configuración heredada.
+- Confirmados los tres fallos WebP: `UIT15fywzpz58jpglarge`,
+  `UIT15fyxz47ocpnglarge` y `UIT15fzcac4lkrespfail` tenían 21 caracteres frente
+  al máximo productivo 20. La única corrección en
+  `EcommerceBinaryImportWebpDerivativeIntegrationTest` genera el sufijo de unidad
+  como `WEBP` + ID único de categoría en base 36. Con el prefijo `UIT` ocupa como
+  máximo 20 caracteres incluso para Long.MAX_VALUE; se comprueban longitud y
+  unicidad del fixture. Los cuerpos y aserciones originales de los diez tests,
+  SKU/productos, imágenes y comportamiento ecommerce permanecen intactos.
+
+| Validación de esta continuación | Resultado |
+|---|---|
+| E2eQaSafetyTest | 10/10 PASS, incluidas dos regresiones nuevas |
+| Tres casos WebP originalmente fallidos | 3/3 PASS con sus aserciones originales |
+| Backend completo, una ejecución clean verify tras la corrección | 848/848 PASS, 0 failures/errors/skipped |
+| Dentro de esa suite compartida | Fase 3 6/6, WebP 10/10 y filtro comercial 6/6 PASS |
+| Gate Auth aislado | Setup 1 PASS; 3 escenarios PASS; 12 negativos PASS; 0 FAIL/SKIPPED, retries 0 |
+| Auth identidad, red, postcondiciones, evidencia de cero escrituras comerciales y limpieza | PASS |
+| Diff, inventario y conservación de los cambios previos | PASS |
+
+Los conteos focales y los subconjuntos de la suite no se suman a 848. Se reutiliza
+el gate comercial 10/10 del primer paso: el filtro comercial, sus pruebas y
+escenarios no cambiaron. No se repitieron matrices JVM ni campañas temporales.
+
+Comandos, desde backend y frontend respectivamente:
+```powershell
+.\mvnw.cmd -B '-Dtest=E2eQaSafetyTest,EcommerceBinaryImportWebpDerivativeIntegrationTest#confirmFileShouldPersistResponsiveWebpVariantsForLargeJpeg+confirmFileShouldPersistResponsiveWebpVariantsForTransparentPngWithoutUpscaling+responsiveStorageFailureShouldCleanNewObjectsAndKeepOtherRowsSuccessful' test
+.\mvnw.cmd -B clean verify
+node e2e/qa/run-qa.mjs
+git diff --check
+```
+
+Evidencia persistida fuera del repo:
+`%LOCALAPPDATA%/Temp/inktoy-fase3/ci-pr13-final/`: `backend-focal.log`,
+`backend-full.log`, `auth-gate.log`, `surefire/` e `inventory.json` con los hashes
+finales. Auth run `7e5d12c7458475669716549a`, recursos efímeros retirados por el
+launcher. Java 17, Node 22.23.3/npm 10.9.9, PostgreSQL 16 aislado y controles de
+identidad/origen/marcador y cleanup del launcher vigente, sin relajar gates.
+
+Estado: **PASS — FASE3_CI_CORRECTION_READY**, GO para solicitar autorización
+independiente de commit correctivo. Inventario acumulado: nueve modificados,
+cero nuevos, índice vacío. Solo tests, barreras QA e informe; sin código
+productivo, cambios de infraestructura, staging, commit o push. El CI remoto del
+futuro SHA sigue pendiente; el run #46 del SHA publicado permanece fallido.
+Persisten los requisitos operativos de reloj backend correcto y conectividad,
+sin acreditar despliegue ni declarar Fase 3 CLOSED.

@@ -65,6 +65,8 @@ class EcommerceBinaryImportWebpDerivativeIntegrationTest extends AbstractHttpInt
     @MockitoBean
     private EcommerceImageStoragePort imageStoragePort;
 
+    private final java.util.Set<String> fixtureUnitCodes = new java.util.HashSet<>();
+
     @BeforeEach
     void setupImageStorage() {
         when(imageStoragePort.store(any())).thenAnswer(invocation -> {
@@ -399,7 +401,12 @@ class EcommerceBinaryImportWebpDerivativeIntegrationTest extends AbstractHttpInt
 
     private long createCatalogProduct(String adminToken, String suffix, BigDecimal salePrice) throws Exception {
         long categoryId = createCategory(adminToken, suffix);
-        long unitId = createUnit(adminToken, suffix);
+        // The category ID is unique; even Long.MAX_VALUE in base 36 keeps UIT + WEBP + ID within 20.
+        String unitSuffix = "WEBP" + Long.toString(categoryId, 36);
+        String unitCode = "UIT" + unitSuffix;
+        assertTrue(unitCode.length() <= 20);
+        assertTrue(fixtureUnitCodes.add(unitCode), "Fixture unit codes must be unique");
+        long unitId = createUnit(adminToken, unitSuffix);
         return createProduct(adminToken, categoryId, unitId, suffix, salePrice);
     }
 

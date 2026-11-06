@@ -75,6 +75,42 @@ class E2eQaSafetyTest {
         var response = new MockHttpServletResponse(); var chain = mock(jakarta.servlet.FilterChain.class);
         filter.doFilter(request, response, chain); verify(chain).doFilter(request, response);
     }
+    @Test void exactTodayReadTraversesRealSecurityChainOnlyAfterReadiness() throws Exception {
+        var id=E2eQaConfiguration.Identity.from(environment());
+        var ready=new AtomicBoolean(false);
+        var filter=new E2eQaReadOnlyFilter(id,mock(DataSource.class),ready,new ObjectMapper());
+        var chain=mock(jakarta.servlet.FilterChain.class);
+        var unavailable=new MockHttpServletResponse();
+        filter.doFilter(new MockHttpServletRequest("GET","/api/v1/sales/today"),unavailable,chain);
+        assertEquals(503,unavailable.getStatus());verifyNoInteractions(chain);
+        ready.set(true);
+        var request=new MockHttpServletRequest("GET","/api/v1/sales/today");
+        var response=new MockHttpServletResponse();
+        filter.doFilter(request,response,chain);
+        verify(chain).doFilter(request,response);
+        assertEquals(200,response.getStatus());
+        assertEquals(id.runId(),response.getHeader("X-QA-Run-Id"));
+        assertEquals("enforced",response.getHeader("X-QA-No-Write"));
+        assertEquals(0,((java.util.concurrent.atomic.AtomicInteger)org.springframework.test.util.ReflectionTestUtils.getField(filter,"violations")).get());
+    }
+    @Test void todayMutationsAndNonexactReadsNeverReachSecurityOrBusinessChain() throws Exception {
+        var id=E2eQaConfiguration.Identity.from(environment());
+        var filter=new E2eQaReadOnlyFilter(id,mock(DataSource.class),new AtomicBoolean(true),new ObjectMapper());
+        String[][] requests={{"POST","/api/v1/sales/today"},{"PUT","/api/v1/sales/today"},
+                {"PATCH","/api/v1/sales/today"},{"DELETE","/api/v1/sales/today"},
+                {"HEAD","/api/v1/sales/today"},{"OPTIONS","/api/v1/sales/today"},{"TRACE","/api/v1/sales/today"},
+                {"GET","/api/v1/sales/today/"},{"GET","/api/v1/sales/today/1"},
+                {"GET","/api/v1/sales/today-extra"},{"GET","/api/v1/sales/unknown"}};
+        for(var denied:requests){
+            var response=new MockHttpServletResponse();var chain=mock(jakarta.servlet.FilterChain.class);
+            filter.doFilter(new MockHttpServletRequest(denied[0],denied[1]),response,chain);
+            assertEquals(405,response.getStatus());
+            assertEquals(id.runId(),response.getHeader("X-QA-Run-Id"));
+            assertEquals("enforced",response.getHeader("X-QA-No-Write"));
+            verifyNoInteractions(chain);
+        }
+        assertEquals(requests.length,((java.util.concurrent.atomic.AtomicInteger)org.springframework.test.util.ReflectionTestUtils.getField(filter,"violations")).get());
+    }
     @Test void unknownReadsAndStartupRequestsAreDenied() throws Exception {
         assertFalse(E2eQaReadOnlyFilter.allowed("GET", "/api/v1/billing/documents/1/xml"));
         var filter = new E2eQaReadOnlyFilter(E2eQaConfiguration.Identity.from(environment()), mock(DataSource.class),

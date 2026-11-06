@@ -21,6 +21,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 @Transactional
 class CommercialDatesIntegrationTest extends AbstractHttpIntegrationTest {
     @Autowired JdbcTemplate jdbc;
+    @Autowired org.springframework.security.crypto.password.PasswordEncoder passwords;
     private long cash;
     private long product;
     private final List<Long> ids = new ArrayList<>();
@@ -105,25 +106,56 @@ class CommercialDatesIntegrationTest extends AbstractHttpIntegrationTest {
     }
 
     @Test void todayUsesServerDayWithNoStoreAndPreservesPermissions() throws Exception {
-        fixture();String admin=login(ADMIN_EMAIL,ADMIN_PASSWORD),cashier=login(CAJERO_EMAIL,CAJERO_PASSWORD);
-        var empty=read("/api/v1/sales/today",admin);
-        assertEquals("America/Lima",empty.path("timeZone").asText());assertTrue(empty.path("sales").isEmpty());
-        var day=java.time.LocalDate.parse(empty.path("businessDate").asText());
-        String username=jdbc.queryForObject("select username from users where email=?",String.class,CAJERO_EMAIL);
+        fixture();String admin=login(ADMIN_EMAIL,ADMIN_PASSWORD);
+        var initial=read("/api/v1/sales/today",admin);
+        var day=java.time.LocalDate.parse(initial.path("businessDate").asText());
+        UUID actor=UUID.randomUUID();String username="f3_"+actor.toString().replace("-","");
+        jdbc.update("insert into users(id,username,email,password_hash,active) values (?,?,?,?,true)",
+                actor,username,username+"@synthetic.invalid",passwords.encode(CAJERO_PASSWORD));
+        jdbc.update("insert into user_roles(user_id,role_id) select ?,id from roles where name='CAJERO'",actor);
+        String cashier=login(username,CAJERO_PASSWORD);
         // Cover adjacent days too, so this fixture cannot race the real test-server midnight.
+        // Foreign current-day rows deliberately reproduce a nonempty shared database.
         for(int delta=-1;delta<=1;delta++) {
             String at=day.plusDays(delta).atTime(12,0).atZone(java.time.ZoneId.of("America/Lima")).toInstant().toString();
-            add(at,"COMPLETED",username);add(at,"COMPLETED","f3.other");
+            add(at,"COMPLETED","f3.other");
         }
-        for(String token:List.of(admin,cashier)) {
+        var empty=read("/api/v1/sales/today",cashier);
+        assertEquals("America/Lima",empty.path("timeZone").asText());assertTrue(empty.path("sales").isEmpty());
+        for(int delta=-1;delta<=1;delta++) {
+            var start=day.plusDays(delta).atStartOfDay(java.time.ZoneId.of("America/Lima")).toInstant();
+            var end=day.plusDays(delta+1).atStartOfDay(java.time.ZoneId.of("America/Lima")).toInstant();
+            add(start.toString(),"COMPLETED",username);
+            add(end.minusNanos(1000).toString(),"COMPLETED",username);
+        }
+        String supervisor=login(SUPERVISOR_EMAIL,SUPERVISOR_PASSWORD);
+        for(String token:List.of(admin,cashier,supervisor)) {
             var response=mockMvc.perform(get("/api/v1/sales/today").header(HttpHeaders.AUTHORIZATION,bearer(token))
                     .param("createdBy","f3.other").param("from","2000-01-01")).andReturn();
             assertEquals(200,response.getResponse().getStatus());assertEquals("no-store",response.getResponse().getHeader("Cache-Control"));
             var body=readJson(response);Instant reference=Instant.parse(body.path("referenceInstant").asText());
             var selected=reference.atZone(java.time.ZoneId.of("America/Lima")).toLocalDate();
+            assertEquals("America/Lima",body.path("timeZone").asText());
             assertEquals(selected.toString(),body.path("businessDate").asText());
-            assertEquals(selected.plusDays(1).atStartOfDay(java.time.ZoneId.of("America/Lima")).toInstant(),Instant.parse(body.path("nextDayStartsAt").asText()));
-            assertEquals(token.equals(cashier)?1:2,body.path("sales").size());
+            var start=selected.atStartOfDay(java.time.ZoneId.of("America/Lima")).toInstant();
+            var end=selected.plusDays(1).atStartOfDay(java.time.ZoneId.of("America/Lima")).toInstant();
+            assertEquals(end,Instant.parse(body.path("nextDayStartsAt").asText()));
+            var expected=new ArrayList<Long>();
+            for(int i=0;i<ids.size();i++) {
+                if(!instants.get(i).isBefore(start)&&instants.get(i).isBefore(end)
+                        &&(!token.equals(cashier)||username.equals(jdbc.queryForObject("select created_by from sales where id=?",String.class,ids.get(i)))))
+                    expected.add(ids.get(i));
+            }
+            var actual=new ArrayList<Long>();
+            body.path("sales").forEach(sale->{
+                Instant sold=Instant.parse(sale.path("soldAt").asText());
+                assertFalse(sold.isBefore(start));assertTrue(sold.isBefore(end));
+                if(sale.path("cashRegisterSessionId").asLong()==cash)actual.add(sale.path("id").asLong());
+            });
+            assertEquals(token.equals(cashier)?2:3,expected.size());
+            assertEquals(new java.util.HashSet<>(expected),new java.util.HashSet<>(actual));
+            assertEquals(expected.size(),actual.size());
+            if(token.equals(cashier))assertEquals(expected.size(),body.path("sales").size());
             if(token.equals(cashier)) body.path("sales").forEach(sale->assertEquals(username,sale.path("createdBy").asText()));
         }
         assertEquals(401,mockMvc.perform(get("/api/v1/sales/today")).andReturn().getResponse().getStatus());
