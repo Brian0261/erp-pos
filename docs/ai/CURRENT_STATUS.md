@@ -4,33 +4,30 @@
 
 Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones tecnicas/QA documentadas.
 
-### Fase 3 — fechas comerciales: PASS local, pendiente de gate Git (2026-11-05)
+### Fase 3 — fechas comerciales: CLOSED técnico (2026-11-06)
 
-- Base `1fa09913476f5382e90807b3e750a2fc69d69e10`; rama local autorizada
-  `feat/fase3-fechas-comerciales`. Sin staging, commit, publicación ni CI remoto de esta fase.
-  Commit, push, PR, CI remoto, revisión y merge siguen pendientes de sus gates;
-  las operaciones Git de escritura requieren autorización independiente.
-- Consultas de Ventas, reporte comercial y ranking interpretan fechas en
-  America/Lima con inicio inclusivo/fin exclusivo; conservan instantes originales,
-  permisos, filtros y contratos monetarios. Se elimina el filtrado temporal del
-  navegador y se alinean presentación y KPI de hoy, preservando actividad reciente.
-- QA focal: backend 77/77, Angular 77/77, E2E sintético GET-only 6/6, build y
-  typecheck PASS. Los mismos siete casos temporales pasaron también en JVM UTC
-  y Tokio, sin sumarlos como casos distintos. Detalle y contrato en
-  `docs/qa/FASE3_COMMERCIAL_DATES_QA.md`.
-- **PASS — FASE3_LOCAL_VALIDATED**, no CLOSED ni despliegue. Sin migraciones,
-  reescritura de históricos, nuevas dependencias o cambios fiscales.
-- Ampliación KPI autorizada: GET `/api/v1/sales/today` expone día Lima, referencia
-  y vigencia del servidor junto a las ventas permitidas, con no-store. El KPI ya
-  no selecciona el día con el reloj del cliente; revalida al vencer, retomar foco
-  o reintentar y descarta respuestas tardías. Actividad reciente preservada.
-  QA incremental: backend 51/51, Angular 19/19, E2E 6/6, build/typecheck PASS,
-  sin sumar estos conteos a las suites anteriores. Antes de producción se requiere
-  sincronización y supervisión operativa del reloj autoritativo del backend,
-  requisito pendiente de acreditación operativa. La conectividad es necesaria
-  para confirmar datos actuales; sin referencia válida no muestra cero ni se
-  promete actualización exacta de medianoche sin conexión.
-  UX-POS-2 y las demás fases mantienen sus estados históricos.
+- PR [#13](https://github.com/Brian0261/erp-pos/pull/13), integrada mediante
+  squash en `master`: `cebeaf1797f38d53f2befea966aa6e8c5e6f52b0` (parent
+  `1fa09913476f5382e90807b3e750a2fc69d69e10`). La rama feature fue conservada;
+  esta actualización documental parte del squash remoto y no implica sincronizar
+  ni modificar `master` local.
+- CI de PR [42168183442](https://github.com/Brian0261/erp-pos/actions/runs/42168183442)
+  y Qodana [42168183444](https://github.com/Brian0261/erp-pos/actions/runs/42168183444)
+  terminaron SUCCESS sobre `5d7958b0db8b196e40446dbde413b09f6bf2fd25`. CI
+  postmerge [42169893802](https://github.com/Brian0261/erp-pos/actions/runs/42169893802)
+  terminó SUCCESS sobre el squash; backend, frontend, e2e-auth y e2e-commercial
+  aprobaron.
+- Consultas de Ventas y reportes seleccionados interpretan `from`/`to` como
+  fechas America/Lima con inicio inclusivo y fin exclusivo. El KPI de hoy usa
+  el día autoritativo del backend mediante GET `/api/v1/sales/today`; se mantienen
+  permisos, aislamiento CAJERO y contratos de importes. Se preservan timestamps
+  e históricos, sin backfill ni cambios monetarios o fiscales.
+- La integración y validación técnica están cerradas; **no implica despliegue
+  productivo**. Antes de producción debe acreditarse sincronización y supervisión
+  del reloj backend. Sin conectividad/respuesta válida no se confirma información
+  comercial actual ni se promete actualización exacta de medianoche sin conexión.
+  Detalle: `docs/qa/FASE3_COMMERCIAL_DATES_QA.md` y
+  `docs/qa/MATRIX_API_ENDPOINTS.md`. UX-POS-2 y las demás fases conservan su estado.
 
 ### UX-POS-2 — CLOSED técnico tras integración y CI postmerge (2026-11-05)
 
