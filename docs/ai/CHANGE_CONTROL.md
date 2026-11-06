@@ -3021,6 +3021,10 @@ Solo crear tag cuando se cumpla todo:
 
 ### Fase 3 — fechas comerciales America/Lima, PASS local (2026-11-05)
 
+> Registro histórico del estado local al 2026-11-05; sus gates pendientes fueron
+> superados por la integración y evidencia de cierre técnico registradas el
+> 2026-11-06 más abajo.
+
 - Autorización: implementación y QA local, creando únicamente la rama
   `feat/fase3-fechas-comerciales` desde `master` en
   `1fa09913476f5382e90807b3e750a2fc69d69e10`. Sin staging, commit, push o PR.
@@ -3055,3 +3059,33 @@ Solo crear tag cuando se cumpla todo:
   del reloj backend. Se necesita conectividad para verificar datos actuales;
   ante error no se presenta cero como resultado confirmado ni se promete una
   actualización exacta de medianoche sin conexión. No se acredita despliegue.
+
+### Fase 3 — cierre técnico postmerge (2026-11-06)
+
+- PR [#13](https://github.com/Brian0261/erp-pos/pull/13), integrada y cerrada
+  mediante squash `cebeaf1797f38d53f2befea966aa6e8c5e6f52b0`; parent
+  `1fa09913476f5382e90807b3e750a2fc69d69e10`. Commits funcionales incluidos:
+  `d717517fa7e28f0cb07be9f87bcaa35018e543f7` y correctivo
+  `5d7958b0db8b196e40446dbde413b09f6bf2fd25`.
+- CI PR [42168183442](https://github.com/Brian0261/erp-pos/actions/runs/42168183442)
+  y Qodana [42168183444](https://github.com/Brian0261/erp-pos/actions/runs/42168183444)
+  concluyeron SUCCESS para el head correctivo. CI postmerge
+  [42169893802](https://github.com/Brian0261/erp-pos/actions/runs/42169893802)
+  concluyó SUCCESS para el squash: backend, frontend, e2e-auth y e2e-commercial.
+- Alcance: fechas comerciales America/Lima para Ventas/reportes; filtros con
+  inicio inclusivo y fin exclusivo; GET `/api/v1/sales/today` con día calculado
+  por backend, `no-store` y aislamiento existente de CAJERO. Históricos, importes,
+  pagos/vuelto, caja, stock, almacén, UUID/idempotencia, recuperación durable,
+  autorización y contratos fiscales preservados.
+- Correcciones CI: fixtures de integración aislados por actor/caja; allowlists
+  de las barreras QA extendidas únicamente para el GET exacto; fixture sintético
+  WebP ajustado al límite vigente sin alterar validación productiva ni aserciones.
+  Evidencia detallada y cronología en `docs/qa/FASE3_COMMERCIAL_DATES_QA.md`.
+- Autorizaciones Git ejecutadas: commit local funcional y correctivo, push de la
+  rama feature, creación de PR #13, squash merge. No se eliminaron ramas ni se
+  crearon tags. Esta anotación no afirma sincronización de `master` local ni
+  registra la integración futura de esta rama documental.
+- Estado: **FASE3 CLOSED técnico**, sin afirmar despliegue/operación productiva.
+  Riesgos residuales: se requiere sincronizar y supervisar el reloj backend antes
+  de producción; los datos comerciales actuales requieren conectividad y una
+  respuesta válida. No se acredita emisión fiscal productiva.

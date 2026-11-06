@@ -1,9 +1,17 @@
 # Fase 3 — fechas comerciales America/Lima
 
-Estado: **PASS — FASE3_LOCAL_VALIDATED**, 2026-11-05. Validación local;
-no CLOSED, commit, publicación, CI remoto ni despliegue de Fase 3.
-Base `1fa09913476f5382e90807b3e750a2fc69d69e10`, rama
-`feat/fase3-fechas-comerciales`. UX-POS-2 permanece CLOSED técnico.
+Estado: **CLOSED técnico**, 2026-11-06; integrado y validado postmerge, sin
+acreditar despliegue productivo. PR [#13](https://github.com/Brian0261/erp-pos/pull/13),
+squash `cebeaf1797f38d53f2befea966aa6e8c5e6f52b0` (parent
+`1fa09913476f5382e90807b3e750a2fc69d69e10`). Se conserva abajo la cronología
+de validación local como evidencia histórica.
+
+CI de PR [42168183442](https://github.com/Brian0261/erp-pos/actions/runs/42168183442)
+y Qodana [42168183444](https://github.com/Brian0261/erp-pos/actions/runs/42168183444)
+SUCCESS sobre `5d7958b0db8b196e40446dbde413b09f6bf2fd25`. CI postmerge
+[42169893802](https://github.com/Brian0261/erp-pos/actions/runs/42169893802)
+SUCCESS sobre el squash, con backend, frontend, e2e-auth y e2e-commercial PASS.
+El CI inicial fallido y las correcciones posteriores se explican en la cronología.
 
 ## Contrato e implementación
 
@@ -100,8 +108,9 @@ El KPI elige hoy mediante la referencia backend descrita en la ampliación sigui
 Actividad reciente conserva su rango histórico.
 Otros módulos y la navegación móvil global mantienen sus limitaciones existentes.
 No se acredita despliegue, impresión térmica física o emisión fiscal productiva.
-Commit, push, PR, CI remoto, revisión, merge y cierre siguen pendientes de sus
-gates; las operaciones Git de escritura requieren autorización independiente.
+En el corte de esta validación local, commit, push, PR, CI remoto, revisión,
+merge y cierre seguían pendientes; esa descripción es histórica y quedó
+superada por el cierre técnico registrado al inicio de este documento.
 
 ## Ampliación autorizada — KPI de hoy sin reloj del cliente
 
@@ -222,13 +231,15 @@ Logs y artifact sanitizado en `%LOCALAPPDATA%/Temp/inktoy-fase3/ci-pr13/`:
 `backend-focal.log`, `backend-full.log`, `commercial-gate.log`, `ci-artifact/`.
 Estado al cierre del primer gate: BLOCKED, validación incompleta y NO-GO para
 commit correctivo. La continuación autorizada y su resultado constan abajo.
-El CI remoto del futuro SHA continúa pendiente; sin staging, commit o push.
+En ese corte, el CI remoto del futuro SHA seguía pendiente y no se había hecho
+staging, commit o push.
 
 ### Resolución final autorizada (2026-11-06)
 
-- Se preservaron los seis archivos pendientes del gate anterior. La ampliación
-  autoriza exclusivamente el filtro Auth, su prueba y el fixture sintético WebP.
-  HEAD local/remoto continúa en `d717517fa7e28f0cb07be9f87bcaa35018e543f7`.
+- En ese gate precommit se preservaron los seis archivos pendientes anteriores;
+  la ampliación autorizó el filtro Auth, su prueba y el fixture sintético WebP.
+  En ese momento HEAD local/remoto aún era
+  `d717517fa7e28f0cb07be9f87bcaa35018e543f7`.
 - `E2eQaReadOnlyFilter.READS` permite ahora únicamente GET sobre la ruta exacta
   `/api/v1/sales/today`. `E2eQaSafetyTest` comprueba paso a la cadena real solo
   tras readiness, identidad en cabeceras y cero violaciones para esa lectura;
@@ -273,10 +284,32 @@ finales. Auth run `7e5d12c7458475669716549a`, recursos efímeros retirados por e
 launcher. Java 17, Node 22.23.3/npm 10.9.9, PostgreSQL 16 aislado y controles de
 identidad/origen/marcador y cleanup del launcher vigente, sin relajar gates.
 
-Estado: **PASS — FASE3_CI_CORRECTION_READY**, GO para solicitar autorización
+Estado en ese gate: **PASS — FASE3_CI_CORRECTION_READY**, GO para solicitar autorización
 independiente de commit correctivo. Inventario acumulado: nueve modificados,
 cero nuevos, índice vacío. Solo tests, barreras QA e informe; sin código
 productivo, cambios de infraestructura, staging, commit o push. El CI remoto del
-futuro SHA sigue pendiente; el run #46 del SHA publicado permanece fallido.
+futuro SHA seguía pendiente en ese corte; el run #46 del SHA publicado permaneció fallido.
 Persisten los requisitos operativos de reloj backend correcto y conectividad,
-sin acreditar despliegue ni declarar Fase 3 CLOSED.
+sin acreditar despliegue.
+
+### Cierre técnico postmerge (2026-11-06)
+
+- PR #13 integrada mediante squash `cebeaf1797f38d53f2befea966aa6e8c5e6f52b0`;
+  head integrado `5d7958b0db8b196e40446dbde413b09f6bf2fd25`, base
+  `1fa09913476f5382e90807b3e750a2fc69d69e10`.
+- CI definitivo de PR #13: run `42168183442` SUCCESS; Qodana `42168183444`
+  SUCCESS. CI postmerge `42169893802` SUCCESS para backend, frontend, e2e-auth
+  y e2e-commercial sobre el SHA squash.
+- Cronología preservada: CI inicial del head `d717517fa7e28f0cb07be9f87bcaa35018e543f7`
+  falló por aislamiento/cardinalidad compartida del fixture de fechas, rutas GET
+  legítimas ausentes en allowlists QA y códigos de unidad sintéticos de 21
+  caracteres frente al máximo de 20. Se corrigieron pruebas y barreras QA dentro
+  del alcance autorizado, sin alterar validación productiva. La corrección pasó
+  backend completo 848/848 y gate Auth aislado; el gate comercial 10/10 previamente
+  acreditado se reutilizó porque no cambió. Los conteos focales/subconjuntos no se
+  suman a la suite completa. Véase “Resolución final autorizada”.
+- **FASE3 CLOSED técnico** tras integración y CI postmerge. Antes de producción
+  es requisito sincronizar y supervisar el reloj backend. Se requiere conectividad
+  y respuesta válida para confirmar datos comerciales actuales; ante error no se
+  trata cero como dato confirmado. No se acredita despliegue, emisión fiscal
+  productiva ni sincronización de infraestructura.
