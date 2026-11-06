@@ -1,3 +1,4 @@
+import { isCommercialDate, formatCommercialInstant } from "../../shared/utils/commercial-date";
 import { CommonModule } from "@angular/common";
 import { Component, DoCheck, HostListener, OnDestroy, OnInit } from "@angular/core";
 import { FormBuilder, ReactiveFormsModule } from "@angular/forms";
@@ -31,8 +32,7 @@ export class SalesPageComponent implements OnInit, OnDestroy, DoCheck {
   private credential: string | null = null;
   private destroyed = false;
   private readonly currency = new Intl.NumberFormat("es-PE", { style: "currency", currency: "PEN" });
-  private readonly date = new Intl.DateTimeFormat("es-PE", { day: "2-digit", month: "2-digit", year: "numeric",
-    hour: "2-digit", minute: "2-digit", hour12: false });
+
 
   constructor(private readonly formBuilder: FormBuilder, private readonly salesService: SalesService,
     private readonly auth: AuthService, private readonly route: ActivatedRoute, private readonly router: Router) {}
@@ -61,6 +61,10 @@ export class SalesPageComponent implements OnInit, OnDestroy, DoCheck {
   applyFilters(): void {
     if (!this.current()) { this.sales = []; this.errorMessage = "Inicia sesión para consultar ventas."; return; }
     const value = this.filterForm.getRawValue();
+    this.generation++; this.request.unsubscribe(); this.sales = []; this.loading = false;
+    if ([value.from, value.to].some(date => !!date && !isCommercialDate(date))) {
+      this.errorMessage = "Ingresa fechas válidas con formato YYYY-MM-DD."; return;
+    }
     if (value.from && value.to && value.from > value.to) {
       this.errorMessage = "La fecha Desde no puede ser mayor que la fecha Hasta."; return;
     }
@@ -83,20 +87,14 @@ export class SalesPageComponent implements OnInit, OnDestroy, DoCheck {
         if (!Array.isArray(rows) || rows.some(row => !row || !Number.isSafeInteger(row.id) || row.id <= 0)) {
           this.errorMessage = "No se pudo verificar el listado recibido."; return;
         }
-        // Preserve the existing date behavior. UTC/Lima alignment is a separate contract gate.
-        const from = filters.from ? new Date(filters.from + "T00:00:00.000") : null;
-        const to = filters.to ? new Date(filters.to + "T23:59:59.999") : null;
-        this.sales = rows.filter(sale => {
-          if (!from && !to) return true;
-          const sold = new Date(sale.soldAt);
-          return !Number.isNaN(sold.getTime()) && (!from || sold >= from) && (!to || sold <= to);
-        });
+        this.sales = rows;
       },
       error: error => {
         if (!this.current() || generation !== this.generation) return;
         this.loading = false; this.sales = [];
         this.errorMessage = error?.status === 401 ? "Sesión vencida. Inicia sesión para consultar ventas."
-          : error?.status === 403 || error?.status === 422 ? "No tienes permiso para consultar estas ventas."
+          : error?.status === 403 ? "No tienes permiso para consultar estas ventas."
+          : error?.status === 400 || error?.status === 422 ? "No se pudieron aplicar las fechas o los filtros. Revisa sus valores."
           : "No se pudo cargar el listado de ventas. Reintenta la consulta.";
       },
     });
@@ -106,6 +104,6 @@ export class SalesPageComponent implements OnInit, OnDestroy, DoCheck {
     this.applyFilters();
   }
   formatCurrency(value: number): string { return Number.isFinite(value) ? this.currency.format(value) : "No disponible"; }
-  formatDate(value: string): string { const date = new Date(value); return Number.isNaN(date.getTime()) ? "No disponible" : this.date.format(date); }
+  formatDate = formatCommercialInstant;
   ngOnDestroy(): void { this.destroyed = true; this.generation++; this.request.unsubscribe(); this.profile.unsubscribe(); }
 }

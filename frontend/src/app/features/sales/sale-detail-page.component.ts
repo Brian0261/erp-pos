@@ -1,3 +1,4 @@
+import { formatCommercialInstant } from "../../shared/utils/commercial-date";
 import { CommonModule } from "@angular/common";
 import { Component, DoCheck, ElementRef, HostListener, OnDestroy, OnInit, ViewChild } from "@angular/core";
 import { ActivatedRoute, Params, RouterLink } from "@angular/router";
@@ -42,7 +43,7 @@ export class SaleDetailPageComponent implements OnInit, OnDestroy, DoCheck {
   private destroyed = false;
   private readonly blockingStatuses = new Set(["DRAFT", "GENERATED", "SIGNED", "SENT", "ACCEPTED"]);
   private readonly currency = new Intl.NumberFormat("es-PE", { style: "currency", currency: "PEN", minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  private readonly date = new Intl.DateTimeFormat("es-PE", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
+
 
   constructor(private readonly route: ActivatedRoute, private readonly salesService: SalesService,
     private readonly documents: ElectronicDocumentService, private readonly auth: AuthService) {}
@@ -161,7 +162,7 @@ export class SaleDetailPageComponent implements OnInit, OnDestroy, DoCheck {
   productSku(item: SaleItemResponse): string | null { return item.skuSnapshot ?? (item.productNameSnapshot == null ? item.sku : null); }
   paymentMethodLabel(method: string): string { return ({ CASH: "Efectivo", CARD: "Tarjeta", TRANSFER: "Transferencia" } as Record<string, string>)[method] || "Método no disponible"; }
   formatCurrency(value: number): string { return Number.isFinite(value) ? this.currency.format(value) : "No disponible"; }
-  formatDateTime(value: string | null): string { if (!value) return "No disponible"; const date = new Date(value); return Number.isNaN(date.getTime()) ? "No disponible" : this.date.format(date); }
+  formatDateTime = formatCommercialInstant;
   formatQuantity(item: SaleItemResponse): string {
     return typeof item.quantityText === "string" && /^\d+(?:\.\d+)?$/.test(item.quantityText) ? item.quantityText
       : new Intl.NumberFormat("es-PE", { maximumFractionDigits: 3 }).format(item.quantity);

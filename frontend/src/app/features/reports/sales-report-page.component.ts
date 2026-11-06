@@ -1,5 +1,8 @@
+import { Subscription } from "rxjs";
+import { createBoundAuthContext } from "../../core/auth/bound-auth-context";
+import { formatCommercialDay, isCommercialDate } from "../../shared/utils/commercial-date";
 import { CommonModule } from "@angular/common";
-import { Component, OnInit } from "@angular/core";
+import { Component, DoCheck, HostListener, OnDestroy, OnInit } from "@angular/core";
 import { FormBuilder, ReactiveFormsModule } from "@angular/forms";
 
 import { AuthService } from "../../core/auth/auth.service";
@@ -21,7 +24,7 @@ import { ReportsService } from "./data/reports.service";
           <p class="ui-page-kicker">Reporteria comercial</p>
           <h1 class="ui-page-title">Reporte de ventas</h1>
           <p class="ui-page-description">
-            Analiza monto vendido, volumen de tickets y comportamiento diario.
+            Analiza monto vendido, volumen de tickets y comportamiento diario. Calendario America/Lima; sin fechas se consultan los últimos 30 días.
           </p>
         </div>
       </header>
@@ -142,7 +145,7 @@ import { ReportsService } from "./data/reports.service";
             </thead>
             <tbody>
               <tr *ngFor="let row of report.salesByDay">
-                <td>{{ row.day }}</td>
+                <td>{{ formatDay(row.day) }}</td>
                 <td>{{ row.salesCount }}</td>
                 <td>{{ numberOf(row.totalAmount) | number: "1.2-2" }}</td>
               </tr>
@@ -181,13 +184,31 @@ import { ReportsService } from "./data/reports.service";
     `,
     ]
 })
-export class SalesReportPageComponent implements OnInit {
+export class SalesReportPageComponent implements OnInit, OnDestroy, DoCheck {
   readonly filtersForm = this.formBuilder.group({
     from: [""],
     to: [""],
   });
 
   canView = false;
+  readonly formatDay = formatCommercialDay;
+  private credential: string | null = null;
+  private generation = 0;
+  private destroyed = false;
+  private request = new Subscription();
+  private profile = new Subscription();
+  private current(generation = this.generation): boolean {
+    return !this.destroyed && generation === this.generation && !!this.credential && this.credential === this.authService.getToken();
+  }
+  ngDoCheck(): void { this.checkSession(); }
+  @HostListener("window:storage")
+  @HostListener("window:focus")
+  checkSession(): void {
+    if (this.credential === this.authService.getToken()) return;
+    this.generation++; this.request.unsubscribe(); this.profile.unsubscribe(); this.report = null; this.canView = false; this.loading = false;
+    this.permissionMessage = "La sesión cambió. Vuelve a abrir el reporte.";
+  }
+  ngOnDestroy(): void { this.destroyed = true; this.generation++; this.request.unsubscribe(); this.profile.unsubscribe(); }
   loading = false;
   report: SalesReportResponse | null = null;
 
@@ -201,8 +222,11 @@ export class SalesReportPageComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    this.authService.me().subscribe({
+    this.credential = this.authService.getToken();
+    if (!this.credential) { this.permissionMessage = "Inicia sesión para consultar el reporte."; return; }
+    this.profile = this.authService.me(createBoundAuthContext(this.credential)).subscribe({
       next: (user) => {
+        if (!this.current()) return;
         this.canView = user.roles.some((role) =>
           ["ADMIN", "SUPERVISOR"].includes(role),
         );
@@ -215,6 +239,7 @@ export class SalesReportPageComponent implements OnInit {
         this.loadReport();
       },
       error: () => {
+        if (!this.current()) return;
         this.permissionMessage = "No se pudo validar permisos del usuario.";
       },
     });
@@ -235,26 +260,29 @@ export class SalesReportPageComponent implements OnInit {
   }
 
   private loadReport(): void {
-    if (!this.canView) {
-      return;
-    }
+    if (!this.canView || !this.current()) return;
 
     const raw = this.filtersForm.getRawValue();
+    this.request.unsubscribe(); const generation = ++this.generation; this.report = null; this.loading = false;
+    if ([raw.from, raw.to].some(date => !!date && !isCommercialDate(date))) { this.errorMessage = "Ingresa fechas válidas YYYY-MM-DD."; return; }
+    if (raw.from && raw.to && raw.from > raw.to) { this.errorMessage = "La fecha Desde no puede ser mayor que Hasta."; return; }
 
     this.loading = true;
     this.errorMessage = "";
 
-    this.reportsService
+    this.request = this.reportsService
       .sales({
         from: this.normalizeOptional(raw.from),
         to: this.normalizeOptional(raw.to),
-      })
+      }, createBoundAuthContext(this.credential))
       .subscribe({
         next: (response) => {
+          if (!this.current(generation)) return;
           this.loading = false;
           this.report = this.normalizeReport(response);
         },
         error: (error: unknown) => {
+          if (!this.current(generation)) return;
           this.loading = false;
           this.errorMessage = toHttpErrorMessage(
             error,

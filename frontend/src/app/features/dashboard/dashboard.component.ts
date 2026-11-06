@@ -1,6 +1,9 @@
+import { Subscription, timeout } from "rxjs";
+import { commercialDateAt, COMMERCIAL_ZONE, formatCommercialDay, formatCommercialInstant, isCommercialDate } from "../../shared/utils/commercial-date";
+import { createBoundAuthContext } from "../../core/auth/bound-auth-context";
 import { HttpErrorResponse } from "@angular/common/http";
 import { CommonModule } from "@angular/common";
-import { Component, OnInit } from "@angular/core";
+import { Component, DoCheck, HostListener, OnDestroy, OnInit } from "@angular/core";
 import { RouterLink } from "@angular/router";
 
 import { AuthService } from "../../core/auth/auth.service";
@@ -21,7 +24,7 @@ import {
 } from "../reports/data/reports.models";
 import { ReportsService } from "../reports/data/reports.service";
 import { CashRegisterService } from "../sales/data/cash-register.service";
-import { SaleResponse } from "../sales/data/sales.models";
+import { SaleResponse, TodaySalesResponse } from "../sales/data/sales.models";
 import { SalesService } from "../sales/data/sales.service";
 
 type DashboardKpiTone = "primary" | "accent" | "warning" | "neutral";
@@ -109,7 +112,9 @@ interface DashboardActivity {
               Cargando...
             </p>
             <p class="kpi-subtitle">{{ kpi.subtitle }}</p>
-            <p class="kpi-message" *ngIf="kpi.message">{{ kpi.message }}</p>
+            <p class="kpi-message" *ngIf="kpi.message" [attr.role]="kpi.id === 'salesToday' ? 'status' : null">{{ kpi.message }}</p>
+            <button *ngIf="kpi.id === 'salesToday' && todayStatus === 'error'" type="button"
+              class="ui-button ui-button--secondary" (click)="refreshTodaySales()">Reintentar ventas de hoy</button>
             <a class="kpi-link" [routerLink]="kpi.route" *ngIf="!kpi.loading"
               >Abrir modulo</a
             >
@@ -164,7 +169,7 @@ interface DashboardActivity {
                 <div class="activity-side">
                   <span class="ui-badge">{{ item.badge }}</span>
                   <span class="activity-date">{{
-                    item.at | date: "dd/MM HH:mm"
+                    item.badge === "VENTA" ? formatSaleTime(item.at) : (item.at | date: "dd/MM HH:mm")
                   }}</span>
                   <a [routerLink]="item.route">Abrir</a>
                 </div>
@@ -555,7 +560,7 @@ interface DashboardActivity {
     `,
     ]
 })
-export class DashboardComponent implements OnInit {
+export class DashboardComponent implements OnInit, OnDestroy, DoCheck {
   user: UserProfile | null = null;
   loadingProfile = true;
   profileErrorMessage = "";
@@ -725,6 +730,17 @@ export class DashboardComponent implements OnInit {
   ];
 
   private salesActivity: DashboardActivity[] = [];
+  private salesReads = new Subscription();
+  private profileRead = new Subscription();
+  private salesGeneration = 0;
+  todayStatus: "idle" | "loading" | "ready" | "error" | "blocked" = "idle";
+  private todayRequest = new Subscription();
+  private todayGeneration = 0;
+  private todayTimer: ReturnType<typeof setTimeout> | null = null;
+  private salesCredential: string | null = null;
+  private salesExpired = false;
+  private destroyed = false;
+  readonly formatSaleTime = formatCommercialInstant;
   private quotesActivity: DashboardActivity[] = [];
   private documentsActivity: DashboardActivity[] = [];
 
@@ -740,13 +756,17 @@ export class DashboardComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    this.authService.me().subscribe({
+    this.salesCredential = this.authService.getToken();
+    if (!this.salesCredential) { this.loadingProfile = false; return; }
+    this.profileRead = this.authService.me(createBoundAuthContext(this.salesCredential)).subscribe({
       next: (response) => {
+        if (!this.salesCurrent()) return;
         this.user = response;
         this.loadingProfile = false;
         this.setupDashboard();
       },
       error: (error: unknown) => {
+        if (!this.salesCurrent()) return;
         this.loadingProfile = false;
         this.profileErrorMessage = toHttpErrorMessage(
           error,
@@ -800,6 +820,7 @@ export class DashboardComponent implements OnInit {
   }
 
   private setupDashboard(): void {
+    this.salesReads.unsubscribe(); this.salesReads = new Subscription(); this.salesGeneration++;
     this.now = new Date();
 
     for (const kpi of this.kpis) {
@@ -823,68 +844,125 @@ export class DashboardComponent implements OnInit {
     this.loadTopProducts();
   }
 
+  private salesCurrent(generation = this.salesGeneration): boolean {
+    return !this.destroyed && !this.salesExpired && generation === this.salesGeneration
+      && !!this.salesCredential && this.salesCredential === this.authService.getToken();
+  }
+  ngDoCheck(): void { this.checkSalesSession(); }
+  @HostListener("window:storage")
+  checkSalesSession(): void {
+    if (this.salesCredential === this.authService.getToken() || this.salesExpired) return;
+    this.salesExpired = true; this.salesGeneration++; this.salesReads.unsubscribe(); this.profileRead.unsubscribe();
+    this.cancelToday(); this.todayStatus = "blocked";
+    this.salesActivity = []; this.rebuildActivity(); this.topProducts = []; this.topProductsLoading = false;
+    this.topProductsMessage = "La sesión cambió. Vuelve a abrir Inicio.";
+    const kpi = this.findKpi("salesToday"); kpi.loading = false; kpi.value = "No disponible";
+    kpi.subtitle = "La sesión cambió"; kpi.message = "Vuelve a abrir Inicio con la sesión actual.";
+  }
+  ngOnDestroy(): void {
+    this.destroyed = true; this.salesGeneration++; this.salesReads.unsubscribe(); this.profileRead.unsubscribe(); this.cancelToday();
+  }
   private loadSalesKpi(): void {
     const kpi = this.findKpi("salesToday");
-    if (!kpi.visible) {
+    if (!kpi.visible || !this.salesCurrent()) return;
+    const generation = this.salesGeneration, context = createBoundAuthContext(this.salesCredential!);
+    // Recent activity retains its existing unbounded history; the KPI has a server-filtered interval.
+    this.salesReads.add(this.salesService.list(undefined, context).subscribe({
+      next: sales => {
+        if (!this.salesCurrent(generation)) return;
+        this.salesActivity = sales.slice().sort((a,b) => this.byNewest(b.soldAt,a.soldAt)).slice(0,4).map(sale => ({
+          title: `Venta ${sale.saleNumber}`, detail: `${this.formatCurrency(sale.totalAmount)} · ${this.saleStatusLabel(sale.status)}`,
+          at: sale.soldAt, badge: "VENTA", route: `/ventas/${sale.id}` }));
+        this.rebuildActivity();
+      }, error: () => { if (this.salesCurrent(generation)) { this.salesActivity = []; this.rebuildActivity(); } }
+    }));
+    this.refreshTodaySales();
+  }
+
+  private cancelToday(): void {
+    this.todayGeneration++;
+    this.todayRequest.unsubscribe(); this.todayRequest = new Subscription();
+    if (this.todayTimer !== null) clearTimeout(this.todayTimer);
+    this.todayTimer = null;
+  }
+
+  @HostListener("window:focus")
+  @HostListener("document:visibilitychange")
+  revalidateTodayOnResume(): void {
+    this.checkSalesSession();
+    if (!this.salesCurrent()) return;
+    if (document.visibilityState !== "visible") {
+      this.cancelToday();
+      if (this.todayStatus === "blocked") return;
+      this.todayStatus = "idle";
+      const kpi = this.findKpi("salesToday");
+      kpi.value = "--"; kpi.loading = false; kpi.empty = false; kpi.message = "";
+      kpi.subtitle = "Pendiente de verificar el día comercial";
       return;
     }
-
-    this.salesService.list().subscribe({
-      next: (sales) => {
-        const today = this.toIsoDate(new Date());
-        const todaySales = sales.filter(
-          (sale) => this.toIsoDate(new Date(sale.soldAt)) === today,
-        );
-
-        const completed = todaySales.filter(
-          (sale) => sale.status === "COMPLETED",
-        );
-        const voidedCount = todaySales.filter(
-          (sale) => sale.status === "VOIDED",
-        ).length;
-        const total = completed.reduce(
-          (sum, sale) => sum + this.numberOf(sale.totalAmount),
-          0,
-        );
-        const average = completed.length > 0 ? total / completed.length : 0;
-
-        kpi.loading = false;
-        kpi.value = this.formatCurrency(total);
-        kpi.subtitle = `${completed.length} ventas completadas hoy.`;
-        kpi.message =
-          completed.length > 0
-            ? `Ticket promedio ${this.formatCurrency(average)}.`
-            : "Sin ventas completadas en el dia.";
-        if (voidedCount > 0) {
-          kpi.message += ` ${voidedCount} anuladas.`;
-        }
-        kpi.empty = completed.length === 0;
-
-        this.salesActivity = sales
-          .slice()
-          .sort((a, b) => this.byNewest(b.soldAt, a.soldAt))
-          .slice(0, 4)
-          .map((sale) => ({
-            title: `Venta ${sale.saleNumber}`,
-            detail: `${this.formatCurrency(sale.totalAmount)} · ${this.saleStatusLabel(sale.status)}`,
-            at: sale.soldAt,
-            badge: "VENTA",
-            route: `/ventas/${sale.id}`,
-          }));
-
-        this.rebuildActivity();
-      },
-      error: (error: unknown) => {
-        this.salesActivity = [];
-        this.rebuildActivity();
-        this.applyKpiError(
-          kpi,
-          error,
-          "No se pudo cargar el resumen de ventas.",
-        );
-      },
-    });
+    if (this.todayStatus !== "blocked") this.refreshTodaySales();
   }
+
+  @HostListener("window:online")
+  retryTodayWhenOnline(): void {
+    if (this.todayStatus === "error") this.refreshTodaySales();
+  }
+
+  refreshTodaySales(retryExpired = true): void {
+    const kpi = this.findKpi("salesToday");
+    if (!kpi.visible || !this.salesCurrent() || this.todayStatus === "loading" || document.visibilityState !== "visible") return;
+    this.cancelToday();
+    const generation = this.todayGeneration, salesGeneration = this.salesGeneration;
+    const valid = () => this.salesCurrent(salesGeneration) && generation === this.todayGeneration;
+    const started = performance.now();
+    this.todayStatus = "loading"; kpi.loading = true; kpi.empty = false; kpi.value = "--";
+    kpi.subtitle = "Verificando día comercial · Lima"; kpi.message = "";
+    const fail = (message: string, blocked = false) => {
+      this.todayStatus = blocked ? "blocked" : "error";
+      kpi.loading = false; kpi.empty = false; kpi.value = "--";
+      kpi.subtitle = "Ventas de hoy no verificadas"; kpi.message = message;
+    };
+    this.todayRequest.add(this.salesService.today(createBoundAuthContext(this.salesCredential!)).pipe(timeout(15000)).subscribe({
+      next: response => {
+        if (!valid()) return;
+        if (!this.validTodayResponse(response)) { fail("No se pudo verificar la referencia comercial recibida. Reintenta la consulta."); return; }
+        // Elapsed monotonic time includes the entire round trip: an intentionally conservative expiry.
+        const remaining = Date.parse(response.nextDayStartsAt) - Date.parse(response.referenceInstant)
+          - Math.max(0, performance.now() - started) - 1;
+        if (remaining <= 0) {
+          fail("La referencia del día venció durante la consulta. Vuelve a comprobar las ventas.");
+          if (retryExpired) void Promise.resolve().then(() => { if (valid()) this.refreshTodaySales(false); });
+          return;
+        }
+        const completed = response.sales.filter(sale => sale.status === "COMPLETED");
+        const voidedCount = response.sales.filter(sale => sale.status === "VOIDED").length;
+        const total = completed.reduce((sum, sale) => sum + this.numberOf(sale.totalAmount), 0);
+        this.todayStatus = "ready"; kpi.loading = false; kpi.value = this.formatCurrency(total);
+        kpi.subtitle = `${completed.length} ventas completadas hoy (${formatCommercialDay(response.businessDate)}) · Lima.`;
+        kpi.message = completed.length ? `Ticket promedio ${this.formatCurrency(total / completed.length)}.` : "Sin ventas completadas en el día confirmado.";
+        if (voidedCount) kpi.message += ` ${voidedCount} anuladas.`;
+        kpi.empty = completed.length === 0;
+        this.todayTimer = setTimeout(() => { this.todayTimer = null; if (valid()) this.refreshTodaySales(); }, remaining);
+      },
+      error: error => {
+        if (!valid()) return;
+        fail(error?.status === 401 ? "Sesión vencida. Inicia sesión para consultar las ventas."
+          : error?.status === 403 ? "No tienes permiso para consultar las ventas de hoy."
+          : "No se pudieron consultar las ventas de hoy. Reintenta cuando haya conexión.", [401, 403].includes(error?.status));
+      }
+    }));
+  }
+
+  private validTodayResponse(response: TodaySalesResponse): boolean {
+    if (!response || response.timeZone !== COMMERCIAL_ZONE || !isCommercialDate(response.businessDate)
+        || commercialDateAt(response.referenceInstant) !== response.businessDate) return false;
+    const next = Date.parse(response.nextDayStartsAt), reference = Date.parse(response.referenceInstant);
+    return Number.isFinite(next) && next > reference && commercialDateAt(response.nextDayStartsAt) !== response.businessDate
+      && commercialDateAt(new Date(next - 1).toISOString()) === response.businessDate
+      && Array.isArray(response.sales) && response.sales.every(sale => sale && Number.isSafeInteger(sale.id) && sale.id > 0
+        && ["COMPLETED", "VOIDED"].includes(sale.status) && Number.isFinite(sale.totalAmount));
+  }
+
 
   private loadCashKpi(): void {
     const kpi = this.findKpi("cashSession");
@@ -1145,14 +1223,12 @@ export class DashboardComponent implements OnInit {
     this.topProductsLoading = true;
     this.topProductsMessage = "";
 
-    this.reportsService
-      .topProducts({
-        from: this.toIsoDate(this.daysAgo(29)),
-        to: this.toIsoDate(new Date()),
-        limit: 5,
-      })
+    const generation = this.salesGeneration;
+    this.salesReads.add(this.reportsService
+      .topProducts({limit: 5}, createBoundAuthContext(this.salesCredential!))
       .subscribe({
         next: (rows) => {
+          if (!this.salesCurrent(generation)) return;
           this.topProductsLoading = false;
           this.topProducts = rows;
           if (rows.length === 0) {
@@ -1161,6 +1237,7 @@ export class DashboardComponent implements OnInit {
           }
         },
         error: (error: unknown) => {
+          if (!this.salesCurrent(generation)) return;
           this.topProductsLoading = false;
           this.topProducts = [];
           this.topProductsMessage = toHttpErrorMessage(
@@ -1168,7 +1245,7 @@ export class DashboardComponent implements OnInit {
             "No se pudo cargar el ranking de productos.",
           );
         },
-      });
+      }));
   }
 
   private rebuildActivity(): void {

@@ -35,6 +35,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.Clock;
+import com.erppos.backend.erp.shared.domain.policy.CommercialDates;
+import com.erppos.backend.erp.sales.application.usecase.TodaySalesResult;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -72,7 +75,9 @@ public class SalesApplicationService implements SalesUseCase {
     private final AuditUserProvider auditUserProvider;
     private final CheckoutReadPort checkoutReadPort;
     private final SaleOperationPort saleOperationPort;
+    private final Clock clock;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public SalesApplicationService(
             SaleRepositoryPort saleRepositoryPort,
             CashRegisterRepositoryPort cashRegisterRepositoryPort,
@@ -84,6 +89,22 @@ public class SalesApplicationService implements SalesUseCase {
             CheckoutReadPort checkoutReadPort,
             SaleOperationPort saleOperationPort
     ) {
+        this(saleRepositoryPort, cashRegisterRepositoryPort, catalogReadPort, warehouseReadPort, inventorySalesPort,
+                salesBillingSummaryReadPort, auditUserProvider, checkoutReadPort, saleOperationPort, Clock.systemUTC());
+    }
+
+    public SalesApplicationService(
+            SaleRepositoryPort saleRepositoryPort,
+            CashRegisterRepositoryPort cashRegisterRepositoryPort,
+            CatalogReadPort catalogReadPort,
+            WarehouseReadPort warehouseReadPort,
+            InventorySalesPort inventorySalesPort,
+            SalesBillingSummaryReadPort salesBillingSummaryReadPort,
+            AuditUserProvider auditUserProvider,
+            CheckoutReadPort checkoutReadPort,
+            SaleOperationPort saleOperationPort,
+            Clock clock
+    ) {
         this.saleRepositoryPort = saleRepositoryPort;
         this.cashRegisterRepositoryPort = cashRegisterRepositoryPort;
         this.catalogReadPort = catalogReadPort;
@@ -93,6 +114,7 @@ public class SalesApplicationService implements SalesUseCase {
         this.auditUserProvider = auditUserProvider;
         this.checkoutReadPort = checkoutReadPort;
         this.saleOperationPort = saleOperationPort;
+        this.clock = clock;
     }
 
     @Override
@@ -283,7 +305,17 @@ public class SalesApplicationService implements SalesUseCase {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public TodaySalesResult today() {
+        Instant reference = clock.instant();
+        LocalDate day = reference.atZone(CommercialDates.ZONE).toLocalDate();
+        return new TodaySalesResult(day, CommercialDates.ZONE.getId(), reference,
+                CommercialDates.endExclusive(day), List.copyOf(list(day, day, null, null, null)));
+    }
+
+    @Override
     public List<Sale> list(LocalDate from, LocalDate to, Long cashRegisterSessionId, SaleStatus status, String createdByFilter) {
+        if (from != null && to != null && to.isBefore(from)) throw new SalesBusinessRuleException("to must be >= from");
         String createdBy = createdByFilter;
         if (auditUserProvider.hasRole(RoleName.CAJERO)) {
             createdBy = auditUserProvider.currentUsername();

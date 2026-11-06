@@ -20,7 +20,7 @@ public final class E2eQaReadOnlyFilter extends OncePerRequestFilter {
     public static final String DIAGNOSTIC = "/api/v1/health/e2e-identity";
     public static final Set<String> READS = Set.of("/api/v1/auth/me", "/api/v1/warehouses", "/api/v1/billing/series",
             "/api/v1/cash-registers/current", "/api/v1/pos/products/search", "/api/v1/pos/products/lookup",
-            "/api/v1/sales", "/api/v1/quotes", "/api/v1/billing/documents", "/api/v1/inventory/stocks",
+            "/api/v1/sales", "/api/v1/sales/today", "/api/v1/quotes", "/api/v1/billing/documents", "/api/v1/inventory/stocks",
             "/api/v2/inventory/stocks");
     private final E2eQaConfiguration.Identity identity;
     private final DataSource datasource;

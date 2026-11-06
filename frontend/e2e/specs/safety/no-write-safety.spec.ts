@@ -39,6 +39,13 @@ test("occupied ports are rejected without killing their owner", async () => {
   } finally { contender.close(); await new Promise<void>(resolve => server.close(() => resolve())); }
 });
 test("external origins and unsafe methods are denied", () => {
+  const today="http://127.0.0.1:4201/api/v1/sales/today";
+  expect(allowedQaRequest("GET",today)).toBe(true);
+  for(const url of [today.replace("4201","8080"),today.replace("127.0.0.1","qa.invalid"),
+    "http://user:password@127.0.0.1:4201/api/v1/sales/today",today+"/",today+"/1",today+"-extra"])
+    expect(allowedQaRequest("GET",url)).toBe(false);
+  for(const method of ["POST","PUT","PATCH","DELETE","HEAD","OPTIONS","TRACE"])
+    expect(allowedQaRequest(method,today)).toBe(false);
   expect(allowedQaRequest("GET", "http://127.0.0.1:4201/api/v1/auth/me")).toBe(true);
   for (const url of ["http://127.0.0.1:8080/api/v1/auth/me", "http://qa.invalid/api/v1/auth/me", "http://127.0.0.1:4201/api/unknown"])
     expect(allowedQaRequest("GET",url)).toBe(false);

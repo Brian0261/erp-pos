@@ -3018,3 +3018,40 @@ Solo crear tag cuando se cumpla todo:
 - Limitaciones: impresión física térmica 58/80 mm no validada; no se acredita
   emisión fiscal productiva mediante proveedor mock. La integración técnica no
   equivale a despliegue. Referencia de estado: `docs/ai/CURRENT_STATUS.md`.
+
+### Fase 3 — fechas comerciales America/Lima, PASS local (2026-11-05)
+
+- Autorización: implementación y QA local, creando únicamente la rama
+  `feat/fase3-fechas-comerciales` desde `master` en
+  `1fa09913476f5382e90807b3e750a2fc69d69e10`. Sin staging, commit, push o PR.
+- Ventas y los reportes seleccionados convierten días Lima a límites UTC
+  inclusivo/exclusivo; agrupación SQL y binding JDBC explícitos. Sin fechas o
+  con un solo extremo, Ventas conserva rangos abiertos. Reportes conservan
+  ventana de 30 días y máximo de 90. Errores 400/422 controlados y acotados.
+  Antes, los filtros backend usaban días UTC y el listado añadía un filtro del
+  navegador; ahora el backend selecciona el conjunto por día America/Lima.
+  Los contratos de filas existentes se conservan; el sobre de `sales/today`
+  es aditivo. No se reescriben timestamps ni históricos, ni se modifican Flyway,
+  cálculos monetarios o flujos de pagos, caja, stock y fiscalidad.
+- Listado/detalle y reporte presentan fechas coherentes; KPI de hoy usa consulta
+  del backend y conserva la actividad histórica. Se mantienen actor, sesión,
+  caja, estado, dinero, stock, recuperación e identidad comercial.
+- Backend 77/77; Angular 77/77; E2E GET-only 6/6 en tres zonas y dos viewports;
+  build/typecheck PASS. Matriz temporal repetida con JVM UTC/Tokio: mismos siete
+  casos, sin inflar el conteo. Evidencia y límites en
+  `docs/qa/FASE3_COMMERCIAL_DATES_QA.md`; estado en `docs/ai/CURRENT_STATUS.md`.
+- **PASS — FASE3_LOCAL_VALIDATED**, no CLOSED. No hay migraciones, cambios de
+  históricos, configuración global o dependencias nuevas. Reportes excluidos,
+  fiscalidad productiva y despliegues no se modificaron. No se inicia otra fase.
+- Ampliación posterior autorizada en el mismo Build local: consulta GET
+  `/api/v1/sales/today` y sobre temporal aditivo para sustituir el día calculado
+  por el dispositivo. Captura única del reloj backend, mismo aislamiento de
+  propietario y no-store; ciclo de caducidad, suspensión, reintento y sesión en
+  el KPI. Actividad reciente conserva su consulta. QA incremental 51 backend,
+  19 Angular y 6 E2E PASS, build/typecheck PASS; no son conteos acumulables con
+  la base. Sin staging ni commit. Commit, push, PR, CI remoto, revisión y merge
+  siguen pendientes de sus gates y autorizaciones aplicables.
+  Antes de producción se debe acreditar sincronización y supervisión operativa
+  del reloj backend. Se necesita conectividad para verificar datos actuales;
+  ante error no se presenta cero como resultado confirmado ni se promete una
+  actualización exacta de medianoche sin conexión. No se acredita despliegue.

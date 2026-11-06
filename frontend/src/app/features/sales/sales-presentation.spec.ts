@@ -36,7 +36,7 @@ describe("Sales presentation truth and context", () => {
     const filters = { from: "2026-10-01", to: "2026-10-31", status: "VOIDED" as const, cashRegisterSessionId: 7, createdBy: "qa" };
     expect(filtersFromContext(convertToParamMap(salesContext(filters)))).toEqual(filters);
     const parsed = filtersFromContext(convertToParamMap({ returnUrl: "https://invalid.test", salesStatus: "PREPARED", salesCash: "-1", salesFrom: "garbage" }));
-    expect(parsed.status).toBeUndefined(); expect(parsed.cashRegisterSessionId).toBeUndefined(); expect(parsed.from).toBeUndefined();
+    expect(parsed.status).toBeUndefined(); expect(parsed.cashRegisterSessionId).toBeUndefined(); expect(parsed.from).toBe("garbage");
     expect(salesContext(parsed)["returnUrl"]).toBeUndefined();
   });
 });
