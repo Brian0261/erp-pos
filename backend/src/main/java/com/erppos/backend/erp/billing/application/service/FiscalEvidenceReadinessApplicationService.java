@@ -6,14 +6,13 @@ import com.erppos.backend.erp.billing.application.usecase.FiscalEvidenceReadines
 import com.erppos.backend.erp.billing.application.usecase.FiscalEvidenceReadinessItem;
 import com.erppos.backend.erp.billing.application.usecase.FiscalEvidenceReadinessReasonCode;
 import com.erppos.backend.erp.billing.application.usecase.FiscalEvidenceReadinessUseCase;
-import com.erppos.backend.erp.billing.domain.exception.BillingNotFoundException;
+import com.erppos.backend.erp.billing.application.usecase.ElectronicDocumentUseCase;
 import com.erppos.backend.erp.billing.domain.model.BillingEnvironment;
 import com.erppos.backend.erp.billing.domain.model.ElectronicDocument;
 import com.erppos.backend.erp.billing.domain.model.ElectronicDocumentEvidence;
 import com.erppos.backend.erp.billing.domain.model.FiscalEvidenceMetadataStatus;
 import com.erppos.backend.erp.billing.domain.model.FiscalEvidenceStorageProvider;
 import com.erppos.backend.erp.billing.domain.port.ElectronicDocumentEvidenceRepositoryPort;
-import com.erppos.backend.erp.billing.domain.port.ElectronicDocumentRepositoryPort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,22 +23,21 @@ import java.util.List;
 @Service
 public class FiscalEvidenceReadinessApplicationService implements FiscalEvidenceReadinessUseCase {
 
-    private final ElectronicDocumentRepositoryPort documentRepositoryPort;
+    private final ElectronicDocumentUseCase documents;
     private final ElectronicDocumentEvidenceRepositoryPort evidenceRepositoryPort;
 
     public FiscalEvidenceReadinessApplicationService(
-            ElectronicDocumentRepositoryPort documentRepositoryPort,
+            ElectronicDocumentUseCase documents,
             ElectronicDocumentEvidenceRepositoryPort evidenceRepositoryPort
     ) {
-        this.documentRepositoryPort = documentRepositoryPort;
+        this.documents = documents;
         this.evidenceRepositoryPort = evidenceRepositoryPort;
     }
 
     @Override
     @Transactional(readOnly = true)
     public FiscalEvidenceReadiness getByDocumentId(Long documentId) {
-        ElectronicDocument document = documentRepositoryPort.findById(documentId)
-                .orElseThrow(() -> new BillingNotFoundException("Electronic document not found"));
+        ElectronicDocument document = documents.getById(documentId);
         List<ElectronicDocumentEvidence> evidence = evidenceRepositoryPort.findByElectronicDocumentId(documentId);
         List<FiscalEvidenceReadinessItem> items = evidence.stream().map(this::toReadinessItem).toList();
         Instant lastUpdatedAt = evidence.stream()

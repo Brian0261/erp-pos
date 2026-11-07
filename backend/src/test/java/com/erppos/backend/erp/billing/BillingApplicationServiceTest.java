@@ -131,13 +131,13 @@ class BillingApplicationServiceTest {
     void setUp() {
         profileRepository = new InMemoryCompanyProfileRepository();
         seriesRepository = new InMemoryBillingSeriesRepository();
-        documentRepository = new InMemoryElectronicDocumentRepository();
+        saleReadPort = new InMemorySaleReadPort();
+        documentRepository = new InMemoryElectronicDocumentRepository(saleReadPort);
         attemptRepository = new InMemoryElectronicDocumentAttemptRepository();
         evidenceRepository = new InMemoryElectronicDocumentEvidenceRepository();
         itemRepository = new InMemoryElectronicDocumentItemRepository();
         historyRepository = new InMemoryElectronicDocumentStatusHistoryRepository();
         xmlRepository = new InMemoryBillingXmlFileRepository();
-        saleReadPort = new InMemorySaleReadPort();
         stubXmlGenerator = new StubXmlGenerator();
         stubXmlSigner = new StubXmlSigner();
         stubProvider = new StubProvider();
@@ -149,6 +149,7 @@ class BillingApplicationServiceTest {
         providerResultClassifier = new FiscalProviderResultClassifier();
 
         AuditUserProvider auditUserProvider = new AuditUserProvider();
+        var documentAccess = new com.erppos.backend.erp.billing.application.service.DocumentSaleAccessPolicy(auditUserProvider, saleReadPort);
         FiscalSendTransactionService fiscalSendTransactionService = new FiscalSendTransactionService(
                 documentRepository,
                 attemptRepository,
@@ -159,11 +160,12 @@ class BillingApplicationServiceTest {
                 lifecyclePolicy,
                 attemptAuditService,
                 fiscalAuditSanitizer,
-                auditUserProvider
+                auditUserProvider,
+                documentAccess,
+                providerResultClassifier
         );
         profileService = new CompanyBillingProfileApplicationService(profileRepository, auditUserProvider);
         seriesService = new BillingSeriesApplicationService(seriesRepository, documentRepository, auditUserProvider);
-        evidenceReadinessService = new FiscalEvidenceReadinessApplicationService(documentRepository, evidenceRepository);
         documentService = new ElectronicDocumentApplicationService(
                 documentRepository,
                 itemRepository,
@@ -180,11 +182,12 @@ class BillingApplicationServiceTest {
                 lifecyclePolicy,
                 attemptAuditService,
                 fiscalAuditSanitizer,
-                providerResultClassifier,
                 fiscalSendTransactionService,
                 auditUserProvider,
-                org.mockito.Mockito.mock(com.erppos.backend.erp.sales.domain.port.CommercialOperationCoordinationPort.class)
+                org.mockito.Mockito.mock(com.erppos.backend.erp.sales.domain.port.CommercialOperationCoordinationPort.class),
+                documentAccess
         );
+        evidenceReadinessService = new FiscalEvidenceReadinessApplicationService(documentService, evidenceRepository);
 
         profileService.create(new CreateCompanyBillingProfileCommand(
                 "20123456789",
@@ -3245,6 +3248,11 @@ class BillingApplicationServiceTest {
     static class InMemoryElectronicDocumentRepository implements ElectronicDocumentRepositoryPort {
         private final AtomicLong seq = new AtomicLong(1);
         private final Map<Long, ElectronicDocument> storage = new HashMap<>();
+        private final InMemorySaleReadPort sales;
+
+        InMemoryElectronicDocumentRepository(InMemorySaleReadPort sales) {
+            this.sales = sales;
+        }
 
         @Override
         public ElectronicDocument save(ElectronicDocument document) {
@@ -3295,6 +3303,14 @@ class BillingApplicationServiceTest {
                     .filter(d -> status == null || d.status() == status)
                     .filter(d -> type == null || d.documentType() == type)
                     .filter(d -> saleId == null || d.saleId().equals(saleId))
+                    .toList();
+        }
+
+        @Override
+        public List<ElectronicDocument> findByFiltersForSaleOwner(ElectronicDocumentStatus status, ElectronicDocumentType type,
+                                                                Long saleId, LocalDate from, LocalDate to, String owner) {
+            return findByFilters(status, type, saleId, from, to).stream()
+                    .filter(d -> sales.findById(d.saleId()).map(s -> owner.equals(s.createdBy())).orElse(false))
                     .toList();
         }
 

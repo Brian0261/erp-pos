@@ -3089,3 +3089,18 @@ Solo crear tag cuando se cumpla todo:
   Riesgos residuales: se requiere sincronizar y supervisar el reloj backend antes
   de producción; los datos comerciales actuales requieren conectividad y una
   respuesta válida. No se acredita emisión fiscal productiva.
+
+### VENTAS-RD-0 — PASS_LOCAL
+
+- 0A preserva pagos como registros históricos; 0B aplica autorización de rol y
+  propietario de venta a lecturas y escrituras documentales, incluido CAJERO en
+  roles combinados. H1 mantiene la autorización al iniciar el envío y finaliza
+  internamente la preparación durable ya autorizada tras la respuesta externa.
+- Se preservan transacciones, bloqueos, rollback, idempotencia, contratos
+  fiscales, fases anteriores, caja, stock y auditoría. No hay reenvío ciego.
+- Riesgo residual: un fallo de persistencia posterior al efecto externo puede
+  dejar SENT/STARTED y requiere reconciliación conservadora. QA local usa
+  PostgreSQL Testcontainers y proveedor simulado. No acredita producción.
+- Alcance, comandos, resultados y límites en
+  [VENTAS_RD_0_HARDENING_QA.md](../qa/VENTAS_RD_0_HARDENING_QA.md). Pendientes
+  los gates Git. VENTAS-RD-0 no está CLOSED.

@@ -1,6 +1,7 @@
 package com.erppos.backend.erp.sales.infrastructure.persistence;
 
 import com.erppos.backend.erp.sales.domain.exception.SalesNotFoundException;
+import com.erppos.backend.erp.sales.domain.exception.SalesConflictException;
 import com.erppos.backend.erp.sales.domain.model.Sale;
 import com.erppos.backend.erp.sales.domain.model.SaleItem;
 import com.erppos.backend.erp.sales.domain.model.SalePayment;
@@ -40,13 +41,17 @@ public class SalePersistenceAdapter implements SaleRepositoryPort {
         SaleEntity entity;
         if (sale.id() == null) {
             entity = SaleMapper.toEntity(sale, cashSession);
+            for (SalePayment payment : sale.payments()) {
+                entity.getPayments().add(SaleMapper.toPaymentEntity(payment, entity));
+            }
         } else {
-            entity = saleJpaRepository.findById(sale.id()).orElseGet(SaleEntity::new);
+            entity = saleJpaRepository.findById(sale.id())
+                    .orElseThrow(() -> new SalesNotFoundException("Sale not found"));
+            assertPaymentsUnchanged(entity, sale.payments());
             SaleMapper.merge(entity, sale, cashSession);
         }
 
         mergeItems(entity, sale.items());
-        mergePayments(entity, sale.payments());
         return SaleMapper.toDomain(saleJpaRepository.save(entity));
     }
 
@@ -94,10 +99,19 @@ public class SalePersistenceAdapter implements SaleRepositoryPort {
         }
     }
 
-    private void mergePayments(SaleEntity saleEntity, List<SalePayment> payments) {
-        saleEntity.getPayments().clear();
+    /** Existing payments are historical records, never children to replace on a sale update. */
+    private void assertPaymentsUnchanged(SaleEntity entity, List<SalePayment> payments) {
+        if (payments == null || payments.size() != entity.getPayments().size()) {
+            throw new SalesConflictException("Historical sale payments cannot be changed");
+        }
+        Map<Long, SalePayment> remaining = new HashMap<>();
+        for (SalePaymentEntity payment : entity.getPayments()) {
+            remaining.put(payment.getId(), SaleMapper.toDomainPayment(payment));
+        }
         for (SalePayment payment : payments) {
-            saleEntity.getPayments().add(SaleMapper.toPaymentEntity(payment, saleEntity));
+            if (payment == null || payment.id() == null || !payment.equals(remaining.remove(payment.id()))) {
+                throw new SalesConflictException("Historical sale payments cannot be changed");
+            }
         }
     }
 }
