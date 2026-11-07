@@ -19,6 +19,46 @@ aislamiento por usuario, incluso si se envían parámetros de filtros ajenos al
 contrato de esta consulta. Sin autenticar: 401; rol no permitido: 403; fallo
 interno: 500. El instante referencia el calendario, no un snapshot financiero exacto.
 
+### VENTAS-RD-1 — listado de ventas paginado
+
+- Todos los filtros de `GET /api/v2/sales` son opcionales. `page` admite de 0
+  (por defecto) a 100000. `size` admite 20 (por defecto), 50 o 100. Una página válida
+  fuera de rango devuelve `items: []` y conserva el número solicitado y los
+  totales autorizados. Con cero resultados, `totalItems` y `totalPages` valen 0.
+- `saleNumber` busca el número comercial exacto (1 a 40 caracteres).
+  `saleNumberPrefix` busca un prefijo literal (3 a 40). Son excluyentes, se
+  recortan los espacios exteriores y se distinguen mayúsculas y minúsculas.
+  `from` y `to` son días ISO en America/Lima con extremos abiertos, inicio
+  inclusivo y fin exclusivo al comenzar el día siguiente a `to`.
+- `status` admite `COMPLETED` o `VOIDED`, `cashRegisterSessionId` es un entero
+  positivo y `createdBy` admite hasta 120 caracteres. `hasElectronicDocument`
+  acepta `true` o `false`. `documentStatus` admite `DRAFT`, `GENERATED`,
+  `SIGNED`, `SENT`, `ACCEPTED`, `REJECTED`, `ERROR` o `CANCELLED` y se evalúa
+  sobre el mismo comprobante que muestra el resumen, ordenado por
+  `created_at DESC, id DESC`.
+- `400` para parámetros inválidos o para enviar las dos búsquedas. `422` para
+  fechas invertidas o combinar `hasElectronicDocument=false` con `documentStatus`.
+  `401` sin autenticación y `403` sin rol permitido. Si el actor tiene CAJERO,
+  incluso combinado, su identidad autenticada sustituye `createdBy` en el
+  conteo y el contenido. Se preservan `GET /api/v1/sales`, `/list-items`,
+  `/today` y `/{id}` con sus contratos v1.
+- **PASS_LOCAL.** La corrida focal del Build aprobó 79 pruebas con 0 fallos,
+  errores u omitidas. Fueron 27 nuevas en `SalesListV2IntegrationTest`, con
+  PostgreSQL 16 Testcontainers dedicado, y 52 regresiones en
+  `SalesApplicationServiceTest` (43), `TodaySalesTest` (2),
+  `CommercialDatesIntegrationTest` (6, PostgreSQL Testcontainers) y
+  `PageResponseMapperTest` (1). En la revisión previa al staging pasaron dos
+  casos reforzados de la misma suite v2: precedencia de fecha sobre ID del
+  comprobante y JSON del listado v1. Esas repeticiones forman parte de los 27
+  casos de v2 y no se suman al total. Pendientes CI y cierre Git de la fase.
+- `EXPLAIN (ANALYZE, BUFFERS)` con 20 000 ventas sintéticas en PostgreSQL aislado
+  y caché caliente, en ms de conteo/contenido: primera página 2,46/6,63, prefijo
+  de CAJERO en `page=500` 3,39/8,92, filtro documental 34,98/25,35 y número
+  exacto 0,05/0,10. Dos consultas principales como máximo, sin cargar entidades
+  de ventas, partidas ni pagos. El costo puede crecer con offsets profundos y
+  filtros documentales. `REPEATABLE READ` da coherencia dentro de una solicitud.
+  `OFFSET/LIMIT` puede desplazar filas entre solicitudes concurrentes.
+
 | Modulo       | Endpoint                                                 | Metodo | Request DTO                                                      | Response DTO                                | Roles permitidos                      | Codigos esperados                 | Estado validacion   | Observaciones                                                                                                                                                 |
 | ------------ | -------------------------------------------------------- | ------ | ---------------------------------------------------------------- | ------------------------------------------- | ------------------------------------- | --------------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | auth         | `/api/v1/auth/login`                                     | POST   | `LoginRequest`                                                   | `LoginResponse`                             | Publico                               | 200, 400, 401                     | OK                  | JWT emitido con `tokenType`, `accessToken`, `expiresAt`, `user`.                                                                                              |
@@ -98,6 +138,7 @@ interno: 500. El instante referencia el calendario, no un snapshot financiero ex
 | sales        | `/api/v1/sales`                                          | POST   | `CreateSaleRequest`                                              | `SaleResponse`                              | CAJERO, ADMIN, SUPERVISOR             | 201, 400, 404, 409, 422, 401, 403 | OK (BT-001 runtime) | Validado con datos controlados: venta `#2` (`S-1777916164455`) en estado `COMPLETED`, pago `CASH`, salida de stock y kardex OK.                               |
 | sales        | `/api/v1/sales`                                          | GET    | filtros `from`,`to`,`cashRegisterSessionId`,`status`,`createdBy` | `List<SaleResponse>`                        | CAJERO, ADMIN, SUPERVISOR             | 200, 400, 401, 403, 422 | PASS — Fase 3 integrada | `from`/`to` son días America/Lima; inicio inclusivo, fin exclusivo; extremos abiertos permitidos; rango invertido 422. Ver FASE3_COMMERCIAL_DATES_QA.md. |
 | sales | `/api/v1/sales/list-items` | GET | filtros `from`,`to`,`cashRegisterSessionId`,`status`,`createdBy` | `List<SalesListItemResponse>` | CAJERO, ADMIN, SUPERVISOR | 200, 400, 401, 403, 422 | PASS — Fase 3 integrada | Mismo calendario y filtros que GET sales; conserva resumen documental y aislamiento por propietario. |
+| sales | `/api/v2/sales` | GET | `page`, `size`, `saleNumber`, `saleNumberPrefix`, `from`, `to`, `cashRegisterSessionId`, `status`, `createdBy`, `hasElectronicDocument`, `documentStatus` | `PageResponse<SalesListItemResponse>` | CAJERO, ADMIN, SUPERVISOR | 200, 400, 401, 403, 422 | PASS_LOCAL — VENTAS-RD-1 | Orden fijo `soldAt DESC, id DESC`. Resumen del último comprobante, incluidos cancelados. `Cache-Control: no-store`. Ver contrato y evidencia de VENTAS-RD-1 arriba. |
 | sales | `/api/v1/sales/today` | GET | Sin fechas ni filtros | `TodaySalesResponse` | CAJERO, ADMIN, SUPERVISOR | 200, 401, 403, 500 | PASS — Fase 3 integrada | Día America/Lima del backend; `businessDate`, `timeZone`, `referenceInstant`, `nextDayStartsAt`, `sales`; `Cache-Control: no-store`; CAJERO solo sus ventas. |
 | sales        | `/api/v1/sales/{id}`                                     | GET    | -                                                                | `SaleResponse`                              | CAJERO, ADMIN, SUPERVISOR             | 200, 404, 401, 403                | OK                  | Items enriquecidos en detalle con `productName`, `sku` y `barcode`; se mantiene `productId` como fallback interno.                                           |
 | sales        | `/api/v1/sales/{id}/void`                                | POST   | `VoidSaleRequest`                                                | `SaleResponse`                              | ADMIN, SUPERVISOR                     | 200, 400, 404, 409, 422, 401, 403 | OK                  | Reposicion de stock.                                                                                                                                          |
