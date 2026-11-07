@@ -4,6 +4,16 @@
 
 Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones tecnicas/QA documentadas.
 
+### VENTAS-RD-1 — CLOSED técnico (2026-11-07)
+
+- Alcance: `GET /api/v2/sales` devuelve `PageResponse<SalesListItemResponse>` con paginación numerada `OFFSET/LIMIT` (tamaños 20, 50 y 100), orden `soldAt DESC, id DESC`, búsqueda por número comercial y filtros comerciales, temporales y documentales. Las fechas usan America/Lima. La consulta es de solo lectura y el conteo y la página comparten una lectura coherente. CAJERO queda limitado por propietario, incluso con roles combinados. Los contratos v1 se preservan. El frontend de VENTAS-RD-2 no está implementado.
+- Integración: PR [#18](https://github.com/Brian0261/erp-pos/pull/18) integrada mediante squash, SHA `81ac4f31d35057af77be50497359b68dbbb5896d`, con diez archivos. `master` local, `origin/master` y `master` remoto están sincronizados en ese SHA, con divergencia 0/0. La rama `codex/ventas-rd-1-sales-query` permanece conservada.
+- QA: CI postmerge [42392153391](https://github.com/Brian0261/erp-pos/actions/runs/42392153391) SUCCESS; backend 934/934 PASS, frontend, e2e-auth y e2e-commercial SUCCESS. El Build local aprobó 79 pruebas focales, incluidas 27 nuevas, con PostgreSQL Testcontainers aislado y validación de compatibilidad v1 y autorización.
+- Documentación: [MATRIX_API_ENDPOINTS.md](../qa/MATRIX_API_ENDPOINTS.md) contiene el contrato REST v2 y sus validaciones. Su evidencia `PASS_LOCAL` corresponde a la validación previa al merge; la integración y CI postmerge quedan acreditados por la PR y el workflow enlazados arriba.
+- Riesgos residuales: `OFFSET/LIMIT` puede encarecer páginas profundas y desplazar filas entre solicitudes; el filtro documental tuvo el mayor costo medido con datos sintéticos locales. No se acredita rendimiento productivo ni se requieren índices adicionales sin evidencia. Persiste el riesgo independiente de reconciliación fiscal posenvío: tras aceptación remota y fallo de persistencia el estado puede quedar `SENT/STARTED`; está prohibido el reenvío ciego. Fiscal PROD sigue bloqueado hasta acreditar recuperación segura con un proveedor real.
+
+VENTAS-RD-1 está CLOSED técnico. No se afirma despliegue, uso productivo ni implementación de VENTAS-RD-2.
+
 ### VENTAS-RD-0 — CLOSED técnico (2026-11-07)
 
 - Alcance cerrado: 0A preserva identidad e historial de pagos al actualizar o anular ventas; 0B aplica autorización documental por rol, operación, recurso y propietario; H1 separa la autorización de inicio de la finalización interna del intento fiscal previamente autorizado. El fixture H1 cierra sus cajas sintéticas y aísla las pruebas CI.
