@@ -11,6 +11,7 @@ import com.erppos.backend.erp.billing.domain.model.ProviderSendResult;
 import com.erppos.backend.erp.billing.domain.port.ElectronicBillingProviderPort;
 import com.erppos.backend.erp.security.adapter.security.ErpUserDetails;
 import com.erppos.backend.erp.security.domain.RoleName;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -52,6 +53,7 @@ class FiscalPostSendContextIntegrationTest extends AbstractHttpIntegrationTest {
     private record Actor(UUID id, String name, Set<RoleName> roles) {}
     private record Prepared(long attempt, String hash, String actor) {}
     private Actor original, replacementCashier, replacementAdmin;
+    private Long cashSessionId;
     private long documentId;
 
     @BeforeEach
@@ -59,21 +61,35 @@ class FiscalPostSendContextIntegrationTest extends AbstractHttpIntegrationTest {
         original = actor(Set.of(RoleName.ADMIN, RoleName.CAJERO));
         replacementCashier = actor(Set.of(RoleName.CAJERO));
         replacementAdmin = actor(Set.of(RoleName.ADMIN));
-        documentId = signedDocument(original);
+        cashSessionId = jdbc.queryForObject("""
+                insert into cash_register_sessions(opened_by_user_id, opened_at, opening_amount, status)
+                values(?, now(), 0, 'OPEN') returning id
+                """, Long.class, original.id());
+        documentId = signedDocument();
         clearInvocations(provider);
     }
 
-    private long signedDocument(Actor owner) {
+    @AfterEach
+    void closeFixtureCashSession() {
+        if (cashSessionId == null) {
+            return;
+        }
+        // Release the fixture's open session after the fiscal assertions observe real commits.
+        int closed = jdbc.update("""
+                update cash_register_sessions
+                set status = 'CLOSED', closed_at = now(), updated_at = now()
+                where id = ? and opened_by_user_id = ? and status = 'OPEN'
+                """, cashSessionId, original.id());
+        assertEquals(1, closed, "The fixture's cash session must be closed");
+    }
+
+    private long signedDocument() {
         long warehouse = jdbc.queryForObject("select min(id) from warehouses", Long.class);
-        var existingCash = jdbc.queryForList("select id from cash_register_sessions where opened_by_user_id=? and status='OPEN'", Long.class, owner.id());
-        long cash = existingCash.isEmpty()
-                ? jdbc.queryForObject("insert into cash_register_sessions(opened_by_user_id,opened_at,opening_amount,status) values(?,now(),0,'OPEN') returning id", Long.class, owner.id())
-                : existingCash.get(0);
         long sale = jdbc.queryForObject("""
                 insert into sales(cash_register_session_id,warehouse_id,sale_number,status,subtotal_amount,discount_amount,
                     total_amount,paid_amount,change_amount,sold_at,created_by)
                 values(?,?,?,'COMPLETED',10,0,10,10,0,now(),?) returning id
-                """, Long.class, cash, warehouse, "H1-" + UUID.randomUUID(), owner.name());
+                """, Long.class, cashSessionId, warehouse, "H1-" + UUID.randomUUID(), original.name());
         String seriesName = "H" + UUID.randomUUID().toString().substring(0, 7);
         long series = jdbc.queryForObject("insert into billing_series(document_type,series,current_number,environment,active,created_by,updated_by) values('RECEIPT',?,1,'LOCAL',false,'H1','H1') returning id", Long.class, seriesName);
         long created = jdbc.queryForObject("""
@@ -159,7 +175,7 @@ class FiscalPostSendContextIntegrationTest extends AbstractHttpIntegrationTest {
     @ValueSource(strings = {"document", "attempt", "missing-attempt", "hash", "payload", "operation", "actor", "state"})
     void invalidOrForeignPreparationCannotChangeAnyCommittedRecord(String fault) {
         var preparation = asOriginal(() -> FiscalFinalizationTestAccess.prepare(sends, documentId));
-        long other = signedDocument(original);
+        long other = signedDocument();
         var otherPreparation = asOriginal(() -> FiscalFinalizationTestAccess.prepare(sends, other));
         var forged = FiscalFinalizationTestAccess.changed(preparation,
                 fault.equals("document") ? documentRepository.findById(other).orElseThrow() : null,
