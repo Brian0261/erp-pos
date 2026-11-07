@@ -4,9 +4,15 @@
 
 Proyecto en estado pre-piloto con MVP funcional, estabilizado y con validaciones tecnicas/QA documentadas.
 
-### VENTAS-RD-0 — PASS_LOCAL
+### VENTAS-RD-0 — CLOSED técnico (2026-11-07)
 
-0A y 0B están validados localmente; H1 fue reproducido en pruebas sintéticas, corregido y validado. Preparación documental y gates Git pendientes de cierre. No está MERGED ni CLOSED. [QA canónica](../qa/VENTAS_RD_0_HARDENING_QA.md).
+- Alcance cerrado: 0A preserva identidad e historial de pagos al actualizar o anular ventas; 0B aplica autorización documental por rol, operación, recurso y propietario; H1 separa la autorización de inicio de la finalización interna del intento fiscal previamente autorizado. El fixture H1 cierra sus cajas sintéticas y aísla las pruebas CI.
+- Integración: PR [#16](https://github.com/Brian0261/erp-pos/pull/16) fusionada por squash en `master`, SHA `2dae071635afcbbda5502c12ddac18f0e50f403f`. `master` local y remoto quedaron sincronizados en ese SHA. La rama feature permanece conservada.
+- QA postmerge: workflow [42346879786](https://github.com/Brian0261/erp-pos/actions/runs/42346879786) SUCCESS; backend 907/907 PASS; frontend, e2e-auth y e2e-commercial SUCCESS.
+- Los cinco documentos oficiales de VENTAS-RD-0 están integrados en la PR. [QA canónica](../qa/VENTAS_RD_0_HARDENING_QA.md).
+- Riesgo fiscal independiente pendiente: si el proveedor acepta y falla la persistencia local, el intento puede quedar `SENT/STARTED`. El reenvío ciego sigue bloqueado. La emisión fiscal en PROD permanece bloqueada hasta acreditar proveedor real y recuperación segura de resultados inciertos. Este riesgo no reabre VENTAS-RD-0.
+
+VENTAS-RD-0 está CLOSED técnico. No se afirma despliegue ni operación fiscal productiva.
 
 ### Fase 3 — fechas comerciales: CLOSED técnico (2026-11-06)
 
