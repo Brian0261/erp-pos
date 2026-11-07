@@ -3,6 +3,7 @@ package com.erppos.backend.integration;
 import com.erppos.backend.erp.billing.application.service.FiscalProviderResultClassification;
 import com.erppos.backend.erp.billing.application.service.FiscalProviderResultClassifier;
 import com.erppos.backend.erp.billing.application.service.FiscalSendTransactionService;
+import com.erppos.backend.erp.billing.application.service.FiscalFinalizationTestAccess;
 import com.erppos.backend.erp.billing.application.usecase.ElectronicDocumentUseCase;
 import com.erppos.backend.erp.billing.domain.exception.BillingConflictException;
 import com.erppos.backend.erp.billing.domain.model.ElectronicDocument;
@@ -32,6 +33,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.security.concurrent.DelegatingSecurityContextExecutorService;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
@@ -68,6 +71,7 @@ import static org.mockito.Mockito.when;
         "spring.datasource.hikari.minimum-idle=0",
         "spring.datasource.hikari.connection-timeout=3000"
 })
+@WithMockUser(roles = "ADMIN")
 class FiscalSendTransactionBoundaryIntegrationTest extends AbstractHttpIntegrationTest {
 
     private static final Duration WAIT = Duration.ofSeconds(8);
@@ -104,6 +108,9 @@ class FiscalSendTransactionBoundaryIntegrationTest extends AbstractHttpIntegrati
 
     @BeforeEach
     void resetFiscalTestDoubles() {
+        // The base HTTP fixture clears the request context; restore the test actor for direct service calls.
+        org.springframework.security.core.context.SecurityContextHolder.setContext(
+                org.springframework.security.test.context.TestSecurityContextHolder.getContext());
         reset(providerPort, evidenceRepositoryPort, historyRepositoryPort);
         when(providerPort.supportsProduction()).thenReturn(false);
     }
@@ -125,7 +132,7 @@ class FiscalSendTransactionBoundaryIntegrationTest extends AbstractHttpIntegrati
     void providerRunsOutsideTransactionAfterDurablePreparationAndWithoutDocumentLock() throws Exception {
         fixture = createFixture();
         BlockingProvider provider = blockingProvider(ProviderSendResult.accepted("TX-ACCEPTED", "Accepted"), 1);
-        ExecutorService executor = Executors.newSingleThreadExecutor();
+        ExecutorService executor = new DelegatingSecurityContextExecutorService(Executors.newSingleThreadExecutor());
         Future<ElectronicDocument> sendFuture = executor.submit(() -> documentUseCase.send(fixture.documentId()));
         try {
             assertTrue(provider.entered().await(WAIT.toMillis(), TimeUnit.MILLISECONDS));
@@ -162,7 +169,7 @@ class FiscalSendTransactionBoundaryIntegrationTest extends AbstractHttpIntegrati
     void concurrentSendOnSameDocumentProducesOneProviderCallAndOneInFlightAttempt() throws Exception {
         fixture = createFixture();
         BlockingProvider provider = blockingProvider(ProviderSendResult.accepted("TX-ONE", "Accepted"), 1);
-        ExecutorService executor = Executors.newFixedThreadPool(2);
+        ExecutorService executor = new DelegatingSecurityContextExecutorService(Executors.newFixedThreadPool(2));
         Future<ElectronicDocument> first = executor.submit(() -> documentUseCase.send(fixture.documentId()));
         try {
             assertTrue(provider.entered().await(WAIT.toMillis(), TimeUnit.MILLISECONDS));
@@ -250,13 +257,9 @@ class FiscalSendTransactionBoundaryIntegrationTest extends AbstractHttpIntegrati
                 fixture.documentId()
         );
 
-        ElectronicDocument repeated = transactionService.finalizeSend(
-                fixture.documentId(),
-                attempt.id(),
-                attempt.requestHash(),
-                accepted,
-                resultClassifier.classify(accepted)
-        );
+        var preparation = FiscalFinalizationTestAccess.recorded(first, attempt.id(), attempt.requestHash(),
+                queryString("SELECT content FROM billing_xml_files WHERE electronic_document_id=? AND file_type='SIGNED'", fixture.documentId()));
+        ElectronicDocument repeated = FiscalFinalizationTestAccess.complete(transactionService, preparation, accepted);
 
         assertEquals(first.status(), repeated.status());
         assertEquals(historyBefore, queryLong(
@@ -281,13 +284,7 @@ class FiscalSendTransactionBoundaryIntegrationTest extends AbstractHttpIntegrati
         ));
 
         ProviderSendResult rejected = ProviderSendResult.rejected("TX-CONTRADICT", "Rejected");
-        assertThrows(BillingConflictException.class, () -> transactionService.finalizeSend(
-                fixture.documentId(),
-                attempt.id(),
-                attempt.requestHash(),
-                rejected,
-                resultClassifier.classify(rejected)
-        ));
+        assertThrows(BillingConflictException.class, () -> FiscalFinalizationTestAccess.complete(transactionService, preparation, rejected));
         assertEquals("ACCEPTED", queryString(
                 "SELECT status FROM electronic_documents WHERE id = ?",
                 fixture.documentId()
@@ -493,7 +490,7 @@ class FiscalSendTransactionBoundaryIntegrationTest extends AbstractHttpIntegrati
         assertTrue(dataSource instanceof HikariDataSource);
         assertEquals(2, ((HikariDataSource) dataSource).getMaximumPoolSize());
         BlockingProvider provider = blockingProvider(ProviderSendResult.accepted("TX-POOL", "Accepted"), 2);
-        ExecutorService executor = Executors.newFixedThreadPool(2);
+        ExecutorService executor = new DelegatingSecurityContextExecutorService(Executors.newFixedThreadPool(2));
         Future<ElectronicDocument> first = executor.submit(() -> documentUseCase.send(fixture.documentId()));
         Future<ElectronicDocument> second = executor.submit(() -> documentUseCase.send(secondFixture.documentId()));
         try {

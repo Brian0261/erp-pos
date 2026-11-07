@@ -55,6 +55,12 @@ public class ElectronicDocumentPersistenceAdapter implements ElectronicDocumentR
 
     @Override
     public List<ElectronicDocument> findByFilters(ElectronicDocumentStatus status, ElectronicDocumentType type, Long saleId, LocalDate from, LocalDate to) {
+        return findByFiltersForSaleOwner(status, type, saleId, from, to, null);
+    }
+
+    @Override
+    public List<ElectronicDocument> findByFiltersForSaleOwner(ElectronicDocumentStatus status, ElectronicDocumentType type,
+                                                            Long saleId, LocalDate from, LocalDate to, String saleCreatedBy) {
         Instant fromInstant = from == null ? MIN_INSTANT_FILTER : from.atStartOfDay().toInstant(ZoneOffset.UTC);
         Instant toInstant = to == null ? MAX_INSTANT_FILTER : to.plusDays(1).atStartOfDay().minusSeconds(1).toInstant(ZoneOffset.UTC);
         return documentJpaRepository.findByFilters(
@@ -62,7 +68,8 @@ public class ElectronicDocumentPersistenceAdapter implements ElectronicDocumentR
                         type,
                         saleId,
                         fromInstant,
-                        toInstant
+                        toInstant,
+                        saleCreatedBy
                 )
                 .stream()
                 .map(ElectronicDocumentMapper::toDomain)

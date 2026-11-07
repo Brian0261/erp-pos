@@ -25,6 +25,9 @@ public interface ElectronicDocumentJpaRepository extends JpaRepository<Electroni
               and (:saleId is null or d.saleId = :saleId)
               and d.createdAt >= :fromInstant
               and d.createdAt <= :toInstant
+              and (:saleCreatedBy is null or exists (
+                  select s.id from SaleEntity s where s.id = d.saleId and s.createdBy = :saleCreatedBy
+              ))
             order by d.createdAt desc
             """)
     List<ElectronicDocumentEntity> findByFilters(
@@ -32,7 +35,8 @@ public interface ElectronicDocumentJpaRepository extends JpaRepository<Electroni
             ElectronicDocumentType type,
             Long saleId,
             Instant fromInstant,
-            Instant toInstant
+            Instant toInstant,
+            String saleCreatedBy
     );
 
     @Query("""

@@ -24,6 +24,7 @@ import com.erppos.backend.erp.billing.domain.port.ElectronicDocumentRepositoryPo
 import com.erppos.backend.erp.billing.domain.port.ElectronicDocumentStatusHistoryRepositoryPort;
 import org.slf4j.MDC;
 import org.springframework.stereotype.Service;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
@@ -46,6 +47,8 @@ public class FiscalSendTransactionService {
     private final FiscalAttemptAuditService attemptAuditService;
     private final FiscalAuditSanitizer sanitizer;
     private final AuditUserProvider auditUserProvider;
+    private final DocumentSaleAccessPolicy documentAccess;
+    private final FiscalProviderResultClassifier resultClassifier;
 
     public FiscalSendTransactionService(
             ElectronicDocumentRepositoryPort documentRepositoryPort,
@@ -57,7 +60,9 @@ public class FiscalSendTransactionService {
             ElectronicDocumentLifecyclePolicy lifecyclePolicy,
             FiscalAttemptAuditService attemptAuditService,
             FiscalAuditSanitizer sanitizer,
-            AuditUserProvider auditUserProvider
+            AuditUserProvider auditUserProvider,
+            DocumentSaleAccessPolicy documentAccess,
+            FiscalProviderResultClassifier resultClassifier
     ) {
         this.documentRepositoryPort = documentRepositoryPort;
         this.attemptRepositoryPort = attemptRepositoryPort;
@@ -69,12 +74,16 @@ public class FiscalSendTransactionService {
         this.attemptAuditService = attemptAuditService;
         this.sanitizer = sanitizer;
         this.auditUserProvider = auditUserProvider;
+        this.documentAccess = documentAccess;
+        this.resultClassifier = resultClassifier;
     }
 
     @Transactional
+    @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR')")
     public FiscalSendPreparationOutcome prepareSend(Long documentId) {
         ElectronicDocument current = documentRepositoryPort.findByIdForUpdate(documentId)
                 .orElseThrow(() -> new BillingNotFoundException("Electronic document not found"));
+        documentAccess.assertAccessible(current);
 
         ElectronicDocumentAttempt inFlight = latestInFlightAttempt(current.id());
         if (inFlight != null) {
@@ -114,10 +123,11 @@ public class FiscalSendTransactionService {
                 ElectronicDocumentStatus.SENT,
                 null,
                 null,
-                Instant.now()
+                Instant.now(),
+                attempt.actor()
         );
         ElectronicDocument saved = documentRepositoryPort.save(sent);
-        addHistory(saved.id(), current.status(), ElectronicDocumentStatus.SENT, sendTrackingMessage(current.environment()));
+        addHistory(saved.id(), current.status(), ElectronicDocumentStatus.SENT, sendTrackingMessage(current.environment()), attempt.actor());
 
         return FiscalSendPreparationOutcome.ready(new FiscalSendPreparation(
                 saved,
@@ -128,31 +138,21 @@ public class FiscalSendTransactionService {
     }
 
     @Transactional
-    public ElectronicDocument finalizeSend(
-            Long documentId,
-            Long attemptId,
-            String requestHash,
-            ProviderSendResult result,
-            FiscalProviderResultClassification classification
-    ) {
-        return finalizeInternal(documentId, attemptId, requestHash, result, classification, null, true);
+    ElectronicDocument finalizeSend(FiscalSendPreparation preparation, ProviderSendResult result) {
+        return finalizeInternal(preparation, result, resultClassifier.classify(result), null, true);
     }
 
     @Transactional
-    public ElectronicDocument finalizeAmbiguousFailure(
-            Long documentId,
-            Long attemptId,
-            String requestHash,
-            FiscalProviderResultClassification classification,
-            String message
-    ) {
-        return finalizeInternal(documentId, attemptId, requestHash, null, classification, message, false);
+    ElectronicDocument finalizeAmbiguousFailure(FiscalSendPreparation preparation, RuntimeException failure) {
+        return finalizeInternal(preparation, null, resultClassifier.classifyException(failure), failure.getMessage(), false);
     }
 
     @Transactional
+    @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR')")
     public FiscalSendFailure blockRetry(Long documentId) {
         ElectronicDocument current = documentRepositoryPort.findByIdForUpdate(documentId)
                 .orElseThrow(() -> new BillingNotFoundException("Electronic document not found"));
+        documentAccess.assertAccessible(current);
         try {
             runtimeSafetyPolicy.assertCanSend(current.environment());
         } catch (BillingConflictException ex) {
@@ -170,24 +170,29 @@ public class FiscalSendTransactionService {
     }
 
     private ElectronicDocument finalizeInternal(
-            Long documentId,
-            Long attemptId,
-            String requestHash,
+            FiscalSendPreparation preparation,
             ProviderSendResult result,
             FiscalProviderResultClassification classification,
             String failureMessage,
             boolean recordEvidence
     ) {
-        ElectronicDocumentAttempt attempt = attemptRepositoryPort.findByIdForUpdate(attemptId)
+        // Only the package-local orchestrator carries this preparation across provider I/O.
+        // Completion records an already authorized effect; it must not re-authorize the ambient requester.
+        if (preparation == null || preparation.document() == null || preparation.document().id() == null
+                || preparation.attemptId() == null || preparation.requestHash() == null
+                || preparation.requestHash().isBlank() || preparation.signedXml() == null || preparation.signedXml().isBlank()) {
+            throw new BillingConflictException("La preparacion fiscal no es valida para finalizar.");
+        }
+        ElectronicDocumentAttempt attempt = attemptRepositoryPort.findByIdForUpdate(preparation.attemptId())
                 .orElseThrow(() -> new BillingNotFoundException("Electronic document attempt not found"));
-        if (!attempt.electronicDocumentId().equals(documentId)
-                || !equal(attempt.requestHash(), requestHash)) {
+        if (!attempt.electronicDocumentId().equals(preparation.document().id())
+                || !equal(attempt.requestHash(), preparation.requestHash())
+                || !equal(attempt.requestHash(), attemptAuditService.hashPayload(preparation.signedXml()))) {
             throw new BillingConflictException("El attempt SEND no corresponde a la preparacion fiscal.");
         }
         ElectronicDocument current = documentRepositoryPort.findByIdForUpdate(attempt.electronicDocumentId())
                 .orElseThrow(() -> new BillingNotFoundException("Electronic document not found"));
-
-        if (attempt.operation() != FiscalOperation.SEND) {
+        if (attempt.operation() != FiscalOperation.SEND || attempt.actor() == null || attempt.actor().isBlank()) {
             throw new BillingConflictException("El attempt no corresponde a una operacion SEND.");
         }
 
@@ -218,11 +223,12 @@ public class FiscalSendTransactionService {
                 finalStatus,
                 providerTicket,
                 providerMessage,
-                current.sentAt() == null ? Instant.now() : current.sentAt()
+                current.sentAt() == null ? Instant.now() : current.sentAt(),
+                attempt.actor()
         );
         ElectronicDocument saved = documentRepositoryPort.save(finalized);
         if (finalStatus != ElectronicDocumentStatus.SENT) {
-            addHistory(saved.id(), ElectronicDocumentStatus.SENT, finalStatus, providerMessage);
+            addHistory(saved.id(), ElectronicDocumentStatus.SENT, finalStatus, providerMessage, attempt.actor());
         }
 
         ElectronicDocumentAttempt finishedAttempt = failureMessage == null
@@ -386,7 +392,8 @@ public class FiscalSendTransactionService {
             ElectronicDocumentStatus status,
             String providerTicket,
             String providerMessage,
-            Instant sentAt
+            Instant sentAt,
+            String actor
     ) {
         return new ElectronicDocument(
                 current.id(),
@@ -412,7 +419,7 @@ public class FiscalSendTransactionService {
                 current.createdAt(),
                 current.updatedAt(),
                 current.createdBy(),
-                auditUserProvider.currentUsername()
+                actor
         );
     }
 
@@ -420,7 +427,8 @@ public class FiscalSendTransactionService {
             Long documentId,
             ElectronicDocumentStatus previous,
             ElectronicDocumentStatus next,
-            String message
+            String message,
+            String actor
     ) {
         historyRepositoryPort.save(new ElectronicDocumentStatusHistory(
                 null,
@@ -429,7 +437,7 @@ public class FiscalSendTransactionService {
                 next,
                 trimToNull(message),
                 Instant.now(),
-                auditUserProvider.currentUsername()
+                actor
         ));
     }
 

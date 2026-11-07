@@ -36,6 +36,7 @@ import com.erppos.backend.erp.billing.domain.port.XmlSignerPort;
 import com.erppos.backend.erp.sales.domain.port.CommercialOperationCoordinationPort;
 import org.slf4j.MDC;
 import org.springframework.stereotype.Service;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -66,10 +67,10 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
     private final ElectronicDocumentLifecyclePolicy lifecyclePolicy;
     private final FiscalAttemptAuditService attemptAuditService;
     private final FiscalAuditSanitizer fiscalAuditSanitizer;
-    private final FiscalProviderResultClassifier providerResultClassifier;
     private final FiscalSendTransactionService fiscalSendTransactionService;
     private final AuditUserProvider auditUserProvider;
     private final CommercialOperationCoordinationPort operationCoordinationPort;
+    private final DocumentSaleAccessPolicy documentAccess;
 
     public ElectronicDocumentApplicationService(
             ElectronicDocumentRepositoryPort documentRepositoryPort,
@@ -87,10 +88,10 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
             ElectronicDocumentLifecyclePolicy lifecyclePolicy,
             FiscalAttemptAuditService attemptAuditService,
             FiscalAuditSanitizer fiscalAuditSanitizer,
-            FiscalProviderResultClassifier providerResultClassifier,
             FiscalSendTransactionService fiscalSendTransactionService,
             AuditUserProvider auditUserProvider,
-            CommercialOperationCoordinationPort operationCoordinationPort
+            CommercialOperationCoordinationPort operationCoordinationPort,
+            DocumentSaleAccessPolicy documentAccess
     ) {
         this.documentRepositoryPort = documentRepositoryPort;
         this.itemRepositoryPort = itemRepositoryPort;
@@ -107,10 +108,10 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
         this.lifecyclePolicy = lifecyclePolicy;
         this.attemptAuditService = attemptAuditService;
         this.fiscalAuditSanitizer = fiscalAuditSanitizer;
-        this.providerResultClassifier = providerResultClassifier;
         this.fiscalSendTransactionService = fiscalSendTransactionService;
         this.auditUserProvider = auditUserProvider;
         this.operationCoordinationPort = operationCoordinationPort;
+        this.documentAccess = documentAccess;
     }
 
     @Override
@@ -268,17 +269,24 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
 
     @Override
     public List<ElectronicDocument> list(ElectronicDocumentStatus status, ElectronicDocumentType type, Long saleId, LocalDate from, LocalDate to) {
+        if (auditUserProvider.hasRole(com.erppos.backend.erp.security.domain.RoleName.CAJERO)) {
+            return documentRepositoryPort.findByFiltersForSaleOwner(status, type, saleId, from, to,
+                    auditUserProvider.currentUsername());
+        }
         return documentRepositoryPort.findByFilters(status, type, saleId, from, to);
     }
 
     @Override
     public ElectronicDocument getById(Long id) {
-        return documentRepositoryPort.findById(id)
+        ElectronicDocument document = documentRepositoryPort.findById(id)
                 .orElseThrow(() -> new BillingNotFoundException("Electronic document not found"));
+        documentAccess.assertAccessible(document);
+        return document;
     }
 
     @Override
     @Transactional
+    @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR','CAJERO')")
     public ElectronicDocument generateXml(Long id) {
         ElectronicDocument current = getByIdForUpdate(id);
         if (current.status() == ElectronicDocumentStatus.GENERATED) {
@@ -308,6 +316,7 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
 
     @Override
     @Transactional
+    @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR')")
     public ElectronicDocument sign(Long id) {
         ElectronicDocument current = getByIdForUpdate(id);
         if (current.status() == ElectronicDocumentStatus.SIGNED) {
@@ -343,6 +352,7 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
     }
 
     @Override
+    @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR')")
     public ElectronicDocument send(Long id) {
         if (TransactionSynchronizationManager.isActualTransactionActive()) {
             throw new IllegalStateException("Fiscal send orchestration requires an inactive transaction");
@@ -361,30 +371,18 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
             result = billingProviderPort.send(preparation.document(), preparation.signedXml());
         } catch (RuntimeException ex) {
             try {
-                fiscalSendTransactionService.finalizeAmbiguousFailure(
-                        preparation.document().id(),
-                        preparation.attemptId(),
-                        preparation.requestHash(),
-                        providerResultClassifier.classifyException(ex),
-                        ex.getMessage()
-                );
+                fiscalSendTransactionService.finalizeAmbiguousFailure(preparation, ex);
             } catch (RuntimeException finalizationFailure) {
                 ex.addSuppressed(finalizationFailure);
             }
             throw ex;
         }
 
-        FiscalProviderResultClassification classification = providerResultClassifier.classify(result);
-        return fiscalSendTransactionService.finalizeSend(
-                preparation.document().id(),
-                preparation.attemptId(),
-                preparation.requestHash(),
-                result,
-                classification
-        );
+        return fiscalSendTransactionService.finalizeSend(preparation, result);
     }
 
     @Override
+    @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR')")
     public ElectronicDocument retrySend(Long id) {
         if (TransactionSynchronizationManager.isActualTransactionActive()) {
             throw new IllegalStateException("Fiscal retry orchestration requires an inactive transaction");
@@ -454,8 +452,10 @@ public class ElectronicDocumentApplicationService implements ElectronicDocumentU
     }
 
     private ElectronicDocument getByIdForUpdate(Long id) {
-        return documentRepositoryPort.findByIdForUpdate(id)
+        ElectronicDocument document = documentRepositoryPort.findByIdForUpdate(id)
                 .orElseThrow(() -> new BillingNotFoundException("Electronic document not found"));
+        documentAccess.assertAccessible(document);
+        return document;
     }
 
     private void recordSignedXmlEvidenceIfMissing(ElectronicDocument document, BillingXmlFile signed) {

@@ -27,13 +27,15 @@ Convencion: SI = permitido, NO = denegado (403), AUTH = requiere token (sin toke
 | quotes    | Consultar e historial                                   | SI    | SI     | NO         | SI           | -                                                       |
 | billing   | Configurar perfil tributario                            | SI    | NO     | NO         | NO           | Solo ADMIN.                                             |
 | billing   | Configurar series                                       | SI    | NO     | NO         | NO           | Solo ADMIN.                                             |
-| billing   | Emitir desde venta (`from-sale`, `generate-xml`)        | SI    | SI     | NO         | SI           | CAJERO autorizado para emision basica.                  |
-| billing   | Firmar y enviar                                         | SI    | NO     | NO         | SI           | Solo ADMIN/SUPERVISOR.                                  |
-| billing   | Consultar comprobantes/xml/historial                    | SI    | SI     | NO         | SI           | ALMACENERO sin acceso.                                  |
+| billing   | Emitir desde venta (`from-sale`, `generate-xml`)        | SI    | SI*    | NO         | SI           | CAJERO sujeto a permiso de rol y propiedad de la venta. |
+| billing   | Firmar y enviar                                         | SI    | NO     | NO         | SI           | Solo ADMIN/SUPERVISOR; también se valida el recurso.     |
+| billing   | Consultar comprobantes, XML, historial y readiness      | SI    | SI*    | NO         | SI           | CAJERO solo ventas propias, incluso con rol combinado.  |
 | reports   | Ver reportes ventas/caja/compras/quotes/e-docs          | SI    | NO     | NO         | SI           | ADMIN/SUPERVISOR.                                       |
 | reports   | Ver reportes stock bajo/movimientos                     | SI    | NO     | SI         | SI           | Incluye ALMACENERO.                                     |
 | outbox    | Listar/ver/mark-published/retry                         | SI    | NO     | NO         | NO           | Solo ADMIN.                                             |
 | health    | `/health` y `/health/db`                                | SI    | SI     | SI         | SI           | Publico (sin token).                                    |
+
+`*` Para CAJERO, el propietario se determina por el creador de la venta (`sales.created_by`), no por el creador del comprobante. Rol permitido y acceso por recurso son controles distintos. Ver [QA VENTAS-RD-0](VENTAS_RD_0_HARDENING_QA.md).
 
 ## Evidencia runtime
 
