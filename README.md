@@ -344,11 +344,31 @@ docker compose up -d
 
 ## CI
 
-Workflow: `.github/workflows/ci.yml`
+Workflow oficial: `.github/workflows/ci.yml`. Se ejecuta en `push` a `master`,
+`main` o `develop`, en `pull_request` y manualmente mediante
+`workflow_dispatch`.
 
-- Job backend: `mvn clean verify`
-- Job frontend: Node desde `frontend/.nvmrc`, `npm ci`, unit tests,
-  `npm run build` y E2E focal de series.
+El job `changes` clasifica cada cambio como `full` o `docs_only`. Este último
+solo aplica a cambios de contenido de archivos Markdown regulares existentes
+en `README.md` o `docs/*.md`. En ese caso se conservan los cuatro jobs y checks
+(`backend`, `frontend`, `e2e-auth` y `e2e-commercial`), pero se omiten sus pasos
+pesados de Maven, npm y E2E.
+
+Se ejecuta CI completo para cambios fuera de esas rutas, diffs vacíos, altas,
+bajas, renombres, tipos o modos de archivo distintos, forks, diferencias que
+no permiten una clasificación documental segura y `workflow_dispatch`. El
+detector es fail-closed: si no se puede verificar el checkout o el historial
+requerido, o falla, se omite o entrega un resultado inválido, los validadores
+de los cuatro jobs fallan y el workflow no concede una exención documental. La
+condición `!cancelled()` permite respetar la cancelación del workflow.
+
+En ejecuciones completas, `e2e-commercial` valida y carga su evidencia saneada
+cuando la suite termina correctamente o falla y hay evidencia disponible.
+Qodana se ejecuta desde `.github/workflows/qodana_code_quality.yml` como
+workflow independiente.
+
+La ruta `docs_only` y la cancelación requieren todavía acreditación operativa
+remota con cambios documentales reales y una cancelación controlada.
 
 ## ADR
 
