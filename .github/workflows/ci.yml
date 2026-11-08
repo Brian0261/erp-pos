@@ -4,18 +4,135 @@ on:
   push:
     branches: ["master", "main", "develop"]
   pull_request:
+  # Run workflow starts all four suites, regardless of the changed files.
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      mode: ${{ steps.classify.outputs.mode }}
+    steps:
+      - name: Checkout for Git comparison
+        if: github.event_name != 'workflow_dispatch' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.id == github.event.pull_request.base.repo.id)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Classify changed files
+        id: classify
+        shell: bash
+        env:
+          EVENT_SHA: ${{ github.sha }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          PR_BASE_REPO: ${{ github.event.pull_request.base.repo.id }}
+          PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.id }}
+          PUSH_BEFORE: ${{ github.event.before }}
+          PUSH_AFTER: ${{ github.event.after }}
+        run: |
+          set -euo pipefail
+          full() { printf 'mode=full\n' >> "$GITHUB_OUTPUT"; exit 0; }
+          fail() { printf '%s\n' "$1" >&2; exit 1; }
+          verify_commit() {
+            [[ $1 =~ ^[0-9a-f]{40}$ && $(git cat-file -t "$1") == commit ]] ||
+              fail 'Expected a valid event commit in local Git history'
+          }
+
+          case "$GITHUB_EVENT_NAME" in
+            workflow_dispatch) full ;;
+            pull_request)
+              [[ $PR_BASE_REPO =~ ^[0-9]+$ && $PR_HEAD_REPO =~ ^[0-9]+$ ]] ||
+                fail 'Missing PR repository identity'
+              [[ $PR_BASE_REPO == "$PR_HEAD_REPO" ]] || full
+              before=$PR_BASE
+              after=$PR_HEAD
+              ;;
+            push)
+              before=$PUSH_BEFORE
+              after=$PUSH_AFTER
+              ;;
+            *) fail 'Unexpected CI event' ;;
+          esac
+
+          verify_commit "$EVENT_SHA"
+          [[ $(git rev-parse HEAD) == "$EVENT_SHA" && $(git rev-parse --is-shallow-repository) == false ]] ||
+            fail 'Cannot verify the checkout or its history'
+          verify_commit "$after"
+          if [[ $GITHUB_EVENT_NAME == pull_request ]]; then
+            [[ $(git rev-list --parents -n 1 "$EVENT_SHA") == "$EVENT_SHA $before $after" ]] ||
+              fail 'Test merge parents do not match the PR event'
+          else
+            [[ $after == "$EVENT_SHA" ]] || fail 'Push head does not match the event SHA'
+            [[ $before != 0000000000000000000000000000000000000000 ]] || full
+          fi
+          verify_commit "$before"
+          if git merge-base --is-ancestor "$before" "$after"; then
+            :
+          else
+            [[ $? == 1 ]] || fail 'Cannot verify event commit ancestry'
+            full
+          fi
+          if [[ $GITHUB_EVENT_NAME == pull_request ]]; then
+            # The up-to-date PR head must match the tree CI will validate.
+            [[ $(git rev-parse "$after^{tree}") == "$(git rev-parse "$EVENT_SHA^{tree}")" ]] || full
+          fi
+
+          diff_file=$(mktemp)
+          trap 'rm -f -- "$diff_file"' EXIT
+          git diff --raw -z --no-renames --no-abbrev --no-ext-diff --no-textconv \
+            --no-relative --ignore-submodules=none "$before" "$after" -- > "$diff_file" ||
+            fail 'Cannot read the complete Git diff'
+          [[ -s $diff_file ]] || full
+
+          # Only content edits to existing regular Markdown in the approved paths qualify.
+          raw_record='^:([0-7]{6}) ([0-7]{6}) [0-9a-f]{40} [0-9a-f]{40} ([A-Z][0-9]*)$'
+          while IFS= read -r -d '' record || [[ -n $record ]]; do
+            [[ $record =~ $raw_record ]] || fail 'Invalid Git diff record'
+            [[ ${BASH_REMATCH[1]} == 100644 && ${BASH_REMATCH[2]} == 100644 && ${BASH_REMATCH[3]} == M ]] || full
+            IFS= read -r -d '' path && [[ -n $path ]] || fail 'Missing path in Git diff'
+            case "$path" in
+              README.md|docs/*.md) ;;
+              *) full ;;
+            esac
+          done < "$diff_file"
+          printf 'mode=docs_only\n' >> "$GITHUB_OUTPUT"
+
+  # Required checks must report an actual failure even when the detector fails.
   backend:
+    needs: changes
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: backend
     steps:
+      - name: Validate CI classification
+        working-directory: .
+        shell: bash
+        env:
+          DETECTOR_RESULT: ${{ needs.changes.result }}
+          CI_MODE: ${{ needs.changes.outputs.mode }}
+        run: |
+          case "$DETECTOR_RESULT:$CI_MODE" in
+            success:full) echo 'Running full CI' ;;
+            success:docs_only) echo 'Documentation verified; heavy QA steps omitted' ;;
+            *) echo 'CI classification failed or is missing' >&2; exit 1 ;;
+          esac
+
       - name: Checkout
+        if: needs.changes.outputs.mode == 'full'
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Set up Java
+        if: needs.changes.outputs.mode == 'full'
         uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -23,21 +140,42 @@ jobs:
           cache: maven
 
       - name: Grant Maven wrapper permission
+        if: needs.changes.outputs.mode == 'full'
         run: chmod +x ./mvnw
 
       - name: Build and test backend
+        if: needs.changes.outputs.mode == 'full'
         run: ./mvnw -B clean verify
 
   frontend:
+    needs: changes
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: frontend
     steps:
+      - name: Validate CI classification
+        working-directory: .
+        shell: bash
+        env:
+          DETECTOR_RESULT: ${{ needs.changes.result }}
+          CI_MODE: ${{ needs.changes.outputs.mode }}
+        run: |
+          case "$DETECTOR_RESULT:$CI_MODE" in
+            success:full) echo 'Running full CI' ;;
+            success:docs_only) echo 'Documentation verified; heavy QA steps omitted' ;;
+            *) echo 'CI classification failed or is missing' >&2; exit 1 ;;
+          esac
+
       - name: Checkout
+        if: needs.changes.outputs.mode == 'full'
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Set up Node
+        if: needs.changes.outputs.mode == 'full'
         uses: actions/setup-node@v4
         with:
           node-version-file: frontend/.nvmrc
@@ -45,77 +183,122 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
+        if: needs.changes.outputs.mode == 'full'
         run: npm ci
 
       - name: Run frontend unit tests
+        if: needs.changes.outputs.mode == 'full'
         run: npm test
 
       - name: Build frontend
+        if: needs.changes.outputs.mode == 'full'
         run: npm run build
 
       - name: Install Playwright Chromium
+        if: needs.changes.outputs.mode == 'full'
         run: npx playwright install --with-deps chromium
 
       - name: Run billing series concurrency E2E
+        if: needs.changes.outputs.mode == 'full'
         run: npm run e2e:billing-series:ci
 
       - name: Run internal note no-write smoke
+        if: needs.changes.outputs.mode == 'full'
         run: npm run e2e:internal-note:ci
 
   e2e-auth:
+    needs: changes
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
       contents: read
     steps:
+      - name: Validate CI classification
+        shell: bash
+        env:
+          DETECTOR_RESULT: ${{ needs.changes.result }}
+          CI_MODE: ${{ needs.changes.outputs.mode }}
+        run: |
+          case "$DETECTOR_RESULT:$CI_MODE" in
+            success:full) echo 'Running full CI' ;;
+            success:docs_only) echo 'Documentation verified; heavy QA steps omitted' ;;
+            *) echo 'CI classification failed or is missing' >&2; exit 1 ;;
+          esac
+
       - name: Checkout
+        if: needs.changes.outputs.mode == 'full'
         uses: actions/checkout@v4
         with:
           persist-credentials: false
       - name: Set up Java
+        if: needs.changes.outputs.mode == 'full'
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
           cache: maven
       - name: Set up approved Node
+        if: needs.changes.outputs.mode == 'full'
         uses: actions/setup-node@v4
         with:
           node-version-file: frontend/.nvmrc
       - name: Grant Maven wrapper permission
+        if: needs.changes.outputs.mode == 'full'
         run: chmod +x backend/mvnw
       - name: Ephemeral authenticated no-write gate
+        if: needs.changes.outputs.mode == 'full'
         working-directory: frontend
         run: node e2e/qa/run-qa.mjs
 
   e2e-commercial:
+    needs: changes
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
       contents: read
     steps:
+      - name: Validate CI classification
+        shell: bash
+        env:
+          DETECTOR_RESULT: ${{ needs.changes.result }}
+          CI_MODE: ${{ needs.changes.outputs.mode }}
+        run: |
+          case "$DETECTOR_RESULT:$CI_MODE" in
+            success:full) echo 'Running full CI' ;;
+            success:docs_only) echo 'Documentation verified; heavy QA steps omitted' ;;
+            *) echo 'CI classification failed or is missing' >&2; exit 1 ;;
+          esac
+
       - name: Checkout
+        if: needs.changes.outputs.mode == 'full'
         uses: actions/checkout@v4
         with:
           persist-credentials: false
       - name: Set up Java
+        if: needs.changes.outputs.mode == 'full'
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
           cache: maven
       - name: Set up approved Node
+        if: needs.changes.outputs.mode == 'full'
         uses: actions/setup-node@v4
         with:
           node-version-file: frontend/.nvmrc
       - name: Grant Maven wrapper permission
+        if: needs.changes.outputs.mode == 'full'
         run: chmod +x backend/mvnw
       - name: Complete isolated commercial and UX gate
+        id: commercial
+        if: needs.changes.outputs.mode == 'full'
         working-directory: frontend
         run: node e2e/qa/run-recovery.mjs
       - name: Validate sanitized final evidence
         id: evidence
-        if: always()
+        if: always() && needs.changes.outputs.mode == 'full' && (steps.commercial.outcome == 'success' || steps.commercial.outcome == 'failure')
         shell: bash
         run: |
           node --input-type=module <<'NODE'
