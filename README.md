@@ -367,8 +367,12 @@ cuando la suite termina correctamente o falla y hay evidencia disponible.
 Qodana se ejecuta desde `.github/workflows/qodana_code_quality.yml` como
 workflow independiente.
 
-La ruta `docs_only` y la cancelación requieren todavía acreditación operativa
-remota con cambios documentales reales y una cancelación controlada.
+La ejecución manual (`workflow_dispatch`) seleccionó `full`. La cancelación
+controlada interrumpió los pasos de Maven y E2E y el resultado fue `CANCELLED`.
+[Run 42437324767](https://github.com/Brian0261/erp-pos/actions/runs/42437324767).
+
+Queda pendiente validar `docs_only` en PR y push con un cambio documental
+elegible.
 
 ## ADR
 
