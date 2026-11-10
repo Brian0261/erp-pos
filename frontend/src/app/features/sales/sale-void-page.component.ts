@@ -16,11 +16,12 @@ import { SalesService } from "./data/sales.service";
 import { SaleResponse } from "./data/sales.models";
 import { blocksInternalVoid, latestSaleDocument } from "./sale-document-verification";
 import { filtersFromContext, salesContext, saleStatusLabel } from "./sales-presentation";
-import { SaleVoidAttempts, saleVoidAttemptKey } from "./sale-void-attempts";
+import { SaleVoidAttempt, SaleVoidAttempts, saleVoidAttemptKey } from "./sale-void-attempts";
 
 interface VoidScope {
   readonly id: number;
   readonly token: string;
+  readonly session: symbol;
   readonly cancelled: Subject<void>;
 }
 
@@ -293,7 +294,9 @@ export class SaleVoidPageComponent implements OnInit, DoCheck, OnDestroy {
   @HostListener("window:storage")
   @HostListener("window:focus")
   checkSession(): void {
-    if (this.credential === this.authService.getToken()) return;
+    const token = this.authService.getToken();
+    if (this.credential === token) return;
+    this.attempts.sessionFor(token);
     this.clearProtected();
     this.errorMessage = "La sesión cambió. Vuelve a abrir la venta con la sesión actual.";
   }
@@ -323,7 +326,7 @@ export class SaleVoidPageComponent implements OnInit, DoCheck, OnDestroy {
     return firstValueFrom(request.pipe(timeout(15_000), takeUntil(scope.cancelled)));
   }
 
-  private async verifyEligibility(scope: VoidScope): Promise<void> {
+  private async verifyEligibility(scope: VoidScope, retryRejected?: SaleVoidAttempt): Promise<void> {
     this.eligible = false;
     const context = createBoundAuthContext(scope.token);
     const actor = await this.read(this.authService.me(context), scope);
@@ -339,24 +342,27 @@ export class SaleVoidPageComponent implements OnInit, DoCheck, OnDestroy {
     if (actor.roles.includes("CAJERO") && (!actor.username || sale.createdBy !== actor.username)) {
       this.blockedReason = "Esta venta no pertenece al ámbito de tu sesión."; return;
     }
-    this.key = saleVoidAttemptKey(actor.id, scope.id);
+    const key = saleVoidAttemptKey(actor.id, scope.id);
+    this.key = key;
     this.sale = sale;
     if (sale.status === "VOIDED") {
-      if (this.attemptState) this.attempts.finish(this.key);
+      const confirmed = this.attempts.state(key)?.kind === "confirmed";
+      this.attempts.finish(key);
       this.successMessage = "Anulación confirmada.";
-      this.blockedReason = "La venta ya está anulada."; return;
-    }
-    if (this.attemptState) {
-      this.verificationMessage = "La venta aún figura registrada. El resultado del intento sigue por verificar.";
+      this.blockedReason = "La venta ya está anulada.";
+      if (confirmed) this.returnToDetail(scope);
       return;
     }
+    if (this.recoverSharedAttempt(scope, key, retryRejected)) return;
     const { cash, documents } = await this.read(forkJoin({
       cash: this.cashRegisters.getById(sale.cashRegisterSessionId, context),
       documents: this.documents.listBySaleId(scope.id, context),
     }), scope);
     if (!this.current(scope)) return;
+    if (this.recoverSharedAttempt(scope, key, retryRejected)) return;
     if (cash?.id !== sale.cashRegisterSessionId || !["OPEN", "CLOSED"].includes(cash.status)) throw new Error("Invalid cash session");
     const document = latestSaleDocument(documents, scope.id);
+    if (retryRejected && this.attempts.state(key) === retryRejected) this.attempts.finish(key);
     if (cash.status === "CLOSED") this.blockedReason = "La sesión de caja de esta venta está cerrada.";
     else if (blocksInternalVoid(document)) this.blockedReason = "El comprobante electrónico activo impide la anulación interna.";
     else {
@@ -365,19 +371,44 @@ export class SaleVoidPageComponent implements OnInit, DoCheck, OnDestroy {
     }
   }
 
+  private recoverSharedAttempt(scope: VoidScope, key: string, retryRejected?: SaleVoidAttempt): boolean {
+    const attempt = this.attempts.state(key);
+    if (!attempt || attempt === retryRejected) return false;
+
+    // Replay the latest outcome after the actor and sale checks, even if it arrived during loading.
+    this.attempts.observe(key).pipe(takeUntil(scope.cancelled)).subscribe(outcome => {
+      if (!outcome || !this.current(scope) || this.key !== key) return;
+      this.eligible = false;
+      if (outcome.kind === "confirmed") void this.verifyOutcome();
+      if (outcome.kind === "rejected") {
+        if (outcome.session === scope.session) this.showRejection(scope, new HttpErrorResponse({ status: outcome.status }));
+        else {
+          this.canReload = true;
+          this.errorMessage = "El intento anterior terminó. Verifica la venta con la sesión actual.";
+        }
+      }
+      if (outcome.kind === "uncertain") {
+        this.verificationMessage = "La venta aún figura registrada. El resultado del intento sigue por verificar.";
+      }
+    });
+    return true;
+  }
+
   async reload(): Promise<void> {
     if (this.submitting || this.verifying) return;
+    const previousAttempt = this.canReload && this.key ? this.attempts.state(this.key) : undefined;
     this.clearProtected();
     this.errorMessage = "";
     if (!this.saleId || !this.credential || this.expired || this.credential !== this.authService.getToken()) {
       this.errorMessage = this.saleId ? "Inicia sesión para consultar esta venta." : "Identificador de venta no válido.";
       return;
     }
-    const scope: VoidScope = { id: this.saleId, token: this.credential, cancelled: new Subject<void>() };
+    const scope: VoidScope = { id: this.saleId, token: this.credential,
+      session: this.attempts.sessionFor(this.credential), cancelled: new Subject<void>() };
     this.scope = scope;
     this.loading = true;
     try {
-      await this.verifyEligibility(scope);
+      await this.verifyEligibility(scope, previousAttempt?.kind === "rejected" ? previousAttempt : undefined);
     } catch (error) {
       this.readFailure(scope, error);
     } finally {
@@ -398,6 +429,16 @@ export class SaleVoidPageComponent implements OnInit, DoCheck, OnDestroy {
     this.canReload = ![403, 404, 422].includes(status ?? 0);
     this.errorMessage = status === 403 || status === 422 ? "No tienes permiso para verificar la anulación de esta venta."
       : "No se pudieron verificar la venta, la caja y el comprobante. La anulación está bloqueada.";
+  }
+
+  private showRejection(scope: VoidScope, error: HttpErrorResponse): void {
+    this.eligible = false;
+    if ([401, 403, 404].includes(error.status) && this.key) this.attempts.finish(this.key);
+    if (error.status === 401) this.readFailure(scope, error);
+    else {
+      this.canReload = ![403, 404].includes(error.status);
+      this.errorMessage = toHttpErrorMessage(error, "El servidor rechazó la anulación.");
+    }
   }
 
   canVoidSale(): boolean {
@@ -438,19 +479,15 @@ export class SaleVoidPageComponent implements OnInit, DoCheck, OnDestroy {
         const updated = await firstValueFrom(this.salesService.voidSale(scope.id, { reason }, createBoundAuthContext(scope.token))
           .pipe(timeout(20_000)));
         if (updated?.id !== scope.id || updated.status !== "VOIDED") throw new Error("Unverified void response");
-        this.attempts.finish(key);
-        if (this.current(scope)) this.returnToDetail(scope);
+        this.attempts.confirm(key);
+        if (this.current(scope)) {
+          this.attempts.finish(key);
+          this.returnToDetail(scope);
+        }
       } catch (error) {
         if (error instanceof HttpErrorResponse && [400, 401, 403, 404, 409, 422].includes(error.status)) {
-          this.attempts.finish(key);
-          if (this.current(scope)) {
-            this.eligible = false;
-            if (error.status === 401) this.readFailure(scope, error);
-            else {
-              this.canReload = ![403, 404].includes(error.status);
-              this.errorMessage = toHttpErrorMessage(error, "El servidor rechazó la anulación.");
-            }
-          }
+          this.attempts.reject(key, error.status, scope.session);
+          if (this.current(scope)) this.showRejection(scope, error);
         } else {
           this.attempts.uncertain(key);
           if (this.current(scope)) await this.verifyOutcome();
