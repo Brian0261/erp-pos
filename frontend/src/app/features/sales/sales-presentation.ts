@@ -1,5 +1,6 @@
 import { ParamMap, Params } from "@angular/router";
-import { BillingSummary, SalesFilters } from "./data/sales.models";
+import { BillingSummary, SalesListContext } from "./data/sales.models";
+import { salesQueryFromUrl, salesQueryParams } from "./sales-list-query";
 
 export type DocumentTone = "neutral" | "success" | "warning" | "danger";
 export interface DocumentView {
@@ -24,17 +25,21 @@ const statuses: Record<string, [string, DocumentTone]> = {
 export function saleStatusLabel(status: string): string {
   return status === "COMPLETED" ? "Registrada" : status === "VOIDED" ? "Anulada" : "Estado no disponible";
 }
+function documentEnvironment(environment: BillingSummary["environment"] | undefined): string | undefined {
+  return environment === "LOCAL" ? "Local · pruebas" : environment === "BETA" ? "Beta · pruebas" : environment === "PROD" ? "Producción" : undefined;
+}
+
 export function documentView(summary: BillingSummary | null | undefined): DocumentView {
   const unknown: DocumentView = { kind: "unverified", type: "Información documental no verificable",
     number: "", status: "Estado no disponible", environment: "", tone: "warning", knownStatus: false };
   if (!summary || typeof summary.hasElectronicDocument !== "boolean") return unknown;
   if (!summary.hasElectronicDocument) {
-    if ([summary.documentId, summary.documentType, summary.fullNumber, summary.status, summary.environment].some(value => value != null)) return unknown;
+    if ([summary.documentId, summary.documentType, summary.fullNumber, summary.status, summary.environment].some(value => value !== null)) return unknown;
     return { ...unknown, kind: "absent", type: "Sin documento electrónico registrado", status: "", tone: "neutral" };
   }
   if (!Number.isSafeInteger(summary.documentId) || summary.documentId! <= 0) return unknown;
   const state = typeof summary.status === "string" && Object.hasOwn(statuses, summary.status) ? statuses[summary.status] : undefined;
-  const verifiedEnvironment = summary.environment === "LOCAL" ? "Local · pruebas" : summary.environment === "BETA" ? "Beta · pruebas" : summary.environment === "PROD" ? "Producción" : undefined;
+  const verifiedEnvironment = documentEnvironment(summary.environment);
   return { kind: "present",
     type: summary.documentType === "INVOICE" ? "Factura electrónica" : summary.documentType === "RECEIPT" ? "Boleta electrónica" : "Tipo no disponible",
     number: typeof summary.fullNumber === "string" && summary.fullNumber.trim() ? summary.fullNumber : "Número no disponible",
@@ -44,19 +49,47 @@ export function documentView(summary: BillingSummary | null | undefined): Docume
     knownStatus: !!state,
   };
 }
+
+export function listDocumentView(summary: BillingSummary | null | undefined): {
+  primary: string; secondary: string; tone: DocumentTone;
+} {
+  const document = documentView(summary);
+  if (document.kind === "absent") {
+    return { primary: "Nota de venta", secondary: "No fiscal · Sin comprobante electrónico", tone: "neutral" };
+  }
+
+  const unverified = { primary: "Información documental no verificable", tone: "warning" as const };
+  if (document.kind !== "present" || !summary) return { ...unverified, secondary: "Estado no disponible" };
+
+  const type = summary.documentType === "RECEIPT" ? "Boleta" : summary.documentType === "INVOICE" ? "Factura" : undefined;
+  const number = typeof summary.fullNumber === "string" && summary.fullNumber.trim() ? summary.fullNumber : undefined;
+  const environment = documentEnvironment(summary.environment);
+  if (!type || !number || !environment || !document.knownStatus || !summary.status) {
+    const missing = [!type && "Tipo no disponible", !number && "Número no disponible",
+      !document.knownStatus && "Estado no disponible", !environment && "Ambiente no disponible"];
+    return { ...unverified, secondary: missing.filter(Boolean).join(" · ") };
+  }
+
+  const status = summary.status === "SENT" ? "Resultado por verificar" : statuses[summary.status][0];
+  return { primary: `${type} · ${number}`, secondary: `${status} · ${environment}`, tone: document.tone };
+}
+
 export function documentReadError(error: unknown): string {
   const status = (error as { status?: number })?.status;
   return status === 401 ? "Sesión vencida. Inicia sesión para verificar la documentación."
     : status === 403 || status === 422 ? "No tienes permiso para consultar la documentación de esta venta."
     : "No se pudo verificar el estado documental. Reintenta la consulta.";
 }
-export function salesContext(filters: SalesFilters): Params {
-  return Object.fromEntries(Object.entries({
-    salesFrom: filters.from, salesTo: filters.to, salesStatus: filters.status,
-    salesCash: filters.cashRegisterSessionId, salesUser: filters.createdBy,
-  }).filter(([, value]) => value !== undefined && value !== ""));
+export function salesContext(filters: SalesListContext): Params {
+  return salesQueryParams(filters);
 }
-export function filtersFromContext(params: ParamMap): SalesFilters {
+export function filtersFromContext(params: ParamMap): SalesListContext {
+  try {
+    return Object.fromEntries(Object.entries(salesQueryFromUrl(params))
+      .filter(([key, value]) => value !== undefined && !(key === "page" && value === 0) && !(key === "size" && value === 20)));
+  } catch {
+    // The list validates the original URL before issuing a request.
+  }
   const date = (name: string) => {
     const value = params.get(name);
     // Preserve invalid input so the list can explain it instead of issuing an unbounded query.

@@ -19,6 +19,30 @@ describe('SalesService optional bound HTTP context', () => {
     service = TestBed.inject(SalesService); http = TestBed.inject(HttpTestingController);
   });
   afterEach(() => http.verify());
+  it('uses only v2 for the paged list and encodes literal prefixes and false presence', () => {
+    const context = createBoundAuthContext(token);
+    const receive = jasmine.createSpy('receive');
+    service.listPage({ page: 2, size: 50, saleNumberPrefix: 'A%_', from: '2032-12-31',
+      status: 'VOIDED', cashRegisterSessionId: 7, createdBy: 'qa', hasElectronicDocument: false }, context).subscribe(receive);
+    const request = http.expectOne(r => r.url === '/api/v2/sales');
+    expect(request.request.method).toBe('GET');
+    expect(request.request.context).toBe(context);
+    expect(request.request.headers.get('Authorization')).toBe('Bearer ' + token);
+    expect(request.request.params.keys().sort()).toEqual([
+      'cashRegisterSessionId', 'createdBy', 'from', 'hasElectronicDocument', 'page', 'saleNumberPrefix', 'size', 'status',
+    ]);
+    expect(request.request.params.get('saleNumberPrefix')).toBe('A%_');
+    expect(request.request.params.get('hasElectronicDocument')).toBe('false');
+    const page = { items: [], page: 2, size: 50, totalItems: 0, totalPages: 0 };
+    request.flush(page);
+    expect(receive).toHaveBeenCalledOnceWith(page);
+  });
+  it('rejects an envelope for a different request instead of accepting an empty array', () => {
+    const fail = jasmine.createSpy('fail');
+    service.listPage({ page: 0, size: 20 }, createBoundAuthContext(token)).subscribe({ error: fail });
+    http.expectOne(r => r.url === '/api/v2/sales').flush({ items: [], page: 1, size: 20, totalItems: 0, totalPages: 0 });
+    expect(fail).toHaveBeenCalledWith(jasmine.any(Error));
+  });
   it('keeps list filters and bound authorization on a GET only', () => {
     const context = createBoundAuthContext(token);
     service.listItems({ status: 'VOIDED', cashRegisterSessionId: 7, createdBy: 'qa', from: '2026-10-01', to: '2026-10-31' }, context).subscribe();

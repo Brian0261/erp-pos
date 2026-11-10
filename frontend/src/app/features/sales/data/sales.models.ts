@@ -118,6 +118,31 @@ export interface SalesListItem {
   billingSummary: BillingSummary;
 }
 
+export const SALES_PAGE_SIZES = [20, 50, 100] as const;
+export type SalesPageSize = (typeof SALES_PAGE_SIZES)[number];
+
+export interface SalesListContext extends SalesFilters {
+  saleNumber?: string;
+  saleNumberPrefix?: string;
+  hasElectronicDocument?: boolean;
+  documentStatus?: BillingDocumentStatus;
+  page?: number;
+  size?: SalesPageSize;
+}
+
+export interface SalesListQuery extends SalesListContext {
+  page: number;
+  size: SalesPageSize;
+}
+
+export interface SalesListPage {
+  items: SalesListItem[];
+  page: number;
+  size: SalesPageSize;
+  totalItems: number;
+  totalPages: number;
+}
+
 export interface CreateSaleItemRequest {
   productId: number;
   quantity: number;

@@ -224,7 +224,7 @@ test('P1 historical completed A stays read-only before and after navigating back
   await expect(panel).toContainText('No se encontraron operaciones por atender');
   await panel.getByLabel('Filtrar operaciones',{exact:true}).selectOption('COMPLETED');
   await expect(panel.getByRole('button',{name:'Continuar documento',exact:true})).toHaveCount(0);expect(await draft(page)).toEqual(before);await capture(page,'historical-A-purchase-B');
-  await panel.getByRole('link',{name:'Ver venta #81',exact:true}).click();await expect(page.getByRole('heading',{name:'Venta #81',exact:true})).toBeVisible();
+  await panel.getByRole('link',{name:'Ver venta #81',exact:true}).click();await expect(page.getByRole('heading',{name:'Venta V-SYN-0081',exact:true})).toBeVisible();
   await page.goBack();await expect(cart(page).locator('app-pos-cart-item')).toHaveCount(2);expect(await draft(page)).toEqual(before);
   await expect(page.locator('app-pos-sale-note [role="dialog"]')).toHaveCount(0);expect(s.writes).toEqual([]);clean(s);
 });
@@ -321,7 +321,7 @@ test('H-02 resolved history navigates read-only and secondary filters keep the l
   await otherFilter(page,'COMPLETED');await expect(panel.locator('.recovery-list')).toContainText('Venta #81 · Registrada');await expect(page.locator('.pending-count')).toHaveCount(0);
   await expect(panel.getByRole('button',{name:'Continuar documento',exact:true})).toHaveCount(0);
   expect(await draft(page)).toEqual(before);await headerShot(page,'historical-readonly');
-  await panel.getByRole('link',{name:'Ver venta #81',exact:true}).click();await expect(page.getByRole('heading',{name:'Venta #81',exact:true})).toBeVisible();
+  await panel.getByRole('link',{name:'Ver venta #81',exact:true}).click();await expect(page.getByRole('heading',{name:'Venta V-SYN-0081',exact:true})).toBeVisible();
   await page.goBack();await expect(cart(page).locator('app-pos-cart-item')).toHaveCount(2);expect(await draft(page)).toEqual(before);
   const reopened=await openPending(page);for(const value of ['PREPARED','','CANCELLED','attention']){
     await otherFilter(page,value);await expect(reopened.getByRole('button',{name:'Actualizar',exact:true})).toBeEnabled();expect(await draft(page)).toEqual(before);
@@ -435,7 +435,7 @@ test('N-04 completed history has only direct read-only navigation and preserves 
   await expect(panel.locator('.recovery-list li')).toContainText('Nota de venta');await expect(panel.locator('.recovery-list button')).toHaveCount(0);
   await expect(panel).not.toContainText('Detalles técnicos');await expect(panel).not.toContainText('Conserva esta compra en su caja');await operationShot(page,'N-04','historica-acceso-directo');
   expect(s.reads.filter(p=>p.includes('/billing/documents'))).toEqual([]);
-  await panel.getByRole('link',{name:'Ver venta #81',exact:true}).click();await expect(page.getByRole('heading',{name:'Venta #81',exact:true})).toBeVisible();
+  await panel.getByRole('link',{name:'Ver venta #81',exact:true}).click();await expect(page.getByRole('heading',{name:'Venta V-SYN-0081',exact:true})).toBeVisible();
   await page.goBack();await expect(cart(page).locator('app-pos-cart-item')).toHaveCount(2);expect(s.reads.filter(p=>p.includes('/sales/operations/'))).toEqual([]);
   await operationShot(page,'N-04','carrito-B-preservado');await operationsAudit(page,s,'N-04',before,['/api/v1/billing/documents?saleId=81']);
 });
