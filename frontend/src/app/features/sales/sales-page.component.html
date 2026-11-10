@@ -1,35 +1,135 @@
 <section class="ui-card sales-page" aria-labelledby="sales-title">
   <header class="ui-page-head">
-    <div><p class="eyebrow">CONSULTA COMERCIAL</p><h1 id="sales-title" class="ui-page-title">{{ cashier ? 'Mis ventas' : 'Ventas' }}</h1>
-      <p class="ui-page-description">Ventas registradas y anuladas. La documentación electrónica tiene su propio estado.</p></div>
-    <span class="ui-badge" *ngIf="!loading && !errorMessage">{{ sales.length }} registros</span>
+    <div>
+      <h1 id="sales-title" tabindex="-1" class="ui-page-title">{{ cashier ? 'Mis ventas' : 'Ventas' }}</h1>
+      <p class="ui-page-description">Consulta y seguimiento comercial</p>
+    </div>
+    <span class="result-total" *ngIf="result"><strong>{{ result.totalItems }}</strong> resultados</span>
   </header>
-  <form [formGroup]="filterForm" (ngSubmit)="applyFilters()" class="filters" aria-label="Filtros de ventas">
-    <label>Desde<input type="date" formControlName="from"></label>
-    <label>Hasta<input type="date" formControlName="to"></label>
-    <label><span>Estado comercial</span><select aria-label="Estado comercial" formControlName="status"><option value="">Todos</option><option value="COMPLETED">Registrada</option><option value="VOIDED">Anulada</option></select></label>
-    <label>Sesión de caja<input type="number" min="1" step="1" inputmode="numeric" formControlName="cashRegisterSessionId"></label>
-    <label *ngIf="!cashier">Usuario<input type="text" formControlName="createdBy" placeholder="Nombre de usuario exacto"></label>
-    <div class="filter-actions"><button type="submit" class="ui-button ui-button--primary">Filtrar</button><button type="button" class="ui-button ui-button--secondary" (click)="resetFilters()">Limpiar</button></div>
+
+  <form [formGroup]="filterForm" (ngSubmit)="applyFilters()" aria-label="Búsqueda y filtros de ventas">
+    <div class="search-row">
+      <div class="search-field">
+        <label for="sales-search">Número de venta</label>
+        <div class="search-inputs">
+          <select aria-label="Modo de búsqueda" formControlName="mode">
+            <option value="exact">Exacto</option>
+            <option value="prefix">Comienza con</option>
+          </select>
+          <input id="sales-search" formControlName="search" type="search" autocomplete="off"
+            placeholder="Ej. V-000123" aria-describedby="sales-search-hint"
+            [attr.aria-invalid]="invalidField === 'saleNumber' || invalidField === 'saleNumberPrefix' ? true : null">
+          <button class="ui-button ui-button--primary" type="submit">Buscar</button>
+        </div>
+        <small id="sales-search-hint" [attr.role]="invalidField === 'saleNumber' || invalidField === 'saleNumberPrefix' ? 'alert' : null">{{ (invalidField === 'saleNumber' || invalidField === 'saleNumberPrefix') && validationError
+          ? validationError : filterForm.controls.mode.value === 'prefix' ? 'Mínimo 3 caracteres del número comercial.' : 'Usa el número comercial completo.' }}</small>
+      </div>
+      <button class="ui-button ui-button--secondary filter-toggle" type="button" aria-controls="sales-advanced"
+        [attr.aria-expanded]="filtersOpen" (click)="filtersOpen = !filtersOpen">Filtros</button>
+    </div>
+
+    <div class="periods" role="group" aria-label="Período comercial">
+      <button *ngFor="let period of periods" type="button" class="ui-button ui-button--secondary"
+        [attr.aria-pressed]="isPeriod(period.key)" (click)="choosePeriod(period.key)">{{ period.label }}</button>
+      <button type="button" class="ui-button ui-button--secondary" aria-controls="sales-advanced"
+        [attr.aria-expanded]="filtersOpen" (click)="openCustomPeriod()">Personalizado</button>
+    </div>
+
+    <div id="sales-advanced" class="advanced" [hidden]="!filtersOpen">
+      <fieldset>
+        <legend>Operación comercial</legend>
+        <div class="filter-grid">
+          <label>Desde<input id="sales-from" type="date" formControlName="from"></label>
+          <label>Hasta<input type="date" formControlName="to"></label>
+          <label>Estado comercial<select aria-label="Estado comercial" formControlName="status">
+            <option value="">Todos</option><option value="COMPLETED">Registrada</option><option value="VOIDED">Anulada</option>
+          </select></label>
+          <label>Sesión de caja<input type="number" min="1" step="1" formControlName="cashRegisterSessionId"></label>
+          <label *ngIf="canFilterUser">Usuario<input formControlName="createdBy" autocomplete="off"></label>
+        </div>
+        <p class="hint">Los días seleccionados se incluyen completos en America/Lima.</p>
+      </fieldset>
+      <fieldset>
+        <legend>Comprobante electrónico</legend>
+        <div class="filter-grid">
+          <label>Presencia de documento<select aria-label="Presencia de documento" formControlName="hasElectronicDocument">
+            <option value="">Todos</option><option value="true">Con documento</option><option value="false">Sin documento</option>
+          </select></label>
+          <label>Estado documental<select aria-label="Estado documental" formControlName="documentStatus">
+            <option value="">Todos</option><option *ngFor="let option of documentStatuses" [value]="option[0]">{{ option[1] }}</option>
+          </select></label>
+        </div>
+      </fieldset>
+      <button type="submit" class="ui-button ui-button--primary">Aplicar filtros</button>
+    </div>
+    <p *ngIf="validationError && invalidField !== 'saleNumber' && invalidField !== 'saleNumberPrefix'" role="alert" class="ui-alert ui-alert--error">{{ validationError }}</p>
   </form>
-  <p class="date-limit">Fechas y horas de venta según America/Lima. Desde y Hasta incluyen los días seleccionados.</p>
-  <p role="alert" class="ui-alert ui-alert--error" *ngIf="errorMessage">{{ errorMessage }}</p>
-  <p role="status" *ngIf="loading">Consultando ventas…</p>
-  <div class="ui-table-wrapper" *ngIf="!loading && !errorMessage" tabindex="0" role="region" aria-label="Resultados de ventas; desplaza horizontalmente si es necesario">
-    <table class="ui-table sales-table"><caption class="visually-hidden">Ventas en orden de fecha descendente. Las notas internas no son documentos electrónicos.</caption>
-      <thead><tr><th scope="col">Venta</th><th scope="col">Fecha y hora</th><th scope="col">Estado comercial</th><th scope="col">Documento electrónico</th><th scope="col">Estado documental / ambiente</th><th scope="col" class="cell-number">Total</th><th scope="col">Acciones</th></tr></thead>
-      <tbody><tr *ngFor="let sale of sales">
-        <td><strong class="sale-reference">Venta #{{ sale.id }}</strong>
-          <details class="operational"><summary>Referencia y operación</summary><span class="full-reference">{{ sale.saleNumber }}</span><span>Usuario: {{ sale.createdBy }}</span><span>Sesión de caja: #{{ sale.cashRegisterSessionId }}</span></details></td>
-        <td class="date-cell">{{ formatDate(sale.soldAt) }}</td>
-        <td><span class="ui-badge" [class.ui-badge--danger]="sale.status === 'VOIDED'" [class.ui-badge--success]="sale.status === 'COMPLETED'">{{ saleStatusLabel(sale.status) }}</span></td>
-        <ng-container *ngIf="documentView(sale.billingSummary) as doc">
-          <td><span>{{ doc.type }}</span><span class="document-number" *ngIf="doc.number">{{ doc.number }}</span></td>
-          <td><span class="document-state" [attr.data-tone]="doc.tone">{{ doc.status || 'Sin documento asociado' }}</span><span class="secondary" *ngIf="doc.environment">{{ doc.environment }}</span></td>
-        </ng-container>
-        <td class="cell-number">{{ formatCurrency(sale.totalAmount) }}</td>
-        <td><a class="ui-button ui-button--secondary" [routerLink]="['/ventas',sale.id]" [queryParams]="listContext" [attr.aria-label]="'Ver detalle de venta #' + sale.id">Ver detalle</a></td>
-      </tr><tr *ngIf="sales.length === 0"><td colspan="7"><p class="ui-empty-state" role="status">No hay ventas para los filtros aplicados.</p></td></tr></tbody>
-    </table>
+
+  <div class="applied" *ngIf="criteria.length || errorMessage">
+    <ul *ngIf="criteria.length" aria-label="Criterios aplicados">
+      <li *ngFor="let criterion of criteria" class="ui-badge">{{ criterion }}</li>
+    </ul>
+    <button type="button" class="ui-button ui-button--secondary" (click)="resetFilters()">Limpiar filtros</button>
   </div>
+
+  <div class="results" [attr.aria-busy]="loading">
+    <p *ngIf="loading" role="status" class="ui-alert ui-alert--info">Consultando ventas…</p>
+    <div *ngIf="errorMessage" class="ui-alert ui-alert--error">
+      <p role="alert">{{ errorMessage }}</p>
+      <button *ngIf="canRetry" type="button" class="ui-button ui-button--secondary" (click)="refresh()">Reintentar</button>
+    </div>
+    <p *ngIf="result && !sales.length" class="ui-empty-state" role="status">No hay ventas para los filtros aplicados.</p>
+    <div *ngIf="sales.length" class="ui-table-wrapper" tabindex="0" role="region" aria-label="Resultados de ventas">
+      <table class="ui-table sales-table">
+        <caption class="visually-hidden">Ventas en orden de fecha descendente</caption>
+        <thead><tr>
+          <th scope="col">Venta <span class="compact-meta">y fecha</span></th>
+          <th scope="col" class="date-column">Fecha y hora</th>
+          <th scope="col" class="state-column">Estado comercial</th>
+          <th scope="col"><span class="compact-meta">Estado / </span>Documento</th>
+          <th scope="col" class="cell-number">Total</th>
+          <th scope="col" aria-label="Detalle"><span class="detail-long">Detalle</span><span class="detail-short" aria-hidden="true">Ver</span></th>
+        </tr></thead>
+        <tbody>
+          <tr *ngFor="let sale of sales">
+            <th scope="row" class="sale-reference"><strong>{{ sale.saleNumber }}</strong>
+              <span class="compact-meta secondary">{{ formatDate(sale.soldAt) }}</span></th>
+            <td class="date-column">{{ formatDate(sale.soldAt) }}</td>
+            <td class="state-column"><ng-container *ngTemplateOutlet="commercialState"></ng-container></td>
+            <td class="document-cell">
+              <ng-template #commercialState><span class="ui-badge" [class.ui-badge--danger]="sale.status === 'VOIDED'"
+                [class.ui-badge--success]="sale.status === 'COMPLETED'">{{ saleStatusLabel(sale.status) }}</span></ng-template>
+              <div class="compact-meta"><ng-container *ngTemplateOutlet="commercialState"></ng-container></div>
+              <ng-container *ngIf="listDocumentView(sale.billingSummary) as doc">
+                <strong class="document-identity">{{ doc.primary }}</strong>
+                <span class="document-state" [attr.data-tone]="doc.tone">{{ doc.secondary }}</span>
+              </ng-container>
+            </td>
+            <td class="cell-number">{{ formatCurrency(sale.totalAmount) }}</td>
+            <td><a class="ui-button ui-button--secondary detail-link" [routerLink]="['/ventas', sale.id]" [queryParams]="listContext"
+              [attr.data-sale-id]="sale.id" (click)="rememberDetail(sale.id)" [attr.aria-label]="'Ver detalle de venta ' + sale.saleNumber">Ver <span class="detail-long">detalle</span></a></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <footer class="results-footer" *ngIf="applied">
+    <div role="status" aria-live="polite" class="page-copy" *ngIf="result && sales.length">
+      <strong>{{ resultRange }}</strong><span>Página {{ result.page + 1 }} de {{ result.totalPages }}</span>
+    </div>
+    <nav *ngIf="result && sales.length" aria-label="Páginas de ventas" class="pages">
+      <button type="button" class="ui-button ui-button--secondary" [disabled]="result.page === 0" (click)="goToPage(result.page - 1)">Anterior</button>
+      <button *ngFor="let page of pageNumbers" type="button" class="ui-button ui-button--secondary"
+        [attr.aria-label]="'Página ' + (page + 1)" [attr.aria-current]="page === result.page ? 'page' : null"
+        (click)="page !== result.page && goToPage(page)">{{ page + 1 }}</button>
+      <button type="button" class="ui-button ui-button--secondary" [disabled]="result.page + 1 >= reachablePages" (click)="goToPage(result.page + 1)">Siguiente</button>
+    </nav>
+    <div class="page-tools">
+      <label>Por página<select #pageSize aria-label="Por página" [value]="applied.size" (change)="changeSize(pageSize.value)">
+        <option *ngFor="let size of sizes" [value]="size" [selected]="applied.size === size">{{ size }}</option>
+      </select></label>
+      <button type="button" class="ui-button ui-button--secondary" [disabled]="loading" (click)="refresh()">Actualizar resultados</button>
+    </div>
+  </footer>
 </section>

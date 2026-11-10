@@ -21,8 +21,9 @@ for(const zone of ['UTC','America/Lima','Asia/Tokyo']) test.describe(zone,()=>{
       if(request.method()!=='GET'){writes.push(request.method()+' '+url.pathname);return route.abort('blockedbyclient');}
       expect(request.headers()['authorization']).toBe('Bearer '+token);
       if(url.pathname.endsWith('/auth/me'))return route.fulfill({json:{id:'f3-admin',username:'qa',email:'qa@example.invalid',roles:['ADMIN']}});
-      if(url.pathname==='/api/v1/sales/list-items'){
-        expect(url.searchParams.get('from')).toBe('2026-10-31');expect(url.searchParams.get('to')).toBe('2026-10-31');return route.fulfill({json:[row]});
+      if(url.pathname==='/api/v2/sales'){
+        expect(url.searchParams.get('from')).toBe('2026-10-31');expect(url.searchParams.get('to')).toBe('2026-10-31');
+        return route.fulfill({json:{items:[row],page:0,size:20,totalItems:1,totalPages:1}});
       }
       if(url.pathname==='/api/v1/sales/81')return route.fulfill({json:sale});
       if(url.pathname==='/api/v1/sales')return route.fulfill({json:[sale,historic]});
@@ -46,10 +47,12 @@ for(const zone of ['UTC','America/Lima','Asia/Tokyo']) test.describe(zone,()=>{
       unexpected.push(url.pathname);return route.abort('blockedbyclient');
     });
     await page.goto('/ventas?salesFrom=2026-10-31&salesTo=2026-10-31');
-    await expect(page.locator('tbody tr')).toHaveCount(1);await expect(page.locator('.date-cell')).toContainText('31/10/2026');
-    await page.getByRole('link',{name:'Ver detalle de venta #81',exact:true}).click();
+    await expect(page.locator('tbody tr')).toHaveCount(1);await expect(page.locator('tbody tr')).toContainText('31/10/2026');
+    await page.getByRole('link',{name:'Ver detalle de venta '+sale.saleNumber,exact:true}).click();
     await expect(page.locator('.sale-head-meta')).toContainText('31/10/2026');
-    await page.getByRole('link',{name:'Volver al listado',exact:true}).click();await expect(page.getByLabel('Desde',{exact:true})).toHaveValue('2026-10-31');
+    await page.getByRole('link',{name:'Volver al listado',exact:true}).click();
+    await page.getByRole('button',{name:'Filtros',exact:true}).click();
+    await expect(page.getByLabel('Desde',{exact:true})).toHaveValue('2026-10-31');
     await page.goto('/reportes/ventas');await expect(page.getByText('31/10/2026',{exact:true})).toBeVisible();
     await page.goto('/dashboard');const kpi=page.locator('.kpi-card').filter({hasText:'Ventas del dia'});
     await expect(kpi).toContainText('1 ventas completadas hoy (31/10/2026) · Lima');await expect(kpi.locator('.kpi-value')).toContainText('21.00');

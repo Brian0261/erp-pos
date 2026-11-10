@@ -2,7 +2,7 @@ import { formatCommercialInstant } from "../../shared/utils/commercial-date";
 import { CommonModule } from "@angular/common";
 import { Component, DoCheck, ElementRef, HostListener, OnDestroy, OnInit, ViewChild } from "@angular/core";
 import { ActivatedRoute, Params, RouterLink } from "@angular/router";
-import { Subscription } from "rxjs";
+import { Subscription, timeout } from "rxjs";
 import { AuthService } from "../../core/auth/auth.service";
 import { UserProfile } from "../../core/auth/auth.models";
 import { createBoundAuthContext } from "../../core/auth/bound-auth-context";
@@ -11,6 +11,9 @@ import { ElectronicDocumentService } from "../billing/data/electronic-document.s
 import { SaleItemResponse, SaleResponse } from "./data/sales.models";
 import { SalesService } from "./data/sales.service";
 import { documentReadError, documentView, filtersFromContext, salesContext, saleStatusLabel } from "./sales-presentation";
+import { blocksInternalVoid, latestSaleDocument } from "./sale-document-verification";
+import { SalesReturnFocus } from "./sales-return-focus";
+import { SaleVoidAttempts, saleVoidAttemptKey } from "./sale-void-attempts";
 
 type DocumentPhase = "loading" | "absent" | "present" | "error";
 @Component({
@@ -28,6 +31,7 @@ export class SaleDetailPageComponent implements OnInit, OnDestroy, DoCheck {
   errorMessage = "";
   billingErrorMessage = "";
   successMessage = "";
+  canRetrySale = false;
   listContext: Params = {};
   readonly saleStatusLabel = saleStatusLabel;
   @ViewChild("saleTitle") private title?: ElementRef<HTMLElement>;
@@ -40,22 +44,23 @@ export class SaleDetailPageComponent implements OnInit, OnDestroy, DoCheck {
   private generation = 0;
   private documentGeneration = 0;
   private credential: string | null = null;
+  private expired = false;
   private destroyed = false;
-  private readonly blockingStatuses = new Set(["DRAFT", "GENERATED", "SIGNED", "SENT", "ACCEPTED"]);
   private readonly currency = new Intl.NumberFormat("es-PE", { style: "currency", currency: "PEN", minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 
   constructor(private readonly route: ActivatedRoute, private readonly salesService: SalesService,
-    private readonly documents: ElectronicDocumentService, private readonly auth: AuthService) {}
+    private readonly documents: ElectronicDocumentService, private readonly auth: AuthService,
+    private readonly returnFocus: SalesReturnFocus, private readonly voidAttempts: SaleVoidAttempts) {}
   ngOnInit(): void {
     this.credential = this.auth.getToken();
-    this.routeSubscription = this.route.paramMap.subscribe(params => {
-      this.listContext = salesContext(filtersFromContext(this.route.snapshot.queryParamMap));
-      this.loadSale(params.get("id"));
-    });
+    this.routeSubscription.add(this.route.queryParamMap.subscribe(params => {
+      this.listContext = salesContext(filtersFromContext(params));
+    }));
+    this.routeSubscription.add(this.route.paramMap.subscribe(params => this.loadSale(params.get("id"))));
   }
   private current(generation = this.generation): boolean {
-    return !this.destroyed && generation === this.generation && !!this.credential && this.credential === this.auth.getToken();
+    return !this.destroyed && !this.expired && generation === this.generation && !!this.credential && this.credential === this.auth.getToken();
   }
   ngDoCheck(): void { this.checkSession(); }
   @HostListener("window:storage")
@@ -64,6 +69,7 @@ export class SaleDetailPageComponent implements OnInit, OnDestroy, DoCheck {
     if (this.credential === this.auth.getToken()) return;
     this.generation++; this.documentGeneration++; this.cancelReads(); this.sale = null;
     this.currentUser = null; this.billingDocument = null; this.loading = false; this.documentPhase = "error";
+    this.successMessage = ""; this.canRetrySale = false;
     this.errorMessage = "La sesión cambió. Vuelve a abrir la venta con la sesión actual.";
   }
   private cancelReads(): void {
@@ -77,34 +83,59 @@ export class SaleDetailPageComponent implements OnInit, OnDestroy, DoCheck {
     title.focus({ preventScroll: true });
     section.scrollIntoView({ behavior: "auto", block: "start", inline: "nearest" });
   }
+  rememberReturn(): void {
+    if (this.sale && this.current()) this.returnFocus.remember(this.sale.id, this.credential);
+  }
+  retrySale(): void {
+    if (this.canRetrySale && this.current()) this.loadSale(this.route.snapshot.paramMap.get("id"));
+  }
+  private expireSession(): void {
+    this.expired = true;
+    this.generation++; this.documentGeneration++; this.cancelReads();
+    this.sale = null; this.billingDocument = null; this.currentUser = null;
+    this.loading = false; this.documentPhase = "error"; this.canRetrySale = false; this.successMessage = "";
+    this.errorMessage = "Sesión vencida. Inicia sesión para consultar esta venta.";
+  }
   private loadSale(rawId: string | null): void {
     const generation = ++this.generation;
     this.documentGeneration++; this.cancelReads();
     this.sale = null; this.billingDocument = null; this.currentUser = null; this.errorMessage = ""; this.billingErrorMessage = "";
-    this.successMessage = this.route.snapshot.queryParamMap.get("status") === "voided" ? "Venta anulada correctamente." : "";
+    this.successMessage = ""; this.canRetrySale = false;
     this.loading = true; this.documentPhase = "loading";
     const id = rawId && /^\d+$/.test(rawId) ? Number(rawId) : 0;
     if (!Number.isSafeInteger(id) || id <= 0) { this.loading = false; this.errorMessage = "Identificador de venta no válido."; return; }
     if (!this.current(generation)) { this.loading = false; this.errorMessage = "Inicia sesión para consultar esta venta."; return; }
     const context = createBoundAuthContext(this.credential);
-    this.profileSubscription = this.auth.me(context).subscribe({
+    this.profileSubscription = this.auth.me(context).pipe(timeout(15_000)).subscribe({
       next: actor => { if (this.current(generation)) this.currentUser = actor; },
-      error: () => { if (this.current(generation)) this.currentUser = null; },
+      error: error => {
+        if (!this.current(generation)) return;
+        if (error?.status === 401) this.expireSession();
+        else this.currentUser = null;
+      },
     });
-    this.saleSubscription = this.salesService.getById(id, context).subscribe({
+    if (!this.current(generation)) return;
+    this.saleSubscription = this.salesService.getById(id, context).pipe(timeout(20_000)).subscribe({
       next: sale => {
         if (!this.current(generation)) return;
         this.loading = false;
-        if (sale?.id !== id) { this.errorMessage = "La respuesta no corresponde a la venta solicitada."; return; }
-        this.sale = sale; this.retryDocument();
+        if (sale?.id !== id || !Array.isArray(sale.items) || !Array.isArray(sale.payments)) {
+          this.errorMessage = "No se pudo verificar la venta solicitada."; this.canRetrySale = true; return;
+        }
+        this.sale = sale;
+        if (sale.status === "VOIDED" && this.route.snapshot.queryParamMap.get("status") === "voided") {
+          this.successMessage = "Anulación confirmada.";
+        }
+        this.retryDocument();
         queueMicrotask(() => { if (this.current(generation)) this.title?.nativeElement.focus({ preventScroll: true }); });
       },
       error: error => {
         if (!this.current(generation)) return;
+        if (error?.status === 401) { this.expireSession(); return; }
         this.loading = false;
-        this.errorMessage = error?.status === 401 ? "Sesión vencida. Inicia sesión para consultar esta venta."
-          : error?.status === 403 || error?.status === 422 ? "No tienes permiso para consultar esta venta."
-          : error?.status === 404 ? "La venta no existe o no está disponible." : "No se pudo consultar la venta. Vuelve al listado y reintenta.";
+        this.canRetrySale = ![403, 404, 422].includes(error?.status);
+        this.errorMessage = error?.status === 403 || error?.status === 422 ? "No tienes permiso para consultar esta venta."
+          : error?.status === 404 ? "La venta no existe o no está disponible." : "No se pudo consultar la venta. Reintenta la consulta.";
       },
     });
   }
@@ -113,24 +144,22 @@ export class SaleDetailPageComponent implements OnInit, OnDestroy, DoCheck {
     this.documentSubscription.unsubscribe();
     const generation = this.generation, documentGeneration = ++this.documentGeneration, saleId = this.sale.id;
     this.documentPhase = "loading"; this.billingDocument = null; this.billingErrorMessage = "";
-    this.documentSubscription = this.documents.listBySaleId(saleId, createBoundAuthContext(this.credential)).subscribe({
+    this.documentSubscription = this.documents.listBySaleId(saleId, createBoundAuthContext(this.credential)).pipe(timeout(20_000)).subscribe({
       next: rows => {
         if (!this.current(generation) || documentGeneration !== this.documentGeneration || this.sale?.id !== saleId) return;
-        if (!Array.isArray(rows)) { this.documentFailure(new Error()); return; }
-        if (rows.length === 0) { this.documentPhase = "absent"; return; }
-        // Keep the existing service order (latest document first); do not infer fiscal transitions.
-        const doc = rows[0];
-        const view = this.viewFor(doc);
-        if (doc.saleId !== saleId || view.kind !== "present" || !view.knownStatus
-          || !["INVOICE", "RECEIPT"].includes(doc.documentType) || !["LOCAL", "BETA", "PROD"].includes(doc.environment)) {
-          this.documentFailure(new Error()); return;
+        try {
+          const doc = latestSaleDocument(rows, saleId);
+          this.billingDocument = doc;
+          this.documentPhase = doc ? "present" : "absent";
+        } catch (error) {
+          this.documentFailure(error);
         }
-        this.billingDocument = doc; this.documentPhase = "present";
       },
       error: error => { if (this.current(generation) && documentGeneration === this.documentGeneration) this.documentFailure(error); },
     });
   }
   private documentFailure(error: unknown): void {
+    if ((error as { status?: number } | null)?.status === 401) { this.expireSession(); return; }
     this.billingDocument = null; this.documentPhase = "error"; this.billingErrorMessage = documentReadError(error);
   }
   private viewFor(doc: ElectronicDocumentResponse) {
@@ -141,12 +170,18 @@ export class SaleDetailPageComponent implements OnInit, OnDestroy, DoCheck {
   private salesRole(): boolean { return this.current() && !!this.currentUser?.roles.some(role => ["ADMIN", "SUPERVISOR", "CAJERO"].includes(role)); }
   canIssue(): boolean { return this.salesRole() && this.sale?.status === "COMPLETED" && this.documentPhase === "absent"; }
   voidRole(): boolean { return this.current() && !!this.currentUser?.roles.some(role => ["ADMIN", "SUPERVISOR"].includes(role)) && this.sale?.status === "COMPLETED"; }
-  canVoidSale(): boolean {
-    return this.voidRole() && (this.documentPhase === "absent" || (this.documentPhase === "present" && !this.hasBlockingBillingDocument()));
+  get pendingVoid(): boolean {
+    return this.voidRole() && !!this.sale && !!this.currentUser
+      && !!this.voidAttempts.get(saleVoidAttemptKey(this.currentUser.id, this.sale.id));
   }
-  hasBlockingBillingDocument(): boolean { return !!this.billingDocument && this.blockingStatuses.has(this.billingDocument.status); }
+  canVoidSale(): boolean {
+    return this.voidRole() && !this.pendingVoid
+      && (this.documentPhase === "absent" || (this.documentPhase === "present" && !this.hasBlockingBillingDocument()));
+  }
+  hasBlockingBillingDocument(): boolean { return blocksInternalVoid(this.billingDocument); }
   get voidHint(): string {
-    return this.documentPhase === "loading" ? "Verifica el estado documental antes de anular."
+    return this.pendingVoid ? "La anulación previa todavía está por verificar."
+      : this.documentPhase === "loading" ? "Verifica el estado documental antes de anular."
       : this.documentPhase === "error" ? "La anulación no está disponible mientras el estado documental no pueda verificarse."
       : "La documentación electrónica activa impide la anulación interna. Gestiona el caso desde Facturación.";
   }

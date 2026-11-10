@@ -1,6 +1,6 @@
 import { HttpClient, HttpContext, HttpParams } from "@angular/common/http";
 import { Injectable } from "@angular/core";
-import { Observable } from "rxjs";
+import { map, Observable } from "rxjs";
 
 import { environment } from "../../../../environments/environment";
 import {
@@ -8,9 +8,12 @@ import {
   SaleResponse,
   SalesListItem,
   SalesFilters,
+  SalesListPage,
+  SalesListQuery,
   TodaySalesResponse,
   VoidSaleRequest,
 } from "./sales.models";
+import { decodeSalesPage } from "../sales-list-query";
 
 @Injectable({ providedIn: "root" })
 export class SalesService {
@@ -87,11 +90,23 @@ export class SalesService {
     return this.http.get<TodaySalesResponse>(`${this.endpoint}/today`, { context });
   }
 
+  listPage(query: SalesListQuery, context: HttpContext): Observable<SalesListPage> {
+    let params = new HttpParams().set("page", query.page).set("size", query.size);
+    for (const key of ["saleNumber", "saleNumberPrefix", "from", "to", "status", "cashRegisterSessionId",
+      "createdBy", "hasElectronicDocument", "documentStatus"] as const) {
+      const value = query[key];
+      if (value !== undefined) params = params.set(key, value);
+    }
+    return this.http.get<unknown>("/api/v2/sales", { params, context }).pipe(
+      map(value => decodeSalesPage(value, query)),
+    );
+  }
+
   getById(id: number, context?: HttpContext): Observable<SaleResponse> {
     return this.http.get<SaleResponse>(`${this.endpoint}/${id}`, { context });
   }
 
-  voidSale(id: number, payload: VoidSaleRequest): Observable<SaleResponse> {
-    return this.http.post<SaleResponse>(`${this.endpoint}/${id}/void`, payload);
+  voidSale(id: number, payload: VoidSaleRequest, context?: HttpContext): Observable<SaleResponse> {
+    return this.http.post<SaleResponse>(`${this.endpoint}/${id}/void`, payload, { context });
   }
 }

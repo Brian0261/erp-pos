@@ -126,7 +126,7 @@ test("restored POS reference never confirms a sale and detail reprint uses GET o
     window.dispatchEvent(new PopStateEvent('popstate',{state:history.state}));
   });
   await expect(page).toHaveURL(/\/ventas\/81$/);
-  await page.getByRole("link",{name:"Ver nota interna",exact:true}).click(); await ready(page);
+  await page.getByRole("link",{name:"Ver nota de venta",exact:true}).click(); await ready(page);
   await expect(page).toHaveURL(/\/ventas\/81\/nota$/);
   await page.getByRole("link",{name:"Volver al detalle",exact:true}).click();
   await expect(page).toHaveURL(/\/ventas\/81$/);
@@ -148,7 +148,7 @@ test("restored POS reference never confirms a sale and detail reprint uses GET o
 test("uncertain result never enables document actions or issues a POST",async({page})=>{
   const {methods}=await setup(page,noteSale(),0,true); await page.goto("/pos");
   await expect(page.getByText(/Operación conservada/)).toBeVisible();
-  await expect(page.getByRole("link",{name:"Ver nota interna",exact:true})).toHaveCount(0);
+  await expect(page.getByRole("link",{name:"Ver nota de venta",exact:true})).toHaveCount(0);
   await expect(page.getByRole("button",{name:/Imprimir nota/})).toHaveCount(0);
   expect(methods.every(m=>m.startsWith("GET "))).toBe(true);
 });
@@ -369,7 +369,7 @@ test('@presentation clean normal, long-name and exceptional tickets preserve val
 
 test('@presentation extensive A4/tickets, annulment and reprint use the updated template without writes',async({page})=>{
   await mkdir(presentationEvidence,{recursive:true});const sale=noteSale(200);const {methods,errors}=await setup(page,sale);
-  await page.goto('/ventas/81');await page.getByRole('link',{name:'Ver nota interna',exact:true}).click();await ready(page);await assertPresentationHtml(page);
+  await page.goto('/ventas/81');await page.getByRole('link',{name:'Ver nota de venta',exact:true}).click();await ready(page);await assertPresentationHtml(page);
   await download(page,'a4-multi',presentationEvidence);await recordPresentation('a4-multi',sale);
   await page.getByLabel('Formato',{exact:true}).selectOption('ticket');await ready(page);
   await download(page,'ticket80-multi',presentationEvidence);await recordPresentation('ticket80-multi',sale);
@@ -390,7 +390,7 @@ test('@ticket-columns reference layout on both widths, long values, continuation
   sale.items[0].unitPrice=6;sale.items[0].lineTotal=12;sale.items[0].discountAmount=0;
   sale.items[1].productNameSnapshot='Lápices de color';
   const {methods,errors}=await setup(page,sale,0,false,true);
-  await page.goto('/ventas/81');await page.getByRole('link',{name:'Ver nota interna',exact:true}).click();await ready(page);
+  await page.goto('/ventas/81');await page.getByRole('link',{name:'Ver nota de venta',exact:true}).click();await ready(page);
   await page.getByLabel('Formato',{exact:true}).selectOption('ticket');await ready(page);
   for(const profile of ['ticket80','ticket58']) {
     if(profile==='ticket58')await page.getByLabel('Perfil de papel',{exact:true}).selectOption(profile);
@@ -469,7 +469,7 @@ test('@a4-reference framed A4 layout uses available sale data through reprint, p
   const sale=noteSale(2);sale.items[0].productNameSnapshot='Cuaderno A5 rayado';sale.items[0].quantityText='2.000';
   sale.items[0].unitPrice=6;sale.items[0].lineTotal=12;sale.items[0].discountAmount=0;sale.items[1].productNameSnapshot='Lápices de color';
   const {methods,errors}=await setup(page,sale,0,false,true);
-  await page.goto('/ventas/81');await page.getByRole('link',{name:'Ver nota interna',exact:true}).click();await ready(page);
+  await page.goto('/ventas/81');await page.getByRole('link',{name:'Ver nota de venta',exact:true}).click();await ready(page);
   const capture=async(name:string):Promise<void>=>{
     await ready(page);await assertPresentationHtml(page);
     const preview=await page.evaluate(async()=>Array.from(new Uint8Array(await (window as unknown as {latestSyntheticPdf:Blob}).latestSyntheticPdf.arrayBuffer())));

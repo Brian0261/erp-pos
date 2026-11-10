@@ -91,7 +91,7 @@ test("owner operations panel, completed history remains separate from the next c
  const operations=page.locator('app-sale-operation-recovery > button');await operations.click();const panel=page.getByRole('dialog',{name:'Operaciones',exact:true});await panel.getByRole('button',{name:'Actualizar',exact:true}).click();
  await expect(panel).toContainText('No se encontraron operaciones por atender');await panel.getByLabel('Filtrar operaciones',{exact:true}).selectOption('COMPLETED');
  await expect(panel.getByRole('button',{name:'Continuar documento',exact:true})).toHaveCount(0);
- await panel.getByRole('link',{name:'Ver venta #81',exact:true}).click();await expect(page.getByRole('heading',{name:'Venta #81',exact:true})).toBeVisible();
+ await panel.getByRole('link',{name:'Ver venta #81',exact:true}).click();await expect(page.getByRole('heading',{name:'Venta V-SYN-0081',exact:true})).toBeVisible();
  await page.goBack();await expect(page.locator('app-pos-cart-panel app-pos-cart-item')).toHaveCount(1);
  const after=await page.evaluate(()=>{const d=JSON.parse(sessionStorage.getItem('erp_pos_sales_draft_v1')!);return {cart:d.cart.map((line:any)=>[line.productId,line.quantity,line.discountAmount]),payments:d.payments.map((p:any)=>[p.paymentMethod,p.amount,p.reference]),last:d.lastSaleId};});
  expect(after).toEqual(before);await expect(page.locator('app-pos-sale-note [role="dialog"]')).toHaveCount(0);await shot(page,'historical-next-cart');clean(s);

@@ -50,8 +50,15 @@ test("E2E 3 committed sale response lost: empty new browser context discovers sa
   try{await login(restored,f.username);expect(await restored.evaluate(()=>sessionStorage.length)).toBe(0);await restored.goto("/pos");
     const panel=await openRecovery(restored);const row=panel.locator(`.recovery-list li[data-operation-id="${id}"]`);await expect(row).toContainText('Registrada');await expect(row.getByRole('button')).toHaveCount(0);
     await expect(panel.getByRole('button',{name:'Continuar documento',exact:true})).toHaveCount(0);
-    await panel.getByRole('link',{name:`Ver venta #${original.operation!.sale_id}`,exact:true}).click();
-    await expect(restored.getByRole('heading',{name:`Venta #${original.operation!.sale_id}`,exact:true})).toBeVisible();
+    const saleId=original.operation!.sale_id;
+    const saleResponse=await browserApi(restored,"GET",`/api/v1/sales/${saleId}`);
+    expect(saleResponse.status).toBe(200);
+    expect(saleResponse.body.id).toBe(saleId);
+    const saleNumber:unknown=saleResponse.body.saleNumber;
+    expect(typeof saleNumber==="string"&&saleNumber.trim().length>0).toBe(true);
+    await panel.getByRole('link',{name:`Ver venta #${saleId}`,exact:true}).click();
+    await expect(restored).toHaveURL(url=>url.pathname===`/ventas/${saleId}`&&url.search==="");
+    await expect(restored.getByRole('heading',{level:1,name:`Venta ${saleNumber}`,exact:true})).toBeVisible();
     expect(await restored.evaluate(()=>JSON.parse(sessionStorage.getItem('erp_pos_sales_draft_v1')||'{}').receiptRecovery??null)).toBeNull();
     expect(afterPosts).toEqual([]);expect(violations).toEqual([]);expect(pageErrors).toEqual([]);const recovered=await snapshot(restored,3,id);expect(recovered).toEqual(original);await screenshot(restored,"03-new-browser-recovered");
   }finally{await fresh.close();}
@@ -114,8 +121,15 @@ for(const [n,type]of [[6,"RECEIPT"],[7,"INVOICE"]] as const){
     await expect(row).toContainText('Ambiente no verificado');await expect(row.getByRole('button')).toHaveCount(0);
     await expect(panel.getByRole('button',{name:'Continuar documento',exact:true})).toHaveCount(0);
     const writesBeforeHistory=posts.length;
-    await row.getByRole('link',{name:`Ver venta #${original.operation!.sale_id}`,exact:true}).click();
-    await expect(page.getByRole('heading',{name:`Venta #${original.operation!.sale_id}`,exact:true})).toBeVisible();
+    const saleId=original.operation!.sale_id;
+    const saleResponse=await browserApi(page,"GET",`/api/v1/sales/${saleId}`);
+    expect(saleResponse.status).toBe(200);
+    expect(saleResponse.body.id).toBe(saleId);
+    const saleNumber:unknown=saleResponse.body.saleNumber;
+    expect(typeof saleNumber==="string"&&saleNumber.trim().length>0).toBe(true);
+    await row.getByRole('link',{name:`Ver venta #${saleId}`,exact:true}).click();
+    await expect(page).toHaveURL(url=>url.pathname===`/ventas/${saleId}`&&url.search==="");
+    await expect(page.getByRole('heading',{level:1,name:`Venta ${saleNumber}`,exact:true})).toBeVisible();
     await expect(page.getByText('Borrador · no emitido',{exact:true})).toBeVisible();
     expect(await page.evaluate(()=>{const draft=JSON.parse(sessionStorage.getItem('erp_pos_sales_draft_v1')||'{}');return {pending:draft.pendingSaleRequest??null,recovery:draft.receiptRecovery??null};})).toEqual({pending:null,recovery:null});
     expect(posts.length).toBe(writesBeforeHistory);

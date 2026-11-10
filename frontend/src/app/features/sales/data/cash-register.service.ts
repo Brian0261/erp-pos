@@ -1,4 +1,4 @@
-import { HttpClient } from "@angular/common/http";
+import { HttpClient, HttpContext } from "@angular/common/http";
 import { Injectable } from "@angular/core";
 import { Observable } from "rxjs";
 
@@ -26,8 +26,8 @@ export class CashRegisterService {
     return this.http.get<CashRegisterResponse>(`${this.endpoint}/current`);
   }
 
-  getById(id: number): Observable<CashRegisterResponse> {
-    return this.http.get<CashRegisterResponse>(`${this.endpoint}/${id}`);
+  getById(id: number, context?: HttpContext): Observable<CashRegisterResponse> {
+    return this.http.get<CashRegisterResponse>(`${this.endpoint}/${id}`, { context });
   }
 
   close(

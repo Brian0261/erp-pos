@@ -1,6 +1,6 @@
 import { convertToParamMap } from "@angular/router";
 import { BillingSummary } from "./data/sales.models";
-import { documentView, filtersFromContext, salesContext, saleStatusLabel } from "./sales-presentation";
+import { documentView, filtersFromContext, listDocumentView, salesContext, saleStatusLabel } from "./sales-presentation";
 describe("Sales presentation truth and context", () => {
   const summary = (status = "DRAFT", environment = "PROD") => ({ hasElectronicDocument: true, documentId: 9,
     documentType: "RECEIPT", fullNumber: "B-SYN-9", status, environment }) as BillingSummary;
@@ -9,8 +9,12 @@ describe("Sales presentation truth and context", () => {
     expect(saleStatusLabel("PENDING")).toBe("Estado no disponible");
   });
   it("only represents an explicit consistent empty summary as absence", () => {
-    expect(documentView({ hasElectronicDocument: false, documentId: null, documentType: null, fullNumber: null, status: null, environment: null }).kind).toBe("absent");
+    const absent: BillingSummary = { hasElectronicDocument: false, documentId: null, documentType: null, fullNumber: null, status: null, environment: null };
+    expect(documentView(absent).kind).toBe("absent");
+    expect(listDocumentView(absent)).toEqual({ primary: "Nota de venta", secondary: "No fiscal · Sin comprobante electrónico", tone: "neutral" });
     expect(documentView(undefined).kind).toBe("unverified");
+    expect(documentView(null).kind).toBe("unverified");
+    expect(documentView({ hasElectronicDocument: false } as BillingSummary).kind).toBe("unverified");
     expect(documentView({ ...summary(), hasElectronicDocument: false }).kind).toBe("unverified");
     expect(documentView({ ...summary(), documentId: null }).kind).toBe("unverified");
   });
@@ -25,12 +29,40 @@ describe("Sales presentation truth and context", () => {
       expect(view.environment).toContain(environment === "PROD" ? "Producción" : environment === "LOCAL" ? "Local · pruebas" : "Beta · pruebas");
       if (status === "ACCEPTED" && environment !== "PROD") expect(view.tone).not.toBe("success");
       if (status !== "ACCEPTED") expect(view.status).not.toContain("Aceptado");
+      const compact = listDocumentView(summary(status, environment));
+      const environmentLabel = environment === "PROD" ? "Producción" : environment === "LOCAL" ? "Local · pruebas" : "Beta · pruebas";
+      expect(compact.primary).toBe("Boleta · B-SYN-9");
+      expect(compact.secondary).toBe(`${status === "SENT" ? "Resultado por verificar" : label} · ${environmentLabel}`);
+      const tone = status === "REJECTED" ? "danger" : ["SENT", "ERROR"].includes(status) ? "warning"
+        : status === "ACCEPTED" && environment === "PROD" ? "success" : "neutral";
+      expect(compact.tone).toBe(tone);
     });
   }
   it("does not invent type, number, environment or an unknown status", () => {
     const view = documentView({ ...summary(), documentType: null, fullNumber: null, status: "toString" as never, environment: null });
     expect(view.type).toBe("Tipo no disponible"); expect(view.number).toBe("Número no disponible");
     expect(view.environment).toBe("Ambiente no disponible"); expect(view.knownStatus).toBeFalse();
+  });
+  it("shows uncertainty in the list without inferring missing fiscal data", () => {
+    const accepted = summary("ACCEPTED");
+    for (const [input, secondary] of [
+      [undefined, "Estado no disponible"],
+      [{ hasElectronicDocument: false } as BillingSummary, "Estado no disponible"],
+      [{ ...accepted, hasElectronicDocument: false }, "Estado no disponible"],
+      [{ ...accepted, documentId: null }, "Estado no disponible"],
+      [{ ...accepted, documentType: null }, "Tipo no disponible"],
+      [{ ...accepted, fullNumber: " " }, "Número no disponible"],
+      [{ ...accepted, status: "toString" as never }, "Estado no disponible"],
+      [{ ...accepted, environment: null }, "Ambiente no disponible"],
+    ] as const) {
+      expect(listDocumentView(input)).toEqual({ primary: "Información documental no verificable", secondary, tone: "warning" });
+    }
+  });
+  it("keeps the full invoice number and long status in the compact view", () => {
+    const fullNumber = "F-" + "1234567890".repeat(2) + "12345678";
+    expect(listDocumentView({ ...summary("ERROR", "LOCAL"), documentType: "INVOICE", fullNumber })).toEqual({
+      primary: `Factura · ${fullNumber}`, secondary: "Error de procesamiento · revisar · Local · pruebas", tone: "warning",
+    });
   });
   it("round trips only the supported filters, preserving zero writes and no foreign return URLs", () => {
     const filters = { from: "2026-10-01", to: "2026-10-31", status: "VOIDED" as const, cashRegisterSessionId: 7, createdBy: "qa" };

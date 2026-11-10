@@ -10,10 +10,12 @@ import { SalesService } from "./data/sales.service";
 import { SaleResponse } from "./data/sales.models";
 import { noteSale } from "./internal-note/note-test-data";
 import { SaleDetailPageComponent } from "./sale-detail-page.component";
+import { SaleVoidAttempts, saleVoidAttemptKey } from "./sale-void-attempts";
 describe("Sale detail consultation and conservative actions", () => {
   let sales: jasmine.SpyObj<SalesService>, documents: jasmine.SpyObj<ElectronicDocumentService>;
   let harness: RouterTestingHarness, page: SaleDetailPageComponent, token: string, roles: string[], pending: Subject<ElectronicDocumentResponse[]>;
-  const doc = (status = "DRAFT") => ({ id: 901, saleId: 81, documentType: "RECEIPT", fullNumber: "B-SYN-9", status, environment: "BETA" }) as ElectronicDocumentResponse;
+  const doc = (status = "DRAFT") => ({ id: 901, saleId: 81, documentType: "RECEIPT", fullNumber: "B-SYN-9", status, environment: "BETA",
+    createdAt: "2026-10-28T02:20:00.000001Z" }) as ElectronicDocumentResponse;
   const text = () => harness.routeNativeElement!.textContent!;
   const hasLink = (name: string) => Array.from(harness.routeNativeElement!.querySelectorAll("a")).some(a => a.textContent?.trim() === name);
   beforeEach(async () => {
@@ -33,9 +35,18 @@ describe("Sale detail consultation and conservative actions", () => {
   });
   it("allows existing actions only after successful empty verification and preserves context", () => {
     pending.next([]); harness.detectChanges(); expect(page.canIssue()).toBeTrue(); expect(page.canVoidSale()).toBeTrue();
-    expect(text()).toContain("Sin documento electrónico registrado"); expect(hasLink("Crear documento electrónico")).toBeTrue();
+    expect(text()).toContain("Sin comprobante electrónico registrado"); expect(hasLink("Crear documento electrónico")).toBeTrue();
+    expect(text()).toContain("documento interno no fiscal"); expect(hasLink("Ver nota de venta")).toBeTrue();
     expect(harness.routeNativeElement!.querySelector<HTMLAnchorElement>('a[href^="/ventas?"]')!.href).toContain("salesStatus=COMPLETED");
     expect(harness.routeNativeElement!.querySelector<HTMLAnchorElement>('a[href^="/ventas/81/nota"]')!.href).toContain("salesStatus=COMPLETED");
+  });
+  it("offers verification instead of another annulment while a local attempt is uncertain", () => {
+    pending.next([]);
+    TestBed.inject(SaleVoidAttempts).uncertain(saleVoidAttemptKey("qa", 81));
+    harness.detectChanges();
+    expect(page.canVoidSale()).toBeFalse();
+    expect(hasLink("Anular venta")).toBeFalse();
+    expect(hasLink("Consultar anulación")).toBeTrue();
   });
   for(const status of ["DRAFT","GENERATED","SIGNED","SENT","ACCEPTED"]) it("keeps internal annulment blocked by " + status,()=>{
     pending.next([doc(status)]);harness.detectChanges();expect(page.canVoidSale()).toBeFalse();expect(page.canIssue()).toBeFalse();
@@ -47,11 +58,22 @@ describe("Sale detail consultation and conservative actions", () => {
     pending.next([doc(status)]);harness.detectChanges();expect(page.canVoidSale()).toBeTrue();expect(page.canIssue()).toBeFalse();
     expect(page.sale!.status).toBe("COMPLETED");
   });
-  for(const status of [0,500,401,403]) it("does not turn HTTP " + status + " into absence and supports retry",()=>{
+  for(const status of [0,500,403]) it("does not turn HTTP " + status + " into absence and supports retry",()=>{
     pending.error({status});harness.detectChanges();expect(page.documentPhase).toBe("error");
-    expect(text()).not.toContain("Sin documento electrónico registrado");expect(page.canIssue()).toBeFalse();expect(page.canVoidSale()).toBeFalse();
+    expect(text()).not.toContain("Sin comprobante electrónico registrado");expect(page.canIssue()).toBeFalse();expect(page.canVoidSale()).toBeFalse();
     expect(hasLink("Crear documento electrónico")).toBeFalse();expect(hasLink("Anular venta")).toBeFalse();
     documents.listBySaleId.and.returnValue(of([]));page.retryDocument();harness.detectChanges();expect(page.documentPhase).toBe("absent");expect(page.canIssue()).toBeTrue();
+  });
+  it("clears commercial data too if a protected document read reports session expiry", () => {
+    pending.error({ status: 401 }); harness.detectChanges();
+    expect(page.sale).toBeNull(); expect(page.canIssue()).toBeFalse();
+    expect(text()).toContain("Sesión vencida"); expect(hasLink("Ver nota de venta")).toBeFalse();
+  });
+  it("selects the latest document with full instant precision and ID tie break", () => {
+    pending.next([doc("ERROR"), { ...doc("DRAFT"), id: 902 }, {
+      ...doc("ERROR"), id: 903, createdAt: "2026-10-28T02:20:00Z",
+    }]); harness.detectChanges();
+    expect(page.billingDocument?.id).toBe(902); expect(page.canVoidSale()).toBeFalse();
   });
   it("rejects inconsistent document identity or unknown status instead of authorizing absence",()=>{
     pending.next([{...doc(),saleId:82}]);harness.detectChanges();expect(page.documentPhase).toBe("error");expect(page.canVoidSale()).toBeFalse();
@@ -64,7 +86,7 @@ describe("Sale detail consultation and conservative actions", () => {
   });
   it("does not retain protected sale/document data after credentials change",()=>{
     pending.next([doc()]);token="different-token";harness.detectChanges();expect(page.sale).toBeNull();expect(page.billingDocument).toBeNull();
-    expect(text()).toContain("La sesión cambió");expect(hasLink("Ver nota interna")).toBeFalse();
+    expect(text()).toContain("La sesión cambió");expect(hasLink("Ver nota de venta")).toBeFalse();
   });
   it("displays persisted money and historical exact quantities rather than recalculating",()=>{
     pending.next([]);harness.detectChanges();const sale=page.sale!;
@@ -88,7 +110,7 @@ describe("Sale detail consultation and conservative actions", () => {
   it("keeps voided sales consultable without creation or annulment actions",async()=>{
     sales.getById.and.returnValue(of({...noteSale(1,true),id:82}));documents.listBySaleId.and.returnValue(of([]));
     page=await harness.navigateByUrl("/ventas/82",SaleDetailPageComponent);harness.detectChanges();
-    expect(text()).toContain("Anulada");expect(page.canIssue()).toBeFalse();expect(page.canVoidSale()).toBeFalse();expect(hasLink("Ver nota interna")).toBeTrue();
+    expect(text()).toContain("Anulada");expect(page.canIssue()).toBeFalse();expect(page.canVoidSale()).toBeFalse();expect(hasLink("Ver nota de venta")).toBeTrue();
   });
   it("ignores late sale reads and refuses an invalid route",async()=>{
     const old=new Subject<SaleResponse>();sales.getById.and.returnValue(old);
