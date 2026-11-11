@@ -2,7 +2,7 @@
 
 ## Node/npm toolchain
 
-Use Node `22.23.3` and npm `10.9.9` for frontend commands. The canonical
+Use Node `22.23.4` and npm `10.9.9` for frontend commands. The canonical
 Node version is `frontend/.nvmrc`; `devEngines` in `package.json` rejects
 other Node/npm versions. On Windows or WSL, select an existing installation
 or your already available toolchain mechanism before installing dependencies;

@@ -73,7 +73,7 @@ const inspect = async id => JSON.parse(await docker(['inspect', id]))[0];
 
 async function main() {
   rejectInherited(process.env);
-  assert(process.version === 'v22.23.3', 'QA_NODE_VERSION_REQUIRED_22_23_3');
+  assert(process.version === 'v22.23.4', 'QA_NODE_VERSION_REQUIRED_22_23_4');
   assert(await checked(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['--version'], { shell: process.platform === 'win32' }) === '10.9.9', 'QA_NPM_VERSION_REQUIRED_10_9_9');
   assert((await docker(['version', '--format', '{{.Server.Os}}'])) === 'linux', 'QA_LINUX_DOCKER_REQUIRED');
   const endpoint = await docker(['context', 'inspect', '--format', '{{(index .Endpoints "docker").Host}}']);
