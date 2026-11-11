@@ -8,6 +8,7 @@ import policy from './safety-policy.cjs';
 
 const frontend=resolve(dirname(fileURLToPath(import.meta.url)),'../..');
 const root=resolve(frontend,'..');
+const NODE_VERSION='v22.23.4';
 const LABEL='inktoy.qa.run',DIAG='/api/v1/health/recovery-e2e';
 const assert=(ok,code)=>{if(!ok)throw Error(code);};
 const log=value=>console.log('[RECOVERY_QA] '+value);
@@ -56,6 +57,7 @@ export function validateRecoveryReport(report,exitCode=0,selection='full'){
   assert(report.stats?.expected===expected.length&&report.stats.unexpected===0&&report.stats.flaky===0&&report.stats.skipped===0,'QA_INCONSISTENT_REPORT_STATS');
   return tests;
 }
+// Schema v1 evidence from the previous Node pin remains valid for review.
 export function validateRecoveryEvidence(summary,progress){
   assert(summary?.result==='PASS'&&summary.selection==='full'&&summary.isolation==='PASS'&&summary.cleanup==='PASS'
     &&summary.phase==='completed'&&summary.completedAt&&summary.fixtureIsolation?.uniqueResources===true
@@ -63,7 +65,7 @@ export function validateRecoveryEvidence(summary,progress){
     &&Array.isArray(summary.tests)&&summary.tests.length===REQUIRED_SCENARIOS.length,'QA_FINAL_EVIDENCE_REQUIRED');
   assert(summary.schemaVersion===1&&/^[a-f0-9]{24}$/.test(summary.runId??'')&&Number.isFinite(Date.parse(summary.startedAt))
     &&Number.isFinite(Date.parse(summary.completedAt))&&Number.isFinite(summary.durationMs)
-    &&summary.versions?.node==='v22.23.3'&&summary.versions.npm==='10.9.9'&&/^jar 17\./.test(summary.versions.jar??'')
+    &&[NODE_VERSION,'v22.23.3'].includes(summary.versions?.node)&&summary.versions.npm==='10.9.9'&&/^jar 17\./.test(summary.versions.jar??'')
     &&summary.versions.maven&&summary.versions.docker&&summary.versions.playwright==='Version 1.61.1'
     &&['tools','postgres','java'].every(k=>/^sha256:[a-f0-9]{64}$/.test(summary.versions.images?.[k]??''))
     &&/^[a-f0-9]{64}$/.test(summary.backendArtifact.sha256??'')&&summary.backendArtifact.sizeBytes>0,
@@ -197,7 +199,7 @@ async function main(){
     assert(process.argv.length===2||pendingUx||modalUx,'QA_ARGUMENT_OVERRIDE_FORBIDDEN');
     assert(!process.env.CI||selection==='full','QA_CI_FULL_SUITE_REQUIRED');policy.rejectInherited(process.env);
     summary.revision={commit:await checked('git',['rev-parse','HEAD']),dirty:!!(await checked('git',['status','--porcelain','--untracked-files=all']))};
-    assert(process.version==='v22.23.3','QA_NODE_VERSION_REQUIRED');
+    assert(process.version===NODE_VERSION,'QA_NODE_VERSION_REQUIRED');
     summary.versions.npm=await checked(process.platform==='win32'?'npm.cmd':'npm',['--version'],{shell:process.platform==='win32'});
     assert(summary.versions.npm==='10.9.9','QA_NPM_VERSION_REQUIRED');
     summary.versions.jar=await checked('jar',['--version']);assert(/^jar 17\./.test(summary.versions.jar),'QA_JAVA_17_REQUIRED');

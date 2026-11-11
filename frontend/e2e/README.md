@@ -10,7 +10,7 @@ npm run e2e:no-write
 node e2e/qa/run-qa.mjs --regression
 ```
 
-Required: Node 22.23.3, npm 10.9.9, Java 17 (java/jar), local Docker Linux engine.
+Required: Node 22.23.4, npm 10.9.9, Java 17 (java/jar), local Docker Linux engine.
 No pre-existing Angular/backend/database, credentials or manual seed is required.
 Preparation downloads pinned-version tool images and installs the unchanged lockfile
 inside a tool image. This is separate from the isolated application runtime.

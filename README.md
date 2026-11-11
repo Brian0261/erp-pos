@@ -316,7 +316,7 @@ Endpoints actuales:
 
 Ruta: `frontend`
 
-Requiere Node `22.23.3` y npm `10.9.9`; `frontend/.nvmrc` declara la version
+Requiere Node `22.23.4` y npm `10.9.9`; `frontend/.nvmrc` declara la version
 de Node. Comprueba `node --version` y `npm --version` antes de instalar.
 
 ```powershell
