@@ -8,11 +8,18 @@
       "version": "22.23.4",
       "onFail": "error"
     },
-    "packageManager": {
-      "name": "npm",
-      "version": "10.9.9",
-      "onFail": "error"
-    }
+    "packageManager": [
+      {
+        "name": "npm",
+        "version": "10.9.9",
+        "onFail": "error"
+      },
+      {
+        "name": "pnpm",
+        "version": "12.19.0",
+        "onFail": "error"
+      }
+    ]
   },
   "scripts": {
     "start": "ng serve",
