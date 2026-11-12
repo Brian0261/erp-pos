@@ -1,0 +1,18 @@
+packages: []
+nodeLinker: isolated
+pmOnFail: error
+runtime: false
+runtimeOnFail: error
+verifyDepsBeforeRun: error
+ignorePnpmfile: true
+strictDepBuilds: true
+sideEffectsCache: false
+allowBuilds:
+  'esbuild@0.28.1': false
+  '@parcel/watcher@2.6.0': false
+  'lmdb@3.5.1': false
+  'msgpackr-extract@3.0.4': false
+  'fsevents@2.3.2': false
+  'fsevents@2.3.3': false
+overrides:
+  '@angular/build@21.2.29>vite:prod': '7.3.8'

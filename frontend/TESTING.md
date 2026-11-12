@@ -17,6 +17,43 @@ npm ci
 Run these commands from `frontend`. `npm ci` installs reproducibly from the
 committed lockfile; do not use `npm install` for this baseline.
 
+## pnpm lockfile validation (PNPM-2)
+
+Download the native pnpm `12.19.0` archive for your platform from the
+[official release](https://github.com/pnpm/pnpm/releases/tag/v12.19.0).
+Verify its SHA-256 and signed build provenance before extracting it.
+
+| Platform | Archive | SHA-256 |
+| --- | --- | --- |
+| Windows x64 | `pnpm-win32-x64.zip` | `1fa21198d4b9dfebabac985b6ab863bd4138d83ad07457d4eb0910cc2b3286c5` |
+| Linux x64 glibc | `pnpm-linux-x64.tar.gz` | `bf37edf4e26c3b31c1cac42c769ffabcb9231e9bc728762aeb1ee86bc711684a` |
+| Linux x64 musl | `pnpm-linux-x64-musl.tar.gz` | `b41d7b2d8f47187fdf9b3df170f984ffb02ef14bd27d353ccff704cef0d1af6e` |
+
+```text
+gh attestation verify <archive> --repo pnpm/pnpm --signer-workflow pnpm/pnpm/.github/workflows/release.yml --source-ref refs/tags/v12.19.0 --source-digest f4afab20988dc20b747e97c48388f901258d0fcb
+```
+
+Extract outside the repository and use the executable's absolute path.
+Select Node `22.23.4` in the current session. Run the version check from
+`frontend` so pnpm uses the project's pin and rejects version switching.
+In the commands below, `pnpm` means the verified executable.
+
+```text
+node --version
+pnpm --version
+pnpm install --frozen-lockfile
+pnpm peers check
+pnpm run build
+pnpm test
+pnpm exec playwright --version
+```
+
+Use separate clean install directories for pnpm and npm. For an approved
+dependency change, review both lockfiles together and validate both frozen
+installs. CI, Docker and QA runners still use the npm baseline until their
+respective migration phases. PNPM-6 retires the npm pin and lockfile after
+those consumers have switched.
+
 ## Unit baseline
 
 The Angular 18 baseline uses Karma 6 and Jasmine 5 temporarily. Run the
