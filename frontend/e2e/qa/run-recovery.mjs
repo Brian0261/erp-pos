@@ -59,17 +59,25 @@ export function validateRecoveryReport(report,exitCode=0,selection='full'){
 }
 function validEvidenceVersions(schema, versions) {
   if (!versions || typeof versions !== 'object' || Array.isArray(versions) || Object.hasOwn(versions, 'pnpm')) return false;
+  const hasImageDetails = Object.hasOwn(versions, 'qaImageNode') || Object.hasOwn(versions, 'qaImageLockfileSha256');
   if (schema === 1) {
-    return [QA_NODE_VERSION, 'v22.23.3'].includes(versions.node) && versions.npm === QA_NPM_VERSION
+    return !hasImageDetails && [QA_NODE_VERSION, 'v22.23.3'].includes(versions.node) && versions.npm === QA_NPM_VERSION
       && !Object.hasOwn(versions, 'hostPackageManager') && !Object.hasOwn(versions, 'qaImagePackageManager');
   }
+  if (versions.node !== QA_NODE_VERSION || Object.hasOwn(versions, 'npm')) return false;
+  const host = versions.hostPackageManager;
   const image = versions.qaImagePackageManager;
-  return schema === 2 && versions.node === QA_NODE_VERSION && !Object.hasOwn(versions, 'npm')
-    && validPnpmIdentity(versions.hostPackageManager)
-    && image?.name === 'npm' && image.version === QA_NPM_VERSION && Object.keys(image).length === 2;
+  if (schema === 2) {
+    return !hasImageDetails && validPnpmIdentity(host)
+      && image?.name === 'npm' && image.version === QA_NPM_VERSION && Object.keys(image).length === 2;
+  }
+  const validNpmHost = host?.name === 'npm' && host.version === QA_NPM_VERSION && Object.keys(host).length === 2;
+  return schema === 3 && (validNpmHost || validPnpmIdentity(host)) && validPnpmIdentity(image)
+    && image.platform === 'linux' && image.arch === 'x64' && versions.qaImageNode === QA_NODE_VERSION
+    && typeof versions.qaImageLockfileSha256 === 'string' && /^[a-f0-9]{64}$/.test(versions.qaImageLockfileSha256);
 }
 
-// V1 remains the format emitted by the npm path and accepted for historical review.
+// V1 and V2 remain readable for runs produced before the QA image switched to pnpm.
 export function validateRecoveryEvidence(summary,progress){
   assert(summary?.result==='PASS'&&summary.selection==='full'&&summary.isolation==='PASS'&&summary.cleanup==='PASS'
     &&summary.phase==='completed'&&summary.completedAt&&summary.fixtureIsolation?.uniqueResources===true
@@ -92,14 +100,13 @@ export function validateRecoveryEvidence(summary,progress){
     'QA_PROGRESS_EVIDENCE_REQUIRED');
 }
 
-function verifyObservedToolchain(summary, manager) {
-  assert(summary.versions.node === process.version, 'QA_EVIDENCE_TOOLCHAIN_MISMATCH');
-  if (manager.name === 'npm') {
-    assert(summary.schemaVersion === 1 && summary.versions.npm === manager.version, 'QA_EVIDENCE_TOOLCHAIN_MISMATCH');
-    return;
-  }
-  const recorded = summary.versions.hostPackageManager;
-  assert(summary.schemaVersion === 2 && Object.entries(manager).every(([key, value]) => recorded?.[key] === value),
+function verifyObservedToolchain(summary, host, image, toolsImageId) {
+  const {versions} = summary;
+  const matches = (recorded, observed) => Object.entries(observed).every(([key, value]) => recorded?.[key] === value);
+  assert(summary.schemaVersion === 3 && validEvidenceVersions(3, versions)
+    && versions.node === process.version && matches(versions.hostPackageManager, host)
+    && matches(versions.qaImagePackageManager, image.manager) && versions.qaImageNode === image.node
+    && versions.qaImageLockfileSha256 === image.lockfileSha256 && versions.images?.tools === toolsImageId,
     'QA_EVIDENCE_TOOLCHAIN_MISMATCH');
 }
 export function denialDiagnostics(data){
@@ -185,8 +192,8 @@ async function main(){
   const runDir=join(qaRoot,runId),stage=join(runDir,'stage'),artifacts=join(runDir,'evidence');
   await noLinks(qaRoot);
   await mkdir(artifacts,{recursive:true});const image='inktoy-recovery-qa-tools:'+runId;
-  let decoy,error,anchor,browser,backend,hostManager,dockerReady=false,timedOut=false,phaseStarted=Date.now();
-  const started=Date.now(),summary={schemaVersion:1,runId,selection,revision:null,versions:{node:process.version},
+  let decoy,error,anchor,browser,backend,hostManager,imageToolchain,toolsImageId,dockerReady=false,timedOut=false,phaseStarted=Date.now();
+  const started=Date.now(),summary={schemaVersion:3,runId,selection,revision:null,versions:{node:process.version},
     startedAt:new Date(started).toISOString(),phase:'preflight',phases:[],isolation:'NOT_STARTED',cleanup:'NOT_STARTED',result:'RUNNING',tests:[],errors:[]};
   const manifest=join(artifacts,'summary.json');
   const save=()=>writeFile(manifest,sanitize(JSON.stringify(summary,null,2)),{mode:0o600});
@@ -225,27 +232,25 @@ async function main(){
     summary.revision={commit:await checked('git',['rev-parse','HEAD']),dirty:!!(await checked('git',['status','--porcelain','--untracked-files=all']))};
     hostManager=await checkRunnerToolchain({target:'recovery',flags,
       allowedScripts:['e2e:recovery'],cwd:frontend,checked});
-    if(hostManager.name==='pnpm'){
-      summary.schemaVersion=2;
-      summary.versions.hostPackageManager={...hostManager};
-    }else summary.versions.npm=hostManager.version;
+    summary.versions.hostPackageManager={...hostManager};
     log(`TOOLCHAIN PASS: ${process.version}; host ${hostManager.name} ${hostManager.version}`);
     summary.versions.jar=await checked('jar',['--version']);assert(/^jar 17\./.test(summary.versions.jar),'QA_JAVA_17_REQUIRED');
     summary.versions.maven=(await checked(process.platform==='win32'?'mvnw.cmd':'./mvnw',['--version'],{cwd:join(root,'backend'),shell:process.platform==='win32'})).match(/Apache Maven [\d.]+/)?.[0];
     summary.versions.docker=await docker(['version','--format','{{.Server.Version}}']);
-    assert(await docker(['version','--format','{{.Server.Os}}'])==='linux','QA_LINUX_DOCKER_REQUIRED');
+    assert(await docker(['version','--format','{{.Server.Os}}/{{.Server.Arch}}'])==='linux/amd64','QA_DOCKER_LINUX_AMD64_REQUIRED');
     const endpoint=await docker(['context','inspect','--format','{{(index .Endpoints "docker").Host}}']);
     assert(endpoint.startsWith('npipe:')||endpoint.startsWith('unix:'),'QA_LOCAL_DOCKER_REQUIRED');
     dockerReady=true;
     await phase('preparation');
     log('RUN '+runId+'; PREPARATION (no application process started)');
-    for(const name of ['package.json','package-lock.json','angular.json','tsconfig.json','tsconfig.app.json','proxy.conf.json','playwright.recovery.config.ts','src','e2e']){
+    for(const name of ['package.json','pnpm-lock.yaml','pnpm-workspace.yaml','.dockerignore','angular.json','tsconfig.json','tsconfig.app.json','proxy.conf.json','playwright.recovery.config.ts','src','e2e/guards','e2e/helpers','e2e/qa','e2e/specs/recovery']){
       await noLinks(join(frontend,name),true);
       await cp(join(frontend,name),join(stage,name),{recursive:true});
     }
     await phase('tools-image');
-    await docker(['build','--label',`${LABEL}=${runId}`,'-t',image,'-f',join(stage,'e2e/qa/Dockerfile'),stage],{timeout:900000});
+    await docker(['build','--platform','linux/amd64','--label',`${LABEL}=${runId}`,'-t',image,'-f',join(stage,'e2e/qa/Dockerfile'),stage],{timeout:900000});
     const tools=await docker(['image','inspect',image,'--format','{{.Id}}']);
+    toolsImageId=tools;
     for(const name of ['postgres:16-alpine','eclipse-temurin:17-jdk-jammy'])if((await command('docker',['image','inspect',name])).code!==0)await docker(['pull',name],{timeout:600000});
     const pgImage=await docker(['image','inspect','postgres:16-alpine','--format','{{.Id}}']);
     const javaImage=await docker(['image','inspect','eclipse-temurin:17-jdk-jammy','--format','{{.Id}}']);
@@ -297,11 +302,25 @@ async function main(){
       '--tmpfs','/tmp:rw,nosuid,size=512m,uid=1001,gid=1001','--tmpfs','/qa-run:rw,nosuid,size=256m,uid=1001,gid=1001,mode=0700',
       '--tmpfs','/app/.angular:rw,nosuid,size=512m,uid=1001,gid=1001'],env);
     await own(browser,network);await docker(['start',browser]);await prove(browser);
-    if(hostManager.name==='pnpm'){
-      const npm=await execNode(browser,"import fs from 'node:fs'; console.log(JSON.parse(fs.readFileSync('/usr/local/lib/node_modules/npm/package.json', 'utf8')).version);");
-      assert(npm===QA_NPM_VERSION,'QA_IMAGE_NPM_VERSION_REQUIRED');
-      summary.versions.qaImagePackageManager={name:'npm',version:npm};
-    }
+    assert((await inspect(browser)).Image===toolsImageId,'QA_TOOLS_IMAGE_IDENTITY_REJECTED');
+    const observed=JSON.parse(await execNode(browser,`
+      import {readFileSync} from 'node:fs';
+      import {createHash} from 'node:crypto';
+      const hash = path => createHash('sha256').update(readFileSync(path)).digest('hex');
+      const {lockfileSha256: installedLock, ...manager} = JSON.parse(readFileSync('/app/.qa-pnpm-install.json'));
+      console.log(JSON.stringify({manager, installedLock, lockfileSha256: hash('/app/pnpm-lock.yaml'),
+        sha256: hash('/opt/pnpm/pnpm'), node: process.version, platform: process.platform, arch: process.arch}));`));
+    const stagedLock=createHash('sha256').update(await readFile(join(stage,'pnpm-lock.yaml'))).digest('hex');
+    assert(validPnpmIdentity(observed.manager)&&observed.manager.platform==='linux'&&observed.manager.arch==='x64'
+      &&observed.platform==='linux'&&observed.arch==='x64'&&observed.sha256===observed.manager.sha256
+      &&observed.node===QA_NODE_VERSION&&observed.installedLock===stagedLock&&observed.lockfileSha256===stagedLock,
+      'QA_IMAGE_PNPM_IDENTITY_REJECTED');
+    const pnpmVersion=await docker(['exec',browser,'/opt/pnpm/pnpm','--version'],{timeout:10000});
+    assert(pnpmVersion===observed.manager.version,'QA_IMAGE_PNPM_VERSION_REJECTED');
+    imageToolchain={manager:observed.manager,node:observed.node,lockfileSha256:stagedLock};
+    Object.assign(summary.versions,{qaImagePackageManager:imageToolchain.manager,qaImageNode:imageToolchain.node,
+      qaImageLockfileSha256:imageToolchain.lockfileSha256});
+    log(`IMAGE TOOLCHAIN PASS: ${imageToolchain.node}; pnpm ${pnpmVersion}; verified executable and installed lockfile`);
     await execNode(browser,`import fs from 'node:fs';fs.mkdirSync('/qa-run/screenshots',{recursive:true});fs.writeFileSync('/qa-run/proxy.json',JSON.stringify({'/api':{target:'http://127.0.0.1:8080',changeOrigin:false,headers:{'X-QA-Proxy-Run':${JSON.stringify(runId)}}}}),{mode:0o600});`);
     await docker(['exec','-d',browser,'node','node_modules/@angular/cli/bin/ng.js','serve','--host','127.0.0.1','--port','4201','--proxy-config','/qa-run/proxy.json','--live-reload=false','--hmr=false']);
     const proxied=await poll(async()=>{const r=await http(browser,'http://127.0.0.1:4201'+DIAG);return r.status===200?JSON.parse(r.body):false;},180000);identity(proxied,true);
@@ -356,7 +375,7 @@ async function main(){
     summary.completedAt=new Date().toISOString();summary.durationMs=Date.now()-started;await phase('completed');await save();
     try{const evidence=await readRecoveryEvidence(artifacts);
       if(summary.result==='PASS'){
-        verifyObservedToolchain(evidence.summary,hostManager);
+        verifyObservedToolchain(evidence.summary,hostManager,imageToolchain,toolsImageId);
         if(selection==='full')validateRecoveryEvidence(evidence.summary,evidence.progress);
       }
     }catch(ex){summary.result='FAIL';summary.errors.push(/^(QA_|UNSAFE_)/.test(ex.message)?ex.message:'QA_EVIDENCE_REJECTED');await save();throw ex;}

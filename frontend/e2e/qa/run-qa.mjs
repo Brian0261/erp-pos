@@ -77,7 +77,7 @@ async function main(flags) {
   const manager = await checkRunnerToolchain({ target: 'auth', flags,
     allowedScripts: ['e2e:auth', 'e2e:no-write', 'e2e:no-write:headed', 'e2e:no-write:ci'], cwd: frontend, checked });
   log(`TOOLCHAIN PASS: ${process.version}; host ${manager.name} ${manager.version}`);
-  assert((await docker(['version', '--format', '{{.Server.Os}}'])) === 'linux', 'QA_LINUX_DOCKER_REQUIRED');
+  assert((await docker(['version', '--format', '{{.Server.Os}}/{{.Server.Arch}}'])) === 'linux/amd64', 'QA_DOCKER_LINUX_AMD64_REQUIRED');
   const endpoint = await docker(['context', 'inspect', '--format', '{{(index .Endpoints "docker").Host}}']);
   assert(endpoint.startsWith('npipe:') || endpoint.startsWith('unix:'), 'QA_LOCAL_DOCKER_REQUIRED');
   const runId = randomBytes(12).toString('hex');
@@ -118,11 +118,11 @@ async function main(flags) {
   try {
     log('PREPARATION: approved tools/images/dependencies; application processes have not started');
     await chmod(temp, 0o700);
-    for (const file of ['package.json', 'package-lock.json', 'angular.json', 'tsconfig.json', 'tsconfig.app.json', 'tsconfig.spec.json', 'playwright.auth.config.ts', 'playwright.config.ts', 'proxy.conf.json', 'src'])
+    for (const file of ['package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', '.dockerignore', 'angular.json', 'tsconfig.json', 'tsconfig.app.json', 'tsconfig.spec.json', 'playwright.auth.config.ts', 'playwright.config.ts', 'proxy.conf.json', 'src'])
       await cp(join(frontend, file), join(stage, file), { recursive: true });
     for (const folder of ['qa', 'fixtures', 'guards', 'helpers', 'setup', 'specs'])
       await cp(join(frontend, 'e2e', folder), join(stage, 'e2e', folder), { recursive: true });
-    await docker(['build', '--label', `${RUN_LABEL}=${runId}`, '-t', image, '-f', join(stage, 'e2e/qa/Dockerfile'), stage], { timeout: 900000 });
+    await docker(['build', '--platform', 'linux/amd64', '--label', `${RUN_LABEL}=${runId}`, '-t', image, '-f', join(stage, 'e2e/qa/Dockerfile'), stage], { timeout: 900000 });
     const runtimeImage = await docker(['image', 'inspect', image, '--format', '{{.Id}}']);
     for (const name of ['postgres:16-alpine', 'eclipse-temurin:17-jdk-jammy']) {
       if ((await command('docker', ['image', 'inspect', name])).code !== 0) await docker(['pull', name], { timeout: 600000 });
@@ -253,14 +253,15 @@ async function main(flags) {
       await own(regression,'none');await docker(['start',regression]);
       await execNode(regression,`import os from 'node:os';if(Object.values(os.networkInterfaces()).flat().some(a=>!a.internal))throw Error('NETWORK_ISOLATION_NOT_PROVEN');`);
       // Container-only launch shim; Karma/Jasmine configuration remains unchanged.
-      await execNode(regression,`import fs from 'node:fs';import {chromium} from 'playwright';fs.writeFileSync('/qa-run/chrome',['#!/bin/sh','exec '+chromium.executablePath()+' --no-sandbox "$@"',''].join(String.fromCharCode(10)),{mode:0o700});`);
-      const unit=await command('docker',['exec','--env','CHROME_BIN=/qa-run/chrome',regression,'npm','test'],{timeout:240000});
+      await execNode(regression,`import fs from 'node:fs';import {chromium} from '@playwright/test';fs.writeFileSync('/qa-run/chrome',['#!/bin/sh','exec '+chromium.executablePath()+' --no-sandbox "$@"',''].join(String.fromCharCode(10)),{mode:0o700});`);
+      const pnpm='/opt/pnpm/pnpm';
+      const unit=await command('docker',['exec','--env','CHROME_BIN=/qa-run/chrome',regression,pnpm,'test'],{timeout:240000});
       // This separate namespace has no credentials/session/backend; show tool error lines only.
       if(unit.code!==0) for(const line of (unit.stdout+unit.stderr).split('\n').filter(l=>/ERROR|Error:|EACCES|EROFS|ENOENT|ChromeHeadless|Cannot/.test(l)).slice(-12)) log(line.replace(/\u001b\[[0-9;]*m/g,''));
       assert(unit.code===0,'QA_ANGULAR_UNIT_REGRESSION');
       const total=(unit.stdout+unit.stderr).match(/TOTAL: \d+ SUCCESS/g)?.at(-1);
       assert(total,'QA_ANGULAR_UNIT_COUNT_MISSING');log('REGRESSION PASS: Angular '+total);
-      await docker(['exec',regression,'npm','run','build','--','--output-path=/qa-run/dist'],{timeout:240000});log('REGRESSION PASS: Angular build');
+      await docker(['exec',regression,pnpm,'run','build','--output-path=/qa-run/dist'],{timeout:240000});log('REGRESSION PASS: Angular build');
       // Playwright clears its output directory. Keep it below tmpfs, not at a mount root.
       const series=await command('docker',['exec',regression,'node','node_modules/@playwright/test/cli.js','test','e2e/specs/billing-series-concurrency.spec.ts','--workers=1','--reporter=json','--output=/qa-run/series-results'],{timeout:240000});
       assert(reportResult(series,'series','QA_SERIES_REGRESSION')===6,'QA_SERIES_COUNT');log('REGRESSION PASS: billing series 6/6');
