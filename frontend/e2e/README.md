@@ -2,7 +2,30 @@
 
 ## Authenticated no-write gate (QA-E2E-AUTH-1A)
 
-Use the same orchestrator locally and in the independent CI job `e2e-auth`:
+From `frontend`, use the same orchestrator locally and in `e2e-auth`. For a
+local pnpm run, first follow the [tool verification and isolated installation](../TESTING.md#pnpm-lockfile-validation-pnpm-2).
+Use the verified executable by absolute path and select Node 22.23.4 in the
+current session. Run with the committed pnpm policy, without inherited overrides.
+The launcher checks the SHA-256 of the extracted executable before checking its
+version. The archive checksums in `TESTING.md` are separate.
+
+```text
+node e2e/qa/qa-toolchain.mjs launch auth "<absolute-path-to-pnpm>"
+node e2e/qa/qa-toolchain.mjs launch recovery "<absolute-path-to-pnpm>"
+pnpm run e2e:internal-note:ci
+```
+
+Here `pnpm` denotes the verified Windows x64 or Linux x64 glibc executable.
+The first two commands start the runner through the verified binary and pass
+the launch record over its private stdin. This protects attribution from
+inherited environment variables in a trusted host and checkout. A user who
+controls the host, checkout or process I/O can fabricate local evidence.
+Recovery evidence records the verified host as schema v2 and records npm
+10.9.9 separately for the QA image. Existing npm invocations continue to
+produce schema v1. Both runners require Java 17 (java/jar) and a local Docker
+Linux engine. The QA image still installs its dependencies with npm 10.9.9.
+
+The npm 10.9.9 entry point remains available for the transition:
 
 ```powershell
 npm run e2e:no-write
@@ -10,7 +33,6 @@ npm run e2e:no-write
 node e2e/qa/run-qa.mjs --regression
 ```
 
-Required: Node 22.23.4, npm 10.9.9, Java 17 (java/jar), local Docker Linux engine.
 No pre-existing Angular/backend/database, credentials or manual seed is required.
 Preparation downloads pinned-version tool images and installs the unchanged lockfile
 inside a tool image. This is separate from the isolated application runtime.
@@ -88,7 +110,8 @@ An abrupt host/daemon termination cannot execute a finally block: inspect remain
 `inktoy.qa.run` labels and remove only resources belonging to that interrupted run.
 
 The existing mocked billing-series suite remains independent:
-`npm run e2e:billing-series:ci`. It does not use generated QA credentials.
+`pnpm run e2e:billing-series:ci` or `npm run e2e:billing-series:ci`.
+It does not use generated QA credentials.
 
 Details, negative-test mapping and local evidence:
 [QA_E2E_AUTH_1_QA.md](../../docs/qa/QA_E2E_AUTH_1_QA.md).
