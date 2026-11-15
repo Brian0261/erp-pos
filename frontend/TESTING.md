@@ -50,9 +50,28 @@ pnpm exec playwright --version
 
 Use separate clean install directories for pnpm and npm. For an approved
 dependency change, review both lockfiles together and validate both frozen
-installs. CI and Docker retain the npm baseline. The local QA entry points
-and their prerequisites are described in [ERP/POS E2E](e2e/README.md).
+installs. The frontend CI job retains the npm baseline. The local QA entry
+points and their prerequisites are described in [ERP/POS E2E](e2e/README.md).
 PNPM-6 retires the npm pin and lockfile after the remaining consumers switch.
+
+## Docker builds (PNPM-4)
+
+Use BuildKit on a linux/amd64 Docker engine and select linux/amd64 as the
+target before building. For example, from the repository root:
+
+```text
+docker build --platform linux/amd64 -f frontend/Dockerfile frontend
+```
+
+The frontend build uses the approved musl release and the QA tools image uses
+the glibc release. Both verify the archive and extracted executable before
+running pnpm 12.19.0 with Node 22.23.4. The release archives are covered by the
+upstream build attestation above. BuildKit caches downloads separately for
+each libc and the install uses the committed frozen lockfile and workspace
+policy. QA runners prepare their own contexts and keep npm support on the host.
+The frontend runtime receives the Angular static output and Nginx config.
+The unchanged rolling Nginx tag can change the runtime image independently of
+the frozen application dependencies.
 
 ## Unit baseline
 

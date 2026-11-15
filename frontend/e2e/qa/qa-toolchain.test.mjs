@@ -156,6 +156,44 @@ test('accept historical npm and verified pnpm evidence; reject crossed or altere
   assert.throws(() => validateRecoveryEvidence(summary, progress.slice(1)), /QA_PROGRESS_EVIDENCE_REQUIRED/);
 });
 
+test('v3 requires compatible host and image identities and a complete commercial result', () => {
+  const { summary, progress } = evidence();
+  summary.schemaVersion = 3;
+  delete summary.versions.npm;
+  Object.assign(summary.versions, {
+    node: QA_NODE_VERSION, qaImageNode: QA_NODE_VERSION, qaImageLockfileSha256: 'a'.repeat(64),
+    hostPackageManager: {name: 'npm', version: '10.9.9'},
+    qaImagePackageManager: {
+      name: 'pnpm', version: '12.19.0', platform: 'linux', arch: 'x64',
+      sha256: 'baae19a2dafc7b6d38980293904f8b8d0522adbe4cfda5c469c8e3175560e4d0',
+    },
+  });
+  validateRecoveryEvidence(summary, progress);
+  const windowsHost = {...pnpm, platform: 'win32',
+    sha256: '9a4dcc51ad07f7159806b4cb14096ddb8f4831511eca0ed4adb8448ec1c18f97'};
+  summary.versions.hostPackageManager = windowsHost;
+  validateRecoveryEvidence(summary, progress);
+  for (const mutate of [
+    s => s.schemaVersion = 2,
+    s => s.versions.npm = '10.9.9',
+    s => s.versions.hostPackageManager = {name: 'npm', version: '10.9.8'},
+    s => s.versions.qaImagePackageManager = {name: 'npm', version: '10.9.9'},
+    s => s.versions.qaImagePackageManager = structuredClone(windowsHost),
+    s => s.versions.qaImagePackageManager.version = '12.19.1',
+    s => s.versions.qaImagePackageManager.sha256 = '0'.repeat(64),
+    s => s.versions.qaImageNode = 'v22.23.3',
+    s => delete s.versions.qaImageLockfileSha256,
+    s => delete s.versions.images.tools,
+    s => s.tests[0].retry = 1,
+    s => s.isolation = 'FAIL',
+  ]) {
+    const invalid = structuredClone(summary);
+    mutate(invalid);
+    assert.throws(() => validateRecoveryEvidence(invalid, progress));
+  }
+  assert.throws(() => validateRecoveryEvidence(summary, progress.slice(1)), /QA_PROGRESS_EVIDENCE_REQUIRED/);
+});
+
 test('the commercial Playwright gate rejects flakes, skips and nonzero exit', () => {
   const report = {
     suites: [{specs: REQUIRED_SCENARIOS.map(([file,title]) => ({file,title,tests:[{ status:'expected', expectedStatus:'passed', results:[{status:'passed', retry:0}] }]}))}],

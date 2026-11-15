@@ -20,10 +20,11 @@ The first two commands start the runner through the verified binary and pass
 the launch record over its private stdin. This protects attribution from
 inherited environment variables in a trusted host and checkout. A user who
 controls the host, checkout or process I/O can fabricate local evidence.
-Recovery evidence records the verified host as schema v2 and records npm
-10.9.9 separately for the QA image. Existing npm invocations continue to
-produce schema v1. Both runners require Java 17 (java/jar) and a local Docker
-Linux engine. The QA image still installs its dependencies with npm 10.9.9.
+New recovery evidence uses schema v3 for either host manager. It records the
+verified host separately from the QA image's pnpm 12.19.0 executable, Node
+version and frozen lockfile digest. The runner checks those values inside the
+same image that runs Playwright. Historical v1 and v2 artifacts remain readable.
+Both runners require Java 17 (java/jar) and a local linux/amd64 Docker engine.
 
 The npm 10.9.9 entry point remains available for the transition:
 
@@ -34,8 +35,10 @@ node e2e/qa/run-qa.mjs --regression
 ```
 
 No pre-existing Angular/backend/database, credentials or manual seed is required.
-Preparation downloads pinned-version tool images and installs the unchanged lockfile
-inside a tool image. This is separate from the isolated application runtime.
+Preparation stages only the required application and QA inputs and installs
+with pnpm and the frozen lockfile inside the tool image. This is separate
+from the isolated application runtime. Auth regression runs with the image's
+verified pnpm and Playwright, with no network.
 
 `e2e:auth`, `e2e:no-write` and `e2e:no-write:ci` run the full gate.
 `e2e:no-write:headed` uses Chromium with Xvfb **inside Docker**, not a visible
