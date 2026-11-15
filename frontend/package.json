@@ -30,6 +30,7 @@
     "e2e:no-write": "node e2e/qa/run-qa.mjs",
     "e2e:no-write:headed": "node e2e/qa/run-qa.mjs --headed",
     "e2e:no-write:ci": "node e2e/qa/run-qa.mjs",
+    "e2e:recovery": "node e2e/qa/run-recovery.mjs",
     "e2e:billing-series:ci": "playwright test e2e/specs/billing-series-concurrency.spec.ts --workers=1",
     "e2e:internal-note:ci": "playwright test e2e/specs/internal-note.no-write.spec.ts --project=chromium --workers=1 --retries=0 --grep @internal-note-ci --reporter=line",
     "e2e:report": "playwright show-report e2e/playwright-report"

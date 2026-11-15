@@ -8,6 +8,9 @@ const configuredBaseURL = resolveE2EBaseURL();
 const internalNoteCi = process.env["npm_lifecycle_event"] === "e2e:internal-note:ci";
 if (internalNoteCi && process.env["E2E_BASE_URL"]) throw new Error("QA_NOTE_BASE_URL_OVERRIDE_FORBIDDEN");
 const baseURL = internalNoteCi ? "http://127.0.0.1:4202" : configuredBaseURL;
+const localServer = shouldUseLocalWebServer(baseURL);
+if (localServer && process.version !== "v22.23.4") throw new Error("QA_NODE_VERSION_REQUIRED_22_23_4");
+const nodePath = [path.dirname(process.execPath), process.env.PATH].filter(Boolean).join(path.delimiter);
 
 export default defineConfig({
   testDir: "./e2e/specs",
@@ -37,9 +40,14 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"] },
     },
   ],
-  webServer: shouldUseLocalWebServer(baseURL)
+  webServer: localServer
       ? {
-          command: `npm run start -- --host 127.0.0.1 --port ${internalNoteCi ? 4202 : 4201}`,
+          command: `node ./node_modules/@angular/cli/bin/ng.js serve --host 127.0.0.1 --port ${internalNoteCi ? 4202 : 4201}`,
+          cwd: ".",
+          env: {
+            PATH: nodePath,
+            ...(process.platform === "win32" ? { NoDefaultCurrentDirectoryInExePath: "1" } : {}),
+          },
           url: baseURL,
           reuseExistingServer: false,
           timeout: 120_000,

@@ -50,9 +50,9 @@ pnpm exec playwright --version
 
 Use separate clean install directories for pnpm and npm. For an approved
 dependency change, review both lockfiles together and validate both frozen
-installs. CI, Docker and QA runners still use the npm baseline until their
-respective migration phases. PNPM-6 retires the npm pin and lockfile after
-those consumers have switched.
+installs. CI and Docker retain the npm baseline. The local QA entry points
+and their prerequisites are described in [ERP/POS E2E](e2e/README.md).
+PNPM-6 retires the npm pin and lockfile after the remaining consumers switch.
 
 ## Unit baseline
 

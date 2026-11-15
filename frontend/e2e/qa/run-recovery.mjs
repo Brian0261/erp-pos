@@ -5,10 +5,10 @@ import { cp, lstat, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:f
 import { dirname, resolve, join, sep, parse } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import policy from './safety-policy.cjs';
+import { QA_NODE_VERSION, QA_NPM_VERSION, checkRunnerToolchain, parseRunnerFlags, validPnpmIdentity } from './qa-toolchain.mjs';
 
 const frontend=resolve(dirname(fileURLToPath(import.meta.url)),'../..');
 const root=resolve(frontend,'..');
-const NODE_VERSION='v22.23.4';
 const LABEL='inktoy.qa.run',DIAG='/api/v1/health/recovery-e2e';
 const assert=(ok,code)=>{if(!ok)throw Error(code);};
 const log=value=>console.log('[RECOVERY_QA] '+value);
@@ -57,15 +57,27 @@ export function validateRecoveryReport(report,exitCode=0,selection='full'){
   assert(report.stats?.expected===expected.length&&report.stats.unexpected===0&&report.stats.flaky===0&&report.stats.skipped===0,'QA_INCONSISTENT_REPORT_STATS');
   return tests;
 }
-// Schema v1 evidence from the previous Node pin remains valid for review.
+function validEvidenceVersions(schema, versions) {
+  if (!versions || typeof versions !== 'object' || Array.isArray(versions) || Object.hasOwn(versions, 'pnpm')) return false;
+  if (schema === 1) {
+    return [QA_NODE_VERSION, 'v22.23.3'].includes(versions.node) && versions.npm === QA_NPM_VERSION
+      && !Object.hasOwn(versions, 'hostPackageManager') && !Object.hasOwn(versions, 'qaImagePackageManager');
+  }
+  const image = versions.qaImagePackageManager;
+  return schema === 2 && versions.node === QA_NODE_VERSION && !Object.hasOwn(versions, 'npm')
+    && validPnpmIdentity(versions.hostPackageManager)
+    && image?.name === 'npm' && image.version === QA_NPM_VERSION && Object.keys(image).length === 2;
+}
+
+// V1 remains the format emitted by the npm path and accepted for historical review.
 export function validateRecoveryEvidence(summary,progress){
   assert(summary?.result==='PASS'&&summary.selection==='full'&&summary.isolation==='PASS'&&summary.cleanup==='PASS'
     &&summary.phase==='completed'&&summary.completedAt&&summary.fixtureIsolation?.uniqueResources===true
     &&summary.backendArtifact?.generatedThisRun===true&&/^[a-f0-9]{40}$/.test(summary.revision?.commit??'')
     &&Array.isArray(summary.tests)&&summary.tests.length===REQUIRED_SCENARIOS.length,'QA_FINAL_EVIDENCE_REQUIRED');
-  assert(summary.schemaVersion===1&&/^[a-f0-9]{24}$/.test(summary.runId??'')&&Number.isFinite(Date.parse(summary.startedAt))
+  assert(validEvidenceVersions(summary.schemaVersion,summary.versions)&&/^[a-f0-9]{24}$/.test(summary.runId??'')&&Number.isFinite(Date.parse(summary.startedAt))
     &&Number.isFinite(Date.parse(summary.completedAt))&&Number.isFinite(summary.durationMs)
-    &&[NODE_VERSION,'v22.23.3'].includes(summary.versions?.node)&&summary.versions.npm==='10.9.9'&&/^jar 17\./.test(summary.versions.jar??'')
+    &&/^jar 17\./.test(summary.versions.jar??'')
     &&summary.versions.maven&&summary.versions.docker&&summary.versions.playwright==='Version 1.61.1'
     &&['tools','postgres','java'].every(k=>/^sha256:[a-f0-9]{64}$/.test(summary.versions.images?.[k]??''))
     &&/^[a-f0-9]{64}$/.test(summary.backendArtifact.sha256??'')&&summary.backendArtifact.sizeBytes>0,
@@ -78,6 +90,17 @@ export function validateRecoveryEvidence(summary,progress){
     &&new Set(progress.map(t=>t.title)).size===REQUIRED_SCENARIOS.length
     &&REQUIRED_SCENARIOS.every(([,title])=>progress.some(t=>t.title===title&&t.status==='passed'&&Array.isArray(t.errors)&&!t.errors.length)),
     'QA_PROGRESS_EVIDENCE_REQUIRED');
+}
+
+function verifyObservedToolchain(summary, manager) {
+  assert(summary.versions.node === process.version, 'QA_EVIDENCE_TOOLCHAIN_MISMATCH');
+  if (manager.name === 'npm') {
+    assert(summary.schemaVersion === 1 && summary.versions.npm === manager.version, 'QA_EVIDENCE_TOOLCHAIN_MISMATCH');
+    return;
+  }
+  const recorded = summary.versions.hostPackageManager;
+  assert(summary.schemaVersion === 2 && Object.entries(manager).every(([key, value]) => recorded?.[key] === value),
+    'QA_EVIDENCE_TOOLCHAIN_MISMATCH');
 }
 export function denialDiagnostics(data){
   assert(Number.isSafeInteger(data?.denied)&&data.denied>=1&&Array.isArray(data.denialRecords)
@@ -147,8 +170,10 @@ const inspect=async id=>JSON.parse(await docker(['inspect',id]))[0];
 async function poll(action,timeout=120000){const until=Date.now()+timeout;while(Date.now()<until){if(interrupted)throw Error('QA_INTERRUPTED');try{const r=await action();if(r)return r;}catch{}await new Promise(r=>setTimeout(r,500));}throw Error('QA_READINESS_TIMEOUT');}
 
 async function main(){
-  const pendingUx=process.argv.length===3&&process.argv[2]==='--pending-ux';
-  const modalUx=process.argv.length===3&&process.argv[2]==='--modal-ux';
+  const flags=parseRunnerFlags(process.argv.slice(2),['--pending-ux','--modal-ux']);
+  const pendingUx=flags.has('--pending-ux');
+  const modalUx=flags.has('--modal-ux');
+  assert(!(pendingUx&&modalUx),'QA_ARGUMENT_OVERRIDE_FORBIDDEN');
   const selection=pendingUx?'pending-ux':modalUx?'modal-ux':'full';
   const runId=randomBytes(12).toString('hex'),secret=()=>randomBytes(32).toString('hex');
   const database='qa_'+runId;
@@ -160,7 +185,7 @@ async function main(){
   const runDir=join(qaRoot,runId),stage=join(runDir,'stage'),artifacts=join(runDir,'evidence');
   await noLinks(qaRoot);
   await mkdir(artifacts,{recursive:true});const image='inktoy-recovery-qa-tools:'+runId;
-  let decoy,error,anchor,browser,backend,dockerReady=false,timedOut=false,phaseStarted=Date.now();
+  let decoy,error,anchor,browser,backend,hostManager,dockerReady=false,timedOut=false,phaseStarted=Date.now();
   const started=Date.now(),summary={schemaVersion:1,runId,selection,revision:null,versions:{node:process.version},
     startedAt:new Date(started).toISOString(),phase:'preflight',phases:[],isolation:'NOT_STARTED',cleanup:'NOT_STARTED',result:'RUNNING',tests:[],errors:[]};
   const manifest=join(artifacts,'summary.json');
@@ -196,12 +221,15 @@ async function main(){
   try{
     await save();
     await writeFile(join(artifacts,'progress.json'),'[]',{mode:0o600});
-    assert(process.argv.length===2||pendingUx||modalUx,'QA_ARGUMENT_OVERRIDE_FORBIDDEN');
     assert(!process.env.CI||selection==='full','QA_CI_FULL_SUITE_REQUIRED');policy.rejectInherited(process.env);
     summary.revision={commit:await checked('git',['rev-parse','HEAD']),dirty:!!(await checked('git',['status','--porcelain','--untracked-files=all']))};
-    assert(process.version===NODE_VERSION,'QA_NODE_VERSION_REQUIRED');
-    summary.versions.npm=await checked(process.platform==='win32'?'npm.cmd':'npm',['--version'],{shell:process.platform==='win32'});
-    assert(summary.versions.npm==='10.9.9','QA_NPM_VERSION_REQUIRED');
+    hostManager=await checkRunnerToolchain({target:'recovery',flags,
+      allowedScripts:['e2e:recovery'],cwd:frontend,checked});
+    if(hostManager.name==='pnpm'){
+      summary.schemaVersion=2;
+      summary.versions.hostPackageManager={...hostManager};
+    }else summary.versions.npm=hostManager.version;
+    log(`TOOLCHAIN PASS: ${process.version}; host ${hostManager.name} ${hostManager.version}`);
     summary.versions.jar=await checked('jar',['--version']);assert(/^jar 17\./.test(summary.versions.jar),'QA_JAVA_17_REQUIRED');
     summary.versions.maven=(await checked(process.platform==='win32'?'mvnw.cmd':'./mvnw',['--version'],{cwd:join(root,'backend'),shell:process.platform==='win32'})).match(/Apache Maven [\d.]+/)?.[0];
     summary.versions.docker=await docker(['version','--format','{{.Server.Version}}']);
@@ -269,6 +297,11 @@ async function main(){
       '--tmpfs','/tmp:rw,nosuid,size=512m,uid=1001,gid=1001','--tmpfs','/qa-run:rw,nosuid,size=256m,uid=1001,gid=1001,mode=0700',
       '--tmpfs','/app/.angular:rw,nosuid,size=512m,uid=1001,gid=1001'],env);
     await own(browser,network);await docker(['start',browser]);await prove(browser);
+    if(hostManager.name==='pnpm'){
+      const npm=await execNode(browser,"import fs from 'node:fs'; console.log(JSON.parse(fs.readFileSync('/usr/local/lib/node_modules/npm/package.json', 'utf8')).version);");
+      assert(npm===QA_NPM_VERSION,'QA_IMAGE_NPM_VERSION_REQUIRED');
+      summary.versions.qaImagePackageManager={name:'npm',version:npm};
+    }
     await execNode(browser,`import fs from 'node:fs';fs.mkdirSync('/qa-run/screenshots',{recursive:true});fs.writeFileSync('/qa-run/proxy.json',JSON.stringify({'/api':{target:'http://127.0.0.1:8080',changeOrigin:false,headers:{'X-QA-Proxy-Run':${JSON.stringify(runId)}}}}),{mode:0o600});`);
     await docker(['exec','-d',browser,'node','node_modules/@angular/cli/bin/ng.js','serve','--host','127.0.0.1','--port','4201','--proxy-config','/qa-run/proxy.json','--live-reload=false','--hmr=false']);
     const proxied=await poll(async()=>{const r=await http(browser,'http://127.0.0.1:4201'+DIAG);return r.status===200?JSON.parse(r.body):false;},180000);identity(proxied,true);
@@ -322,7 +355,10 @@ async function main(){
     summary.result=!error&&!interrupted&&!summary.errors.length&&summary.isolation==='PASS'&&summary.cleanup==='PASS'?'PASS':'FAIL';
     summary.completedAt=new Date().toISOString();summary.durationMs=Date.now()-started;await phase('completed');await save();
     try{const evidence=await readRecoveryEvidence(artifacts);
-      if(summary.result==='PASS'&&selection==='full')validateRecoveryEvidence(evidence.summary,evidence.progress);
+      if(summary.result==='PASS'){
+        verifyObservedToolchain(evidence.summary,hostManager);
+        if(selection==='full')validateRecoveryEvidence(evidence.summary,evidence.progress);
+      }
     }catch(ex){summary.result='FAIL';summary.errors.push(/^(QA_|UNSAFE_)/.test(ex.message)?ex.message:'QA_EVIDENCE_REJECTED');await save();throw ex;}
     policy.verifyCleanup(failures);
     log('CLEANUP '+summary.cleanup+': only owned ephemeral resources and staged copies removed');log('EVIDENCE '+artifacts);

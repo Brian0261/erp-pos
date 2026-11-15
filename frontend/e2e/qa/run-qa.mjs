@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { dirname, resolve, join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import policy from './safety-policy.cjs';
+import { checkRunnerToolchain, parseRunnerFlags } from './qa-toolchain.mjs';
 const { rejectInherited, verifyIdentity, verifyResults, verifyContainer, verifyCleanup } = policy;
 
 const frontend = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -71,10 +72,11 @@ async function checked(file, args, options) {
 const docker = (args, options) => checked('docker', args, options);
 const inspect = async id => JSON.parse(await docker(['inspect', id]))[0];
 
-async function main() {
+async function main(flags) {
   rejectInherited(process.env);
-  assert(process.version === 'v22.23.4', 'QA_NODE_VERSION_REQUIRED_22_23_4');
-  assert(await checked(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['--version'], { shell: process.platform === 'win32' }) === '10.9.9', 'QA_NPM_VERSION_REQUIRED_10_9_9');
+  const manager = await checkRunnerToolchain({ target: 'auth', flags,
+    allowedScripts: ['e2e:auth', 'e2e:no-write', 'e2e:no-write:headed', 'e2e:no-write:ci'], cwd: frontend, checked });
+  log(`TOOLCHAIN PASS: ${process.version}; host ${manager.name} ${manager.version}`);
   assert((await docker(['version', '--format', '{{.Server.Os}}'])) === 'linux', 'QA_LINUX_DOCKER_REQUIRED');
   const endpoint = await docker(['context', 'inspect', '--format', '{{(index .Endpoints "docker").Host}}']);
   assert(endpoint.startsWith('npipe:') || endpoint.startsWith('unix:'), 'QA_LOCAL_DOCKER_REQUIRED');
@@ -232,7 +234,7 @@ async function main() {
     log(`SAFETY PASS: ${safetyCount} negative tests; backend mutation rejected before business services`);
     const baseline = JSON.parse((await http(browser,'http://127.0.0.1:4201'+DIAG)).body);
     assert(baseline.violations===1,'QA_UNEXPECTED_PRE_GATE_VIOLATION');
-    const headed=process.argv.includes('--headed');
+    const headed=flags.has('--headed');
     const gate=await command('docker',['exec',browser,...(headed?['xvfb-run','-a']:[]),'node','node_modules/@playwright/test/cli.js','test','--config=playwright.auth.config.ts','--project=public','--project=authenticated','--reporter=json',...(headed?['--headed']:[])],{timeout:240000});
     reportResult(gate,'gate','QA_AUTHENTICATED_GATE_FAILED');
     const final=JSON.parse((await http(browser,'http://127.0.0.1:4201'+DIAG)).body);
@@ -241,7 +243,7 @@ async function main() {
     await proveNetwork(browser);await proveNetwork(backend);await proveNetwork(pgId);
     resultSummary=`3 PASS / 0 FAIL / 0 SKIPPED; setup 1 PASS; safety ${safetyCount} PASS`;
     log(resultSummary);
-    if(process.argv.includes('--regression')) {
+    if(flags.has('--regression')) {
       const regression=await create('regression',runtimeImage,['--network','none',...hardened,'--shm-size','256m',
         '--tmpfs','/tmp:rw,nosuid,size=512m,uid=1001,gid=1001','--tmpfs','/qa-run:rw,exec,nosuid,size=512m,uid=1001,gid=1001,mode=0700',
         '--tmpfs','/app/.angular:rw,nosuid,size=512m,uid=1001,gid=1001',
@@ -314,7 +316,7 @@ async function main() {
 }
 
 if(process.argv[1] && resolve(process.argv[1])===fileURLToPath(import.meta.url)) {
-  assert(process.argv.slice(2).every(a=>['--headed','--regression'].includes(a)) && new Set(process.argv.slice(2)).size===process.argv.length-2,'QA_ARGUMENT_OVERRIDE_FORBIDDEN');
   for(const signal of ['SIGINT','SIGTERM']) process.once(signal,()=>{stopping=true;for(const child of activeChildren)child.kill();});
-  main().catch(error=>{console.error('[QA] '+(/^QA_|^UNSAFE_|^NETWORK_/.test(error.message)?error.message:'QA_FAILED_SANITIZED'));process.exitCode=1;});
+  Promise.resolve().then(()=>main(parseRunnerFlags(process.argv.slice(2),['--headed','--regression'])))
+    .catch(error=>{console.error('[QA] '+(/^QA_|^UNSAFE_|^NETWORK_/.test(error.message)?error.message:'QA_FAILED_SANITIZED'));process.exitCode=1;});
 }
