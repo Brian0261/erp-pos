@@ -40,7 +40,7 @@ Ambiente: Docker Compose (frontend Nginx 4200, backend 8080, postgres 5432)
 ### Checklist estandar pre-aceptacion UI (obligatorio)
 
 - [x] `cd frontend`.
-- [x] `npm run build`.
+- [x] `pnpm run build`.
 - [x] `cd ..`.
 - [x] `docker compose up --build -d`.
 - [x] `docker compose ps`.

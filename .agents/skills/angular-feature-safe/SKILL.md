@@ -31,7 +31,7 @@ Skill para trabajo frontend InkToy ERP/POS orientado a features reales, UI estab
 2. Identificar si el cambio es visual, funcional o mixto.
 3. Limitar el alcance a la feature afectada.
 4. Implementar y validar el build.
-5. Ejecutar `cd frontend && npm run build && cd ..`.
+5. Ejecutar `cd frontend && pnpm run build && cd ..`.
 
 ## Entregables
 - Archivos tocados.

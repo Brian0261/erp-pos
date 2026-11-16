@@ -173,7 +173,7 @@ git diff --stat
 
 ```powershell
 cd frontend
-npm run build
+pnpm run build
 ```
 
 ### Validacion post-flight
@@ -329,7 +329,7 @@ mvn clean verify
 cd backend
 mvn clean test
 cd ../frontend
-npm run build
+pnpm run build
 ```
 
 ### Validacion post-flight
@@ -426,7 +426,7 @@ docker compose config
 
 ```powershell
 cd frontend
-npm run build
+pnpm run build
 ```
 
 ### Validacion post-flight
@@ -582,7 +582,7 @@ Adicionalmente, ejecutar la validacion proporcional al modulo afectado:
 
 ```powershell
 cd frontend
-npm run build
+pnpm run build
 ```
 
 o
@@ -618,12 +618,12 @@ mvn clean test
 | Tipo de cambio | Comandos minimos | Validacion manual minima | Documentacion a actualizar |
 | --- | --- | --- | --- |
 | docs-only | `git status`, `git diff --stat` | Revisar diff y coherencia con fuentes de verdad | `docs/ai` o documento objetivo; `docs/qa` solo si cambia protocolo QA |
-| frontend-only | `cd frontend`, `npm run build` | Ruta objetivo, consola, network, roles si aplica | `docs/qa/REGRESSION_CHECKLIST.md` si cambia UX/flujo/permisos |
+| frontend-only | `cd frontend`, `pnpm run build` | Ruta objetivo, consola, network, roles si aplica | `docs/qa/REGRESSION_CHECKLIST.md` si cambia UX/flujo/permisos |
 | backend-only sin DB | `cd backend`, `mvn clean test` | Endpoint/regla afectada si hay runtime disponible | `MATRIX_API_ENDPOINTS` o findings si cambia contrato/comportamiento |
 | backend con DB/Flyway | `cd backend`, `mvn clean verify`, `docker compose config`, `docker compose up --build -d`, `docker compose ps` | Flyway OK, health, smoke modulo, consistencia SQL si aplica | `BACKEND_QA_FINDINGS`, `REGRESSION_CHECKLIST`, `MVP_STABILIZATION_REPORT` |
-| RBAC/rutas protegidas | `mvn clean test`, `npm run build` | `401/403/200` API y ruta forzada por rol en UI | `MATRIX_ROLES_PERMISSIONS`, `MATRIX_SCREENS_ENDPOINTS` |
+| RBAC/rutas protegidas | `mvn clean test`, `pnpm run build` | `401/403/200` API y ruta forzada por rol en UI | `MATRIX_ROLES_PERMISSIONS`, `MATRIX_SCREENS_ENDPOINTS` |
 | Docker/runtime | `docker compose config`, `docker compose up --build -d`, `docker compose ps` | Logs backend/frontend, health, proxy `/api` | `REGRESSION_CHECKLIST`, `MVP_STABILIZATION_REPORT` si cambia protocolo/runtime |
-| UI/layout/theme/sidebar | `cd frontend`, `npm run build` | Desktop/mobile, tema, scroll, logout, roles, anti-cache | `REGRESSION_CHECKLIST`, `FRONTEND_QA_FINDINGS` si hay hallazgo |
+| UI/layout/theme/sidebar | `cd frontend`, `pnpm run build` | Desktop/mobile, tema, scroll, logout, roles, anti-cache | `REGRESSION_CHECKLIST`, `FRONTEND_QA_FINDINGS` si hay hallazgo |
 | API contract | `cd backend`, `mvn clean verify` | JSON esperado, codigos HTTP, compatibilidad `v1/v2` | `MATRIX_API_ENDPOINTS`, `MATRIX_SCREENS_ENDPOINTS`, README si aplica |
 | QA regression | `git status`, `git diff --stat` mas comandos proporcionales | Flujos criticos y roles definidos por alcance | `REGRESSION_CHECKLIST`, `BUG_REPORT`, findings correspondientes |
 | hotfix urgente | `git status`, `git diff --stat`, build/test proporcional | Repro/fix del fallo y smoke del flujo afectado | `docs/qa` si bug relevante o cambio observable |

@@ -18,7 +18,7 @@ Nota: segun entorno local, tambien se puede usar `./mvnw.cmd` en Windows.
 
 ```powershell
 cd frontend
-npm run build
+pnpm run build
 ```
 
 ## Validacion Docker

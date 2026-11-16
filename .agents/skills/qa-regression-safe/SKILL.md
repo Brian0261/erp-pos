@@ -17,7 +17,7 @@ Skill para validar cambios de InkToy ERP/POS con evidencia mínima, foco en ries
 ## Guía InkToy
 - Validación proporcional al cambio: frontend, backend o ambos.
 - Usar `git status --short` y `git diff --stat` como verificación base.
-- Si toca Angular, ejecutar `cd frontend && npm run build && cd ..`.
+- Si toca Angular, ejecutar `cd frontend && pnpm run build && cd ..`.
 - Si toca backend, ejecutar `cd backend && mvn clean test && cd ..`.
 - Si aplica runtime, usar `docker compose up --build -d`.
 - Registrar evidencia en `docs/qa/REGRESSION_CHECKLIST.md` solo si hubo QA real.

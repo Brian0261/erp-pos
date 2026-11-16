@@ -18,7 +18,7 @@ base_skills:
 - No tocar backend, endpoints ni modelos/payload si el cambio es solo visual.
 - No tocar guards, AuthService, JWT ni interceptores salvo autorización explícita.
 - Preferir CSS/template local para fixes visuales.
-- Validar con `cd frontend && npm run build && cd ..`.
+- Validar con `cd frontend && pnpm run build && cd ..`.
 
 ## Salida esperada
 - Archivos tocados.
