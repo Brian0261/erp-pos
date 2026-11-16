@@ -316,14 +316,17 @@ Endpoints actuales:
 
 Ruta: `frontend`
 
-Requiere Node `22.23.4` y npm `10.9.9`; `frontend/.nvmrc` declara la version
-de Node. Comprueba `node --version` y `npm --version` antes de instalar.
+Requiere Node `22.23.4` y pnpm nativo `12.19.0`. Selecciona la versión de
+Node declarada en `frontend/.nvmrc` y verifica el ejecutable de pnpm según
+la [guía de pruebas](frontend/TESTING.md) antes de instalar.
 
 ```powershell
 Push-Location .\frontend
-npm ci
-npm run build
-npm start
+node --version
+pnpm --version
+pnpm install --frozen-lockfile
+pnpm run build
+pnpm run start
 Pop-Location
 ```
 
@@ -352,7 +355,7 @@ El job `changes` clasifica cada cambio como `full` o `docs_only`. Este último
 solo aplica a cambios de contenido de archivos Markdown regulares existentes
 en `README.md` o `docs/*.md`. En ese caso se conservan los cuatro jobs y checks
 (`backend`, `frontend`, `e2e-auth` y `e2e-commercial`), pero se omiten sus pasos
-pesados de Maven, npm y E2E.
+pesados de Maven, pnpm y E2E.
 
 Se ejecuta CI completo para cambios fuera de esas rutas, diffs vacíos, altas,
 bajas, renombres, tipos o modos de archivo distintos, forks, diferencias que

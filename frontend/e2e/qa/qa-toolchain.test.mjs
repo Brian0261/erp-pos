@@ -1,21 +1,20 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { mkdtemp, realpath, rm, rmdir, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, rmdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { checkQaToolchain, parseQaFlags, QA_NODE_VERSION, validPnpmIdentity, verifyPnpmExecutable } from './qa-toolchain.mjs';
+import { checkRunnerToolchain, parseQaFlags, QA_NODE_VERSION, validPnpmIdentity, verifyPnpmExecutable } from './qa-toolchain.mjs';
 import { REQUIRED_SCENARIOS, validateRecoveryEvidence, validateRecoveryReport } from './run-recovery.mjs';
 
 const pnpm = {
   name: 'pnpm', version: '12.19.0', platform: 'linux', arch: 'x64',
   sha256: 'baae19a2dafc7b6d38980293904f8b8d0522adbe4cfda5c469c8e3175560e4d0',
 };
-const allowedScripts = ['e2e:no-write'];
 const pnpmContext = executable => ({
   npm_command: 'run-script', npm_config_user_agent: 'pnpm/12.19.0 npm/? node/?',
-  npm_execpath: executable, npm_lifecycle_event: allowedScripts[0],
+  npm_execpath: executable, npm_lifecycle_event: 'e2e:no-write',
 });
 
 function runAuthPreflight(args, env, input) {
@@ -34,17 +33,14 @@ function runAuthPreflight(args, env, input) {
   });
 }
 
-test('invalid arguments and package manager contexts fail before running a tool', async () => {
+test('invalid arguments and direct runner entry points fail before running a tool', async () => {
   assert.deepEqual([...parseQaFlags(['--headed'], ['--headed'])], ['--headed']);
   for (const args of [['--pnpm'], ['--headed', '--headed'], ['--npm'], ['--config=outside']]) {
     assert.throws(() => parseQaFlags(args, ['--headed']), /QA_ARGUMENT_OVERRIDE_FORBIDDEN/);
   }
-  const context = pnpmContext(resolve('pnpm'));
-  for (const env of [context, pnpmContext('pnpm'), {...context, npm_config_user_agent: 'npm/10.9.9', npm_lifecycle_event: 'start'},
-    {...context, npm_config_user_agent: 'npm/10.9.8'}]) {
-    await assert.rejects(checkQaToolchain({ allowedScripts, env }), /QA_PACKAGE_MANAGER_CONTEXT_REJECTED/);
+  for (const target of ['auth', 'recovery']) {
+    await assert.rejects(checkRunnerToolchain({ target, flags: new Set() }), /QA_PNPM_CONTROLLED_LAUNCH_REQUIRED/);
   }
-  await assert.rejects(checkQaToolchain({ nodeVersion: 'v22.23.3' }), /QA_NODE_VERSION_REQUIRED/);
 });
 
 test('a shim or an unreadable binary never reaches the version check', async () => {
@@ -64,18 +60,27 @@ test('a shim or an unreadable binary never reaches the version check', async () 
   }
 });
 
-test('direct runner rejects inherited pnpm context before Docker', async () => {
+test('direct runner rejects plain Node and inherited npm or pnpm context before Docker', async () => {
   const executable = process.env.INKTOY_TEST_PNPM || resolve('pnpm');
   if (process.env.INKTOY_TEST_PNPM) {
     await verifyPnpmExecutable(executable, { checked: async () => '12.19.0' });
     await assert.rejects(verifyPnpmExecutable(executable, { checked: async () => '12.18.0' }), /QA_PNPM_VERSION_REQUIRED/);
+    for (const error of ['QA_COMMAND_START_FAILED', 'QA_COMMAND_TIMEOUT']) {
+      await assert.rejects(verifyPnpmExecutable(executable, { checked: async () => { throw Error(error + ':private path'); } }),
+        { message: error + ':PACKAGE_MANAGER' });
+    }
   }
-  for (const [flags, expected] of [
-    [['--pnpm'], /QA_ARGUMENT_OVERRIDE_FORBIDDEN/],
-    [[], /QA_PACKAGE_MANAGER_CONTEXT_REJECTED/],
-    [['--qa-pnpm-launch'], /QA_PNPM_CONTROLLED_LAUNCH_REQUIRED/],
+  const inherited = pnpmContext(executable);
+  const npmContext = { ...inherited, npm_config_user_agent: 'npm/10.9.9 node/v22.23.4' };
+  for (const [flags, env, expected] of [
+    [['--pnpm'], inherited, /QA_ARGUMENT_OVERRIDE_FORBIDDEN/],
+    [[], {}, /QA_PNPM_CONTROLLED_LAUNCH_REQUIRED/],
+    [[], inherited, /QA_PNPM_CONTROLLED_LAUNCH_REQUIRED/],
+    [[], npmContext, /QA_PNPM_CONTROLLED_LAUNCH_REQUIRED/],
+    [['--qa-pnpm-launch'], inherited, /QA_PNPM_CONTROLLED_LAUNCH_REQUIRED/],
+    [['--qa-pnpm-launch'], npmContext, /QA_PNPM_CONTROLLED_LAUNCH_REQUIRED/],
   ]) {
-    const {code, output} = await runAuthPreflight(flags, pnpmContext(executable));
+    const {code, output} = await runAuthPreflight(flags, env);
     assert.equal(code, 1);
     assert.match(output, expected);
     assert.doesNotMatch(output, /TOOLCHAIN PASS|PREPARATION/);
@@ -91,30 +96,6 @@ test('the launch channel rejects missing, incomplete, repeated and oversized rec
     assert.match(output, /QA_PNPM_LAUNCH_RECORD_INVALID/);
     assert.doesNotMatch(output, /TOOLCHAIN PASS|PREPARATION/);
   }
-});
-
-test('the npm path invokes the Node installation CLI by absolute path', async () => {
-  const node = await realpath(process.execPath);
-  const relative = process.platform === 'win32' ? 'node_modules/npm/bin/npm-cli.js' : '../lib/node_modules/npm/bin/npm-cli.js';
-  const cli = await realpath(resolve(dirname(node), relative));
-  const checked = (file, args, options) => new Promise((done, fail) => {
-    assert.equal(file, process.execPath);
-    assert.deepEqual(args, [cli, '--version']);
-    const child = spawn(file, args, { ...options, stdio: ['ignore', 'pipe', 'ignore'] });
-    let output = '';
-    child.stdout.on('data', data => output += data);
-    child.on('error', fail);
-    child.on('close', code => code === 0 ? done(output.trim()) : fail(Error('npm version failed')));
-  });
-  const npmContext = {...pnpmContext(cli), npm_config_user_agent: 'npm/10.9.9 node/v22.23.4'};
-  for (const env of [{}, npmContext]) {
-    assert.deepEqual(await checkQaToolchain({ usePnpm: false, allowedScripts, env, checked }), { name: 'npm', version: '10.9.9' });
-  }
-  for (const code of ['QA_COMMAND_START_FAILED', 'QA_COMMAND_TIMEOUT']) {
-    await assert.rejects(checkQaToolchain({ env: {}, checked: async () => { throw Error(code + ':private path'); } }),
-      { message: code + ':PACKAGE_MANAGER' });
-  }
-  await assert.rejects(checkQaToolchain({ env: {}, checked: async () => '10.9.8' }), /QA_NPM_VERSION_REQUIRED/);
 });
 
 function evidence() {

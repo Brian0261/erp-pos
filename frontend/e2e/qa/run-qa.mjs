@@ -74,8 +74,7 @@ const inspect = async id => JSON.parse(await docker(['inspect', id]))[0];
 
 async function main(flags) {
   rejectInherited(process.env);
-  const manager = await checkRunnerToolchain({ target: 'auth', flags,
-    allowedScripts: ['e2e:auth', 'e2e:no-write', 'e2e:no-write:headed', 'e2e:no-write:ci'], cwd: frontend, checked });
+  const manager = await checkRunnerToolchain({ target: 'auth', flags });
   log(`TOOLCHAIN PASS: ${process.version}; host ${manager.name} ${manager.version}`);
   assert((await docker(['version', '--format', '{{.Server.Os}}/{{.Server.Arch}}'])) === 'linux/amd64', 'QA_DOCKER_LINUX_AMD64_REQUIRED');
   const endpoint = await docker(['context', 'inspect', '--format', '{{(index .Endpoints "docker").Host}}']);

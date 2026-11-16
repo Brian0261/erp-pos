@@ -152,7 +152,7 @@ Apply visual consistency across the ERP/POS while preserving MVP behavior.
 
 ## Validation Checklist
 
-- npm run build succeeds.
+- `pnpm run build` succeeds.
 - Docker composition serves frontend and backend correctly.
 - /api proxy remains functional.
 - Login still authenticates seeded users.

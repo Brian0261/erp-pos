@@ -1,21 +1,10 @@
 # Frontend testing
 
-## Node/npm toolchain
+## Node and pnpm toolchain
 
-Use Node `22.23.4` and npm `10.9.9` for frontend commands. The canonical
-Node version is `frontend/.nvmrc`; `devEngines` in `package.json` rejects
-other Node/npm versions. On Windows or WSL, select an existing installation
-or your already available toolchain mechanism before installing dependencies;
-no particular version manager is required. Check the active terminal first:
-
-```powershell
-node --version
-npm --version
-npm ci
-```
-
-Run these commands from `frontend`. `npm ci` installs reproducibly from the
-committed lockfile; do not use `npm install` for this baseline.
+Use Node `22.23.4` and native pnpm `12.19.0` for frontend commands.
+`frontend/.nvmrc` declares the Node version. Select the existing toolchain
+for the current Windows, WSL or Linux session before installing dependencies.
 
 ## pnpm lockfile validation (PNPM-2)
 
@@ -34,9 +23,10 @@ gh attestation verify <archive> --repo pnpm/pnpm --signer-workflow pnpm/pnpm/.gi
 ```
 
 Extract outside the repository and use the executable's absolute path.
-Select Node `22.23.4` in the current session. Run the version check from
-`frontend` so pnpm uses the project's pin and rejects version switching.
-In the commands below, `pnpm` means the verified executable.
+Use `pnpm.exe` on Windows and the matching Linux executable on WSL or Linux.
+Put the verified executable's directory first on the current session's PATH so
+tools launched by pnpm use the same binary. Run the version checks from
+`frontend` and proceed only with Node `v22.23.4` and pnpm `12.19.0`.
 
 ```text
 node --version
@@ -44,15 +34,17 @@ pnpm --version
 pnpm install --frozen-lockfile
 pnpm peers check
 pnpm run build
-pnpm test
+pnpm run test
 pnpm exec playwright --version
 ```
 
-Use separate clean install directories for pnpm and npm. For an approved
-dependency change, review both lockfiles together and validate both frozen
-installs. The GitHub Actions frontend and QA jobs now use pnpm. The local QA entry
-points and their prerequisites are described in [ERP/POS E2E](e2e/README.md).
-PNPM-6 retires the npm pin and lockfile after the remaining consumers switch.
+Run `pnpm run start` to start the local Angular development server.
+
+Use a clean checkout or a clean `node_modules` directory when switching from
+an npm install. Keep native Windows and WSL/Linux installs separate. If a
+version check fails, select the approved toolchain. If the frozen install fails,
+compare the manifest and lockfile with the approved revision before continuing.
+The local QA entry points are described in [ERP/POS E2E](e2e/README.md).
 
 ## Docker builds (PNPM-4)
 
@@ -68,7 +60,7 @@ the glibc release. Both verify the archive and extracted executable before
 running pnpm 12.19.0 with Node 22.23.4. The release archives are covered by the
 upstream build attestation above. BuildKit caches downloads separately for
 each libc and the install uses the committed frozen lockfile and workspace
-policy. QA runners prepare their own contexts and keep npm support on the host.
+policy. QA runners prepare their own contexts and use the verified host pnpm.
 The frontend runtime receives the Angular static output and Nginx config.
 The unchanged rolling Nginx tag can change the runtime image independently of
 the frozen application dependencies.
@@ -79,7 +71,7 @@ The Angular 18 baseline uses Karma 6 and Jasmine 5 temporarily. Run the
 headless suite once with:
 
 ```powershell
-npm test
+pnpm run test
 ```
 
 The target uses `ChromeHeadless`, `zone.js/testing` and
@@ -96,15 +88,17 @@ Current P0/P1 scope:
 ## Build and focal E2E
 
 ```powershell
-npm run build
-npm run e2e:billing-series:ci
-npm run e2e:no-write
+pnpm run build
+pnpm run e2e:install
+pnpm run e2e:billing-series:ci
+pnpm run e2e:internal-note:ci
+node e2e/qa/qa-toolchain.mjs launch auth "<absolute-path-to-pnpm>"
+node e2e/qa/qa-toolchain.mjs launch recovery "<absolute-path-to-pnpm>"
 ```
 
-`e2e:billing-series:ci` is fully simulated through Playwright routing and does
-not write to the backend. Authenticated no-write cases require the existing QA
-credentials and may be skipped when they are unavailable; skipped cases are not
-evidence of PASS.
+`e2e:billing-series:ci` is fully simulated through Playwright routing.
+The controlled Auth gate creates its own disposable fixtures and fails when a
+required case is skipped.
 
 ## CI order
 
@@ -125,8 +119,7 @@ The QA jobs invoke `qa-toolchain.mjs launch auth|recovery` with the verified
 absolute pnpm path. Commercial CI requires schema v3 with pnpm on both the
 host and the QA image. It checks the checkout commit (including the test
 merge commit for a PR), lockfile and observed Docker browser image before
-accepting the result. Historical evidence and local npm commands remain
-supported.
+accepting the result. The historical v1, v2 and v3 evidence remains readable.
 
 Karma remains a temporary safety baseline. A separate QA-FE-2 phase will decide
 whether to retain it or migrate to Vitest after the Angular major upgrades.

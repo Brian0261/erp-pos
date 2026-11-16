@@ -9,7 +9,6 @@ import { promisify } from 'node:util';
 import policy from './safety-policy.cjs';
 
 export const QA_NODE_VERSION = 'v22.23.4';
-export const QA_NPM_VERSION = '10.9.9';
 const PNPM_VERSION = '12.19.0';
 const LAUNCH_FLAG = '--qa-pnpm-launch';
 const RECORD_TIMEOUT = 10000;
@@ -48,16 +47,6 @@ function isLocalAbsolute(executable) {
     && (process.platform !== 'win32' || /^[a-z]:[\\/]/i.test(executable));
 }
 
-function verifyNpmContext(allowedScripts, env) {
-  const { npm_command: command, npm_config_user_agent: agent, npm_execpath: executable,
-    npm_lifecycle_event: script } = env;
-  if ([command, agent, executable, script].every(value => value === undefined)) return;
-  if (command !== 'run-script' || !allowedScripts.includes(script) || !isLocalAbsolute(executable)
-    || agent?.split(' ')[0] !== `npm/${QA_NPM_VERSION}`) {
-    throw Error('QA_PACKAGE_MANAGER_CONTEXT_REJECTED');
-  }
-}
-
 async function checkVersion(checked, executable, args, options) {
   try {
     return await checked(executable, args, options);
@@ -89,21 +78,6 @@ function pnpmLaunchEnv(env) {
   return { ...child, PNPM_CONFIG_MANAGE_PACKAGE_MANAGER_VERSIONS: 'false', PNPM_CONFIG_PM_ON_FAIL: 'error',
     PNPM_CONFIG_VERIFY_DEPS_BEFORE_RUN: 'error', PNPM_CONFIG_RUNTIME: 'false', PNPM_CONFIG_RUNTIME_ON_FAIL: 'error',
     PNPM_CONFIG_OFFLINE: 'true', PATH: [dirname(process.execPath), path && env[path]].filter(Boolean).join(delimiter) };
-}
-
-export async function checkQaToolchain({ allowedScripts, cwd, checked,
-  env = process.env, nodeVersion = process.version }) {
-  if (nodeVersion !== QA_NODE_VERSION) throw Error('QA_NODE_VERSION_REQUIRED_22_23_4');
-  verifyNpmContext(allowedScripts, env);
-  const nodeDir = dirname(await realpath(process.execPath));
-  const relative = process.platform === 'win32' ? 'node_modules/npm/bin/npm-cli.js' : '../lib/node_modules/npm/bin/npm-cli.js';
-  const cli = await realpath(resolve(nodeDir, relative)).catch(() => { throw Error('QA_NPM_CLI_UNAVAILABLE'); });
-  if (env.npm_execpath && await realpath(env.npm_execpath).catch(() => null) !== cli) {
-    throw Error('QA_PACKAGE_MANAGER_CONTEXT_REJECTED');
-  }
-  const version = await checkVersion(checked, process.execPath, [cli, '--version'], { cwd, env, timeout: 10000 });
-  if (version !== QA_NPM_VERSION) throw Error('QA_NPM_VERSION_REQUIRED_10_9_9');
-  return { name: 'npm', version };
 }
 
 export async function verifyPnpmExecutable(path, options) {
@@ -146,8 +120,8 @@ function readLaunchRecord(input) {
   });
 }
 
-export async function checkRunnerToolchain({ target, flags, ...options }) {
-  if (!flags.has(LAUNCH_FLAG)) return checkQaToolchain(options);
+export async function checkRunnerToolchain({ target, flags }) {
+  if (!flags.has(LAUNCH_FLAG)) throw Error('QA_PNPM_CONTROLLED_LAUNCH_REQUIRED');
   if (process.version !== QA_NODE_VERSION) throw Error('QA_NODE_VERSION_REQUIRED_22_23_4');
   const { stdin, ppid, platform, arch, env } = process;
   const candidate = env.npm_execpath;

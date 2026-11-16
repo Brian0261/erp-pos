@@ -5,10 +5,11 @@ import { cp, lstat, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:f
 import { dirname, resolve, join, sep, parse } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import policy from './safety-policy.cjs';
-import { QA_NODE_VERSION, QA_NPM_VERSION, checkRunnerToolchain, parseRunnerFlags, validPnpmIdentity } from './qa-toolchain.mjs';
+import { QA_NODE_VERSION, checkRunnerToolchain, parseRunnerFlags, validPnpmIdentity } from './qa-toolchain.mjs';
 
 const frontend=resolve(dirname(fileURLToPath(import.meta.url)),'../..');
 const root=resolve(frontend,'..');
+const HISTORICAL_NPM_VERSION='10.9.9';
 const LABEL='inktoy.qa.run',DIAG='/api/v1/health/recovery-e2e';
 const assert=(ok,code)=>{if(!ok)throw Error(code);};
 const log=value=>console.log('[RECOVERY_QA] '+value);
@@ -61,7 +62,7 @@ function validEvidenceVersions(schema, versions) {
   if (!versions || typeof versions !== 'object' || Array.isArray(versions) || Object.hasOwn(versions, 'pnpm')) return false;
   const hasImageDetails = Object.hasOwn(versions, 'qaImageNode') || Object.hasOwn(versions, 'qaImageLockfileSha256');
   if (schema === 1) {
-    return !hasImageDetails && [QA_NODE_VERSION, 'v22.23.3'].includes(versions.node) && versions.npm === QA_NPM_VERSION
+    return !hasImageDetails && [QA_NODE_VERSION, 'v22.23.3'].includes(versions.node) && versions.npm === HISTORICAL_NPM_VERSION
       && !Object.hasOwn(versions, 'hostPackageManager') && !Object.hasOwn(versions, 'qaImagePackageManager');
   }
   if (versions.node !== QA_NODE_VERSION || Object.hasOwn(versions, 'npm')) return false;
@@ -69,9 +70,9 @@ function validEvidenceVersions(schema, versions) {
   const image = versions.qaImagePackageManager;
   if (schema === 2) {
     return !hasImageDetails && validPnpmIdentity(host)
-      && image?.name === 'npm' && image.version === QA_NPM_VERSION && Object.keys(image).length === 2;
+      && image?.name === 'npm' && image.version === HISTORICAL_NPM_VERSION && Object.keys(image).length === 2;
   }
-  const validNpmHost = host?.name === 'npm' && host.version === QA_NPM_VERSION && Object.keys(host).length === 2;
+  const validNpmHost = host?.name === 'npm' && host.version === HISTORICAL_NPM_VERSION && Object.keys(host).length === 2;
   return schema === 3 && (validNpmHost || validPnpmIdentity(host)) && validPnpmIdentity(image)
     && image.platform === 'linux' && image.arch === 'x64' && versions.qaImageNode === QA_NODE_VERSION
     && typeof versions.qaImageLockfileSha256 === 'string' && /^[a-f0-9]{64}$/.test(versions.qaImageLockfileSha256);
@@ -230,8 +231,7 @@ async function main(){
     await writeFile(join(artifacts,'progress.json'),'[]',{mode:0o600});
     assert(!process.env.CI||selection==='full','QA_CI_FULL_SUITE_REQUIRED');policy.rejectInherited(process.env);
     summary.revision={commit:await checked('git',['rev-parse','HEAD']),dirty:!!(await checked('git',['status','--porcelain','--untracked-files=all']))};
-    hostManager=await checkRunnerToolchain({target:'recovery',flags,
-      allowedScripts:['e2e:recovery'],cwd:frontend,checked});
+    hostManager=await checkRunnerToolchain({target:'recovery',flags});
     summary.versions.hostPackageManager={...hostManager};
     log(`TOOLCHAIN PASS: ${process.version}; host ${hostManager.name} ${hostManager.version}`);
     summary.versions.jar=await checked('jar',['--version']);assert(/^jar 17\./.test(summary.versions.jar),'QA_JAVA_17_REQUIRED');
