@@ -1,0 +1,78 @@
+name: Set up verified InkToy pnpm
+description: Verify and prepare the pinned native Linux pnpm executable.
+outputs:
+  executable:
+    description: Absolute path of the verified pnpm executable.
+    value: ${{ steps.verify.outputs.executable }}
+runs:
+  using: composite
+  steps:
+    - name: Verify pnpm 12.19.0
+      id: verify
+      shell: bash
+      run: |
+        set -euo pipefail
+        node -e 'if (process.version !== "v22.23.4" || process.platform !== "linux" || process.arch !== "x64" || !process.report.getReport().header.glibcVersionRuntime) { console.error("Expected Node 22.23.4 on Linux x64 glibc"); process.exit(1); }'
+        gh_version="$(gh --version | awk 'NR == 1 { print $3 }')"
+        if [[ ! $gh_version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] ||
+           [[ $(printf '%s\n' 2.102.0 "$gh_version" | sort -V | sed -n '1p') != 2.102.0 ]]; then
+          echo 'GitHub CLI 2.102.0 or newer is required for attestation verification' >&2
+          exit 1
+        fi
+
+        umask 077
+        temp_root="$(realpath -e -- "$RUNNER_TEMP")"
+        [[ $temp_root == /* && $temp_root != *$'\n'* && $temp_root != *$'\r'* ]]
+        dir="$(mktemp -d -- "$temp_root/inktoy-pnpm.XXXXXX")"
+        asset=pnpm-linux-x64.tar.gz
+        archive="$dir/$asset"
+        archive_sha=bf37edf4e26c3b31c1cac42c769ffabcb9231e9bc728762aeb1ee86bc711684a
+        executable_sha=baae19a2dafc7b6d38980293904f8b8d0522adbe4cfda5c469c8e3175560e4d0
+        source_digest=f4afab20988dc20b747e97c48388f901258d0fcb
+        signer=pnpm/pnpm/.github/workflows/release.yml
+        source_ref=refs/tags/v12.19.0
+        issuer=https://token.actions.githubusercontent.com
+        predicate=https://slsa.dev/provenance/v1
+        fetch=(curl --disable --fail --silent --show-error --location --proto '=https' --proto-redir '=https' --connect-timeout 10 --max-time 120)
+        "${fetch[@]}" --output "$archive" "https://github.com/pnpm/pnpm/releases/download/v12.19.0/$asset"
+        printf '%s  %s\n' "$archive_sha" "$archive" | sha256sum --check --status
+
+        bundle="$dir/provenance.jsonl"
+        "${fetch[@]}" --header 'Accept: application/vnd.github+json' \
+          "https://api.github.com/repos/pnpm/pnpm/attestations/sha256:$archive_sha" \
+          | jq -ec '.attestations[].bundle | select(type == "object")' > "$bundle"
+        env -u GH_TOKEN -u GITHUB_TOKEN -u GH_ENTERPRISE_TOKEN -u GITHUB_ENTERPRISE_TOKEN \
+          GH_CONFIG_DIR="$dir/gh-config" \
+          gh attestation verify "$archive" --hostname github.com --bundle "$bundle" \
+            --repo pnpm/pnpm --predicate-type "$predicate" --signer-workflow "$signer" \
+            --source-ref "$source_ref" --source-digest "$source_digest" --cert-oidc-issuer "$issuer" \
+            --format json > "$dir/verified.json"
+        jq -e --arg asset "$asset" --arg sha "$archive_sha" --arg predicate "$predicate" \
+          --arg signer "https://github.com/$signer@$source_ref" --arg ref "$source_ref" \
+          --arg commit "$source_digest" --arg issuer "$issuer" '
+            any(.[].verificationResult;
+              .statement.predicateType == $predicate
+              and (.statement.subject | any(.name == $asset and .digest.sha256 == $sha))
+              and .signature.certificate.sourceRepositoryURI == "https://github.com/pnpm/pnpm"
+              and .signature.certificate.buildSignerURI == $signer
+              and .signature.certificate.sourceRepositoryRef == $ref
+              and .signature.certificate.sourceRepositoryDigest == $commit
+              and .signature.certificate.issuer == $issuer)
+          ' "$dir/verified.json" >/dev/null
+
+        # The signed distribution also contains dist/. No other member is used.
+        tar -tzf "$archive" | awk '
+          $0 == "pnpm" { executables++; next }
+          /^dist\// && !/(^|\/)\.\.?(\/|$)/ && !/[\\[:cntrl:]]/ { next }
+          { unexpected = 1 }
+          END { exit (unexpected || executables != 1) }
+        '
+        bin="$dir/pnpm"
+        tar -xOzf "$archive" -- pnpm > "$bin"
+        printf '%s  %s\n' "$executable_sha" "$bin" | sha256sum --check --status
+        chmod 0700 "$bin"
+        [[ $(cd "$dir" && PNPM_CONFIG_OFFLINE=true "$bin" --version) == 12.19.0 ]]
+
+        printf 'PNPM_BIN=%s\n' "$bin" >> "$GITHUB_ENV"
+        printf 'executable=%s\n' "$bin" >> "$GITHUB_OUTPUT"
+        printf '%s\n' 'Verified pnpm 12.19.0 for Linux x64 glibc'

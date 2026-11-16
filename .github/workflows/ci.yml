@@ -19,7 +19,7 @@ jobs:
     steps:
       - name: Checkout for Git comparison
         if: github.event_name != 'workflow_dispatch' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.id == github.event.pull_request.base.repo.id)
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -127,13 +127,13 @@ jobs:
 
       - name: Checkout
         if: needs.changes.outputs.mode == 'full'
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
 
       - name: Set up Java
         if: needs.changes.outputs.mode == 'full'
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
         with:
           distribution: temurin
           java-version: '17'
@@ -170,41 +170,104 @@ jobs:
 
       - name: Checkout
         if: needs.changes.outputs.mode == 'full'
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
 
       - name: Set up Node
         if: needs.changes.outputs.mode == 'full'
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version-file: frontend/.nvmrc
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
+
+      - name: Set up verified pnpm
+        id: pnpm_bootstrap
+        if: needs.changes.outputs.mode == 'full'
+        uses: ./.github/actions/setup-inktoy-pnpm
 
       - name: Install dependencies
         if: needs.changes.outputs.mode == 'full'
-        run: npm ci
+        shell: bash
+        env:
+          INKTOY_BOOTSTRAP_PNPM: &frontend_pnpm_bin ${{ steps.pnpm_bootstrap.outputs.executable }}
+          INKTOY_FRONTEND_TASK: install
+        run: &run_verified_frontend_pnpm |
+          run_verified_pnpm() {
+            local executable="${INKTOY_BOOTSTRAP_PNPM:-}" canonical checksum
+            if [[ $executable != /* || ${executable##*/} != pnpm || $executable != "${PNPM_BIN:-}" ||
+                  ! -f $executable || ! -x $executable ]]; then
+              echo 'pnpm path does not match the verified bootstrap executable' >&2
+              return 1
+            fi
+            canonical="$(/usr/bin/realpath -e -- "$executable")" || return 1
+            if [[ $executable != "$canonical" ]]; then
+              echo 'pnpm executable path must not traverse symbolic links' >&2
+              return 1
+            fi
+            checksum="$(/usr/bin/sha256sum < "$executable")" || return 1
+            if [[ ${checksum%% *} != baae19a2dafc7b6d38980293904f8b8d0522adbe4cfda5c469c8e3175560e4d0 ]]; then
+              echo 'pnpm executable SHA-256 does not match the approved release' >&2
+              return 1
+            fi
+            # Angular CLI looks up pnpm by name in the child process.
+            if [[ -e node_modules/.bin/pnpm || -L node_modules/.bin/pnpm ]]; then
+              echo 'frontend node_modules must not shadow the verified pnpm' >&2
+              return 1
+            fi
+            PATH="${executable%/*}:$PATH" "$executable" "$@"
+          }
+
+          case "$INKTOY_FRONTEND_TASK" in
+            install) run_verified_pnpm install --frozen-lockfile --store-dir "$RUNNER_TEMP/inktoy-pnpm-store" ;;
+            test|build|e2e:billing-series:ci|e2e:internal-note:ci) run_verified_pnpm run "$INKTOY_FRONTEND_TASK" ;;
+            chromium)
+              test -x node_modules/.bin/playwright
+              playwright_version="$(run_verified_pnpm exec playwright --version)"
+              test "$playwright_version" = 'Version 1.61.1'
+              run_verified_pnpm exec playwright install --with-deps chromium
+              ;;
+            *) echo 'Unknown frontend pnpm task' >&2; exit 1 ;;
+          esac
 
       - name: Run frontend unit tests
         if: needs.changes.outputs.mode == 'full'
-        run: npm test
+        shell: bash
+        env:
+          INKTOY_BOOTSTRAP_PNPM: *frontend_pnpm_bin
+          INKTOY_FRONTEND_TASK: test
+        run: *run_verified_frontend_pnpm
 
       - name: Build frontend
         if: needs.changes.outputs.mode == 'full'
-        run: npm run build
+        shell: bash
+        env:
+          INKTOY_BOOTSTRAP_PNPM: *frontend_pnpm_bin
+          INKTOY_FRONTEND_TASK: build
+        run: *run_verified_frontend_pnpm
 
       - name: Install Playwright Chromium
         if: needs.changes.outputs.mode == 'full'
-        run: npx playwright install --with-deps chromium
+        shell: bash
+        env:
+          INKTOY_BOOTSTRAP_PNPM: *frontend_pnpm_bin
+          INKTOY_FRONTEND_TASK: chromium
+        run: *run_verified_frontend_pnpm
 
       - name: Run billing series concurrency E2E
         if: needs.changes.outputs.mode == 'full'
-        run: npm run e2e:billing-series:ci
+        shell: bash
+        env:
+          INKTOY_BOOTSTRAP_PNPM: *frontend_pnpm_bin
+          INKTOY_FRONTEND_TASK: e2e:billing-series:ci
+        run: *run_verified_frontend_pnpm
 
       - name: Run internal note no-write smoke
         if: needs.changes.outputs.mode == 'full'
-        run: npm run e2e:internal-note:ci
+        shell: bash
+        env:
+          INKTOY_BOOTSTRAP_PNPM: *frontend_pnpm_bin
+          INKTOY_FRONTEND_TASK: e2e:internal-note:ci
+        run: *run_verified_frontend_pnpm
 
   e2e-auth:
     needs: changes
@@ -228,28 +291,35 @@ jobs:
 
       - name: Checkout
         if: needs.changes.outputs.mode == 'full'
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
       - name: Set up Java
         if: needs.changes.outputs.mode == 'full'
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
         with:
           distribution: temurin
           java-version: '17'
           cache: maven
       - name: Set up approved Node
         if: needs.changes.outputs.mode == 'full'
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version-file: frontend/.nvmrc
+      - name: Set up verified pnpm
+        if: needs.changes.outputs.mode == 'full'
+        uses: ./.github/actions/setup-inktoy-pnpm
+      - name: Install frozen frontend dependencies
+        if: needs.changes.outputs.mode == 'full'
+        working-directory: frontend
+        run: '"$PNPM_BIN" install --frozen-lockfile --store-dir "$RUNNER_TEMP/inktoy-pnpm-store"'
       - name: Grant Maven wrapper permission
         if: needs.changes.outputs.mode == 'full'
         run: chmod +x backend/mvnw
       - name: Ephemeral authenticated no-write gate
         if: needs.changes.outputs.mode == 'full'
         working-directory: frontend
-        run: node e2e/qa/run-qa.mjs
+        run: node e2e/qa/qa-toolchain.mjs launch auth "$PNPM_BIN"
 
   e2e-commercial:
     needs: changes
@@ -273,21 +343,28 @@ jobs:
 
       - name: Checkout
         if: needs.changes.outputs.mode == 'full'
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
       - name: Set up Java
         if: needs.changes.outputs.mode == 'full'
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
         with:
           distribution: temurin
           java-version: '17'
           cache: maven
       - name: Set up approved Node
         if: needs.changes.outputs.mode == 'full'
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version-file: frontend/.nvmrc
+      - name: Set up verified pnpm
+        if: needs.changes.outputs.mode == 'full'
+        uses: ./.github/actions/setup-inktoy-pnpm
+      - name: Install frozen frontend dependencies
+        if: needs.changes.outputs.mode == 'full'
+        working-directory: frontend
+        run: '"$PNPM_BIN" install --frozen-lockfile --store-dir "$RUNNER_TEMP/inktoy-pnpm-store"'
       - name: Grant Maven wrapper permission
         if: needs.changes.outputs.mode == 'full'
         run: chmod +x backend/mvnw
@@ -295,16 +372,29 @@ jobs:
         id: commercial
         if: needs.changes.outputs.mode == 'full'
         working-directory: frontend
-        run: node e2e/qa/run-recovery.mjs
+        shell: bash
+        run: |
+          # Record the image reference actually used by the QA browser, before cleanup.
+          docker events --since "$(date -u +%FT%T.%NZ)" --filter type=container --filter event=create \
+            --filter label=inktoy.qa.purpose=pos-recovery-a \
+            --format '{{index .Actor.Attributes "name"}} {{index .Actor.Attributes "image"}}' \
+            > "$RUNNER_TEMP/inktoy-commercial-image-events" &
+          observer=$!
+          trap 'kill "$observer" 2>/dev/null || true; wait "$observer" 2>/dev/null || true' EXIT
+          node e2e/qa/qa-toolchain.mjs launch recovery "$PNPM_BIN"
       - name: Validate sanitized final evidence
         id: evidence
         if: always() && needs.changes.outputs.mode == 'full' && (steps.commercial.outcome == 'success' || steps.commercial.outcome == 'failure')
         shell: bash
         run: |
           node --input-type=module <<'NODE'
-          import { appendFile, readdir } from 'node:fs/promises';
+          import assert from 'node:assert/strict';
+          import { execFileSync } from 'node:child_process';
+          import { createHash } from 'node:crypto';
+          import { appendFile, readFile, readdir } from 'node:fs/promises';
           import { resolve, join } from 'node:path';
           import { readRecoveryEvidence, validateRecoveryEvidence } from './frontend/e2e/qa/run-recovery.mjs';
+          import { QA_NODE_VERSION, validPnpmIdentity } from './frontend/e2e/qa/qa-toolchain.mjs';
           const base = resolve('backend/target/recovery-e2e');
           const runs = (await readdir(base)).filter(name => /^[a-f0-9]{24}$/.test(name));
           if (runs.length !== 1) throw Error('QA_SINGLE_RUN_EVIDENCE_REQUIRED');
@@ -313,10 +403,55 @@ jobs:
           // Publish only the inspected allowlist, including safe evidence of a failed run.
           await appendFile(process.env.GITHUB_OUTPUT, `directory=${directory}\n`);
           validateRecoveryEvidence(summary, progress);
+
+          const { versions, revision, schemaVersion } = summary;
+          const hash = bytes => createHash('sha256').update(bytes).digest('hex');
+          const git = (...args) => execFileSync('git', args);
+          const sha = process.env.GITHUB_SHA;
+          const event = JSON.parse(await readFile(process.env.GITHUB_EVENT_PATH, 'utf8'));
+          assert.match(sha, /^[0-9a-f]{40}$/, 'QA_CI_INVALID_EVENT_SHA');
+          assert.equal(git('rev-parse', 'HEAD').toString().trim(), sha, 'QA_CI_CHECKOUT_MISMATCH');
+          assert.equal(revision.commit, sha, 'QA_CI_EVIDENCE_REVISION_MISMATCH');
+          switch (process.env.GITHUB_EVENT_NAME) {
+            case 'pull_request': {
+              // Read raw commit headers so this also works with a shallow checkout.
+              const headers = git('cat-file', '-p', sha).toString().split('\n\n', 1)[0];
+              const parents = [...headers.matchAll(/^parent ([0-9a-f]{40})$/gm)].map(match => match[1]);
+              assert.deepEqual(parents, [event.pull_request.base.sha, event.pull_request.head.sha],
+                'QA_CI_PR_MERGE_PARENTS_MISMATCH');
+              break;
+            }
+            case 'push':
+              assert.equal(sha, event.after, 'QA_CI_PUSH_SHA_MISMATCH');
+              break;
+            case 'workflow_dispatch':
+              break;
+            default:
+              throw Error('QA_CI_UNEXPECTED_EVENT');
+          }
+
+          const host = versions.hostPackageManager;
+          assert.equal(schemaVersion, 3, 'QA_CI_SCHEMA_REQUIRED');
+          assert(validPnpmIdentity(host) && host.platform === 'linux' && host.arch === 'x64',
+            'QA_CI_PNPM_HOST_REQUIRED');
+          assert.equal(host.sha256, hash(await readFile(process.env.PNPM_BIN)), 'QA_CI_PNPM_HOST_MISMATCH');
+          assert.deepEqual(versions.qaImagePackageManager, host, 'QA_CI_PNPM_IMAGE_MISMATCH');
+          assert(versions.node === process.version && process.version === QA_NODE_VERSION
+            && versions.qaImageNode === QA_NODE_VERSION, 'QA_CI_NODE_MISMATCH');
+          const lockfile = 'frontend/pnpm-lock.yaml';
+          const expectedLock = hash(git('cat-file', 'blob', `${sha}:${lockfile}`));
+          assert.equal(hash(await readFile(lockfile)), expectedLock, 'QA_CI_CHECKOUT_LOCKFILE_MISMATCH');
+          assert.equal(versions.qaImageLockfileSha256, expectedLock, 'QA_CI_IMAGE_LOCKFILE_MISMATCH');
+          const browser = `inktoy-recovery-${summary.runId}-browser`;
+          const events = await readFile(join(process.env.RUNNER_TEMP, 'inktoy-commercial-image-events'), 'utf8');
+          const browserImages = events.trim().split('\n').map(line => line.split(' '))
+            .filter(([name]) => name === browser).map(([, image]) => image);
+          assert.deepEqual(browserImages, [versions.images.tools], 'QA_CI_DOCKER_IMAGE_MISMATCH');
+          console.log('CI evidence v3 verified: checkout, pnpm host and image, lockfile, and Docker browser image');
           NODE
       - name: Upload sanitized commercial evidence
         if: always() && steps.evidence.outputs.directory != ''
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: e2e-commercial-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ steps.evidence.outputs.directory }}

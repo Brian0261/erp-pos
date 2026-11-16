@@ -50,7 +50,7 @@ pnpm exec playwright --version
 
 Use separate clean install directories for pnpm and npm. For an approved
 dependency change, review both lockfiles together and validate both frozen
-installs. The frontend CI job retains the npm baseline. The local QA entry
+installs. The GitHub Actions frontend and QA jobs now use pnpm. The local QA entry
 points and their prerequisites are described in [ERP/POS E2E](e2e/README.md).
 PNPM-6 retires the npm pin and lockfile after the remaining consumers switch.
 
@@ -108,13 +108,25 @@ evidence of PASS.
 
 ## CI order
 
-The frontend CI job reads Node from `frontend/.nvmrc`, then performs:
+For full runs, GitHub Actions reads Node from `frontend/.nvmrc`. The frontend
+and both QA jobs verify the native Linux x64 glibc pnpm archive, its SLSA
+provenance and its executable before exposing `PNPM_BIN`. Each job installs
+from the frozen lockfile into its own local store without a remote pnpm cache.
 
-1. `npm ci`;
-2. `npm test`;
-3. `npm run build`;
-4. `npx playwright install --with-deps chromium`;
-5. `npm run e2e:billing-series:ci`.
+The frontend job then runs:
+
+1. `pnpm run test`;
+2. `pnpm run build`;
+3. `pnpm exec playwright install --with-deps chromium` after checking the
+   installed Playwright CLI is 1.61.1;
+4. `pnpm run e2e:billing-series:ci` and `pnpm run e2e:internal-note:ci`.
+
+The QA jobs invoke `qa-toolchain.mjs launch auth|recovery` with the verified
+absolute pnpm path. Commercial CI requires schema v3 with pnpm on both the
+host and the QA image. It checks the checkout commit (including the test
+merge commit for a PR), lockfile and observed Docker browser image before
+accepting the result. Historical evidence and local npm commands remain
+supported.
 
 Karma remains a temporary safety baseline. A separate QA-FE-2 phase will decide
 whether to retain it or migrate to Vitest after the Angular major upgrades.
