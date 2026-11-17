@@ -1,3 +1,4 @@
+ARG TARGETARCH
 FROM node:24.22.3-alpine3.24@sha256:116b800c3754b440ee0aa3ed2f20f5bf3d99a554bfd9adeea09ea8017f6e85f5 AS toolchain
 ARG TARGETARCH
 
@@ -50,13 +51,39 @@ test "$(npx --version)" = 11.21.2
 test "$(apk info -v | grep '^zlib-')" = zlib-1.4-r0
 SH
 
-FROM toolchain AS deps
+FROM toolchain AS verified-pnpm-amd64
+# Official pnpm/pnpm v12.21.0 release, verified against its SLSA provenance.
+ADD --checksum=sha256:6dbcd9ea8ed37b5acbe279159ad0ed3a4ac614f5d7ae62d5ba51d32a85a589d7 https://github.com/pnpm/pnpm/releases/download/v12.21.0/pnpm-linux-x64-musl.tar.gz /tmp/pnpm.tar.gz
+RUN mkdir -p /opt/pnpm \
+    && tar -xzf /tmp/pnpm.tar.gz -C /opt/pnpm \
+    && printf '%s  %s\n' '88a7e71e4e98a5cf512e84cab7f50fd5ce38374862a7c1ac982c7bf2ba0f2809' /opt/pnpm/pnpm | sha256sum -c - \
+    && test "$(/opt/pnpm/pnpm --version)" = 12.21.0 \
+    && rm /tmp/pnpm.tar.gz
+
+FROM toolchain AS verified-pnpm-arm64
+# Official pnpm/pnpm v12.21.0 release, verified against its SLSA provenance.
+ADD --checksum=sha256:4faedaaa333b44d940ce5e38c223e829124affdbe5a6d3f694a69dd979a5a8d8 https://github.com/pnpm/pnpm/releases/download/v12.21.0/pnpm-linux-arm64-musl.tar.gz /tmp/pnpm.tar.gz
+RUN mkdir -p /opt/pnpm \
+    && tar -xzf /tmp/pnpm.tar.gz -C /opt/pnpm \
+    && printf '%s  %s\n' 'd5cecd62ee12cd7ae98e3586aa00723213442dc814c632cdb6d7cecae0fd42b4' /opt/pnpm/pnpm | sha256sum -c - \
+    && test "$(/opt/pnpm/pnpm --version)" = 12.21.0 \
+    && rm /tmp/pnpm.tar.gz
+
+FROM verified-pnpm-$TARGETARCH AS pnpm
+ENV PATH="/opt/pnpm:$PATH" \
+    PNPM_CONFIG_STORE_DIR=/pnpm-store \
+    PNPM_CONFIG_CACHE_DIR=/pnpm-store/cache \
+    PNPM_CONFIG_STATE_DIR=/pnpm-state \
+    PNPM_CONFIG_UPDATE_NOTIFIER=false \
+    CI=true
+
+FROM pnpm AS deps
 WORKDIR /app
 
-COPY package*.json ./
-RUN npm ci
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN /opt/pnpm/pnpm install --frozen-lockfile
 
-FROM toolchain AS builder
+FROM pnpm AS builder
 WORKDIR /app
 
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -71,7 +98,7 @@ ENV STOREFRONT_IMAGE_ALLOWED_DOMAINS=$STOREFRONT_IMAGE_ALLOWED_DOMAINS
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN npm run build
+RUN /opt/pnpm/pnpm run build
 
 FROM toolchain AS runner
 WORKDIR /app
