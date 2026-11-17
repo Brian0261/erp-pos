@@ -1,0 +1,19 @@
+packages: []
+nodeLinker: isolated
+virtualStoreType: project
+hoist: false
+pmOnFail: error
+runtime: false
+runtimeOnFail: error
+engineStrict: true
+verifyDepsBeforeRun: error
+strictPeerDependencies: true
+autoInstallPeers: false
+ignorePnpmfile: true
+sideEffectsCache: false
+strictDepBuilds: true
+allowBuilds:
+  'unrs-resolver@1.12.2': false
+# Keep the exact B1 version already verified in S-SEC1.
+minimumReleaseAgeExclude:
+  - 'baseline-browser-mapping@2.11.38'
