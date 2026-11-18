@@ -10,8 +10,26 @@ runs:
     - name: Verify pnpm 12.19.0
       id: verify
       shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
       run: |
+        set +x
         set -euo pipefail
+        # Keep the credential out of child processes and command-line arguments.
+        attestation_token=${GH_TOKEN-}
+        export -n attestation_token
+        unset GH_TOKEN GITHUB_TOKEN GH_ENTERPRISE_TOKEN GITHUB_ENTERPRISE_TOKEN
+        if [[ ! $attestation_token =~ ^[A-Za-z0-9._~+/-]+=*$ ]]; then
+          echo 'Attestation API authentication is missing or invalid' >&2
+          exit 1
+        fi
+        cleanup_http() {
+          unset attestation_token
+          for file in "${auth_file:-}" "${http_headers:-}" "${http_body:-}" "${http_errors:-}"; do
+            if [[ -n $file ]]; then rm -f -- "$file"; fi
+          done
+        }
+        trap cleanup_http EXIT
         node -e 'if (process.version !== "v22.23.4" || process.platform !== "linux" || process.arch !== "x64" || !process.report.getReport().header.glibcVersionRuntime) { console.error("Expected Node 22.23.4 on Linux x64 glibc"); process.exit(1); }'
         gh_version="$(gh --version | awk 'NR == 1 { print $3 }')"
         if [[ ! $gh_version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] ||
@@ -37,10 +55,117 @@ runs:
         "${fetch[@]}" --output "$archive" "https://github.com/pnpm/pnpm/releases/download/v12.19.0/$asset"
         printf '%s  %s\n' "$archive_sha" "$archive" | sha256sum --check --status
 
+        endpoint="https://api.github.com/repos/pnpm/pnpm/attestations/sha256:$archive_sha"
+        auth_file="$dir/auth.curl"
+        http_headers="$dir/http.headers"
+        http_body="$dir/http.json"
+        http_errors="$dir/http.errors"
+        printf 'header = "Authorization: Bearer %s"\n' "$attestation_token" > "$auth_file"
+        unset attestation_token
+
+        response_header() {
+          awk -v name="$1" '
+            /^HTTP\// { value = "" }
+            index(tolower($0), name ":") == 1 {
+              value = substr($0, length(name) + 2)
+              sub(/^[ \t]+/, "", value); sub(/[ \t\r]+$/, "", value)
+            }
+            END { print value }
+          ' "$http_headers"
+        }
+        budget=300
+        deadline=$((SECONDS + budget))
+        for attempt in 1 2 3; do
+          remaining_time=$((deadline - SECONDS))
+          if ((remaining_time <= 0)); then
+            echo 'Attestation API time budget exhausted' >&2; exit 75
+          fi
+          request_timeout=$remaining_time
+          if ((request_timeout > 120)); then request_timeout=120; fi
+          : > "$http_headers"; : > "$http_body"; : > "$http_errors"
+          curl_code=0
+          # Do not forward this API credential through redirects or to release downloads.
+          status=$(curl --disable --silent --show-error --proto '=https' \
+            --connect-timeout 10 --max-time "$request_timeout" --config "$auth_file" \
+            --header 'Accept: application/vnd.github+json' \
+            --dump-header "$http_headers" --output "$http_body" --write-out '%{http_code}' \
+            "$endpoint" 2> "$http_errors") || curl_code=$?
+
+          request_id=$(response_header x-github-request-id)
+          quota=$(response_header x-ratelimit-remaining)
+          reset=$(response_header x-ratelimit-reset)
+          retry_after=$(response_header retry-after)
+          [[ $status =~ ^[0-9]{3}$ ]] || status=000
+          [[ $request_id =~ ^[[:xdigit:]]+(:[[:xdigit:]]+)+$ && ${#request_id} -le 128 ]] || request_id=unavailable
+          [[ $quota =~ ^[0-9]{1,10}$ ]] || quota=unavailable
+          [[ $reset =~ ^[0-9]{1,10}$ ]] || reset=unavailable
+          retry_log=unavailable
+          retry_delay=-1
+          if [[ $retry_after =~ ^[0-9]+$ ]]; then
+            retry_after=${retry_after#"${retry_after%%[!0]*}"}; retry_after=${retry_after:-0}
+            if ((${#retry_after} > 3)); then
+              retry_log=over_budget; retry_delay=$((budget + 1))
+            else
+              retry_log=$retry_after; retry_delay=$((10#$retry_after))
+            fi
+          elif [[ $retry_after =~ ^[A-Z][a-z]{2},\ [0-9]{2}\ [A-Z][a-z]{2}\ [0-9]{4}\ [0-9]{2}:[0-9]{2}:[0-9]{2}\ GMT$ ]]; then
+            if retry_epoch=$(LC_ALL=C date -u --date="$retry_after" +%s 2>/dev/null); then
+              retry_log=$retry_after
+              retry_delay=$((retry_epoch - $(date -u +%s)))
+              if ((retry_delay < 0)); then retry_delay=0; fi
+            fi
+          fi
+
+          category=http_permanent
+          delay=$((2 * attempt))
+          if ((curl_code != 0)); then
+            case "$curl_code" in
+              5|6|7|18|28|52|55|56|92) category=transport_transient ;;
+              *) category=transport_permanent ;;
+            esac
+          else
+            case "$status" in
+              200) category=ok ;;
+              429) category=rate_limit ;;
+              403)
+                if [[ $quota =~ ^0+$ ]] || jq -e '(.message? // "") | strings | test("API rate limit exceeded|secondary rate limit"; "i")' "$http_body" >/dev/null 2>&1; then
+                  category=rate_limit
+                fi ;;
+              500|502|503|504) category=server_transient ;;
+            esac
+          fi
+          printf 'Attestation API endpoint=%s attempt=%s/3 http=%s curl=%s request_id=%s remaining=%s reset=%s retry_after=%s category=%s\n' \
+            "$endpoint" "$attempt" "$status" "$curl_code" "$request_id" "$quota" "$reset" "$retry_log" "$category"
+          if [[ $category == ok ]]; then break; fi
+          case "$category" in
+            http_permanent) exit 22 ;;
+            transport_permanent) exit "$curl_code" ;;
+          esac
+          if ((attempt == 3)); then
+            echo 'Attestation API retry limit exhausted (3 attempts)' >&2; exit 75
+          fi
+          if [[ $category == rate_limit ]]; then delay=$((60 * attempt)); fi
+          if ((retry_delay >= 0)); then delay=$retry_delay; fi
+          if [[ $quota =~ ^0+$ && $reset != unavailable ]]; then
+            reset_delay=$((10#$reset - $(date -u +%s)))
+            if ((reset_delay > delay)); then delay=$reset_delay; fi
+          fi
+          remaining_time=$((deadline - SECONDS))
+          if ((delay >= remaining_time)); then
+            echo 'Attestation API required wait exceeds remaining time budget' >&2; exit 75
+          fi
+          printf 'Attestation API retry wait=%ss budget_remaining=%ss\n' "$delay" "$remaining_time"
+          sleep "$delay"
+        done
+        rm -f -- "$auth_file"
+        auth_file=''
+        if ! jq -es 'length == 1 and (.[0] | type == "object" and (.attestations | type == "array" and length > 0))' "$http_body" >/dev/null 2>&1; then
+          echo 'Attestation API invalid JSON or missing attestations' >&2; exit 65
+        fi
         bundle="$dir/provenance.jsonl"
-        "${fetch[@]}" --header 'Accept: application/vnd.github+json' \
-          "https://api.github.com/repos/pnpm/pnpm/attestations/sha256:$archive_sha" \
-          | jq -ec '.attestations[].bundle | select(type == "object")' > "$bundle"
+        if ! jq -ec '.attestations[].bundle | select(type == "object")' "$http_body" > "$bundle" 2> "$http_errors"; then
+          echo 'Attestation API bundle missing or invalid' >&2; exit 65
+        fi
         env -u GH_TOKEN -u GITHUB_TOKEN -u GH_ENTERPRISE_TOKEN -u GITHUB_ENTERPRISE_TOKEN \
           GH_CONFIG_DIR="$dir/gh-config" \
           gh attestation verify "$archive" --hostname github.com --bundle "$bundle" \
