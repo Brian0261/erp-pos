@@ -21,7 +21,7 @@ Esta guia define como debe trabajar cualquier AI Coding Agent (Copilot, ChatGPT,
 3. Leer `README.md` y solo los documentos vigentes directamente relacionados con la tarea: instrucciones de agente, playbook, decisiones, ADR y QA pertinente. No es necesario recorrer indiscriminadamente todos los documentos de `docs/ai` o `docs/qa`.
 4. Si se modifica código, inspeccionar sus pruebas, contratos y dependencias relevantes antes de editar.
 
-Para trabajo Git, seguir el flujo normativo de `docs/ai/TASK_EXECUTION_PLAYBOOK.md`; `docs/ai/DECISIONS_LOG.md` registra su adopcion documental y el estado pendiente de configuración administrativa.
+Para el trabajo con Git, seguir el flujo normativo del [Task Execution Playbook](TASK_EXECUTION_PLAYBOOK.md). El [registro de decisiones](DECISIONS_LOG.md) documenta la adopción del playbook y el estado de protección verificado. Antes de ejecutar operaciones Git, comprobar las reglas vigentes de GitHub aplicables a la operación.
 
 ## Estado git local
 

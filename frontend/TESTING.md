@@ -46,6 +46,13 @@ version check fails, select the approved toolchain. If the frozen install fails,
 compare the manifest and lockfile with the approved revision before continuing.
 The local QA entry points are described in [ERP/POS E2E](e2e/README.md).
 
+The committed [pnpm policy](pnpm-workspace.yaml) defines the isolated install,
+the dependency build scripts that are explicitly denied, and the effective
+pnpm override for Vite `7.3.8` preserved from SEC-DEP-1. The validated platforms
+use the locked prebuilt native packages. Keep this policy and the frozen lockfile
+when setting up a workstation; new dependency scripts or resolutions require
+separate review.
+
 ## Docker builds (PNPM-4)
 
 Use BuildKit on a linux/amd64 Docker engine and select linux/amd64 as the
@@ -67,8 +74,8 @@ the frozen application dependencies.
 
 ## Unit baseline
 
-The Angular 18 baseline uses Karma 6 and Jasmine 5 temporarily. Run the
-headless suite once with:
+The current Angular 21 frontend retains the Karma 6 and Jasmine 5 safety
+baseline introduced under Angular 18. Run the headless suite once with:
 
 ```powershell
 pnpm run test
@@ -77,7 +84,7 @@ pnpm run test
 The target uses `ChromeHeadless`, `zone.js/testing` and
 `frontend/tsconfig.spec.json`. There is no initial coverage threshold.
 
-Current P0/P1 scope:
+The original P0/P1 billing-series baseline covered:
 
 - fiscal billing-series ETag construction and response capture;
 - `If-Match` on update, reactivate and deactivate;
@@ -107,6 +114,22 @@ and both QA jobs verify the native Linux x64 glibc pnpm archive, its SLSA
 provenance and its executable before exposing `PNPM_BIN`. Each job installs
 from the frozen lockfile into its own local store without a remote pnpm cache.
 
+The shared [bootstrap action](../.github/actions/setup-inktoy-pnpm/action.yml)
+uses `github.token` only to fetch attestations with the jobs' existing
+`contents: read` permissions. CI requires GitHub CLI `2.102.0` or newer. The
+archive/executable SHA-256 and SLSA checks remain independent of download
+authentication, and credentials are removed before `gh attestation verify`.
+
+The attestation API query permits at most three attempts within 300 seconds.
+It respects valid `Retry-After` and quota-reset values and retries only
+identified rate limits or selected transient HTTP/transport failures.
+Unknown 403, 401/404, invalid JSON/bundles and failed provenance checks stop
+the bootstrap. Inspect the sanitized HTTP diagnostics before requesting a
+workflow retry; preserve verification and permissions when diagnosing a failure.
+[CI-ATTEST-1 closure](https://github.com/Brian0261/erp-pos/pull/32#issuecomment-6966826480)
+records real-runner token/SLSA validation and the remaining external
+availability risk; it does not guarantee that every future request will succeed.
+
 The frontend job then runs:
 
 1. `pnpm run test`;
@@ -121,5 +144,5 @@ host and the QA image. It checks the checkout commit (including the test
 merge commit for a PR), lockfile and observed Docker browser image before
 accepting the result. The historical v1, v2 and v3 evidence remains readable.
 
-Karma remains a temporary safety baseline. A separate QA-FE-2 phase will decide
-whether to retain it or migrate to Vitest after the Angular major upgrades.
+Karma remains a temporary safety baseline. Any decision to retain it or migrate
+to Vitest belongs to the separate QA-FE-2 phase.
