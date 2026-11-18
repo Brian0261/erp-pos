@@ -37,7 +37,12 @@ Cada decision debe incluir:
 | D-021 | Separar categoria online SEO de la categoria interna.                                  | Evitar arrastrar jerarquia interna al modelo publico de busqueda.                   | SEO ecommerce queda aislado de catalogacion interna.                   | Aprobada para Fase 1              | Fase 1A.2 documental          |
 | D-022 | Bloquear cambios de slug en productos publicados sin historial/redireccion.           | Proteger SEO y enlaces ya expuestos.                                                | Slugs publicados se vuelven estables hasta definir estrategia de historial. | Aprobada para Fase 1          | Fase 1A.2 documental          |
 | D-023 | Cerrar documentalmente Fase 1A.2 y preparar commit documental antes de Fase 1B.        | Asegurar trazabilidad y orden de entrega antes de abrir implementacion persistente. | El siguiente paso es commit documental; luego se valida Fase 1B.      | Aprobada y activa                 | CURRENT_STATUS + CHANGE_CONTROL |
-| D-024 | Adoptar GitHub Flow con ramas temporales, PR, CI y autorización humana separada para cada operación Git. | Mantener `master` estable, revisión y trazabilidad por tarea, sin confundir CI exitoso con permiso de merge. | `TASK_EXECUTION_PLAYBOOK.md` es la fuente normativa; checks observados: `backend`, `frontend`, `e2e-auth`. Protecciones de `master` aún no aplicadas; transición documental local pendiente de PR y configuración administrativa separada. | Aprobada para documentación local; adopción remota pendiente | GIT-GOV-1 + `TASK_EXECUTION_PLAYBOOK.md` |
+| D-024 | Adoptar GitHub Flow con ramas temporales, PR, CI y autorización humana separada para cada operación Git. | Mantener `master` estable, revisión y trazabilidad por tarea, sin confundir CI exitoso con permiso de merge. | `TASK_EXECUTION_PLAYBOOK.md` es la fuente normativa. Protección de `master` verificada: checks `backend`, `frontend`, `e2e-auth`, rama actualizada, conversaciones resueltas, historial lineal y administradores sujetos a reglas; sin force-push ni eliminación. Revalidar la configuración efectiva antes de integrar. | Adoptada; protección remota verificada el 2026-11-18 | GIT-GOV-1 + [playbook](TASK_EXECUTION_PLAYBOOK.md#protección-de-master--estado-verificado-y-control-de-cambios) + [evidencia PR #32](https://github.com/Brian0261/erp-pos/pull/32#issuecomment-6966826480) |
+
+D-024 registró inicialmente una adopción documental local con configuración
+remota pendiente. La consulta de reglas del 2026-11-18 y la evidencia enlazada
+respaldan el estado actualizado de la tabla. Este registro no autoriza cambios
+administrativos ni omitir requisitos de protección.
 
 ## Reglas de actualizacion del log
 

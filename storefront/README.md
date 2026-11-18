@@ -48,6 +48,31 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Security and validation scope
+
+The Docker base intentionally retains remediated npm `11.21.2` as inherited
+tooling. Storefront dependency installation and builds use pnpm and the frozen
+lockfile; npm's presence in the base does not indicate an incomplete migration.
+The existing [local Docker commands](../docs/qa/PHASE2S8J_STOREFRONT_DOCKER_LOCAL_QA.md#comandos-de-uso-local)
+describe the opt-in Storefront profile.
+
+The repository's CI validates the ERP/POS backend, Angular frontend, Auth and
+commercial gates. Those results do not replace Storefront-specific validation.
+[PNPM-S1 closure](https://github.com/Brian0261/erp-pos/pull/31#issuecomment-6965093251)
+records the approved Storefront QA: application checks on Linux, emulated arm64,
+and Windows checks of the native pnpm executable and toolchain guards. It does
+not claim application QA on native Windows. Reuse evidence only when its content
+and execution conditions still apply.
+
+OpenSSL and picomatch remain affected under the assessed baseline. Their
+non-applicability conclusions are limited to the documented runtime and
+controlled-glob conditions; they are not vulnerability fixes. Consult
+[S-SEC1 security closure](https://github.com/Brian0261/erp-pos/pull/30#issuecomment-6939414919)
+and the [PNPM-S1 focal assessment](https://github.com/Brian0261/erp-pos/pull/31#issuecomment-6963972727),
+including moderate findings and platform limits. Changes to those conditions
+require reevaluation. Technical CLOSED status and a successful production build
+do not authorize a production deployment.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

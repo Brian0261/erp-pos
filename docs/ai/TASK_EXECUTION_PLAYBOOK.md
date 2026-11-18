@@ -76,18 +76,28 @@ No ejecutar el bloque completo mecánicamente: cada cambio Git requiere autoriza
 - No ejecutar automáticamente commit, push, PR, merge, force push, rebase, amend, tag, eliminación de rama, cambios de protección/ruleset ni despliegue.
 - Si una autorización no especifica con claridad la operación y su alcance, detenerse antes de esa escritura y pedir autorización.
 
-### Configuración recomendada de `master` — pendiente de autorización administrativa
+### Protección de master — estado verificado y control de cambios
 
-No asumir que estas reglas están activas ni cambiarlas durante una tarea normal. Cuando se autorice una fase administrativa separada, evaluar:
+La consulta de protección clásica y rulesets del 2026-11-18 confirmó:
 
-- requerir PR para actualizar `master`;
-- requerir los checks observados `backend`, `frontend` y `e2e-auth`;
-- requerir rama actualizada antes de merge, conversaciones resueltas e historial lineal;
-- impedir force-push y eliminación de `master`; evitar bypass administrativo si la plataforma permite conservar una recuperación segura.
+- PR obligatorio para actualizar `master`;
+- checks obligatorios `backend`, `frontend` y `e2e-auth` de GitHub Actions;
+- rama actualizada antes del merge, conversaciones resueltas e historial lineal;
+- administradores sujetos a las reglas, sin force-push ni eliminación de `master`;
+- cero aprobaciones formales obligatorias y ningún ruleset adicional aplicable.
+
+La [evidencia de cierre del PR #32](https://github.com/Brian0261/erp-pos/pull/32#issuecomment-6966826480)
+acredita su aplicación. Esta lectura es una referencia fechada: reconsultar
+protección clásica y rulesets antes de cada integración. Los checks obligatorios
+no sustituyen los demás jobs y controles aplicables a la tarea. Modificar reglas
+requiere autorización administrativa específica; no usar privilegios para omitirlas.
 
 No exigir aprobación de reviewer mientras no exista una segunda persona revisora disponible. No habilitar por defecto merge queue, auto-merge, despliegue productivo requerido, restricciones por equipos/organización ni commits firmados obligatorios sin necesidad y configuración verificadas. Antes de guardar required checks, confirmar en un PR real sus contextos exactos y que sean inequívocos/no omitibles; los nombres de jobs observados son `backend`, `frontend`, `e2e-auth`. La configuración efectiva solo se confirma leyéndola después de la fase administrativa autorizada.
 
 ### Transición de adopción
+
+La secuencia siguiente conserva los gates de adopción originales; el estado
+verificado vigente se registra arriba y en D-024 de `DECISIONS_LOG.md`.
 
 1. **A — documentación local:** registrar la política en este playbook, enlazarla desde las instrucciones generales y `AGENTS.md`, y dejar constancia en `DECISIONS_LOG.md`. No crear PR/commit/push como parte de esa fase si no se autorizan.
 2. **B — PR de transición:** requiere autorización independiente; rama documental temporal, PR hacia `master`, los tres checks verdes, revisión de diff y autorización humana de squash merge. Verificar CI y sincronización tras el merge. No activar protecciones desde esta fase.
