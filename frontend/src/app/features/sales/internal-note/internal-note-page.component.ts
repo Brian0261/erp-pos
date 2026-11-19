@@ -11,14 +11,20 @@ import { filtersFromContext, salesContext } from "../sales-presentation";
   template: `
   <section class="note-page" aria-label="NOTA DE VENTA">
     <header class="ui-page-head">
-      <div><p class="eyebrow">VENTAS</p><h1 #noteTitle tabindex="-1" class="ui-page-title">{{ config.heading }}</h1>
-        <p class="ui-page-description">{{ session.note() ? session.note()!.number + ' · ' + session.note()!.date : 'Consulta autorizada de la venta' }}</p></div>
+      <div>
+        <p class="eyebrow">VENTAS</p>
+        <h1 #noteTitle tabindex="-1" class="ui-page-title">{{ config.heading }}</h1>
+        <ng-container *ngIf="session.note() as note; else pendingSale">
+          <p class="ui-page-description">{{ note.date }}</p>
+          <div class="note-status" [class.cancelled]="note.status === 'VOIDED'">
+            <strong>{{ note.status === 'VOIDED' ? 'ANULADA' : 'Venta registrada' }}</strong>
+            <span>{{ note.status === 'VOIDED' ? 'Se conservan los importes originales.' : 'La nota no modifica la venta ni sus pagos.' }}</span>
+          </div>
+        </ng-container>
+        <ng-template #pendingSale><p class="ui-page-description">Consulta autorizada de la venta</p></ng-template>
+      </div>
       <a class="ui-button ui-button--secondary" [routerLink]="backLink" [queryParams]="listContext">{{ fromPos ? 'Volver al POS' : 'Volver al detalle' }}</a>
     </header>
-    <div class="note-status" *ngIf="session.note() as note" [class.cancelled]="note.status === 'VOIDED'">
-      <strong>{{ note.status === 'VOIDED' ? 'ANULADA' : 'Venta registrada' }}</strong>
-      <span>{{ note.status === 'VOIDED' ? 'Se conservan los importes originales.' : 'La nota no modifica la venta ni sus pagos.' }}</span>
-    </div>
     <div class="note-toolbar" aria-label="Acciones de la nota">
       <label>Formato<select aria-label="Formato" [value]="isTicket ? 'ticket' : 'a4'" (change)="selectFormat($event)" [disabled]="busy">
         <option value="a4">A4</option><option value="ticket">Ticket térmico</option></select></label>
@@ -44,19 +50,41 @@ import { filtersFromContext, salesContext } from "../sales-presentation";
         <p class="viewer-help">{{ viewerUnavailable ? 'Visor no disponible. ' : '¿El visor está vacío o no responde? ' }}Usa Abrir PDF o Descargar PDF. El contenido accesible está disponible a continuación.</p>
       </div>
       <details class="accessible-note" [open]="viewerUnavailable">
-        <summary>Ver datos de la venta <span>Alternativa accesible</span></summary>
+        <summary>Ver datos de la venta <span class="summary-hint">Alternativa accesible</span></summary>
         <article>
-          <p class="eyebrow">{{ config.tradeName }} · {{ config.heading }}</p>
-          <h2>{{ note.number }}</h2><strong *ngIf="note.status === 'VOIDED'" class="cancelled-text">ANULADA</strong>
-          <p class="note-meta">{{ note.date }}</p>
-          <p class="note-meta" *ngIf="note.voidedDate">Anulada: {{ note.voidedDate }}</p>
-          <div class="note-table-scroll"><table><caption>{{ note.lines.length }} artículos · Importes persistidos</caption><thead><tr><th>Producto</th><th>Cant.</th><th>Precio</th><th>Dto.</th><th>Importe</th></tr></thead>
-            <tbody><tr *ngFor="let line of note.lines"><td><strong>{{ line.name }}</strong><small *ngIf="line.source" class="history-note">{{ line.source }}</small></td><td>{{ line.quantity }}</td><td>{{ line.price }}</td><td>{{ line.discount }}</td><td>{{ line.total }}</td></tr></tbody></table></div>
-          <dl class="note-totals"><div><dt>Subtotal</dt><dd>{{ note.subtotal }}</dd></div><div><dt>Descuento</dt><dd>{{ note.discount }}</dd></div>
+          <h2>Información de la venta</h2>
+          <p class="note-meta">
+            <span>{{ config.heading }}</span>
+            <strong [class.registered]="note.status === 'COMPLETED'">{{ note.status === 'VOIDED' ? 'ANULADA' : 'Venta registrada' }}</strong>
+            <span>{{ note.date }}</span>
+          </p>
+          <p class="note-meta" *ngIf="note.voidedDate">Fecha de anulación {{ note.voidedDate }}</p>
+          <div class="note-reference">
+            <label for="note-reference">Referencia de venta</label>
+            <textarea id="note-reference" readonly rows="2" spellcheck="false" [value]="note.number"></textarea>
+          </div>
+          <div class="note-table-scroll" role="region" aria-labelledby="note-products" tabindex="0">
+            <table>
+              <caption id="note-products">{{ note.lines.length }} {{ note.lines.length === 1 ? 'artículo' : 'artículos' }} · Importes persistidos</caption>
+              <thead><tr>
+                <th scope="col">Producto</th><th scope="col">Cantidad</th><th scope="col">Precio unitario</th>
+                <th scope="col">Descuento</th><th scope="col">Importe</th>
+              </tr></thead>
+              <tbody><tr *ngFor="let line of note.lines">
+                <td><strong>{{ line.name }}</strong><small *ngIf="line.source" class="history-note">{{ line.source }}</small></td>
+                <td>{{ line.quantity }}</td><td>{{ line.price }}</td><td>{{ line.discount }}</td><td>{{ line.total }}</td>
+              </tr></tbody>
+            </table>
+          </div>
+          <dl class="note-totals">
+            <div><dt>Subtotal</dt><dd>{{ note.subtotal }}</dd></div>
+            <div><dt>Descuento</dt><dd>{{ note.discount }}</dd></div>
             <div class="grand-total"><dt>Total</dt><dd>{{ note.total }}</dd></div>
             <div *ngFor="let payment of note.payments"><dt>{{ payment.method }}</dt><dd>{{ payment.amount }}</dd></div>
-            <div><dt>Pagado</dt><dd>{{ note.paid }}</dd></div><div class="change-total"><dt>Vuelto</dt><dd>{{ note.change }}</dd></div></dl>
-          <p>{{ config.thanks }}</p>
+            <div><dt>Importe recibido</dt><dd>{{ note.paid }}</dd></div>
+            <div class="change-total"><dt>Vuelto</dt><dd>{{ note.change }}</dd></div>
+          </dl>
+          <p class="note-thanks">{{ config.thanks }}</p>
         </article>
       </details>
     </div>
