@@ -27,50 +27,54 @@ interface ReportShortcut {
         </div>
       </header>
 
-      <p class="ui-alert ui-alert--error" *ngIf="permissionMessage">
-        {{ permissionMessage }}
-      </p>
+      @if (permissionMessage) {
+        <p class="ui-alert ui-alert--error">
+          {{ permissionMessage }}
+        </p>
+      }
 
-      <section class="cards-grid" *ngIf="cards.length > 0; else emptyState">
-        <a
-          class="report-card"
-          *ngFor="let card of cards"
-          [routerLink]="card.route"
-        >
-          <p class="report-card__kicker">Reporte</p>
-          <h2>{{ card.title }}</h2>
-          <p class="report-card__description">{{ card.description }}</p>
-          <span class="ui-chip ui-chip--info report-card__chip"
-            >Abrir vista</span
-          >
-        </a>
-      </section>
-
-      <ng-template #emptyState>
+      @if (cards.length > 0) {
+        <section class="cards-grid">
+          @for (card of cards; track card.route) {
+            <a class="report-card" [routerLink]="card.route">
+              <p class="report-card__kicker">Reporte</p>
+              <h2>{{ card.title }}</h2>
+              <p class="report-card__description">{{ card.description }}</p>
+              <span class="ui-chip ui-chip--info report-card__chip"
+                >Abrir vista</span
+              >
+            </a>
+          }
+        </section>
+      } @else {
         <div class="ui-module-section">
           <p class="ui-empty-state">
             No hay reportes habilitados para tu rol en esta sesion.
           </p>
         </div>
-      </ng-template>
+      }
 
-      <section class="ui-module-section quick-guide" *ngIf="cards.length > 0">
-        <header class="ui-module-section__head">
-          <h2 class="ui-module-section__title">Guia rapida</h2>
-        </header>
-        <p class="quick-guide__text">
-          Accede a indicadores clave del MVP y consulta por filtros.
-        </p>
-      </section>
+      @if (cards.length > 0) {
+        <section class="ui-module-section quick-guide">
+          <header class="ui-module-section__head">
+            <h2 class="ui-module-section__title">Guia rapida</h2>
+          </header>
+          <p class="quick-guide__text">
+            Accede a indicadores clave del MVP y consulta por filtros.
+          </p>
+        </section>
+      }
 
-      <section class="hint-row" *ngIf="cards.length > 0">
-        <p class="hint-row__item">
-          Prioriza reportes con impacto diario: ventas, caja y comprobantes.
-        </p>
-        <p class="hint-row__item">
-          Usa filtros de fecha para reducir ruido y detectar variaciones.
-        </p>
-      </section>
+      @if (cards.length > 0) {
+        <section class="hint-row">
+          <p class="hint-row__item">
+            Prioriza reportes con impacto diario: ventas, caja y comprobantes.
+          </p>
+          <p class="hint-row__item">
+            Usa filtros de fecha para reducir ruido y detectar variaciones.
+          </p>
+        </section>
+      }
     </section>
   `,
     styles: [
