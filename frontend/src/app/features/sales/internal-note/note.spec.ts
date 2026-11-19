@@ -200,7 +200,7 @@ describe("Internal note route invalidation", () => {
   routeTest("clears a ready PDF and accessible HTML on an invalid ID in the same instance, then loads B normally", () => {
     const page = navigate("81"), oldUrl = page.session.url()!;
     expect(page.ready).toBe(true); expect(harness.routeNativeElement!.querySelector("iframe")).not.toBeNull();
-    expect(harness.routeNativeElement!.querySelector(".accessible-note")!.textContent).toContain("V-SYN-0081");
+    expect(harness.routeNativeElement!.querySelector<HTMLTextAreaElement>("#note-reference")!.value).toBe("V-SYN-0081");
     expect(navigate("0")).toBe(page); expectEmpty(page);
     expect(URL.revokeObjectURL).toHaveBeenCalledWith(oldUrl); expect(opened).not.toHaveBeenCalled();
     expect(navigate("82")).toBe(page); expect(page.ready).toBe(true); expect(page.session.note()?.id).toBe(82);
@@ -213,7 +213,13 @@ describe("Internal note route invalidation", () => {
     const src = element.querySelector<HTMLIFrameElement>("iframe")!.src;
     expect(src).toContain("#toolbar=1&navpanes=0&view=Fit");
     details.querySelector("summary")!.click(); expect(details.open).toBe(true);
-    expect(details.textContent).toContain("V-SYN-0081");
+    const reference = details.querySelector<HTMLTextAreaElement>("#note-reference")!;
+    expect(reference.value).toBe("V-SYN-0081");
+    expect(reference.readOnly).toBe(true);
+    const header = element.querySelector(".ui-page-head")!;
+    expect(header.textContent).toContain(page.session.note()!.date);
+    expect(header.textContent).toContain("Venta registrada");
+    expect(header.textContent).not.toContain(reference.value);
     page.viewerUnavailable = true; harness.detectChanges();
     expect(details.open).toBe(true); expect(element.querySelector("iframe")).toBeNull();
   });

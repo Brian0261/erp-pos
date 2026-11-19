@@ -156,7 +156,7 @@ test("uncertain result never enables document actions or issues a POST",async({p
 test("real PDF preview, A4/tickets, responsive screens, downloads and temporary print viewer",ciCase('pdf'),async({page})=>{
   const {methods,errors}=await setup(page,noteSale(),0,false,true); await page.goto("/ventas/81/nota"); await ready(page);
   await assertPresentationHtml(page);
-  await expect(page.locator('.accessible-note')).toContainText('V-SYN-0081');
+  await expect(page.getByLabel('Referencia de venta', { exact: true })).toHaveValue('V-SYN-0081');
   await expect(page.locator('.accessible-note')).toContainText('150.00');
   for(const [name,width,height] of [["02-note-desktop",1440,1000],["03-note-tablet",900,1100],["04-note-mobile",390,844]] as const) {
     await page.setViewportSize({width,height}); await page.locator('.note-page').evaluate(e=>e.scrollIntoView({block:'start'})); await page.screenshot({path:path.join(evidence,name+".png"),fullPage:width>1100});
@@ -216,6 +216,7 @@ for(const code of [401,403,404,422]) test("denied sale "+code+" exposes no PDF o
   const {methods}=await setup(page,noteSale(),code); await page.goto("/ventas/81/nota");
   await expect(page.getByRole("alert")).toBeVisible(); await expect(page.locator("iframe")).toHaveCount(0);
   await expect(page.getByRole("button",{name:"Descargar PDF",exact:true})).toBeDisabled();
+  await expect(page.getByLabel('Referencia de venta', { exact: true })).toHaveCount(0);
   await expect(page.getByText("V-SYN-0081",{exact:true})).toHaveCount(0);
   if(code===403) await page.screenshot({path:path.join(evidence,"05-permission-error.png"),fullPage:true});
   expect(methods.every(m=>m.startsWith("GET "))).toBe(true);
@@ -311,6 +312,103 @@ test('@preview-layout approved PDF remains primary with a full-width viewer and 
   }
   await openAccessible(page);
   expect(methods.every(method=>method.startsWith('GET '))).toBe(true);expect(errors).toEqual([]);
+});
+
+test('@panel-accessibility accessible note preserves the reference, amounts and keyboard access at narrow widths', async ({ page }) => {
+  const sale = noteSale(2);
+  const historicalName = 'Cuaderno de colección · ' + 'Nombre histórico largo '.repeat(6).trim();
+  sale.saleNumber = 'S-00000000-0000-4000-8000-000000000081';
+  sale.items[0].productNameSnapshot = null;
+  sale.items[0].skuSnapshot = null;
+  sale.items[0].productName = historicalName;
+  const { methods, errors } = await setup(page, sale);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/ventas/81/nota');
+  await ready(page);
+
+  const header = page.locator('.ui-page-head');
+  const panel = page.locator('.accessible-note');
+  const summary = panel.locator('summary');
+  const reference = panel.getByLabel('Referencia de venta', { exact: true });
+  const products = panel.getByRole('region', { name: '2 artículos · Importes persistidos' });
+  const accessibility = await page.context().newCDPSession(page);
+  const expandedState = async () => {
+    const { nodes } = await accessibility.send('Accessibility.getFullAXTree');
+    return nodes.filter(node => node.name?.value === 'Ver datos de la venta Alternativa accesible')
+      .flatMap(node => node.properties ?? []).find(property => property.name === 'expanded')?.value.value;
+  };
+  await expect(header).toContainText('Venta registrada');
+  await expect(header).toContainText('Lima');
+  await expect(header).not.toContainText(sale.saleNumber);
+  await summary.focus();
+  if (await panel.evaluate(node => (node as HTMLDetailsElement).open)) await page.keyboard.press('Space');
+  await expect(panel).not.toHaveAttribute('open');
+  expect(await expandedState()).toBe(false);
+  await page.keyboard.press('Enter');
+  await expect(panel).toHaveAttribute('open', '');
+  await expect(summary).toBeFocused();
+  expect(await expandedState()).toBe(true);
+  await expect(summary).toHaveCSS('outline-color', 'rgb(168, 198, 255)');
+  await expect(summary).toHaveCSS('outline-style', 'solid');
+
+  await page.keyboard.press('Tab');
+  await expect(reference).toBeFocused();
+  await expect(reference).toHaveValue(sale.saleNumber);
+  await expect(reference).toHaveJSProperty('readOnly', true);
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write'], { origin: new URL(page.url()).origin });
+  await page.keyboard.press('ControlOrMeta+A');
+  await page.keyboard.press('ControlOrMeta+C');
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(sale.saleNumber);
+
+  await page.keyboard.press('Tab');
+  await expect(products).toBeFocused();
+  await expect(products.getByRole('columnheader')).toHaveText(['Producto', 'Cantidad', 'Precio unitario', 'Descuento', 'Importe']);
+  const money = new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' });
+  const firstItem = sale.items[0];
+  const cells = products.locator('tbody tr').first().getByRole('cell');
+  await expect(cells.first()).toContainText(historicalName);
+  await expect(cells.first()).toContainText('Histórico: nombre del catálogo actual');
+  await expect(cells.nth(1)).toHaveText(firstItem.quantityText);
+  for (const [offset, amount] of [firstItem.unitPrice, firstItem.discountAmount, firstItem.lineTotal].entries()) {
+    await expect(cells.nth(offset + 2)).toHaveText(money.format(amount));
+  }
+  await expect(panel.locator('dt')).toHaveText(['Subtotal', 'Descuento', 'Total', 'Efectivo', 'Tarjeta', 'Importe recibido', 'Vuelto']);
+  await expect(panel.locator('dd')).toHaveText([
+    sale.subtotalAmount, sale.discountAmount, sale.totalAmount, ...sale.payments.map(payment => payment.amount), sale.paidAmount, sale.changeAmount,
+  ].map(amount => money.format(amount)));
+
+  for (const theme of ['light', 'dark']) {
+    await page.locator('body').evaluate((body, value) => body.setAttribute('data-theme', value), theme);
+    await expect(panel).toHaveCSS('background-color', 'rgb(23, 33, 59)');
+    await expect(panel).toHaveCSS('border-top-color', 'rgb(103, 125, 159)');
+    await expect(summary).toHaveCSS('background-color', 'rgb(32, 44, 74)');
+    await expect(summary).toHaveCSS('color', 'rgb(243, 246, 255)');
+    await expect(summary.locator('.summary-hint')).toHaveCSS('color', 'rgb(203, 213, 232)');
+    await expect(panel.locator('.registered')).toHaveCSS('color', 'rgb(169, 243, 210)');
+    await expect(panel.locator('.grand-total')).toHaveCSS('background-color', 'rgb(38, 59, 99)');
+    await expect(panel.locator('.grand-total')).toHaveCSS('border-top-color', 'rgb(168, 198, 255)');
+  }
+
+  const pageOverflow = () => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  await page.setViewportSize({ width: 320, height: 800 });
+  expect(await pageOverflow()).toBe(0);
+  expect(await reference.evaluate(node => node.scrollHeight - node.clientHeight)).toBeLessThanOrEqual(1);
+  await products.focus();
+  await page.keyboard.press('ArrowRight');
+  await expect.poll(() => products.evaluate(node => node.scrollLeft)).toBeGreaterThan(0);
+  await panel.screenshot({ path: path.join(evidence, 'accessible-note-320.png') });
+
+  await page.setViewportSize({ width: 640, height: 900 });
+  await page.locator('html').evaluate(node => node.style.fontSize = '200%');
+  expect(await pageOverflow()).toBe(0);
+  expect(await reference.evaluate(node => node.scrollHeight - node.clientHeight)).toBeLessThanOrEqual(1);
+  await page.locator('html').evaluate(node => node.style.removeProperty('font-size'));
+  await summary.focus();
+  await page.keyboard.press('Space');
+  await expect(panel).not.toHaveAttribute('open');
+  await expect(reference).toBeHidden();
+  expect(methods.every(method => method.startsWith('GET '))).toBe(true);
+  expect(errors).toEqual([]);
 });
 
 const presentationEvidence=path.join(evidence,'presentation-final');
@@ -421,7 +519,7 @@ test('@ticket-columns reference layout on both widths, long values, continuation
   expect(methods.every(method=>method.startsWith('GET '))).toBe(true);expect(errors).toEqual([]);
 });
 
-test('@regular-black all formats and annulment keep regular black text and unchanged values',async({page})=>{
+test('@regular-black dark HTML preserves the data and all printable PDF formats keep their values',async({page})=>{
   test.setTimeout(60000);
   const folder=path.join(evidence,process.env['INKTOY_NOTE_EVIDENCE_SUBDIR'] ?? 'regular-black');await mkdir(folder,{recursive:true});
   const sale=noteSale(2);sale.items[0].productNameSnapshot='Cuaderno A5 rayado';sale.items[0].quantityText='2.000';
@@ -430,17 +528,14 @@ test('@regular-black all formats and annulment keep regular black text and uncha
   const assertHtml=async():Promise<void>=>{
     await assertPresentationHtml(page);
     await expect(page.locator('.accessible-note tbody td:first-child strong')).toHaveText(sale.items.map(item=>item.productNameSnapshot ?? item.productName ?? 'Descripción no disponible'));
-    for(const theme of ['light','dark']) {
-      await page.locator('body').evaluate((element,theme)=>element.setAttribute('data-theme',theme),theme);
-      const styles=await page.locator('.accessible-note').evaluate(element=>[element,...element.querySelectorAll('*')]
-        .filter(node=>[...node.childNodes].some(child=>child.nodeType===Node.TEXT_NODE && !!child.textContent?.trim()))
-        .map(node=>({weight:getComputedStyle(node).fontWeight,color:getComputedStyle(node).color})));
-      expect(styles.length).toBeGreaterThan(10);
-      for(const style of styles)expect(style).toEqual({weight:'400',color:'rgb(0, 0, 0)'});
-      await expect(page.locator('.accessible-note')).toHaveCSS('background-color','rgb(255, 255, 255)');
-    }
+    const panel = page.locator('.accessible-note');
+    await expect(panel.getByLabel('Referencia de venta', { exact: true })).toHaveValue(sale.saleNumber);
+    const status = sale.status === 'VOIDED' ? 'ANULADA' : 'Venta registrada';
+    await expect(page.locator('.note-status strong')).toHaveText(status);
+    await expect(panel.locator('.note-meta strong')).toHaveText(status);
+    await expect(panel.locator('.grand-total dd')).toHaveText(new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' }).format(sale.totalAmount));
   };
-  await assertHtml();await page.locator('.accessible-note').screenshot({path:path.join(folder,'html-regular-black.png')});
+  await assertHtml();await page.locator('.accessible-note').screenshot({path:path.join(folder,'html-accessible-panel.png')});
   const capture=async(format:string,state:string):Promise<void>=>{
     if(format==='a4')await page.getByLabel('Formato',{exact:true}).selectOption('a4');
     else if(format==='ticket80')await page.getByLabel('Formato',{exact:true}).selectOption('ticket');
