@@ -22,12 +22,16 @@ import { ReportsService } from "./data/reports.service";
         </div>
       </header>
 
-      <p class="ui-alert ui-alert--error" *ngIf="permissionMessage">
-        {{ permissionMessage }}
-      </p>
-      <p class="ui-alert ui-alert--error" *ngIf="errorMessage">
-        {{ errorMessage }}
-      </p>
+      @if (permissionMessage) {
+        <p class="ui-alert ui-alert--error">
+          {{ permissionMessage }}
+        </p>
+      }
+      @if (errorMessage) {
+        <p class="ui-alert ui-alert--error">
+          {{ errorMessage }}
+        </p>
+      }
 
       <section class="ui-module-section">
         <header class="ui-module-section__head">
@@ -61,26 +65,28 @@ import { ReportsService } from "./data/reports.service";
         </form>
       </section>
 
-      <section class="ui-kpi-grid" *ngIf="canView">
-        <article class="ui-kpi-card">
-          <p class="ui-kpi-label">Registros encontrados</p>
-          <p class="ui-kpi-value">{{ items.length }}</p>
-        </article>
-        <article class="ui-kpi-card">
-          <p class="ui-kpi-label">Umbral aplicado</p>
-          <p class="ui-kpi-value">
-            {{
-              numberOf(filtersForm.controls.threshold.value) | number: "1.2-2"
-            }}
-          </p>
-        </article>
-        <article class="ui-kpi-card">
-          <p class="ui-kpi-label">Estado</p>
-          <p class="low-stock-state">
-            <span class="ui-chip ui-chip--warning">Alerta de reposicion</span>
-          </p>
-        </article>
-      </section>
+      @if (canView) {
+        <section class="ui-kpi-grid">
+          <article class="ui-kpi-card">
+            <p class="ui-kpi-label">Registros encontrados</p>
+            <p class="ui-kpi-value">{{ items.length }}</p>
+          </article>
+          <article class="ui-kpi-card">
+            <p class="ui-kpi-label">Umbral aplicado</p>
+            <p class="ui-kpi-value">
+              {{
+                numberOf(filtersForm.controls.threshold.value) | number: "1.2-2"
+              }}
+            </p>
+          </article>
+          <article class="ui-kpi-card">
+            <p class="ui-kpi-label">Estado</p>
+            <p class="low-stock-state">
+              <span class="ui-chip ui-chip--warning">Alerta de reposicion</span>
+            </p>
+          </article>
+        </section>
+      }
 
       <section class="ui-module-section">
         <header class="ui-module-section__head">
@@ -102,28 +108,32 @@ import { ReportsService } from "./data/reports.service";
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let row of items">
-                <td>{{ row.productName }}</td>
-                <td>{{ row.sku }}</td>
-                <td>{{ row.barcode || "-" }}</td>
-                <td>{{ row.warehouseName }} (#{{ row.warehouseId }})</td>
-                <td>
-                  <span
-                    class="ui-chip"
-                    [ngClass]="stockChipClass(row.currentStock)"
-                  >
-                    {{ numberOf(row.currentStock) | number: "1.2-2" }}
-                  </span>
-                </td>
-                <td>{{ numberOf(row.threshold) | number: "1.2-2" }}</td>
-              </tr>
-              <tr *ngIf="!loading && items.length === 0">
-                <td colspan="6" class="ui-table__empty">
-                  <div class="ui-empty-state">
-                    No hay registros para el threshold seleccionado.
-                  </div>
-                </td>
-              </tr>
+              @for (row of items; track row.productId + ':' + row.warehouseId) {
+                <tr>
+                  <td>{{ row.productName }}</td>
+                  <td>{{ row.sku }}</td>
+                  <td>{{ row.barcode || "-" }}</td>
+                  <td>{{ row.warehouseName }} (#{{ row.warehouseId }})</td>
+                  <td>
+                    <span
+                      class="ui-chip"
+                      [ngClass]="stockChipClass(row.currentStock)"
+                    >
+                      {{ numberOf(row.currentStock) | number: "1.2-2" }}
+                    </span>
+                  </td>
+                  <td>{{ numberOf(row.threshold) | number: "1.2-2" }}</td>
+                </tr>
+              }
+              @if (!loading && items.length === 0) {
+                <tr>
+                  <td colspan="6" class="ui-table__empty">
+                    <div class="ui-empty-state">
+                      No hay registros para el threshold seleccionado.
+                    </div>
+                  </td>
+                </tr>
+              }
             </tbody>
           </table>
         </div>
