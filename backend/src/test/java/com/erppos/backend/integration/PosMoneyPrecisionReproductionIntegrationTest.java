@@ -250,10 +250,19 @@ class PosMoneyPrecisionReproductionIntegrationTest extends AbstractHttpIntegrati
                 .content("{\"countedAmount\":0.001}")).andExpect(status().isUnprocessableEntity());
         assertEquals(before, snapshot(f));
         ensureNoOpenCash(f.token());
+        assertEquals(0, jdbc.queryForObject("""
+                SELECT COUNT(*) FROM cash_register_sessions
+                WHERE opened_by_user_id = (SELECT opened_by_user_id FROM cash_register_sessions WHERE id = ?)
+                  AND status = 'OPEN'
+                """, Integer.class, f.cash()), "The fixture actor must have no open session before the request");
+
+        String sessionsQuery = "SELECT * FROM cash_register_sessions ORDER BY id";
+        var sessionsBeforeOpen = jdbc.queryForList(sessionsQuery);
         mockMvc.perform(post("/api/v1/cash-registers/open").header(HttpHeaders.AUTHORIZATION, bearer(f.token()))
                 .contentType(MediaType.APPLICATION_JSON).content("{\"openingAmount\":0.001}"))
                 .andExpect(status().isUnprocessableEntity());
-        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM cash_register_sessions WHERE status = 'OPEN'", Integer.class));
+        assertEquals(sessionsBeforeOpen, jdbc.queryForList(sessionsQuery),
+                "Rejected opening must leave existing cash sessions unchanged and create none");
     }
 
     @Test
