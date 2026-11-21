@@ -6,6 +6,7 @@ import { dirname, resolve, join, sep, parse } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import policy from './safety-policy.cjs';
 import { QA_NODE_VERSION, checkRunnerToolchain, parseRunnerFlags, validPnpmIdentity } from './qa-toolchain.mjs';
+import { observeMaven } from './maven-diagnostics.mjs';
 
 const frontend=resolve(dirname(fileURLToPath(import.meta.url)),'../..');
 const root=resolve(frontend,'..');
@@ -14,6 +15,7 @@ const LABEL='inktoy.qa.run',DIAG='/api/v1/health/recovery-e2e';
 const assert=(ok,code)=>{if(!ok)throw Error(code);};
 const log=value=>console.log('[RECOVERY_QA] '+value);
 const resources=[],children=new Set();let interrupted=false,cleaning=false;
+const mavenProcesses = new WeakMap();
 export const REQUIRED_SCENARIOS=Object.freeze([
   ['pos-recovery-commercial.spec.ts','E2E 1 normal POS: preparation precedes one sale, stock/payment/cash persist'],
   ['pos-recovery-commercial.spec.ts','E2E 2 committed PREPARED response lost: no automatic checkout, same identity recovered'],
@@ -162,14 +164,27 @@ export async function readRecoveryEvidence(directory){
   assert(summary.runId===parse(dirname(directory)).base,'QA_EVIDENCE_RUN_MISMATCH');
   return {summary,progress:JSON.parse(await readFile(join(directory,'progress.json'),'utf8'))};
 }
-function command(file,args,{cwd=root,env=process.env,timeout=120000,shell=false}={}){
+function command(file,args,{cwd=root,env=process.env,timeout=120000,shell=false,mavenOperation}={}){
   if(interrupted&&!cleaning)throw Error('QA_INTERRUPTED');
   return new Promise((done,fail)=>{
-    const child=spawn(file,args,{cwd,env,shell,windowsHide:true,stdio:['ignore','pipe','pipe']});children.add(child);
-    let stdout='',stderr='';child.stdout.on('data',b=>stdout+=b);child.stderr.on('data',b=>stderr+=b);
-    const timer=setTimeout(()=>{child.kill();fail(Error('QA_COMMAND_TIMEOUT:'+file+':'+args[0]));},timeout);
+    const startChild = () => spawn(file,args,{cwd,env,shell,windowsHide:true,stdio:['ignore','pipe','pipe']});
+    const maven = mavenOperation ? observeMaven(startChild, mavenOperation, log) : null;
+    const child = maven?.child ?? startChild();
+    children.add(child);
+    let stdout='',stderr='';
+    if (maven) mavenProcesses.set(child, maven);
+    else {
+      child.stdout.on('data', b => stdout += b);
+      child.stderr.on('data', b => stderr += b);
+    }
+    const timer=setTimeout(()=>{maven?.timeout();child.kill();fail(Error('QA_COMMAND_TIMEOUT:'+file+':'+args[0]));},timeout);
     child.on('error',()=>{clearTimeout(timer);children.delete(child);fail(Error('QA_COMMAND_START_FAILED:'+file));});
-    child.on('close',code=>{clearTimeout(timer);children.delete(child);done({code,stdout,stderr});});
+    child.on('close', code => {
+      clearTimeout(timer);
+      children.delete(child);
+      mavenProcesses.delete(child);
+      done({code,stdout: maven?.version ?? stdout,stderr});
+    });
   });
 }
 async function checked(file,args,options){const r=await command(file,args,options);assert(r.code===0,'QA_TOOL_FAILED:'+file+':'+args[0]);return r.stdout.trim();}
@@ -200,7 +215,13 @@ async function main(){
   const save=()=>writeFile(manifest,sanitize(JSON.stringify(summary,null,2)),{mode:0o600});
   async function phase(name){const now=Date.now();summary.phases.push({name:summary.phase,durationMs:now-phaseStarted});
     phaseStarted=now;summary.phase=name;await save();log('PHASE '+name);}
-  const deadline=setTimeout(()=>{timedOut=true;interrupted=true;for(const c of children)c.kill();},35*60*1000);
+  const deadline=setTimeout(()=>{
+    timedOut=true;interrupted=true;
+    for(const child of children){
+      mavenProcesses.get(child)?.timeout();
+      child.kill();
+    }
+  },35*60*1000);
   const hard=['--cap-drop','ALL','--security-opt','no-new-privileges','--read-only'];
   const execNode=(id,code)=>docker(['exec',id,'node','--input-type=module','-e',code],{timeout:180000});
   async function http(id,url,options={}){return JSON.parse(await execNode(id,`const p=${JSON.stringify({url,options})};const r=await fetch(p.url,{...p.options,signal:AbortSignal.timeout(4000)});console.log(JSON.stringify({status:r.status,headers:Object.fromEntries(r.headers),body:await r.text()}));`));}
@@ -235,7 +256,8 @@ async function main(){
     summary.versions.hostPackageManager={...hostManager};
     log(`TOOLCHAIN PASS: ${process.version}; host ${hostManager.name} ${hostManager.version}`);
     summary.versions.jar=await checked('jar',['--version']);assert(/^jar 17\./.test(summary.versions.jar),'QA_JAVA_17_REQUIRED');
-    summary.versions.maven=(await checked(process.platform==='win32'?'mvnw.cmd':'./mvnw',['--version'],{cwd:join(root,'backend'),shell:process.platform==='win32'})).match(/Apache Maven [\d.]+/)?.[0];
+    summary.versions.maven=(await checked(process.platform==='win32'?'mvnw.cmd':'./mvnw',['--version'],
+      {cwd:join(root,'backend'),shell:process.platform==='win32',mavenOperation:'commercial_version'})) || undefined;
     summary.versions.docker=await docker(['version','--format','{{.Server.Version}}']);
     assert(await docker(['version','--format','{{.Server.Os}}/{{.Server.Arch}}'])==='linux/amd64','QA_DOCKER_LINUX_AMD64_REQUIRED');
     const endpoint=await docker(['context','inspect','--format','{{(index .Endpoints "docker").Host}}']);
@@ -260,7 +282,7 @@ async function main(){
     const oldJar=await stat(jarPath).catch(ex=>{if(ex.code==='ENOENT')return null;throw ex;}),buildStarted=Date.now();
     // forceCreation prevents a pre-existing (possibly repackaged) JAR becoming an input.
     await checked(process.platform==='win32'?'mvnw.cmd':'./mvnw',['-B','-DskipTests','-Dmaven.jar.forceCreation=true','package','dependency:copy-dependencies','-DincludeScope=test','-DoutputDirectory=target/e2e-deps'],
-      {cwd:join(root,'backend'),shell:process.platform==='win32',timeout:600000});
+      {cwd:join(root,'backend'),shell:process.platform==='win32',timeout:600000,mavenOperation:'commercial_package'});
     const jarInfo=await stat(jarPath);
     assert(jarInfo.isFile()&&jarInfo.mtimeMs>=buildStarted-2000&&(!oldJar||jarInfo.mtimeMs!==oldJar.mtimeMs),'QA_FRESH_JAR_REQUIRED');
     summary.backendArtifact={generatedThisRun:true,sizeBytes:jarInfo.size,sha256:createHash('sha256').update(await readFile(jarPath)).digest('hex')};

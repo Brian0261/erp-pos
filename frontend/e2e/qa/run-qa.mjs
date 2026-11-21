@@ -7,6 +7,7 @@ import { dirname, resolve, join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import policy from './safety-policy.cjs';
 import { checkRunnerToolchain, parseRunnerFlags } from './qa-toolchain.mjs';
+import { observeMaven } from './maven-diagnostics.mjs';
 const { rejectInherited, verifyIdentity, verifyResults, verifyContainer, verifyCleanup } = policy;
 
 const frontend = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -52,15 +53,23 @@ function reportResult(result, mode, failureCode) {
 function command(file, args, options = {}) {
   if (stopping && !cleaning) return Promise.reject(new Error('QA_INTERRUPTED'));
   return new Promise((resolvePromise, reject) => {
-    const child = spawn(file, args, { cwd: options.cwd ?? root, env: options.env ?? process.env,
+    const startChild = () => spawn(file, args, { cwd: options.cwd ?? root, env: options.env ?? process.env,
       shell: options.shell ?? false, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    const maven = options.mavenOperation ? observeMaven(startChild, options.mavenOperation, log) : null;
+    const child = maven?.child ?? startChild();
     activeChildren.add(child);
     let stdout = '', stderr = '';
-    child.stdout.on('data', chunk => { stdout += chunk; });
-    child.stderr.on('data', chunk => { stderr += chunk; });
-    const timer = setTimeout(() => { child.kill(); reject(new Error('QA_COMMAND_TIMEOUT')); }, options.timeout ?? 120000);
+    if (!maven) {
+      child.stdout.on('data', chunk => { stdout += chunk; });
+      child.stderr.on('data', chunk => { stderr += chunk; });
+    }
+    const timer = setTimeout(() => { maven?.timeout(); child.kill(); reject(new Error('QA_COMMAND_TIMEOUT')); }, options.timeout ?? 120000);
     child.on('error', () => { clearTimeout(timer); reject(new Error('QA_COMMAND_START_FAILED')); });
-    child.on('close', code => { activeChildren.delete(child); clearTimeout(timer); resolvePromise({ code, stdout, stderr }); });
+    child.on('close', code => {
+      activeChildren.delete(child);
+      clearTimeout(timer);
+      resolvePromise({ code, stdout: maven?.version ?? stdout, stderr });
+    });
   });
 }
 
@@ -129,7 +138,7 @@ async function main(flags) {
     const pgImage = await docker(['image', 'inspect', 'postgres:16-alpine', '--format', '{{.Id}}']);
     const javaImage = await docker(['image', 'inspect', 'eclipse-temurin:17-jdk-jammy', '--format', '{{.Id}}']);
     await checked(process.platform === 'win32' ? 'mvnw.cmd' : './mvnw', ['-B', '-DskipTests', 'package', 'dependency:copy-dependencies', '-DincludeScope=test', '-DoutputDirectory=target/e2e-deps'],
-      { cwd: join(root, 'backend'), shell: process.platform === 'win32', timeout: 600000 });
+      { cwd: join(root, 'backend'), shell: process.platform === 'win32', timeout: 600000, mavenOperation: 'auth_package' });
     const jarEntries = await checked('jar', ['tf', join(root, 'backend/target/backend-0.0.1-SNAPSHOT.jar')]);
     assert(!jarEntries.includes('/e2e/') && !jarEntries.includes('E2eQa'), 'QA_CLASSES_IN_PRODUCTION_ARTIFACT');
     for (const folder of ['classes', 'test-classes', 'e2e-deps']) await cp(join(root, 'backend/target', folder), join(temp, 'backend', folder), { recursive: true });
