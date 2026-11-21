@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 assert.ok(process.argv.length === 3 || process.argv.length === 4,
-  'Usage: node prepare.cjs <empty overlay directory> [note|checkout-money]');
+  'Usage: node prepare.cjs <empty overlay directory> [note|checkout-money|operation-recovery]');
 const source = path.resolve(__dirname, '..');
 const destination = fs.realpathSync(process.argv[2]);
 const worktrees = execFileSync('git', ['worktree', 'list', '--porcelain', '-z'], {
@@ -33,6 +33,13 @@ const batches = new Map([
       'pos-page.component.vitest.ts',
       'utils/pos-calculations.vitest.ts',
       'pos-money-precision-repro.vitest.ts',
+    ],
+    helpers: ['testing/sale-operation-double.vitest.ts'],
+  }],
+  ['operation-recovery', {
+    suites: [
+      'data/sale-operations.service.vitest.ts',
+      'components/sale-operation-recovery.component.vitest.ts',
     ],
     helpers: ['testing/sale-operation-double.vitest.ts'],
   }],
