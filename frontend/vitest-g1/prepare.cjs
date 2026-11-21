@@ -5,7 +5,8 @@ const { execFileSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 
-assert.equal(process.argv.length, 3, 'Usage: node prepare.cjs <empty overlay directory>');
+assert.ok(process.argv.length === 3 || process.argv.length === 4,
+  'Usage: node prepare.cjs <empty overlay directory> [note|checkout-money]');
 const source = path.resolve(__dirname, '..');
 const destination = fs.realpathSync(process.argv[2]);
 const worktrees = execFileSync('git', ['worktree', 'list', '--porcelain', '-z'], {
@@ -18,8 +19,28 @@ for (const record of worktrees) {
 }
 assert.equal(fs.readdirSync(destination).length, 0, 'Use an empty overlay directory');
 
-const note = 'src/app/features/sales/internal-note';
-const suites = [note + '/note.vitest.ts', note + '/note-presentation.vitest.ts'];
+const batch = process.argv[3] ?? 'note';
+const sales = 'src/app/features/sales/';
+const batches = new Map([
+  ['note', {
+    suites: ['internal-note/note.vitest.ts', 'internal-note/note-presentation.vitest.ts'],
+    helpers: [],
+  }],
+  ['checkout-money', {
+    suites: [
+      'pos-checkout-confirmation.vitest.ts',
+      'components/pos-checkout-modal.component.vitest.ts',
+      'pos-page.component.vitest.ts',
+      'utils/pos-calculations.vitest.ts',
+      'pos-money-precision-repro.vitest.ts',
+    ],
+    helpers: ['testing/sale-operation-double.vitest.ts'],
+  }],
+]);
+const selected = batches.get(batch);
+assert.ok(selected, 'Unknown Vitest batch');
+const suites = selected.suites.map(suite => sales + suite);
+const testTsConfig = 'tsconfig.vitest-' + batch + '.json';
 const readJson = name => JSON.parse(fs.readFileSync(path.join(source, name), 'utf8'));
 const writeJson = (name, content) => fs.writeFileSync(path.join(destination, name), JSON.stringify(content, null, 2) + '\n');
 const lock = fs.readFileSync(path.join(__dirname, 'pnpm-lock.yaml'), 'utf8').replaceAll('\r\n', '\n');
@@ -41,12 +62,12 @@ const angular = readJson('angular.json');
 const project = 'erp-pos-frontend';
 const targets = angular.projects[project].architect;
 targets['build-vitest-pilot'] = { ...targets.build, builder: '@angular/build:application' };
-targets['test-vitest-note'] = {
+targets['test-vitest-' + batch] = {
   builder: '@angular/build:unit-test',
   options: {
     runner: 'vitest',
     buildTarget: project + ':build-vitest-pilot:development',
-    tsConfig: 'tsconfig.vitest-note.json',
+    tsConfig: testTsConfig,
     include: suites,
     browsers: ['ChromiumHeadless'],
     watch: false,
@@ -54,11 +75,14 @@ targets['test-vitest-note'] = {
   },
 };
 writeJson('angular.json', angular);
-writeJson('tsconfig.vitest-note.json', {
+writeJson(testTsConfig, {
   extends: './tsconfig.json',
-  compilerOptions: { outDir: './out-tsc/vitest-note', types: ['vitest/globals'] },
+  compilerOptions: { outDir: './out-tsc/vitest-' + batch, types: ['vitest/globals'] },
   include: [...suites, 'src/**/*.d.ts'],
 });
 fs.copyFileSync(path.join(__dirname, 'vitest-pilot.config.mts'), path.join(destination, 'vitest-pilot.config.mts'));
-fs.mkdirSync(path.join(destination, note), { recursive: true });
-for (const suite of suites) fs.copyFileSync(path.join(source, suite), path.join(destination, suite));
+for (const file of [...suites, ...selected.helpers.map(helper => sales + helper)]) {
+  const output = path.join(destination, file);
+  fs.mkdirSync(path.dirname(output), { recursive: true });
+  fs.copyFileSync(path.join(source, file), output);
+}
