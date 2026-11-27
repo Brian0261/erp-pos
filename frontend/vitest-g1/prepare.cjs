@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 assert.ok(process.argv.length === 3 || process.argv.length === 4,
-  'Usage: node prepare.cjs <empty overlay directory> [note|checkout-money|operation-recovery|pos-state-persistence]');
+  'Usage: node prepare.cjs <empty overlay directory> [note|checkout-money|operation-recovery|pos-state-persistence|pos-durable-recovery]');
 const source = path.resolve(__dirname, '..');
 const destination = fs.realpathSync(process.argv[2]);
 const worktrees = execFileSync('git', ['worktree', 'list', '--porcelain', '-z'], {
@@ -46,6 +46,10 @@ const batches = new Map([
   ['pos-state-persistence', {
     suites: ['data/pos-state.service.vitest.ts'],
     helpers: [],
+  }],
+  ['pos-durable-recovery', {
+    suites: ['pos-durable-recovery.vitest.ts'],
+    helpers: ['testing/sale-operation-double.vitest.ts'],
   }],
 ]);
 const selected = batches.get(batch);
