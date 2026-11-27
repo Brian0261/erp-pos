@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 assert.ok(process.argv.length === 3 || process.argv.length === 4,
-  'Usage: node prepare.cjs <empty overlay directory> [note|checkout-money|operation-recovery|pos-state-persistence|pos-durable-recovery|pos-cart-revalidation|pos-complementary]');
+  'Usage: node prepare.cjs <empty overlay directory> [note|checkout-money|operation-recovery|pos-state-persistence|pos-durable-recovery|pos-cart-revalidation|pos-complementary|auth-jwt]');
 const source = path.resolve(__dirname, '..');
 const destination = fs.realpathSync(process.argv[2]);
 const worktrees = execFileSync('git', ['worktree', 'list', '--porcelain', '-z'], {
@@ -59,10 +59,15 @@ const batches = new Map([
     suites: ['pos-presentation.vitest.ts', 'data/pos.service.vitest.ts'],
     helpers: ['testing/sale-operation-double.vitest.ts'],
   }],
+  ['auth-jwt', {
+    base: 'src/app/core/',
+    suites: ['auth/auth.service.vitest.ts', 'interceptors/jwt.interceptor.vitest.ts'],
+    helpers: [],
+  }],
 ]);
 const selected = batches.get(batch);
 assert.ok(selected, 'Unknown Vitest batch');
-const suites = selected.suites.map(suite => sales + suite);
+const suites = selected.suites.map(suite => (selected.base ?? sales) + suite);
 const testTsConfig = 'tsconfig.vitest-' + batch + '.json';
 const readJson = name => JSON.parse(fs.readFileSync(path.join(source, name), 'utf8'));
 const writeJson = (name, content) => fs.writeFileSync(path.join(destination, name), JSON.stringify(content, null, 2) + '\n');
