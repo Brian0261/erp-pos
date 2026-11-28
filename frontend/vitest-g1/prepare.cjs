@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 assert.ok(process.argv.length === 3 || process.argv.length === 4,
-  'Usage: node prepare.cjs <empty overlay directory> [note|checkout-money|operation-recovery|pos-state-persistence|pos-durable-recovery|pos-cart-revalidation|pos-complementary|auth-jwt|electronic-documents-http|billing-series|sale-void|quote-conversion]');
+  'Usage: node prepare.cjs <empty overlay directory> [note|checkout-money|operation-recovery|pos-state-persistence|pos-durable-recovery|pos-cart-revalidation|pos-complementary|auth-jwt|electronic-documents-http|billing-series|sale-void|quote-conversion|sales-detail-http]');
 const source = path.resolve(__dirname, '..');
 const destination = fs.realpathSync(process.argv[2]);
 const worktrees = execFileSync('git', ['worktree', 'list', '--porcelain', '-z'], {
@@ -82,6 +82,10 @@ const batches = new Map([
     base: 'src/app/features/quotes/',
     suites: ['quote-convert-page.component.vitest.ts'],
     helpers: ['testing/sale-operation-double.vitest.ts'],
+  }],
+  ['sales-detail-http', {
+    suites: ['sale-detail-page.component.vitest.ts', 'data/sales.service.vitest.ts'],
+    helpers: [],
   }],
 ]);
 const selected = batches.get(batch);

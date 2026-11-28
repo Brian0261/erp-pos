@@ -1,0 +1,81 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { provideHttpClient, withInterceptors } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { TestBed } from '@angular/core/testing';
+import { AuthService } from '../../../core/auth/auth.service';
+import { createBoundAuthContext } from '../../../core/auth/bound-auth-context';
+import { jwtInterceptor } from '../../../core/interceptors/jwt.interceptor';
+import { SalesService } from './sales.service';
+import type { CreateSaleRequest, SalesListPage } from './sales.models';
+
+describe('SalesService optional bound HTTP context', () => {
+  let service: SalesService; let http: HttpTestingController;
+  const token = 'synthetic-service-credential';
+  const payload: CreateSaleRequest = { operationId: '00000000-0000-4000-8000-000000000001', confirmedTotal: 10,
+    warehouseId: 1, items: [{ productId: 1, quantity: 1, discountAmount: 0, confirmedUnitPrice: 10 }],
+    payments: [{ paymentMethod: 'CASH', amount: 10 }] };
+  beforeEach(() => {
+    TestBed.configureTestingModule({ providers: [provideHttpClient(withInterceptors([jwtInterceptor])), provideHttpClientTesting(),
+      { provide: AuthService, useValue: { getToken: () => token } }] });
+    service = TestBed.inject(SalesService); http = TestBed.inject(HttpTestingController);
+  });
+  afterEach(() => http.verify());
+  it('uses only v2 for the paged list and encodes literal prefixes and false presence', () => {
+    const context = createBoundAuthContext(token);
+    const receive = vi.fn<(page: SalesListPage) => void>();
+    service.listPage({ page: 2, size: 50, saleNumberPrefix: 'A%_', from: '2032-12-31',
+      status: 'VOIDED', cashRegisterSessionId: 7, createdBy: 'qa', hasElectronicDocument: false }, context).subscribe(receive);
+    const request = http.expectOne(r => r.url === '/api/v2/sales');
+    expect(request.request.method).toBe('GET');
+    expect(request.request.context).toBe(context);
+    expect(request.request.headers.get('Authorization')).toBe('Bearer ' + token);
+    expect(request.request.params.keys().sort()).toEqual([
+      'cashRegisterSessionId', 'createdBy', 'from', 'hasElectronicDocument', 'page', 'saleNumberPrefix', 'size', 'status',
+    ]);
+    expect(request.request.params.get('saleNumberPrefix')).toBe('A%_');
+    expect(request.request.params.get('hasElectronicDocument')).toBe('false');
+    const page = { items: [], page: 2, size: 50, totalItems: 0, totalPages: 0 };
+    request.flush(page);
+    expect(receive).toHaveBeenCalledTimes(1);
+    expect(receive.mock.calls[0]).toStrictEqual([page]);
+  });
+  it('rejects an envelope for a different request instead of accepting an empty array', () => {
+    const fail = vi.fn<(error: unknown) => void>();
+    service.listPage({ page: 0, size: 20 }, createBoundAuthContext(token)).subscribe({ error: fail });
+    http.expectOne(r => r.url === '/api/v2/sales').flush({ items: [], page: 1, size: 20, totalItems: 0, totalPages: 0 });
+    expect(fail).toHaveBeenCalledWith(expect.any(Error));
+  });
+  it('keeps list filters and bound authorization on a GET only', () => {
+    const context = createBoundAuthContext(token);
+    service.listItems({ status: 'VOIDED', cashRegisterSessionId: 7, createdBy: 'qa', from: '2026-10-01', to: '2026-10-31' }, context).subscribe();
+    const request = http.expectOne(r => r.url.endsWith('/sales/list-items'));
+    expect(request.request.method).toBe('GET'); expect(request.request.context).toBe(context);
+    expect(request.request.headers.get('Authorization')).toBe('Bearer ' + token);
+    expect(request.request.params.get('status')).toBe('VOIDED'); expect(request.request.params.get('cashRegisterSessionId')).toBe('7');
+    expect(request.request.params.get('createdBy')).toBe('qa'); expect(request.request.params.get('from')).toBe('2026-10-01');
+    expect(request.request.params.get('to')).toBe('2026-10-31'); request.flush([]);
+  });
+  for (const bound of [false, true]) {
+    it('preserves the sale body and existing endpoint with bound=' + bound, () => {
+      const context = bound ? createBoundAuthContext(token) : undefined;
+      service.create(payload, context).subscribe();
+      const request = http.expectOne(r => r.url.endsWith('/sales'));
+      expect(request.request.method).toBe('POST'); expect(request.request.body).toBe(payload);
+      expect(request.request.headers.get('Authorization')).toBe(`Bearer ${token}`);
+      if (context) expect(request.request.context).toBe(context);
+      expect(JSON.stringify(request.request.body)).not.toContain(token); request.flush({ id: 1 });
+    });
+  }
+  it('keeps explicit range consumers unchanged with their bound credential', () => {
+    const context=createBoundAuthContext(token);service.list({from:'2032-12-31',to:'2032-12-31'},context).subscribe();
+    const request=http.expectOne(r=>r.url.endsWith('/sales'));
+    expect(request.request.method).toBe('GET');expect(request.request.context).toBe(context);expect(request.request.params.get('from')).toBe('2032-12-31');
+    expect(request.request.headers.get('Authorization')).toBe('Bearer '+token);request.flush([]);
+  });
+  it('reads today without client dates and with bound credentials', () => {
+    const context=createBoundAuthContext(token);service.today(context).subscribe();
+    const req=http.expectOne(r=>r.url.endsWith('/sales/today'));
+    expect(req.request.method).toBe('GET');expect(req.request.params.keys()).toEqual([]);expect(req.request.context).toBe(context);
+    expect(req.request.headers.get('Authorization')).toBe('Bearer '+token);req.flush({});
+  });
+});
